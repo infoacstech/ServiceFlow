@@ -2,10 +2,13 @@
   "entities": {
     "businesses": {
       "title": "Business",
-      "description": "Business profiles and tenant details",
+      "description": "Business profiles and settings",
+      "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "name": { "type": "string" },
         "type": { "type": "string" },
+        "logo": { "type": "string" },
         "mobile": { "type": "string" },
         "whatsapp": { "type": "string" },
         "email": { "type": "string" },
@@ -20,10 +23,75 @@
         "status": { "type": "string" }
       }
     },
+    "users": {
+      "title": "User",
+      "description": "User profile records for staff, technicians, and owners",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "role": { "type": "string" },
+        "businessId": { "type": "string" },
+        "avatar": { "type": "string" },
+        "status": { "type": "string" },
+        "skillCategory": { "type": "string" }
+      }
+    },
+    "customers": {
+      "title": "Customer",
+      "description": "Customer contact and location records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "name": { "type": "string" },
+        "companyName": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "city": { "type": "string" },
+        "pincode": { "type": "string" },
+        "gstin": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "type": { "type": "string" }
+      }
+    },
+    "categories": {
+      "title": "Service Category",
+      "description": "Service categories",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "services": {
+      "title": "Service",
+      "description": "Service menu offerings and pricing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "taxPercent": { "type": "number" },
+        "estimatedMinutes": { "type": "number" },
+        "description": { "type": "string" }
+      }
+    },
     "jobs": {
       "title": "Job",
-      "description": "Field technician service jobs and assignments",
+      "description": "Field service jobs and job sheets",
+      "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "businessId": { "type": "string" },
         "jobId": { "type": "string" },
         "customerId": { "type": "string" },
@@ -34,13 +102,151 @@
         "scheduledDate": { "type": "string" },
         "scheduledTime": { "type": "string" },
         "status": { "type": "string" },
+        "estimatedAmount": { "type": "number" },
+        "notes": { "type": "string" },
+        "problemFound": { "type": "string" },
+        "solutionProvided": { "type": "string" },
+        "customerRating": { "type": "number" },
+        "customerFeedback": { "type": "string" },
         "createdAt": { "type": "string" }
+      }
+    },
+    "inventory": {
+      "title": "Inventory Item",
+      "description": "Spare parts and equipment inventory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "name": { "type": "string" },
+        "sku": { "type": "string" },
+        "category": { "type": "string" },
+        "unit": { "type": "string" },
+        "currentStock": { "type": "number" },
+        "minStockLevel": { "type": "number" },
+        "unitCost": { "type": "number" },
+        "sellingPrice": { "type": "number" }
+      }
+    },
+    "quotations": {
+      "title": "Quotation",
+      "description": "Sales estimates and quotes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "quotationNumber": { "type": "string" },
+        "customerId": { "type": "string" },
+        "date": { "type": "string" },
+        "validUntil": { "type": "string" },
+        "status": { "type": "string" },
+        "subtotal": { "type": "number" },
+        "taxTotal": { "type": "number" },
+        "discountTotal": { "type": "number" },
+        "grandTotal": { "type": "number" }
+      }
+    },
+    "invoices": {
+      "title": "Invoice",
+      "description": "Billing invoices",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "customerId": { "type": "string" },
+        "date": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "status": { "type": "string" },
+        "subtotal": { "type": "number" },
+        "taxTotal": { "type": "number" },
+        "discountTotal": { "type": "number" },
+        "grandTotal": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "balanceAmount": { "type": "number" }
+      }
+    },
+    "payments": {
+      "title": "Payment",
+      "description": "Received payments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "invoiceId": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "paymentMode": { "type": "string" },
+        "referenceNumber": { "type": "string" }
+      }
+    },
+    "contracts": {
+      "title": "Recurring Contract",
+      "description": "Annual Maintenance Contracts (AMC)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "contractNumber": { "type": "string" },
+        "customerId": { "type": "string" },
+        "title": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "billingCycle": { "type": "string" },
+        "contractAmount": { "type": "number" },
+        "status": { "type": "string" }
+      }
+    },
+    "expenses": {
+      "title": "Expense",
+      "description": "Business expenses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "paidTo": { "type": "string" },
+        "paymentMode": { "type": "string" }
+      }
+    },
+    "notifications": {
+      "title": "Notification",
+      "description": "System alerts and notifications",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "read": { "type": "boolean" },
+        "type": { "type": "string" }
+      }
+    },
+    "activities": {
+      "title": "Activity Log",
+      "description": "Activity audit log entries",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "action": { "type": "string" },
+        "entityType": { "type": "string" },
+        "entityId": { "type": "string" },
+        "description": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "userName": { "type": "string" }
       }
     },
     "manualSyncLogs": {
       "title": "Manual Sync Log",
-      "description": "Logs of technician manual and auto sync operations for transparency",
+      "description": "Logs of technician manual and auto sync operations",
+      "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "timestamp": { "type": "string" },
         "technicianName": { "type": "string" },
         "status": { "type": "string" },
@@ -49,6 +255,68 @@
         "details": { "type": "string" },
         "networkLatencyMs": { "type": "number" }
       }
+    }
+  },
+  "firestore": {
+    "businesses/{businessId}": {
+      "schema": "businesses",
+      "description": "Business profile documents"
+    },
+    "users/{userId}": {
+      "schema": "users",
+      "description": "User profile documents"
+    },
+    "customers/{customerId}": {
+      "schema": "customers",
+      "description": "Customer documents"
+    },
+    "categories/{categoryId}": {
+      "schema": "categories",
+      "description": "Service categories"
+    },
+    "services/{serviceId}": {
+      "schema": "services",
+      "description": "Service offerings"
+    },
+    "jobs/{jobId}": {
+      "schema": "jobs",
+      "description": "Job documents"
+    },
+    "inventory/{inventoryId}": {
+      "schema": "inventory",
+      "description": "Inventory documents"
+    },
+    "quotations/{quotationId}": {
+      "schema": "quotations",
+      "description": "Quotation documents"
+    },
+    "invoices/{invoiceId}": {
+      "schema": "invoices",
+      "description": "Invoice documents"
+    },
+    "payments/{paymentId}": {
+      "schema": "payments",
+      "description": "Payment documents"
+    },
+    "contracts/{contractId}": {
+      "schema": "contracts",
+      "description": "Contract documents"
+    },
+    "expenses/{expenseId}": {
+      "schema": "expenses",
+      "description": "Expense documents"
+    },
+    "notifications/{notificationId}": {
+      "schema": "notifications",
+      "description": "Notification documents"
+    },
+    "activities/{activityId}": {
+      "schema": "activities",
+      "description": "Activity log documents"
+    },
+    "manualSyncLogs/{logId}": {
+      "schema": "manualSyncLogs",
+      "description": "Manual sync log documents"
     }
   }
 }

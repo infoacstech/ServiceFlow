@@ -39,6 +39,14 @@ import {
   DEMO_ACTIVITIES,
   DEMO_PLANS,
 } from '../data/demoData';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import {
+  collection,
+  doc,
+  setDoc,
+  deleteDoc,
+  onSnapshot,
+} from 'firebase/firestore';
 
 export interface ToastMessage {
   id: string;
@@ -199,141 +207,52 @@ export const useTheme = () => {
   return context;
 };
 
-const LOCAL_STORAGE_KEY = 'serviflow_saas_v1_data';
+// Firestore helper wrappers
+const saveToFirestore = async (colName: string, id: string, data: any) => {
+  try {
+    await setDoc(doc(db, colName, id), data, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `${colName}/${id}`);
+  }
+};
+
+const deleteFromFirestore = async (colName: string, id: string) => {
+  try {
+    await deleteDoc(doc(db, colName, id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `${colName}/${id}`);
+  }
+};
 
 const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { theme, toggleTheme } = useTheme();
 
-  // Load from LocalStorage or initialize with DEMO
-  const [businesses, setBusinesses] = useState<Business[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_businesses`);
-    return saved ? JSON.parse(saved) : DEMO_BUSINESSES;
-  });
+  // State arrays populated directly via real-time Firestore onSnapshot listeners
+  const [businesses, setBusinesses] = useState<Business[]>(DEMO_BUSINESSES);
+  const [currentBusiness, setCurrentBusiness] = useState<Business>(DEMO_BUSINESSES[0]);
 
-  const [currentBusiness, setCurrentBusiness] = useState<Business>(() => businesses[0]);
+  const [users, setUsers] = useState<User[]>(DEMO_USERS);
+  const [currentUser, setCurrentUser] = useState<User>(DEMO_USERS[1]); // Rajesh (Owner)
 
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_users`);
-    return saved ? JSON.parse(saved) : DEMO_USERS;
-  });
-
-  const [currentUser, setCurrentUser] = useState<User>(() => users[1]); // Default to Rajesh (Business Owner)
-
-  const [customers, setCustomers] = useState<Customer[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_customers`);
-    return saved ? JSON.parse(saved) : DEMO_CUSTOMERS;
-  });
-
-  const [categories, setCategories] = useState<ServiceCategory[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_categories`);
-    return saved ? JSON.parse(saved) : DEMO_CATEGORIES;
-  });
-
-  const [services, setServices] = useState<Service[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_services`);
-    return saved ? JSON.parse(saved) : DEMO_SERVICES;
-  });
-
-  const [jobs, setJobs] = useState<Job[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_jobs`);
-    return saved ? JSON.parse(saved) : DEMO_JOBS;
-  });
-
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_inventory`);
-    return saved ? JSON.parse(saved) : DEMO_INVENTORY;
-  });
-
+  const [customers, setCustomers] = useState<Customer[]>(DEMO_CUSTOMERS);
+  const [categories, setCategories] = useState<ServiceCategory[]>(DEMO_CATEGORIES);
+  const [services, setServices] = useState<Service[]>(DEMO_SERVICES);
+  const [jobs, setJobs] = useState<Job[]>(DEMO_JOBS);
+  const [inventory, setInventory] = useState<InventoryItem[]>(DEMO_INVENTORY);
   const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>([]);
+  const [quotations, setQuotations] = useState<Quotation[]>(DEMO_QUOTATIONS);
+  const [invoices, setInvoices] = useState<Invoice[]>(DEMO_INVOICES);
+  const [payments, setPayments] = useState<Payment[]>(DEMO_PAYMENTS);
+  const [contracts, setContracts] = useState<RecurringContract[]>(DEMO_CONTRACTS);
+  const [expenses, setExpenses] = useState<Expense[]>(DEMO_EXPENSES);
+  const [notifications, setNotifications] = useState<Notification[]>(DEMO_NOTIFICATIONS);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(DEMO_ACTIVITIES);
 
-  const [quotations, setQuotations] = useState<Quotation[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_quotations`);
-    return saved ? JSON.parse(saved) : DEMO_QUOTATIONS;
-  });
-
-  const [invoices, setInvoices] = useState<Invoice[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_invoices`);
-    return saved ? JSON.parse(saved) : DEMO_INVOICES;
-  });
-
-  const [payments, setPayments] = useState<Payment[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_payments`);
-    return saved ? JSON.parse(saved) : DEMO_PAYMENTS;
-  });
-
-  const [contracts, setContracts] = useState<RecurringContract[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_contracts`);
-    return saved ? JSON.parse(saved) : DEMO_CONTRACTS;
-  });
-
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_expenses`);
-    return saved ? JSON.parse(saved) : DEMO_EXPENSES;
-  });
-
-  const [notifications, setNotifications] = useState<Notification[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_notifications`);
-    return saved ? JSON.parse(saved) : DEMO_NOTIFICATIONS;
-  });
-
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_activities`);
-    return saved ? JSON.parse(saved) : DEMO_ACTIVITIES;
-  });
-
-  // Offline Technician Sync States & Manual Sync Logs
+  // Offline Technician Sync States
   const [isOffline, setIsOffline] = useState<boolean>(!navigator.onLine);
   const [isSimulatedOffline, setIsSimulatedOffline] = useState<boolean>(false);
-  const [pendingSyncQueue, setPendingSyncQueue] = useState<OfflineSyncItem[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_pending_sync`);
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [manualSyncLogs, setManualSyncLogs] = useState<ManualSyncLog[]>(() => {
-    const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_sync_logs`);
-    if (saved) return JSON.parse(saved);
-    return [
-      {
-        id: 'sync-log-101',
-        timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-        technicianName: 'Suresh Kumar',
-        status: 'SUCCESS',
-        itemsProcessedCount: 3,
-        triggerType: 'MANUAL_BUTTON',
-        details: '3 job status updates and digital signatures synchronized with Cloud DB.',
-        itemsSynced: [
-          { jobId: 'JOB-1024', description: 'Updated status to Completed & Customer Signature saved', action: 'complete_job', timestamp: new Date(Date.now() - 1000 * 60 * 20).toISOString() },
-          { jobId: 'JOB-1025', description: 'Added voice note & updated problem diagnosis', action: 'update_job', timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString() },
-          { jobId: 'JOB-1026', description: 'Updated technician status to On The Way', action: 'update_job_status', timestamp: new Date(Date.now() - 1000 * 60 * 90).toISOString() },
-        ],
-        networkLatencyMs: 142,
-      },
-      {
-        id: 'sync-log-100',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-        technicianName: 'Suresh Kumar',
-        status: 'SUCCESS',
-        itemsProcessedCount: 1,
-        triggerType: 'AUTO_RECONNECT',
-        details: 'Auto-sync upon cellular network reconnection. 1 cached material record uploaded.',
-        itemsSynced: [
-          { jobId: 'JOB-1022', description: 'Recorded inventory parts used (2x 100A MCB Breaker)', action: 'update_job', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3.5).toISOString() },
-        ],
-        networkLatencyMs: 210,
-      },
-      {
-        id: 'sync-log-099',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-        technicianName: 'Rajesh Sharma',
-        status: 'NO_CHANGES',
-        itemsProcessedCount: 0,
-        triggerType: 'MANUAL_BUTTON',
-        details: 'Manual sync check executed. All local offline queues already in sync.',
-        itemsSynced: [],
-        networkLatencyMs: 88,
-      },
-    ];
-  });
+  const [pendingSyncQueue, setPendingSyncQueue] = useState<OfflineSyncItem[]>([]);
+  const [manualSyncLogs, setManualSyncLogs] = useState<ManualSyncLog[]>([]);
 
   const isActuallyOffline = isOffline || isSimulatedOffline;
 
@@ -341,42 +260,237 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // Persist state to localStorage
+  // -------------------------------------------------------------
+  // REAL-TIME FIRESTORE SUBSCRIPTIONS & AUTOMATIC SEEDING
+  // -------------------------------------------------------------
   useEffect(() => {
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_businesses`, JSON.stringify(businesses));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_users`, JSON.stringify(users));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_customers`, JSON.stringify(customers));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_categories`, JSON.stringify(categories));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_services`, JSON.stringify(services));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_jobs`, JSON.stringify(jobs));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_inventory`, JSON.stringify(inventory));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_quotations`, JSON.stringify(quotations));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_invoices`, JSON.stringify(invoices));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_payments`, JSON.stringify(payments));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_contracts`, JSON.stringify(contracts));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_expenses`, JSON.stringify(expenses));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_notifications`, JSON.stringify(notifications));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_activities`, JSON.stringify(activityLogs));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_pending_sync`, JSON.stringify(pendingSyncQueue));
-    localStorage.setItem(`${LOCAL_STORAGE_KEY}_sync_logs`, JSON.stringify(manualSyncLogs));
-  }, [
-    businesses,
-    users,
-    customers,
-    categories,
-    services,
-    jobs,
-    inventory,
-    quotations,
-    invoices,
-    payments,
-    contracts,
-    expenses,
-    notifications,
-    activityLogs,
-    pendingSyncQueue,
-    manualSyncLogs,
-  ]);
+    // 1. Businesses
+    const unsubBiz = onSnapshot(
+      collection(db, 'businesses'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_BUSINESSES.forEach((b) => saveToFirestore('businesses', b.id, b));
+        } else {
+          const items = snapshot.docs.map((d) => d.data() as Business);
+          setBusinesses(items);
+          setCurrentBusiness((prev) => items.find((b) => b.id === prev.id) || items[0] || prev);
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'businesses')
+    );
+
+    // 2. Users
+    const unsubUsers = onSnapshot(
+      collection(db, 'users'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_USERS.forEach((u) => saveToFirestore('users', u.id, u));
+        } else {
+          const items = snapshot.docs.map((d) => d.data() as User);
+          setUsers(items);
+          setCurrentUser((prev) => items.find((u) => u.id === prev.id) || items[1] || items[0] || prev);
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'users')
+    );
+
+    // 3. Customers
+    const unsubCustomers = onSnapshot(
+      collection(db, 'customers'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_CUSTOMERS.forEach((c) => saveToFirestore('customers', c.id, c));
+        } else {
+          setCustomers(snapshot.docs.map((d) => d.data() as Customer));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'customers')
+    );
+
+    // 4. Categories
+    const unsubCategories = onSnapshot(
+      collection(db, 'categories'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_CATEGORIES.forEach((cat) => saveToFirestore('categories', cat.id, cat));
+        } else {
+          setCategories(snapshot.docs.map((d) => d.data() as ServiceCategory));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'categories')
+    );
+
+    // 5. Services
+    const unsubServices = onSnapshot(
+      collection(db, 'services'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_SERVICES.forEach((s) => saveToFirestore('services', s.id, s));
+        } else {
+          setServices(snapshot.docs.map((d) => d.data() as Service));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'services')
+    );
+
+    // 6. Jobs
+    const unsubJobs = onSnapshot(
+      collection(db, 'jobs'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_JOBS.forEach((j) => saveToFirestore('jobs', j.id, j));
+        } else {
+          setJobs(snapshot.docs.map((d) => d.data() as Job));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'jobs')
+    );
+
+    // 7. Inventory
+    const unsubInventory = onSnapshot(
+      collection(db, 'inventory'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_INVENTORY.forEach((i) => saveToFirestore('inventory', i.id, i));
+        } else {
+          setInventory(snapshot.docs.map((d) => d.data() as InventoryItem));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'inventory')
+    );
+
+    // 8. Inventory Transactions
+    const unsubInvTx = onSnapshot(
+      collection(db, 'inventoryTransactions'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          setInventoryTransactions(snapshot.docs.map((d) => d.data() as InventoryTransaction));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'inventoryTransactions')
+    );
+
+    // 9. Quotations
+    const unsubQuotations = onSnapshot(
+      collection(db, 'quotations'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_QUOTATIONS.forEach((q) => saveToFirestore('quotations', q.id, q));
+        } else {
+          setQuotations(snapshot.docs.map((d) => d.data() as Quotation));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'quotations')
+    );
+
+    // 10. Invoices
+    const unsubInvoices = onSnapshot(
+      collection(db, 'invoices'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_INVOICES.forEach((inv) => saveToFirestore('invoices', inv.id, inv));
+        } else {
+          setInvoices(snapshot.docs.map((d) => d.data() as Invoice));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'invoices')
+    );
+
+    // 11. Payments
+    const unsubPayments = onSnapshot(
+      collection(db, 'payments'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_PAYMENTS.forEach((p) => saveToFirestore('payments', p.id, p));
+        } else {
+          setPayments(snapshot.docs.map((d) => d.data() as Payment));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'payments')
+    );
+
+    // 12. Contracts
+    const unsubContracts = onSnapshot(
+      collection(db, 'contracts'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_CONTRACTS.forEach((c) => saveToFirestore('contracts', c.id, c));
+        } else {
+          setContracts(snapshot.docs.map((d) => d.data() as RecurringContract));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'contracts')
+    );
+
+    // 13. Expenses
+    const unsubExpenses = onSnapshot(
+      collection(db, 'expenses'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_EXPENSES.forEach((e) => saveToFirestore('expenses', e.id, e));
+        } else {
+          setExpenses(snapshot.docs.map((d) => d.data() as Expense));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'expenses')
+    );
+
+    // 14. Notifications
+    const unsubNotifications = onSnapshot(
+      collection(db, 'notifications'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_NOTIFICATIONS.forEach((n) => saveToFirestore('notifications', n.id, n));
+        } else {
+          setNotifications(snapshot.docs.map((d) => d.data() as Notification));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'notifications')
+    );
+
+    // 15. Activity Logs
+    const unsubActivities = onSnapshot(
+      collection(db, 'activities'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_ACTIVITIES.forEach((a) => saveToFirestore('activities', a.id, a));
+        } else {
+          setActivityLogs(snapshot.docs.map((d) => d.data() as ActivityLog));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'activities')
+    );
+
+    // 16. Manual Sync Logs
+    const unsubSyncLogs = onSnapshot(
+      collection(db, 'manualSyncLogs'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          setManualSyncLogs(snapshot.docs.map((d) => d.data() as ManualSyncLog));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'manualSyncLogs')
+    );
+
+    return () => {
+      unsubBiz();
+      unsubUsers();
+      unsubCustomers();
+      unsubCategories();
+      unsubServices();
+      unsubJobs();
+      unsubInventory();
+      unsubInvTx();
+      unsubQuotations();
+      unsubInvoices();
+      unsubPayments();
+      unsubContracts();
+      unsubExpenses();
+      unsubNotifications();
+      unsubActivities();
+      unsubSyncLogs();
+    };
+  }, []);
 
   // Online / Offline Window Listener
   useEffect(() => {
@@ -449,7 +563,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         itemsSynced: [],
         networkLatencyMs: 0,
       };
-      setManualSyncLogs((prev) => [logEntry, ...prev]);
+      saveToFirestore('manualSyncLogs', logEntry.id, logEntry);
       showToast(`Device is Offline. ${pendingSyncQueue.length} update(s) remain queued in local storage.`, 'info');
       return;
     }
@@ -469,6 +583,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           item.jobId,
           `[Synced from Offline Queue]: ${item.description}`
         );
+        // Sync queued job updates directly to Firestore
+        if (item.action === 'update_job' || item.action === 'update_job_status' || item.action === 'start_job' || item.action === 'complete_job') {
+          saveToFirestore('jobs', item.jobId, item.payload);
+        }
       });
 
       const logEntry: ManualSyncLog = {
@@ -483,9 +601,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         networkLatencyMs: simulatedLatency,
       };
 
-      setManualSyncLogs((prev) => [logEntry, ...prev]);
+      saveToFirestore('manualSyncLogs', logEntry.id, logEntry);
       setPendingSyncQueue([]);
-      showToast(`Successfully synchronized ${syncedItems.length} queued update(s)!`, 'success');
+      showToast(`Successfully synchronized ${syncedItems.length} queued update(s) to Firestore!`, 'success');
     } else {
       const logEntry: ManualSyncLog = {
         id: `sync-log-${Date.now()}`,
@@ -494,13 +612,13 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         status: 'NO_CHANGES',
         itemsProcessedCount: 0,
         triggerType,
-        details: 'Manual verification completed. All technician records & local state are fully synchronized.',
+        details: 'Manual verification completed. All technician records & local state are fully synchronized with Firestore.',
         itemsSynced: [],
         networkLatencyMs: simulatedLatency,
       };
 
-      setManualSyncLogs((prev) => [logEntry, ...prev]);
-      showToast('Sync check complete! All local offline records are up-to-date.', 'info');
+      saveToFirestore('manualSyncLogs', logEntry.id, logEntry);
+      showToast('Sync check complete! All records are in sync with Firestore.', 'info');
     }
   };
 
@@ -509,10 +627,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const clearSyncLogs = () => {
+    manualSyncLogs.forEach((log) => deleteFromFirestore('manualSyncLogs', log.id));
     setManualSyncLogs([]);
     showToast('Manual sync history logs cleared.', 'info');
   };
-
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     const id = Date.now().toString() + Math.random();
@@ -523,29 +641,31 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetDemoData = () => {
-    localStorage.clear();
-    setBusinesses(DEMO_BUSINESSES);
-    setCurrentBusiness(DEMO_BUSINESSES[0]);
-    setUsers(DEMO_USERS);
-    setCurrentUser(DEMO_USERS[1]);
-    setCustomers(DEMO_CUSTOMERS);
-    setCategories(DEMO_CATEGORIES);
-    setServices(DEMO_SERVICES);
-    setJobs(DEMO_JOBS);
-    setInventory(DEMO_INVENTORY);
-    setQuotations(DEMO_QUOTATIONS);
-    setInvoices(DEMO_INVOICES);
-    setPayments(DEMO_PAYMENTS);
-    setContracts(DEMO_CONTRACTS);
-    setExpenses(DEMO_EXPENSES);
-    setNotifications(DEMO_NOTIFICATIONS);
-    setActivityLogs(DEMO_ACTIVITIES);
-    showToast('Reset data to initial demo state', 'success');
+    DEMO_BUSINESSES.forEach((b) => saveToFirestore('businesses', b.id, b));
+    DEMO_USERS.forEach((u) => saveToFirestore('users', u.id, u));
+    DEMO_CUSTOMERS.forEach((c) => saveToFirestore('customers', c.id, c));
+    DEMO_CATEGORIES.forEach((cat) => saveToFirestore('categories', cat.id, cat));
+    DEMO_SERVICES.forEach((s) => saveToFirestore('services', s.id, s));
+    DEMO_JOBS.forEach((j) => saveToFirestore('jobs', j.id, j));
+    DEMO_INVENTORY.forEach((i) => saveToFirestore('inventory', i.id, i));
+    DEMO_QUOTATIONS.forEach((q) => saveToFirestore('quotations', q.id, q));
+    DEMO_INVOICES.forEach((inv) => saveToFirestore('invoices', inv.id, inv));
+    DEMO_PAYMENTS.forEach((p) => saveToFirestore('payments', p.id, p));
+    DEMO_CONTRACTS.forEach((ct) => saveToFirestore('contracts', ct.id, ct));
+    DEMO_EXPENSES.forEach((e) => saveToFirestore('expenses', e.id, e));
+    DEMO_NOTIFICATIONS.forEach((n) => saveToFirestore('notifications', n.id, n));
+    DEMO_ACTIVITIES.forEach((a) => saveToFirestore('activities', a.id, a));
+    showToast('Reset data to initial state & synced to Firestore', 'success');
   };
 
-  const logActivity = (action: string, entityType: ActivityLog['entityType'], entityId: string, description: string) => {
+  const logActivity = (
+    action: string,
+    entityType: ActivityLog['entityType'],
+    entityId: string,
+    description: string
+  ) => {
     const newLog: ActivityLog = {
-      id: `act-${Date.now()}`,
+      id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
       businessId: currentBusiness.id,
       action,
       entityType,
@@ -554,7 +674,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       timestamp: new Date().toISOString(),
       userName: currentUser.name,
     };
-    setActivityLogs((prev) => [newLog, ...prev]);
+    saveToFirestore('activities', newLog.id, newLog);
   };
 
   // Switch role helper for live demo toggling
@@ -565,16 +685,16 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         name: 'SaaS Platform Admin',
         email: 'admin@serviflow.io',
         phone: '+91 90000 00000',
-        role: 'super_admin',
+        role: 'super_admin' as const,
         businessId: 'all',
-        status: 'active',
+        status: 'active' as const,
       };
       setCurrentUser(adminUser);
+      saveToFirestore('users', adminUser.id, adminUser);
       showToast('Switched to Super Admin Role', 'info');
       return;
     }
 
-    // Find first user with target role in current business or create mock
     let target = users.find((u) => u.businessId === currentBusiness.id && u.role === role);
     if (!target) {
       target = {
@@ -586,7 +706,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         businessId: currentBusiness.id,
         status: 'active',
       };
-      setUsers((prev) => [...prev, target!]);
+      saveToFirestore('users', target.id, target);
     }
     setCurrentUser(target);
     showToast(`Switched active role to: ${role.replace('_', ' ').toUpperCase()}`, 'info');
@@ -597,7 +717,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const target = businesses.find((b) => b.id === bId);
     if (target) {
       setCurrentBusiness(target);
-      // Auto assign user context to owner or tech of that business
       const bUser = users.find((u) => u.businessId === bId && u.role === 'business_owner') || {
         id: `usr-owner-${bId}`,
         name: `${target.name} Owner`,
@@ -662,14 +781,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       description: 'Standard diagnostic and site inspection service',
     };
 
-    setBusinesses((prev) => [newBiz, ...prev]);
-    setUsers((prev) => [...prev, ownerUser]);
-    setCategories((prev) => [...prev, defaultCategory]);
-    setServices((prev) => [...prev, defaultService]);
+    saveToFirestore('businesses', newBiz.id, newBiz);
+    saveToFirestore('users', ownerUser.id, ownerUser);
+    saveToFirestore('categories', defaultCategory.id, defaultCategory);
+    saveToFirestore('services', defaultService.id, defaultService);
 
     setCurrentBusiness(newBiz);
     setCurrentUser(ownerUser);
-    showToast(`Welcome! Business "${newBiz.name}" onboarded successfully.`, 'success');
+    showToast(`Welcome! Business "${newBiz.name}" onboarded and synced to Firestore.`, 'success');
     return newBiz;
   };
 
@@ -696,19 +815,19 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       businessId: currentBusiness.id,
       createdAt: new Date().toISOString().split('T')[0],
     };
-    setCustomers((prev) => [newCust, ...prev]);
+    saveToFirestore('customers', newCust.id, newCust);
     logActivity('Customer Created', 'customer', newCust.id, `Created customer record for ${newCust.name}`);
     showToast(`Added customer: ${newCust.name}`, 'success');
     return newCust;
   };
 
   const updateCustomer = (id: string, updates: Partial<Customer>) => {
-    setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
-    showToast('Customer information updated', 'success');
+    saveToFirestore('customers', id, updates);
+    showToast('Customer information updated & synced', 'success');
   };
 
   const deleteCustomer = (id: string) => {
-    setCustomers((prev) => prev.filter((c) => c.id !== id));
+    deleteFromFirestore('customers', id);
     showToast('Customer deleted', 'info');
   };
 
@@ -720,7 +839,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       name,
       description,
     };
-    setCategories((prev) => [...prev, newCat]);
+    saveToFirestore('categories', newCat.id, newCat);
     showToast(`Added category: ${name}`, 'success');
     return newCat;
   };
@@ -731,17 +850,17 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `srv-${Date.now()}`,
       businessId: currentBusiness.id,
     };
-    setServices((prev) => [...prev, newSrv]);
+    saveToFirestore('services', newSrv.id, newSrv);
     showToast(`Service "${newSrv.name}" created`, 'success');
   };
 
   const updateService = (id: string, updates: Partial<Service>) => {
-    setServices((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)));
+    saveToFirestore('services', id, updates);
     showToast('Service details updated', 'success');
   };
 
   const deleteService = (id: string) => {
-    setServices((prev) => prev.filter((s) => s.id !== id));
+    deleteFromFirestore('services', id);
     showToast('Service removed', 'info');
   };
 
@@ -756,56 +875,50 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       jobId,
       createdAt: new Date().toISOString().split('T')[0],
     };
-    setJobs((prev) => [newJob, ...prev]);
+    saveToFirestore('jobs', newJob.id, newJob);
     logActivity('Job Created', 'job', newJob.id, `Created job ${jobId}`);
     showToast(`Job ${jobId} created successfully!`, 'success');
     return newJob;
   };
 
   const updateJob = (id: string, updates: Partial<Job>) => {
-    setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...updates } : j)));
     if (isActuallyOffline) {
       addToSyncQueue('update_job', id, updates, 'Updated job schedule/assignment');
       showToast('Offline Mode: Saved locally and queued for sync.', 'info');
     } else {
+      saveToFirestore('jobs', id, updates);
       logActivity('Job Updated', 'job', id, 'Updated job assignment and schedule');
-      showToast('Job updated successfully', 'success');
+      showToast('Job updated & synced to Firestore', 'success');
     }
   };
 
   const updateJobStatus = (id: string, status: JobStatus) => {
-    setJobs((prev) =>
-      prev.map((j) => (j.id === id ? { ...j, status } : j))
-    );
     if (isActuallyOffline) {
       addToSyncQueue('update_job_status', id, { status }, `Job status changed to ${status.replace('_', ' ')}`);
       showToast(`Offline Mode: Status updated to ${status.replace('_', ' ')} (queued)`, 'info');
     } else {
+      saveToFirestore('jobs', id, { status });
       logActivity('Job Status Updated', 'job', id, `Changed job status to ${status.replace('_', ' ').toUpperCase()}`);
       showToast(`Job status updated to ${status.replace('_', ' ')}`, 'info');
     }
   };
 
   const startJob = (id: string, beforePhotos: string[], notes?: string) => {
-    setJobs((prev) =>
-      prev.map((j) =>
-        j.id === id
-          ? {
-              ...j,
-              status: 'started',
-              beforePhotos: beforePhotos.length > 0 ? beforePhotos : j.beforePhotos,
-              startTime: new Date().toISOString(),
-              notes: notes ? `${j.notes || ''}\nStart Notes: ${notes}` : j.notes,
-            }
-          : j
-      )
-    );
+    const existingJob = jobs.find((j) => j.id === id);
+    const startUpdates = {
+      status: 'started' as const,
+      beforePhotos: beforePhotos.length > 0 ? beforePhotos : (existingJob?.beforePhotos || []),
+      startTime: new Date().toISOString(),
+      notes: notes ? `${existingJob?.notes || ''}\nStart Notes: ${notes}` : (existingJob?.notes || ''),
+    };
+
     if (isActuallyOffline) {
       addToSyncQueue('start_job', id, { beforePhotos, notes }, 'Technician started job work on site');
       showToast('Offline Mode: Job start logged locally & queued for sync.', 'info');
     } else {
+      saveToFirestore('jobs', id, startUpdates);
       logActivity('Job Work Started', 'job', id, 'Technician initiated work on site');
-      showToast('Job work started!', 'success');
+      showToast('Job work started & synced!', 'success');
     }
   };
 
@@ -821,44 +934,35 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       materialsUsed?: JobMaterialUsed[];
     }
   ) => {
-    // Reduce stock for materials used
     if (data.materialsUsed && data.materialsUsed.length > 0) {
-      setInventory((prev) =>
-        prev.map((item) => {
-          const used = data.materialsUsed?.find((m) => m.inventoryItemId === item.id);
-          if (used) {
-            const newStock = Math.max(0, item.currentStock - used.quantity);
-            return { ...item, currentStock: newStock };
-          }
-          return item;
-        })
-      );
+      data.materialsUsed.forEach((used) => {
+        const item = inventory.find((i) => i.id === used.inventoryItemId);
+        if (item) {
+          const newStock = Math.max(0, item.currentStock - used.quantity);
+          saveToFirestore('inventory', item.id, { currentStock: newStock });
+        }
+      });
     }
 
-    setJobs((prev) =>
-      prev.map((j) =>
-        j.id === id
-          ? {
-              ...j,
-              status: 'completed',
-              completionTime: new Date().toISOString(),
-              problemFound: data.problemFound,
-              solutionProvided: data.solutionProvided,
-              afterPhotos: data.afterPhotos,
-              customerSignature: data.customerSignature,
-              customerRating: data.customerRating || 5,
-              customerFeedback: data.customerFeedback,
-              materialsUsed: data.materialsUsed,
-            }
-          : j
-      )
-    );
+    const completionData = {
+      status: 'completed' as const,
+      completionTime: new Date().toISOString(),
+      problemFound: data.problemFound,
+      solutionProvided: data.solutionProvided,
+      afterPhotos: data.afterPhotos,
+      customerSignature: data.customerSignature || '',
+      customerRating: data.customerRating || 5,
+      customerFeedback: data.customerFeedback || '',
+      materialsUsed: data.materialsUsed || [],
+    };
+
     if (isActuallyOffline) {
       addToSyncQueue('complete_job', id, data, 'Technician completed job & recorded customer report/signature');
       showToast('Offline Mode: Job report saved locally & queued for sync!', 'success');
     } else {
+      saveToFirestore('jobs', id, completionData);
       logActivity('Job Completed', 'job', id, 'Technician completed job work & obtained customer signature');
-      showToast('Job marked as completed & Service Report generated!', 'success');
+      showToast('Job marked as completed & synced to Firestore!', 'success');
     }
   };
 
@@ -869,7 +973,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `inv-${Date.now()}`,
       businessId: currentBusiness.id,
     };
-    setInventory((prev) => [...prev, newItem]);
+    saveToFirestore('inventory', newItem.id, newItem);
     showToast(`Added inventory item: ${newItem.name}`, 'success');
   };
 
@@ -879,16 +983,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     type: 'stock_in' | 'stock_out' | 'adjustment',
     notes?: string
   ) => {
-    setInventory((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const diff = type === 'stock_out' ? -qty : qty;
-          const newStock = Math.max(0, item.currentStock + diff);
-          return { ...item, currentStock: newStock };
-        }
-        return item;
-      })
-    );
+    const item = inventory.find((i) => i.id === id);
+    if (item) {
+      const diff = type === 'stock_out' ? -qty : qty;
+      const newStock = Math.max(0, item.currentStock + diff);
+      saveToFirestore('inventory', id, { currentStock: newStock });
+    }
     const newTx: InventoryTransaction = {
       id: `tx-${Date.now()}`,
       businessId: currentBusiness.id,
@@ -899,7 +999,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       date: new Date().toISOString().split('T')[0],
       createdBy: currentUser.name,
     };
-    setInventoryTransactions((prev) => [newTx, ...prev]);
+    saveToFirestore('inventoryTransactions', newTx.id, newTx);
     showToast(`Inventory stock adjusted (${type.replace('_', ' ')})`, 'success');
   };
 
@@ -912,14 +1012,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       businessId: currentBusiness.id,
       quotationNumber: num,
     };
-    setQuotations((prev) => [newQt, ...prev]);
+    saveToFirestore('quotations', newQt.id, newQt);
     logActivity('Quotation Created', 'quotation', newQt.id, `Created quotation ${num}`);
     showToast(`Quotation ${num} created`, 'success');
     return newQt;
   };
 
   const updateQuotationStatus = (id: string, status: Quotation['status']) => {
-    setQuotations((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
+    saveToFirestore('quotations', id, { status });
     showToast(`Quotation status changed to ${status}`, 'info');
   };
 
@@ -947,8 +1047,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       notes: `Converted from Quotation ${qt.quotationNumber}. ${qt.notes || ''}`,
     };
 
-    setInvoices((prev) => [newInv, ...prev]);
-    setQuotations((prev) => prev.map((q) => (q.id === quotationId ? { ...q, status: 'approved' } : q)));
+    saveToFirestore('invoices', newInv.id, newInv);
+    saveToFirestore('quotations', quotationId, { status: 'approved' });
     logActivity('Converted Quote to Invoice', 'invoice', newInv.id, `Generated invoice ${invNum} from quote ${qt.quotationNumber}`);
     showToast(`Invoice ${invNum} created from Quotation ${qt.quotationNumber}!`, 'success');
     return newInv;
@@ -963,7 +1063,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       businessId: currentBusiness.id,
       invoiceNumber: num,
     };
-    setInvoices((prev) => [newInv, ...prev]);
+    saveToFirestore('invoices', newInv.id, newInv);
     logActivity('Invoice Created', 'invoice', newInv.id, `Created invoice ${num}`);
     showToast(`Invoice ${num} generated`, 'success');
     return newInv;
@@ -976,26 +1076,20 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       businessId: currentBusiness.id,
     };
 
-    setPayments((prev) => [newPmt, ...prev]);
+    saveToFirestore('payments', newPmt.id, newPmt);
 
-    // Update Invoice balances
-    setInvoices((prev) =>
-      prev.map((inv) => {
-        if (inv.id === data.invoiceId) {
-          const newPaid = inv.paidAmount + data.amount;
-          const newBalance = Math.max(0, inv.grandTotal - newPaid);
-          const newStatus: Invoice['status'] =
-            newBalance <= 0 ? 'paid' : newPaid > 0 ? 'partial' : 'pending';
-          return {
-            ...inv,
-            paidAmount: newPaid,
-            balanceAmount: newBalance,
-            status: newStatus,
-          };
-        }
-        return inv;
-      })
-    );
+    const inv = invoices.find((i) => i.id === data.invoiceId);
+    if (inv) {
+      const newPaid = inv.paidAmount + data.amount;
+      const newBalance = Math.max(0, inv.grandTotal - newPaid);
+      const newStatus: Invoice['status'] =
+        newBalance <= 0 ? 'paid' : newPaid > 0 ? 'partial' : 'pending';
+      saveToFirestore('invoices', inv.id, {
+        paidAmount: newPaid,
+        balanceAmount: newBalance,
+        status: newStatus,
+      });
+    }
 
     logActivity('Payment Recorded', 'payment', newPmt.id, `Recorded payment of ${currentBusiness.currency}${data.amount}`);
     showToast(`Payment of ${currentBusiness.currency}${data.amount} recorded!`, 'success');
@@ -1011,7 +1105,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       businessId: currentBusiness.id,
       contractNumber: num,
     };
-    setContracts((prev) => [newContract, ...prev]);
+    saveToFirestore('contracts', newContract.id, newContract);
     logActivity('Service Contract Created', 'contract', newContract.id, `Created contract ${num}`);
     showToast(`Service contract ${num} registered`, 'success');
     return newContract;
@@ -1024,7 +1118,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `exp-${Date.now()}`,
       businessId: currentBusiness.id,
     };
-    setExpenses((prev) => [newExp, ...prev]);
+    saveToFirestore('expenses', newExp.id, newExp);
     showToast(`Recorded expense: ${currentBusiness.currency}${newExp.amount}`, 'success');
   };
 
@@ -1035,7 +1129,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `usr-${Date.now()}`,
       businessId: currentBusiness.id,
     };
-    setUsers((prev) => [...prev, newStaff]);
+    saveToFirestore('users', newStaff.id, newStaff);
     showToast(`Staff member "${newStaff.name}" added`, 'success');
     return newStaff;
   };
@@ -1043,12 +1137,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateBusinessSettings = (updates: Partial<Business>) => {
     const updated = { ...currentBusiness, ...updates };
     setCurrentBusiness(updated);
-    setBusinesses((prev) => prev.map((b) => (b.id === currentBusiness.id ? updated : b)));
-    showToast('Business settings updated', 'success');
+    saveToFirestore('businesses', currentBusiness.id, updates);
+    showToast('Business profile & settings updated and synced to Firestore', 'success');
   };
 
   const markNotificationRead = (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    saveToFirestore('notifications', id, { read: true });
   };
 
   return (
