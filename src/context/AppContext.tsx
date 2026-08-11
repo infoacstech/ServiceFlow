@@ -87,6 +87,8 @@ interface AppContextType {
   setIsSearchOpen: (v: boolean) => void;
   isActivityLogOpen: boolean;
   setIsActivityLogOpen: (v: boolean) => void;
+  isAuthModalOpen: boolean;
+  setIsAuthModalOpen: (v: boolean) => void;
   toasts: ToastMessage[];
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   resetDemoData: () => void;
@@ -258,6 +260,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   // -------------------------------------------------------------
@@ -1177,6 +1180,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsSearchOpen,
         isActivityLogOpen,
         setIsActivityLogOpen,
+        isAuthModalOpen,
+        setIsAuthModalOpen,
         toasts,
         showToast,
         resetDemoData,

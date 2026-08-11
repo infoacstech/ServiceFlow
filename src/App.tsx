@@ -8,6 +8,7 @@ import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { ToastContainer } from './components/ToastContainer';
 import { ActivityLogDrawer } from './components/ActivityLogDrawer';
 import { OfflineSyncBanner } from './components/OfflineSyncBanner';
+import { AuthModal } from './components/AuthModal';
 
 import { DashboardView } from './views/DashboardView';
 import { CustomersView } from './views/CustomersView';
@@ -29,7 +30,7 @@ import { SettingsView } from './views/SettingsView';
 import { NotificationsView } from './views/NotificationsView';
 
 const MainContent: React.FC = () => {
-  const { currentUser } = useApp();
+  const { currentUser, isAuthModalOpen, setIsAuthModalOpen } = useApp();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isCreateJobOpen, setIsCreateJobOpen] = useState(false);
@@ -129,6 +130,10 @@ const MainContent: React.FC = () => {
       <MobileNav activeTab={activeTab} setActiveTab={setActiveTab} />
 
       {/* Global Modals & Toasts */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
       <OnboardingModal
         isOpen={isOnboardingOpen}
         onClose={() => setIsOnboardingOpen(false)}
