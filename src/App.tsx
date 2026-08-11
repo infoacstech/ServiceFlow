@@ -28,6 +28,7 @@ import { CustomerPortalView } from './views/CustomerPortalView';
 import { SuperAdminView } from './views/SuperAdminView';
 import { SettingsView } from './views/SettingsView';
 import { NotificationsView } from './views/NotificationsView';
+import { LoginView } from './views/LoginView';
 
 const MainContent: React.FC = () => {
   const { currentUser, isAuthModalOpen, setIsAuthModalOpen } = useApp();
@@ -122,6 +123,10 @@ const MainContent: React.FC = () => {
             {activeTab === 'settings' && <SettingsView />}
 
             {activeTab === 'notifications' && <NotificationsView />}
+
+            {activeTab === 'login' && (
+              <LoginView onLoginSuccess={() => setActiveTab(isTech ? 'jobs' : 'dashboard')} />
+            )}
           </div>
         </main>
       </div>

@@ -19,6 +19,7 @@ import {
   Sparkles,
   Settings,
   ShieldCheck,
+  KeyRound,
 } from 'lucide-react';
 
 interface MobileNavProps {
@@ -63,6 +64,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
     { id: 'notifications', label: 'Notifications', icon: Bell, roles: ['business_owner', 'manager', 'technician'] },
     { id: 'ai_assistant', label: 'AI Business Assistant', icon: Sparkles, roles: ['business_owner', 'manager'] },
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['business_owner', 'manager'] },
+    { id: 'login', label: 'Login Panel & Switch', icon: KeyRound, roles: ['business_owner', 'manager', 'technician', 'super_admin'] },
   ];
 
   if (isSuperAdmin) {

@@ -18,6 +18,8 @@ import {
   Settings,
   ShieldCheck,
   Globe,
+  KeyRound,
+  LogOut,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -48,6 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
     { id: 'ai_assistant', label: 'AI Business Assistant', icon: Sparkles, roles: ['business_owner', 'manager'] },
     { id: 'customer_portal', label: 'Customer Portal', icon: Globe, roles: ['business_owner', 'manager'] },
     { id: 'settings', label: 'Business Settings', icon: Settings, roles: ['business_owner', 'manager'] },
+    { id: 'login', label: 'Login Panel & Switch', icon: KeyRound, roles: ['business_owner', 'manager', 'technician', 'super_admin'] },
   ];
 
   if (isSuperAdmin) {

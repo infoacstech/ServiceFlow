@@ -314,12 +314,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                 <button
                   onClick={() => {
-                    setIsAuthModalOpen(true);
+                    setActiveTab('login');
                     closeAllMenus();
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 my-1"
                 >
-                  <Smartphone className="w-3.5 h-3.5" /> Mobile / Email Login
+                  <Smartphone className="w-3.5 h-3.5" /> Login Panel & Switch User
                 </button>
 
                 <button
