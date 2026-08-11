@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "businesses": {
+      "title": "Business",
+      "description": "Business profiles and tenant details",
+      "properties": {
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "mobile": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "pin": { "type": "string" },
+        "gstNumber": { "type": "string" },
+        "currency": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "planId": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "jobs": {
+      "title": "Job",
+      "description": "Field technician service jobs and assignments",
+      "properties": {
+        "businessId": { "type": "string" },
+        "jobId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "description": { "type": "string" },
+        "priority": { "type": "string" },
+        "assignedStaffId": { "type": "string" },
+        "scheduledDate": { "type": "string" },
+        "scheduledTime": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "manualSyncLogs": {
+      "title": "Manual Sync Log",
+      "description": "Logs of technician manual and auto sync operations for transparency",
+      "properties": {
+        "timestamp": { "type": "string" },
+        "technicianName": { "type": "string" },
+        "status": { "type": "string" },
+        "itemsProcessedCount": { "type": "number" },
+        "triggerType": { "type": "string" },
+        "details": { "type": "string" },
+        "networkLatencyMs": { "type": "number" }
+      }
+    }
+  }
+}
