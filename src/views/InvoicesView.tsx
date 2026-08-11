@@ -91,8 +91,8 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
     setIsCreateInvoiceOpen(false);
   };
 
-  const filtered = invoices.filter((inv) => {
-    const cust = customers.find((c) => c.id === inv.customerId);
+  const filtered = (invoices || []).filter((inv) => {
+    const cust = (customers || []).find((c) => c.id === inv.customerId);
     const matchesSearch =
       inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
       cust?.name.toLowerCase().includes(search.toLowerCase());
@@ -173,8 +173,8 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filtered.map((inv) => {
-                const customer = customers.find((c) => c.id === inv.customerId);
+              {(filtered || []).map((inv) => {
+                const customer = (customers || []).find((c) => c.id === inv.customerId);
 
                 return (
                   <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
@@ -325,7 +325,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
               <div>
                 <div className="font-bold text-slate-400 uppercase text-[10px]">Billed To:</div>
                 <div className="font-bold text-slate-900 dark:text-slate-100">
-                  {customers.find((c) => c.id === selectedInvoice.customerId)?.name}
+                  {(customers || []).find((c) => c.id === selectedInvoice.customerId)?.name}
                 </div>
               </div>
 

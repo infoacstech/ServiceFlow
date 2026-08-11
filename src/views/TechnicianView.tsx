@@ -36,7 +36,7 @@ export const TechnicianView: React.FC = () => {
   } = useApp();
 
   // Filter jobs assigned to this technician or all jobs if testing
-  const techJobs = jobs.filter((j) => j.assignedStaffId === currentUser.id || currentUser.role !== 'technician');
+  const techJobs = (jobs || []).filter((j) => j.assignedStaffId === currentUser?.id || currentUser?.role !== 'technician');
   const activeJob = techJobs.find((j) => j.status !== 'completed' && j.status !== 'closed') || techJobs[0];
 
   const [selectedJob, setSelectedJob] = useState<Job | null>(activeJob || null);
@@ -67,7 +67,7 @@ export const TechnicianView: React.FC = () => {
     );
   }
 
-  const customer = customers.find((c) => c.id === selectedJob.customerId);
+  const customer = (customers || []).find((c) => c.id === selectedJob.customerId);
 
   const handleStatusChange = (newStatus: JobStatus) => {
     updateJobStatus(selectedJob.id, newStatus);
@@ -276,7 +276,7 @@ export const TechnicianView: React.FC = () => {
                   <div className="p-3 bg-indigo-50 rounded-xl space-y-1">
                     <div className="font-bold text-indigo-900">Items to deduct from inventory:</div>
                     {selectedMaterials.map((m) => {
-                      const invItem = inventory.find((i) => i.id === m.inventoryId);
+                      const invItem = (inventory || []).find((i) => i.id === m.inventoryId);
                       return (
                         <div key={m.inventoryId} className="flex justify-between text-indigo-700">
                           <span>{invItem?.name}</span>

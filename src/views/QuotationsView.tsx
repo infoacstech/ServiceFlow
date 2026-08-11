@@ -85,8 +85,8 @@ export const QuotationsView: React.FC = () => {
     setIsCreateOpen(false);
   };
 
-  const filtered = quotations.filter((q) => {
-    const cust = customers.find((c) => c.id === q.customerId);
+  const filtered = (quotations || []).filter((q) => {
+    const cust = (customers || []).find((c) => c.id === q.customerId);
     return (
       q.quotationNumber.toLowerCase().includes(search.toLowerCase()) ||
       cust?.name.toLowerCase().includes(search.toLowerCase())
@@ -140,8 +140,8 @@ export const QuotationsView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filtered.map((qt) => {
-                const customer = customers.find((c) => c.id === qt.customerId);
+              {(filtered || []).map((qt) => {
+                const customer = (customers || []).find((c) => c.id === qt.customerId);
 
                 return (
                   <tr key={qt.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
@@ -209,7 +209,7 @@ export const QuotationsView: React.FC = () => {
               <div>
                 <div className="font-bold text-slate-400 uppercase text-[10px]">Prepared For:</div>
                 <div className="font-bold text-slate-900 dark:text-slate-100">
-                  {customers.find((c) => c.id === selectedQuotation.customerId)?.name}
+                  {(customers || []).find((c) => c.id === selectedQuotation.customerId)?.name}
                 </div>
               </div>
 

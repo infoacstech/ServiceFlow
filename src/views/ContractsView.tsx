@@ -15,7 +15,7 @@ export const ContractsView: React.FC = () => {
       assignedStaffId: 'user-tech-1',
       scheduledDate: new Date().toISOString().split('T')[0],
       scheduledTime: '11:00 AM',
-      location: customers.find((cust) => cust.id === c.customerId)?.address || 'Site Location',
+      location: (customers || []).find((cust) => cust.id === c.customerId)?.address || 'Site Location',
       estimatedAmount: 0,
       status: 'assigned',
     });
@@ -36,8 +36,8 @@ export const ContractsView: React.FC = () => {
 
       {/* Contracts Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {contracts.map((contract) => {
-          const customer = customers.find((c) => c.id === contract.customerId);
+        {(contracts || []).map((contract) => {
+          const customer = (customers || []).find((c) => c.id === contract.customerId);
           const percentUsed = (contract.visitsUsed / contract.visitsAllowed) * 100;
 
           return (

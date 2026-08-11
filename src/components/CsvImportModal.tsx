@@ -116,7 +116,7 @@ export function CsvImportModal<T>({
       const fieldKeyLower = field.fieldKey.toLowerCase();
       const fieldLabelLower = field.fieldLabel.toLowerCase();
 
-      const matchedHeader = headers.find((h) => {
+      const matchedHeader = (headers || []).find((h) => {
         const hLower = h.toLowerCase().replace(/[^a-z0-9]/g, '');
         return (
           hLower === fieldKeyLower.replace(/[^a-z0-9]/g, '') ||

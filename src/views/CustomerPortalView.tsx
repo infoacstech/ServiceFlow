@@ -5,11 +5,11 @@ import { Globe, Briefcase, Receipt, Repeat, Plus, CheckCircle2, Clock, MapPin } 
 export const CustomerPortalView: React.FC = () => {
   const { customers, jobs, invoices, contracts, addJob, currentBusiness } = useApp();
 
-  const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
+  const [selectedCustomerId, setSelectedCustomerId] = useState(customers?.[0]?.id || '');
   const [isBookModalOpen, setIsBookModalOpen] = useState(false);
   const [serviceNotes, setServiceNotes] = useState('Camera display flickering in main hall.');
 
-  const customer = customers.find((c) => c.id === selectedCustomerId) || customers[0];
+  const customer = (customers || []).find((c) => c.id === selectedCustomerId) || customers?.[0];
   const customerJobs = jobs.filter((j) => j.customerId === customer?.id);
   const customerInvoices = invoices.filter((inv) => inv.customerId === customer?.id);
   const customerContracts = contracts.filter((c) => c.customerId === customer?.id);

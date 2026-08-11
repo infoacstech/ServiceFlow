@@ -11,9 +11,9 @@ export const AccessDeniedView: React.FC<AccessDeniedViewProps> = ({
   requiredRoleLabel = 'Admin or Manager',
   onSwitchAccount,
 }) => {
-  const { currentUser, roles, getRolePermissions } = useApp();
+  const { currentUser, roles = [], getRolePermissions } = useApp();
   const currentPermissions = getRolePermissions(currentUser.role);
-  const currentRoleObj = roles.find((r) => r.code === currentUser.role);
+  const currentRoleObj = (roles || []).find((r) => r.code === currentUser.role);
 
   return (
     <div className="max-w-2xl mx-auto my-8 p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xl space-y-6 text-center animate-in fade-in">

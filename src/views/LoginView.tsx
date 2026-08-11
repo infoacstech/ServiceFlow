@@ -61,7 +61,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     }
 
     // Match existing user by phone
-    const matchedUser = users.find((u) =>
+    const matchedUser = (users || []).find((u) =>
       u.phone.replace(/[^0-9]/g, '').endsWith(phoneNumber.replace(/[^0-9]/g, '').slice(-10))
     );
 
@@ -93,7 +93,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    const matchedUser = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    const matchedUser = (users || []).find((u) => u.email.toLowerCase() === email.toLowerCase());
     if (matchedUser) {
       setCurrentUser(matchedUser);
       switchBusiness(matchedUser.businessId);
@@ -468,9 +468,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {users.map((u) => {
-                  const isCurrent = currentUser.id === u.id;
-                  const bizName = businesses.find((b) => b.id === u.businessId)?.name || 'ServiceFlow';
+                {(users || []).map((u) => {
+                  const isCurrent = currentUser?.id === u.id;
+                  const bizName = (businesses || []).find((b) => b.id === u.businessId)?.name || 'ServiceFlow';
                   return (
                     <div
                       key={u.id}

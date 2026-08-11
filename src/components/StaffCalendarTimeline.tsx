@@ -85,8 +85,8 @@ export const StaffCalendarTimeline: React.FC = () => {
 
     if (!jobId) return;
 
-    const job = jobs.find((j) => j.id === jobId);
-    const targetStaff = staff.find((s) => s.id === targetStaffId);
+    const job = (jobs || []).find((j) => j.id === jobId);
+    const targetStaff = (staff || []).find((s) => s.id === targetStaffId);
 
     if (!job) return;
 
@@ -187,8 +187,8 @@ export const StaffCalendarTimeline: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3 overflow-x-auto pb-2 no-scrollbar">
-            {unassignedJobs.map((job) => {
-              const cust = customers.find((c) => c.id === job.customerId);
+            {(unassignedJobs || []).map((job) => {
+              const cust = (customers || []).find((c) => c.id === job.customerId);
               return (
                 <div
                   key={job.id}
@@ -305,8 +305,8 @@ export const StaffCalendarTimeline: React.FC = () => {
                           <div className="h-full space-y-1.5 flex flex-col justify-between">
                             {/* Job Cards list */}
                             <div className="space-y-1.5 overflow-y-auto max-h-32 pr-0.5 no-scrollbar">
-                              {dayJobs.map((job) => {
-                                const cust = customers.find((c) => c.id === job.customerId);
+                              {(dayJobs || []).map((job) => {
+                                const cust = (customers || []).find((c) => c.id === job.customerId);
 
                                 return (
                                   <div
@@ -391,7 +391,7 @@ export const StaffCalendarTimeline: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500 font-bold">Client:</span>
                   <span className="font-bold text-slate-900 dark:text-slate-100">
-                    {customers.find((c) => c.id === selectedJob.customerId)?.name || 'N/A'}
+                    {(customers || []).find((c) => c.id === selectedJob.customerId)?.name || 'N/A'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

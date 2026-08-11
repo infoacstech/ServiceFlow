@@ -64,7 +64,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
 
     // Search existing user by phone number
-    const matchedUser = users.find(
+    const matchedUser = (users || []).find(
       (u) => u.phone.replace(/[^0-9]/g, '').endsWith(phoneNumber.replace(/[^0-9]/g, '').slice(-10))
     );
 
@@ -96,7 +96,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       return;
     }
 
-    const matchedUser = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    const matchedUser = (users || []).find((u) => u.email.toLowerCase() === email.toLowerCase());
     if (matchedUser) {
       setCurrentUser(matchedUser);
       switchBusiness(matchedUser.businessId);
@@ -381,9 +381,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Or click any existing staff member / technician to switch:
               </p>
-              {users.map((u) => {
-                const isCurrent = currentUser.id === u.id;
-                const bizName = businesses.find((b) => b.id === u.businessId)?.name || 'ServiceFlow';
+              {(users || []).map((u) => {
+                const isCurrent = currentUser?.id === u.id;
+                const bizName = (businesses || []).find((b) => b.id === u.businessId)?.name || 'ServiceFlow';
                 return (
                   <div
                     key={u.id}

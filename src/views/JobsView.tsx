@@ -78,14 +78,14 @@ export const JobsView: React.FC<JobsViewProps> = ({
 
   // New Job Form State
   const [newJobData, setNewJobData] = useState({
-    customerId: customers[0]?.id || '',
-    serviceId: services[0]?.id || '',
+    customerId: customers?.[0]?.id || '',
+    serviceId: services?.[0]?.id || '',
     description: '',
     priority: 'medium' as JobPriority,
-    assignedStaffId: staff.find((s) => s.role === 'technician')?.id || '',
+    assignedStaffId: (staff || []).find((s) => s.role === 'technician')?.id || '',
     scheduledDate: new Date().toISOString().split('T')[0],
     scheduledTime: '10:00 AM',
-    location: customers[0]?.address || 'Site Location',
+    location: customers?.[0]?.address || 'Site Location',
     estimatedAmount: 1500,
     status: 'assigned' as JobStatus,
   });
@@ -260,8 +260,8 @@ export const JobsView: React.FC<JobsViewProps> = ({
                     <div className="text-center py-10 text-xs text-slate-400 font-medium">No jobs in stage</div>
                   ) : (
                     colJobs.map((job) => {
-                      const customer = customers.find((c) => c.id === job.customerId);
-                      const tech = staff.find((s) => s.id === job.assignedStaffId);
+                      const customer = (customers || []).find((c) => c.id === job.customerId);
+                      const tech = (staff || []).find((s) => s.id === job.assignedStaffId);
 
                       return (
                         <div
@@ -327,9 +327,9 @@ export const JobsView: React.FC<JobsViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filteredJobs.map((job) => {
-                  const cust = customers.find((c) => c.id === job.customerId);
-                  const tech = staff.find((s) => s.id === job.assignedStaffId);
+                {(filteredJobs || []).map((job) => {
+                  const cust = (customers || []).find((c) => c.id === job.customerId);
+                  const tech = (staff || []).find((s) => s.id === job.assignedStaffId);
 
                   return (
                     <tr
@@ -367,7 +367,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
               <div>
                 <span className="text-xs font-bold text-indigo-600">{selectedJob.jobId}</span>
                 <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
-                  {customers.find((c) => c.id === selectedJob.customerId)?.name}
+                  {(customers || []).find((c) => c.id === selectedJob.customerId)?.name}
                 </h3>
               </div>
               <button onClick={() => setSelectedJob(null)} className="text-slate-400">
@@ -433,7 +433,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
               <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl">
                 <div>
                   <span className="text-slate-400">Assigned Technician:</span>
-                  <div className="font-bold">{staff.find((s) => s.id === selectedJob.assignedStaffId)?.name || 'Unassigned'}</div>
+                  <div className="font-bold">{(staff || []).find((s) => s.id === selectedJob.assignedStaffId)?.name || 'Unassigned'}</div>
                 </div>
                 <div>
                   <span className="text-slate-400">Scheduled Date:</span>
@@ -516,7 +516,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
                 <select
                   value={newJobData.customerId}
                   onChange={(e) => {
-                    const c = customers.find((cust) => cust.id === e.target.value);
+                    const c = (customers || []).find((cust) => cust.id === e.target.value);
                     setNewJobData({
                       ...newJobData,
                       customerId: e.target.value,
@@ -525,7 +525,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
                   }}
                   className="w-full px-3 py-2 rounded-xl border bg-slate-50"
                 >
-                  {customers.map((c) => (
+                  {(customers || []).map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name} ({c.companyName || c.mobile})
                     </option>
@@ -538,7 +538,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
                 <select
                   value={newJobData.serviceId}
                   onChange={(e) => {
-                    const s = services.find((srv) => srv.id === e.target.value);
+                    const s = (services || []).find((srv) => srv.id === e.target.value);
                     setNewJobData({
                       ...newJobData,
                       serviceId: e.target.value,

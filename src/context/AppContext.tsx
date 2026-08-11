@@ -287,7 +287,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } else {
           const items = snapshot.docs.map((d) => d.data() as Business);
           setBusinesses(items);
-          setCurrentBusiness((prev) => items.find((b) => b.id === prev.id) || items[0] || prev);
+          setCurrentBusiness((prev) => (prev ? items.find((b) => b.id === prev.id) || items[0] || prev : items[0]));
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'businesses')
@@ -302,7 +302,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } else {
           const items = snapshot.docs.map((d) => d.data() as User);
           setUsers(items);
-          setCurrentUser((prev) => items.find((u) => u.id === prev.id) || items[1] || items[0] || prev);
+          setCurrentUser((prev) => (prev ? items.find((u) => u.id === prev.id) || items[1] || items[0] || prev : items[0]));
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'users')
@@ -1084,7 +1084,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     firestoreService.saveDocument<Invoice>('invoices', newInv.id, newInv);
-    firestoreService.saveDocument<Quotation>(quotationId, quotationId, { status: 'approved' });
+    firestoreService.saveDocument<Quotation>('quotations', quotationId, { status: 'approved' });
     logActivity('Converted Quote to Invoice', 'invoice', newInv.id, `Generated invoice ${invNum} from quote ${qt.quotationNumber}`);
     showToast(`Invoice ${invNum} created from Quotation ${qt.quotationNumber}!`, 'success');
     return newInv;
@@ -1189,7 +1189,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const getRolePermissions = (roleCode: UserRole): RolePermission => {
-    const r = roles.find((role) => role.code === roleCode);
+    const r = (roles || []).find((role) => role.code === roleCode);
     if (r) return r.permissions;
     if (roleCode === 'super_admin') {
       return {

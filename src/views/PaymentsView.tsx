@@ -12,8 +12,8 @@ export const PaymentsView: React.FC = () => {
     preset: 'all',
   });
 
-  const filtered = payments.filter((p) => {
-    const cust = customers.find((c) => c.id === p.customerId);
+  const filtered = (payments || []).filter((p) => {
+    const cust = (customers || []).find((c) => c.id === p.customerId);
     const matchesSearch =
       p.paymentNumber.toLowerCase().includes(search.toLowerCase()) ||
       p.referenceNumber?.toLowerCase().includes(search.toLowerCase()) ||
@@ -88,9 +88,9 @@ export const PaymentsView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filtered.map((p) => {
-                const customer = customers.find((c) => c.id === p.customerId);
-                const invoice = invoices.find((inv) => inv.id === p.invoiceId);
+              {(filtered || []).map((p) => {
+                const customer = (customers || []).find((c) => c.id === p.customerId);
+                const invoice = (invoices || []).find((inv) => inv.id === p.invoiceId);
 
                 return (
                   <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">

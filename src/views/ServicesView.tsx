@@ -124,8 +124,8 @@ export const ServicesView: React.FC = () => {
 
       {/* Service Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredServices.map((service) => {
-          const category = categories.find((c) => c.id === service.categoryId);
+        {(filteredServices || []).map((service) => {
+          const category = (categories || []).find((c) => c.id === service.categoryId);
 
           return (
             <div

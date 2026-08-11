@@ -611,9 +611,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="space-y-3">
-          {jobs.slice(0, 4).map((job) => {
-            const customer = customers.find((c) => c.id === job.customerId);
-            const assignedTech = staff.find((s) => s.id === job.assignedStaffId);
+          {(jobs || []).slice(0, 4).map((job) => {
+            const customer = (customers || []).find((c) => c.id === job.customerId);
+            const assignedTech = (staff || []).find((s) => s.id === job.assignedStaffId);
 
             return (
               <div
