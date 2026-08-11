@@ -9,6 +9,7 @@ import { ToastContainer } from './components/ToastContainer';
 import { ActivityLogDrawer } from './components/ActivityLogDrawer';
 import { OfflineSyncBanner } from './components/OfflineSyncBanner';
 import { AuthModal } from './components/AuthModal';
+import { AccessDeniedView } from './components/AccessDeniedView';
 
 import { DashboardView } from './views/DashboardView';
 import { CustomersView } from './views/CustomersView';
@@ -31,13 +32,54 @@ import { NotificationsView } from './views/NotificationsView';
 import { LoginView } from './views/LoginView';
 
 const MainContent: React.FC = () => {
-  const { currentUser, isAuthModalOpen, setIsAuthModalOpen } = useApp();
+  const { currentUser, isAuthModalOpen, setIsAuthModalOpen, getRolePermissions } = useApp();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isCreateJobOpen, setIsCreateJobOpen] = useState(false);
 
   const [jobsFilter, setJobsFilter] = useState<JobInitialFilter | null>(null);
   const [invoicesFilter, setInvoicesFilter] = useState<InvoiceInitialFilter | null>(null);
+
+  const permissions = getRolePermissions(currentUser.role);
+
+  const getTabAccess = (tab: string) => {
+    switch (tab) {
+      case 'dashboard':
+        return { allowed: permissions.canManageJobs || permissions.canViewFinancials, label: 'Admin or Manager' };
+      case 'jobs':
+        return { allowed: permissions.canManageJobs, label: 'Technician, Manager, or Admin' };
+      case 'customers':
+        return { allowed: permissions.canManageJobs || permissions.canManageStaff, label: 'Technician, Manager, or Admin' };
+      case 'services':
+        return { allowed: permissions.canManageServices, label: 'Admin or Manager' };
+      case 'staff':
+        return { allowed: permissions.canManageStaff, label: 'Admin or Manager' };
+      case 'inventory':
+        return { allowed: permissions.canManageInventory, label: 'Admin or Manager' };
+      case 'quotations':
+      case 'invoices':
+      case 'payments':
+      case 'expenses':
+      case 'reports':
+        return { allowed: permissions.canViewFinancials, label: 'Admin or Manager' };
+      case 'contracts':
+        return { allowed: permissions.canManageContracts, label: 'Admin or Manager' };
+      case 'ai_assistant':
+        return { allowed: permissions.canManageJobs || permissions.canViewFinancials, label: 'Admin or Manager' };
+      case 'customer_portal':
+        return { allowed: permissions.canAccessCustomerPortal, label: 'Admin or Manager' };
+      case 'super_admin':
+        return { allowed: permissions.canAccessSuperAdmin, label: 'Super Admin' };
+      case 'settings':
+        return { allowed: permissions.canAccessSettings, label: 'Admin / Business Owner' };
+      case 'notifications':
+      case 'login':
+      default:
+        return { allowed: true, label: '' };
+    }
+  };
+
+  const currentTabAccess = getTabAccess(activeTab);
 
   const handleNavigateWithFilter = (tab: string, filter?: any) => {
     if (tab === 'jobs') {
@@ -75,57 +117,66 @@ const MainContent: React.FC = () => {
         {/* View Content Area */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
           <div key={activeTab} className="animate-in fade-in duration-200">
-            {activeTab === 'dashboard' && (
-              <DashboardView
-                setActiveTab={setActiveTab}
-                onNavigateWithFilter={handleNavigateWithFilter}
-                onOpenNewJob={handleOpenNewJob}
+            {!currentTabAccess.allowed ? (
+              <AccessDeniedView
+                requiredRoleLabel={currentTabAccess.label}
+                onSwitchAccount={() => setActiveTab('login')}
               />
-            )}
+            ) : (
+              <>
+                {activeTab === 'dashboard' && (
+                  <DashboardView
+                    setActiveTab={setActiveTab}
+                    onNavigateWithFilter={handleNavigateWithFilter}
+                    onOpenNewJob={handleOpenNewJob}
+                  />
+                )}
 
-            {activeTab === 'customers' && <CustomersView />}
+                {activeTab === 'customers' && <CustomersView />}
 
-            {activeTab === 'services' && <ServicesView />}
+                {activeTab === 'services' && <ServicesView />}
 
-            {activeTab === 'jobs' &&
-              (isTech ? (
-                <TechnicianView />
-              ) : (
-                <JobsView
-                  isCreateModalOpen={isCreateJobOpen}
-                  setIsCreateModalOpen={setIsCreateJobOpen}
-                  initialFilter={jobsFilter}
-                />
-              ))}
+                {activeTab === 'jobs' &&
+                  (isTech ? (
+                    <TechnicianView />
+                  ) : (
+                    <JobsView
+                      isCreateModalOpen={isCreateJobOpen}
+                      setIsCreateModalOpen={setIsCreateJobOpen}
+                      initialFilter={jobsFilter}
+                    />
+                  ))}
 
-            {activeTab === 'staff' && <StaffView />}
+                {activeTab === 'staff' && <StaffView />}
 
-            {activeTab === 'inventory' && <InventoryView />}
+                {activeTab === 'inventory' && <InventoryView />}
 
-            {activeTab === 'quotations' && <QuotationsView />}
+                {activeTab === 'quotations' && <QuotationsView />}
 
-            {activeTab === 'invoices' && <InvoicesView initialFilter={invoicesFilter} />}
+                {activeTab === 'invoices' && <InvoicesView initialFilter={invoicesFilter} />}
 
-            {activeTab === 'payments' && <PaymentsView />}
+                {activeTab === 'payments' && <PaymentsView />}
 
-            {activeTab === 'contracts' && <ContractsView />}
+                {activeTab === 'contracts' && <ContractsView />}
 
-            {activeTab === 'expenses' && <ExpensesView />}
+                {activeTab === 'expenses' && <ExpensesView />}
 
-            {activeTab === 'reports' && <ReportsView />}
+                {activeTab === 'reports' && <ReportsView />}
 
-            {activeTab === 'ai_assistant' && <AIAssistantView />}
+                {activeTab === 'ai_assistant' && <AIAssistantView />}
 
-            {activeTab === 'customer_portal' && <CustomerPortalView />}
+                {activeTab === 'customer_portal' && <CustomerPortalView />}
 
-            {activeTab === 'super_admin' && <SuperAdminView />}
+                {activeTab === 'super_admin' && <SuperAdminView />}
 
-            {activeTab === 'settings' && <SettingsView />}
+                {activeTab === 'settings' && <SettingsView />}
 
-            {activeTab === 'notifications' && <NotificationsView />}
+                {activeTab === 'notifications' && <NotificationsView />}
 
-            {activeTab === 'login' && (
-              <LoginView onLoginSuccess={() => setActiveTab(isTech ? 'jobs' : 'dashboard')} />
+                {activeTab === 'login' && (
+                  <LoginView onLoginSuccess={() => setActiveTab(isTech ? 'jobs' : 'dashboard')} />
+                )}
+              </>
             )}
           </div>
         </main>

@@ -28,36 +28,37 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
-  const { currentUser } = useApp();
+  const { currentUser, getRolePermissions } = useApp();
+  const permissions = getRolePermissions(currentUser.role);
 
   const isTech = currentUser.role === 'technician';
   const isSuperAdmin = currentUser.role === 'super_admin';
 
   const mainNavItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['business_owner', 'manager'] },
-    { id: 'jobs', label: isTech ? 'My Assigned Jobs' : 'Job Management', icon: Briefcase, roles: ['business_owner', 'manager', 'technician'] },
-    { id: 'customers', label: 'Customers CRM', icon: Users, roles: ['business_owner', 'manager', 'technician'] },
-    { id: 'services', label: 'Service Catalog', icon: Wrench, roles: ['business_owner', 'manager'] },
-    { id: 'staff', label: 'Staff & Techs', icon: UserCheck, roles: ['business_owner', 'manager'] },
-    { id: 'inventory', label: 'Inventory & Parts', icon: Package, roles: ['business_owner', 'manager'] },
-    { id: 'quotations', label: 'Quotations', icon: FileText, roles: ['business_owner', 'manager'] },
-    { id: 'invoices', label: 'Invoices', icon: Receipt, roles: ['business_owner', 'manager'] },
-    { id: 'payments', label: 'Payment Ledger', icon: CreditCard, roles: ['business_owner', 'manager'] },
-    { id: 'contracts', label: 'Recurring Contracts', icon: Repeat, roles: ['business_owner', 'manager'] },
-    { id: 'expenses', label: 'Expense Tracker', icon: DollarSign, roles: ['business_owner', 'manager'] },
-    { id: 'reports', label: 'Reports & Analytics', icon: BarChart3, roles: ['business_owner', 'manager'] },
-    { id: 'notifications', label: 'Notifications', icon: Bell, roles: ['business_owner', 'manager', 'technician'] },
-    { id: 'ai_assistant', label: 'AI Business Assistant', icon: Sparkles, roles: ['business_owner', 'manager'] },
-    { id: 'customer_portal', label: 'Customer Portal', icon: Globe, roles: ['business_owner', 'manager'] },
-    { id: 'settings', label: 'Business Settings', icon: Settings, roles: ['business_owner', 'manager'] },
-    { id: 'login', label: 'Login Panel & Switch', icon: KeyRound, roles: ['business_owner', 'manager', 'technician', 'super_admin'] },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: permissions.canManageJobs || permissions.canViewFinancials },
+    { id: 'jobs', label: isTech ? 'My Assigned Jobs' : 'Job Management', icon: Briefcase, visible: permissions.canManageJobs },
+    { id: 'customers', label: 'Customers CRM', icon: Users, visible: permissions.canManageJobs || permissions.canManageStaff },
+    { id: 'services', label: 'Service Catalog', icon: Wrench, visible: permissions.canManageServices },
+    { id: 'staff', label: 'Staff & Techs', icon: UserCheck, visible: permissions.canManageStaff },
+    { id: 'inventory', label: 'Inventory & Parts', icon: Package, visible: permissions.canManageInventory },
+    { id: 'quotations', label: 'Quotations', icon: FileText, visible: permissions.canViewFinancials },
+    { id: 'invoices', label: 'Invoices', icon: Receipt, visible: permissions.canViewFinancials },
+    { id: 'payments', label: 'Payment Ledger', icon: CreditCard, visible: permissions.canViewFinancials },
+    { id: 'contracts', label: 'Recurring Contracts', icon: Repeat, visible: permissions.canManageContracts },
+    { id: 'expenses', label: 'Expense Tracker', icon: DollarSign, visible: permissions.canViewFinancials },
+    { id: 'reports', label: 'Reports & Analytics', icon: BarChart3, visible: permissions.canViewFinancials },
+    { id: 'notifications', label: 'Notifications', icon: Bell, visible: true },
+    { id: 'ai_assistant', label: 'AI Business Assistant', icon: Sparkles, visible: permissions.canManageJobs || permissions.canViewFinancials },
+    { id: 'customer_portal', label: 'Customer Portal', icon: Globe, visible: permissions.canAccessCustomerPortal },
+    { id: 'settings', label: 'Business Settings', icon: Settings, visible: permissions.canAccessSettings },
+    { id: 'login', label: 'Login Panel & Switch', icon: KeyRound, visible: true },
   ];
 
-  if (isSuperAdmin) {
-    mainNavItems.unshift({ id: 'super_admin', label: 'SaaS Platform Admin', icon: ShieldCheck, roles: ['super_admin'] });
+  if (isSuperAdmin || permissions.canAccessSuperAdmin) {
+    mainNavItems.unshift({ id: 'super_admin', label: 'SaaS Platform Admin', icon: ShieldCheck, visible: true });
   }
 
-  const visibleNav = mainNavItems.filter((item) => item.roles.includes(currentUser.role));
+  const visibleNav = mainNavItems.filter((item) => item.visible);
 
   return (
     <aside className="hidden md:flex flex-col w-64 bg-slate-900 text-slate-300 border-r border-slate-800 p-3 shrink-0 select-none">

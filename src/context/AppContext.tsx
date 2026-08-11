@@ -3,6 +3,8 @@ import {
   Business,
   User,
   UserRole,
+  Role,
+  RolePermission,
   Customer,
   ServiceCategory,
   Service,
@@ -38,8 +40,10 @@ import {
   DEMO_NOTIFICATIONS,
   DEMO_ACTIVITIES,
   DEMO_PLANS,
+  DEMO_ROLES,
 } from '../data/demoData';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { FirestoreService, firestoreService } from '../services/FirestoreService';
 import {
   collection,
   doc,
@@ -81,6 +85,8 @@ interface AppContextType {
   activityLogs: ActivityLog[];
   staff: User[];
   plans: Plan[];
+  roles: Role[];
+  getRolePermissions: (role: UserRole) => RolePermission;
 
   // Global UI & search state
   isSearchOpen: boolean;
@@ -96,6 +102,8 @@ interface AppContextType {
   toggleTheme: () => void;
   logActivity: (action: string, entityType: ActivityLog['entityType'], entityId: string, description: string) => void;
 
+  firestoreService: typeof FirestoreService;
+
   // Actions
   addCustomer: (c: Omit<Customer, 'id' | 'businessId' | 'createdAt'>) => Customer;
   updateCustomer: (id: string, updates: Partial<Customer>) => void;
@@ -110,6 +118,7 @@ interface AppContextType {
   addJob: (j: Omit<Job, 'id' | 'businessId' | 'jobId' | 'createdAt'>) => Job;
   updateJob: (id: string, updates: Partial<Job>) => void;
   updateJobStatus: (id: string, status: JobStatus) => void;
+  deleteJob: (id: string) => void;
   startJob: (id: string, beforePhotos: string[], notes?: string) => void;
   completeJob: (
     id: string,
@@ -137,6 +146,7 @@ interface AppContextType {
   convertQuotationToInvoice: (quotationId: string) => Invoice;
 
   addInvoice: (inv: Omit<Invoice, 'id' | 'businessId' | 'invoiceNumber'>) => Invoice;
+  deleteInvoice: (id: string) => void;
   recordPayment: (p: Omit<Payment, 'id' | 'businessId'>) => Payment;
 
   addContract: (c: Omit<RecurringContract, 'id' | 'businessId' | 'contractNumber'>) => RecurringContract;
@@ -249,6 +259,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [expenses, setExpenses] = useState<Expense[]>(DEMO_EXPENSES);
   const [notifications, setNotifications] = useState<Notification[]>(DEMO_NOTIFICATIONS);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(DEMO_ACTIVITIES);
+  const [roles, setRoles] = useState<Role[]>(DEMO_ROLES);
 
   // Offline Technician Sync States
   const [isOffline, setIsOffline] = useState<boolean>(!navigator.onLine);
@@ -475,6 +486,19 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (error) => handleFirestoreError(error, OperationType.GET, 'manualSyncLogs')
     );
 
+    // 17. Roles
+    const unsubRoles = onSnapshot(
+      collection(db, 'roles'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_ROLES.forEach((r) => saveToFirestore('roles', r.id, r));
+        } else {
+          setRoles(snapshot.docs.map((d) => d.data() as Role));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'roles')
+    );
+
     return () => {
       unsubBiz();
       unsubUsers();
@@ -492,6 +516,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubNotifications();
       unsubActivities();
       unsubSyncLogs();
+      unsubRoles();
     };
   }, []);
 
@@ -812,26 +837,27 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Customer Actions
   const addCustomer = (data: Omit<Customer, 'id' | 'businessId' | 'createdAt'>) => {
+    const id = `cust-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newCust: Customer = {
       ...data,
-      id: `cust-${Date.now()}`,
+      id,
       businessId: currentBusiness.id,
       createdAt: new Date().toISOString().split('T')[0],
     };
-    saveToFirestore('customers', newCust.id, newCust);
+    firestoreService.saveDocument<Customer>('customers', newCust.id, newCust);
     logActivity('Customer Created', 'customer', newCust.id, `Created customer record for ${newCust.name}`);
     showToast(`Added customer: ${newCust.name}`, 'success');
     return newCust;
   };
 
   const updateCustomer = (id: string, updates: Partial<Customer>) => {
-    saveToFirestore('customers', id, updates);
-    showToast('Customer information updated & synced', 'success');
+    firestoreService.updateCustomer(id, updates);
+    showToast('Customer information updated & synced to Firestore', 'success');
   };
 
   const deleteCustomer = (id: string) => {
-    deleteFromFirestore('customers', id);
-    showToast('Customer deleted', 'info');
+    firestoreService.deleteCustomer(id);
+    showToast('Customer deleted from Firestore', 'info');
   };
 
   // Services Actions
@@ -842,7 +868,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       name,
       description,
     };
-    saveToFirestore('categories', newCat.id, newCat);
+    firestoreService.saveDocument<ServiceCategory>('categories', newCat.id, newCat);
     showToast(`Added category: ${name}`, 'success');
     return newCat;
   };
@@ -853,17 +879,17 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `srv-${Date.now()}`,
       businessId: currentBusiness.id,
     };
-    saveToFirestore('services', newSrv.id, newSrv);
+    firestoreService.saveDocument<Service>('services', newSrv.id, newSrv);
     showToast(`Service "${newSrv.name}" created`, 'success');
   };
 
   const updateService = (id: string, updates: Partial<Service>) => {
-    saveToFirestore('services', id, updates);
+    firestoreService.saveDocument<Service>('services', id, updates);
     showToast('Service details updated', 'success');
   };
 
   const deleteService = (id: string) => {
-    deleteFromFirestore('services', id);
+    firestoreService.deleteDocument('services', id);
     showToast('Service removed', 'info');
   };
 
@@ -871,16 +897,17 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addJob = (data: Omit<Job, 'id' | 'businessId' | 'jobId' | 'createdAt'>) => {
     const count = filteredJobs.length + 101;
     const jobId = `JOB-${new Date().getFullYear()}-${count}`;
+    const id = `job-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newJob: Job = {
       ...data,
-      id: `job-${Date.now()}`,
+      id,
       businessId: currentBusiness.id,
       jobId,
       createdAt: new Date().toISOString().split('T')[0],
     };
-    saveToFirestore('jobs', newJob.id, newJob);
+    firestoreService.saveDocument<Job>('jobs', newJob.id, newJob);
     logActivity('Job Created', 'job', newJob.id, `Created job ${jobId}`);
-    showToast(`Job ${jobId} created successfully!`, 'success');
+    showToast(`Job ${jobId} created & synced to Firestore!`, 'success');
     return newJob;
   };
 
@@ -889,7 +916,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToSyncQueue('update_job', id, updates, 'Updated job schedule/assignment');
       showToast('Offline Mode: Saved locally and queued for sync.', 'info');
     } else {
-      saveToFirestore('jobs', id, updates);
+      firestoreService.updateJob(id, updates);
       logActivity('Job Updated', 'job', id, 'Updated job assignment and schedule');
       showToast('Job updated & synced to Firestore', 'success');
     }
@@ -900,10 +927,16 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToSyncQueue('update_job_status', id, { status }, `Job status changed to ${status.replace('_', ' ')}`);
       showToast(`Offline Mode: Status updated to ${status.replace('_', ' ')} (queued)`, 'info');
     } else {
-      saveToFirestore('jobs', id, { status });
+      firestoreService.updateJob(id, { status });
       logActivity('Job Status Updated', 'job', id, `Changed job status to ${status.replace('_', ' ').toUpperCase()}`);
       showToast(`Job status updated to ${status.replace('_', ' ')}`, 'info');
     }
+  };
+
+  const deleteJob = (id: string) => {
+    firestoreService.deleteJob(id);
+    logActivity('Job Deleted', 'job', id, 'Deleted job record from Firestore');
+    showToast('Job deleted from Firestore', 'info');
   };
 
   const startJob = (id: string, beforePhotos: string[], notes?: string) => {
@@ -919,7 +952,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToSyncQueue('start_job', id, { beforePhotos, notes }, 'Technician started job work on site');
       showToast('Offline Mode: Job start logged locally & queued for sync.', 'info');
     } else {
-      saveToFirestore('jobs', id, startUpdates);
+      firestoreService.saveDocument<Job>('jobs', id, startUpdates);
       logActivity('Job Work Started', 'job', id, 'Technician initiated work on site');
       showToast('Job work started & synced!', 'success');
     }
@@ -942,7 +975,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const item = inventory.find((i) => i.id === used.inventoryItemId);
         if (item) {
           const newStock = Math.max(0, item.currentStock - used.quantity);
-          saveToFirestore('inventory', item.id, { currentStock: newStock });
+          firestoreService.saveDocument<InventoryItem>('inventory', item.id, { currentStock: newStock });
         }
       });
     }
@@ -963,7 +996,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToSyncQueue('complete_job', id, data, 'Technician completed job & recorded customer report/signature');
       showToast('Offline Mode: Job report saved locally & queued for sync!', 'success');
     } else {
-      saveToFirestore('jobs', id, completionData);
+      firestoreService.saveDocument<Job>('jobs', id, completionData);
       logActivity('Job Completed', 'job', id, 'Technician completed job work & obtained customer signature');
       showToast('Job marked as completed & synced to Firestore!', 'success');
     }
@@ -976,7 +1009,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `inv-${Date.now()}`,
       businessId: currentBusiness.id,
     };
-    saveToFirestore('inventory', newItem.id, newItem);
+    firestoreService.saveDocument<InventoryItem>('inventory', newItem.id, newItem);
     showToast(`Added inventory item: ${newItem.name}`, 'success');
   };
 
@@ -990,7 +1023,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (item) {
       const diff = type === 'stock_out' ? -qty : qty;
       const newStock = Math.max(0, item.currentStock + diff);
-      saveToFirestore('inventory', id, { currentStock: newStock });
+      firestoreService.saveDocument<InventoryItem>('inventory', id, { currentStock: newStock });
     }
     const newTx: InventoryTransaction = {
       id: `tx-${Date.now()}`,
@@ -1002,7 +1035,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       date: new Date().toISOString().split('T')[0],
       createdBy: currentUser.name,
     };
-    saveToFirestore('inventoryTransactions', newTx.id, newTx);
+    firestoreService.saveDocument<InventoryTransaction>('inventoryTransactions', newTx.id, newTx);
     showToast(`Inventory stock adjusted (${type.replace('_', ' ')})`, 'success');
   };
 
@@ -1015,14 +1048,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       businessId: currentBusiness.id,
       quotationNumber: num,
     };
-    saveToFirestore('quotations', newQt.id, newQt);
+    firestoreService.saveDocument<Quotation>('quotations', newQt.id, newQt);
     logActivity('Quotation Created', 'quotation', newQt.id, `Created quotation ${num}`);
     showToast(`Quotation ${num} created`, 'success');
     return newQt;
   };
 
   const updateQuotationStatus = (id: string, status: Quotation['status']) => {
-    saveToFirestore('quotations', id, { status });
+    firestoreService.saveDocument<Quotation>('quotations', id, { status });
     showToast(`Quotation status changed to ${status}`, 'info');
   };
 
@@ -1050,8 +1083,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       notes: `Converted from Quotation ${qt.quotationNumber}. ${qt.notes || ''}`,
     };
 
-    saveToFirestore('invoices', newInv.id, newInv);
-    saveToFirestore('quotations', quotationId, { status: 'approved' });
+    firestoreService.saveDocument<Invoice>('invoices', newInv.id, newInv);
+    firestoreService.saveDocument<Quotation>(quotationId, quotationId, { status: 'approved' });
     logActivity('Converted Quote to Invoice', 'invoice', newInv.id, `Generated invoice ${invNum} from quote ${qt.quotationNumber}`);
     showToast(`Invoice ${invNum} created from Quotation ${qt.quotationNumber}!`, 'success');
     return newInv;
@@ -1060,16 +1093,23 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Invoice Actions
   const addInvoice = (data: Omit<Invoice, 'id' | 'businessId' | 'invoiceNumber'>) => {
     const num = `INV-${new Date().getFullYear()}-${filteredInvoices.length + 101}`;
+    const id = `invc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newInv: Invoice = {
       ...data,
-      id: `invc-${Date.now()}`,
+      id,
       businessId: currentBusiness.id,
       invoiceNumber: num,
     };
-    saveToFirestore('invoices', newInv.id, newInv);
+    firestoreService.saveDocument<Invoice>('invoices', newInv.id, newInv);
     logActivity('Invoice Created', 'invoice', newInv.id, `Created invoice ${num}`);
-    showToast(`Invoice ${num} generated`, 'success');
+    showToast(`Invoice ${num} generated & synced to Firestore`, 'success');
     return newInv;
+  };
+
+  const deleteInvoice = (id: string) => {
+    firestoreService.deleteInvoice(id);
+    logActivity('Invoice Deleted', 'invoice', id, 'Deleted invoice record from Firestore');
+    showToast('Invoice deleted from Firestore', 'info');
   };
 
   const recordPayment = (data: Omit<Payment, 'id' | 'businessId'>) => {
@@ -1079,7 +1119,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       businessId: currentBusiness.id,
     };
 
-    saveToFirestore('payments', newPmt.id, newPmt);
+    firestoreService.saveDocument<Payment>('payments', newPmt.id, newPmt);
 
     const inv = invoices.find((i) => i.id === data.invoiceId);
     if (inv) {
@@ -1087,7 +1127,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const newBalance = Math.max(0, inv.grandTotal - newPaid);
       const newStatus: Invoice['status'] =
         newBalance <= 0 ? 'paid' : newPaid > 0 ? 'partial' : 'pending';
-      saveToFirestore('invoices', inv.id, {
+      firestoreService.saveDocument<Invoice>('invoices', inv.id, {
         paidAmount: newPaid,
         balanceAmount: newBalance,
         status: newStatus,
@@ -1148,6 +1188,61 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveToFirestore('notifications', id, { read: true });
   };
 
+  const getRolePermissions = (roleCode: UserRole): RolePermission => {
+    const r = roles.find((role) => role.code === roleCode);
+    if (r) return r.permissions;
+    if (roleCode === 'super_admin') {
+      return {
+        canManageJobs: true,
+        canViewFinancials: true,
+        canManageStaff: true,
+        canManageInventory: true,
+        canAccessSettings: true,
+        canAccessSuperAdmin: true,
+        canAccessCustomerPortal: true,
+        canManageServices: true,
+        canManageContracts: true,
+      };
+    }
+    if (roleCode === 'business_owner') {
+      return {
+        canManageJobs: true,
+        canViewFinancials: true,
+        canManageStaff: true,
+        canManageInventory: true,
+        canAccessSettings: true,
+        canAccessSuperAdmin: false,
+        canAccessCustomerPortal: true,
+        canManageServices: true,
+        canManageContracts: true,
+      };
+    }
+    if (roleCode === 'manager') {
+      return {
+        canManageJobs: true,
+        canViewFinancials: true,
+        canManageStaff: true,
+        canManageInventory: true,
+        canAccessSettings: false,
+        canAccessSuperAdmin: false,
+        canAccessCustomerPortal: true,
+        canManageServices: true,
+        canManageContracts: true,
+      };
+    }
+    return {
+      canManageJobs: true,
+      canViewFinancials: false,
+      canManageStaff: false,
+      canManageInventory: false,
+      canAccessSettings: false,
+      canAccessSuperAdmin: false,
+      canAccessCustomerPortal: false,
+      canManageServices: false,
+      canManageContracts: false,
+    };
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1175,6 +1270,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activityLogs: filteredActivityLogs,
         staff: filteredStaff,
         plans: DEMO_PLANS,
+        roles,
+        getRolePermissions,
 
         isSearchOpen,
         setIsSearchOpen,
@@ -1189,6 +1286,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleTheme,
         logActivity,
 
+        firestoreService,
+
         addCustomer,
         updateCustomer,
         deleteCustomer,
@@ -1201,6 +1300,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addJob,
         updateJob,
         updateJobStatus,
+        deleteJob,
         startJob,
         completeJob,
 
@@ -1212,6 +1312,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         convertQuotationToInvoice,
 
         addInvoice,
+        deleteInvoice,
         recordPayment,
 
         addContract,

@@ -28,7 +28,8 @@ interface MobileNavProps {
 }
 
 export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab }) => {
-  const { currentUser } = useApp();
+  const { currentUser, getRolePermissions } = useApp();
+  const permissions = getRolePermissions(currentUser.role);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
   const isTech = currentUser.role === 'technician';
@@ -49,26 +50,26 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
       ];
 
   const allModules = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['business_owner', 'manager'] },
-    { id: 'jobs', label: 'Jobs & Field Work', icon: Briefcase, roles: ['business_owner', 'manager', 'technician'] },
-    { id: 'customers', label: 'Customers CRM', icon: Users, roles: ['business_owner', 'manager', 'technician'] },
-    { id: 'services', label: 'Service Catalog', icon: Wrench, roles: ['business_owner', 'manager'] },
-    { id: 'staff', label: 'Staff & Techs', icon: UserCheck, roles: ['business_owner', 'manager'] },
-    { id: 'inventory', label: 'Inventory & Parts', icon: Package, roles: ['business_owner', 'manager'] },
-    { id: 'quotations', label: 'Quotations', icon: FileText, roles: ['business_owner', 'manager'] },
-    { id: 'invoices', label: 'Invoices', icon: Receipt, roles: ['business_owner', 'manager'] },
-    { id: 'payments', label: 'Payment Ledger', icon: CreditCard, roles: ['business_owner', 'manager'] },
-    { id: 'contracts', label: 'Recurring Contracts', icon: Repeat, roles: ['business_owner', 'manager'] },
-    { id: 'expenses', label: 'Expenses', icon: DollarSign, roles: ['business_owner', 'manager'] },
-    { id: 'reports', label: 'Reports & Analytics', icon: BarChart3, roles: ['business_owner', 'manager'] },
-    { id: 'notifications', label: 'Notifications', icon: Bell, roles: ['business_owner', 'manager', 'technician'] },
-    { id: 'ai_assistant', label: 'AI Business Assistant', icon: Sparkles, roles: ['business_owner', 'manager'] },
-    { id: 'settings', label: 'Settings', icon: Settings, roles: ['business_owner', 'manager'] },
-    { id: 'login', label: 'Login Panel & Switch', icon: KeyRound, roles: ['business_owner', 'manager', 'technician', 'super_admin'] },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: permissions.canManageJobs || permissions.canViewFinancials },
+    { id: 'jobs', label: 'Jobs & Field Work', icon: Briefcase, visible: permissions.canManageJobs },
+    { id: 'customers', label: 'Customers CRM', icon: Users, visible: permissions.canManageJobs || permissions.canManageStaff },
+    { id: 'services', label: 'Service Catalog', icon: Wrench, visible: permissions.canManageServices },
+    { id: 'staff', label: 'Staff & Techs', icon: UserCheck, visible: permissions.canManageStaff },
+    { id: 'inventory', label: 'Inventory & Parts', icon: Package, visible: permissions.canManageInventory },
+    { id: 'quotations', label: 'Quotations', icon: FileText, visible: permissions.canViewFinancials },
+    { id: 'invoices', label: 'Invoices', icon: Receipt, visible: permissions.canViewFinancials },
+    { id: 'payments', label: 'Payment Ledger', icon: CreditCard, visible: permissions.canViewFinancials },
+    { id: 'contracts', label: 'Recurring Contracts', icon: Repeat, visible: permissions.canManageContracts },
+    { id: 'expenses', label: 'Expenses', icon: DollarSign, visible: permissions.canViewFinancials },
+    { id: 'reports', label: 'Reports & Analytics', icon: BarChart3, visible: permissions.canViewFinancials },
+    { id: 'notifications', label: 'Notifications', icon: Bell, visible: true },
+    { id: 'ai_assistant', label: 'AI Business Assistant', icon: Sparkles, visible: permissions.canManageJobs || permissions.canViewFinancials },
+    { id: 'settings', label: 'Settings', icon: Settings, visible: permissions.canAccessSettings },
+    { id: 'login', label: 'Login Panel & Switch', icon: KeyRound, visible: true },
   ];
 
-  if (isSuperAdmin) {
-    allModules.unshift({ id: 'super_admin', label: 'Super Admin', icon: ShieldCheck, roles: ['super_admin'] });
+  if (isSuperAdmin || permissions.canAccessSuperAdmin) {
+    allModules.unshift({ id: 'super_admin', label: 'Super Admin', icon: ShieldCheck, visible: true });
   }
 
   const handleTabClick = (id: string) => {
@@ -121,7 +122,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
 
             <div className="grid grid-cols-3 gap-3">
               {allModules
-                .filter((m) => m.roles.includes(currentUser.role))
+                .filter((m) => m.visible)
                 .map((m) => {
                   const Icon = m.icon;
                   return (

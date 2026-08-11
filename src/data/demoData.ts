@@ -1,6 +1,7 @@
 import {
   Business,
   User,
+  Role,
   Plan,
   Subscription,
   Customer,
@@ -17,6 +18,81 @@ import {
   Notification,
   ActivityLog,
 } from '../types';
+
+export const DEMO_ROLES: Role[] = [
+  {
+    id: 'role-superadmin',
+    name: 'Super Admin',
+    code: 'super_admin',
+    description: 'SaaS Platform Owner with full multi-tenant control across all businesses & billing',
+    isSystemRole: true,
+    permissions: {
+      canManageJobs: true,
+      canViewFinancials: true,
+      canManageStaff: true,
+      canManageInventory: true,
+      canAccessSettings: true,
+      canAccessSuperAdmin: true,
+      canAccessCustomerPortal: true,
+      canManageServices: true,
+      canManageContracts: true,
+    },
+  },
+  {
+    id: 'role-owner',
+    name: 'Admin / Business Owner',
+    code: 'business_owner',
+    description: 'Full business operations, staff dispatch, invoices, quotations, settings & analytics',
+    isSystemRole: true,
+    permissions: {
+      canManageJobs: true,
+      canViewFinancials: true,
+      canManageStaff: true,
+      canManageInventory: true,
+      canAccessSettings: true,
+      canAccessSuperAdmin: false,
+      canAccessCustomerPortal: true,
+      canManageServices: true,
+      canManageContracts: true,
+    },
+  },
+  {
+    id: 'role-manager',
+    name: 'Service Operations Manager',
+    code: 'manager',
+    description: 'Manages field dispatch, customers, inventory stock, invoices, and team dispatch',
+    isSystemRole: true,
+    permissions: {
+      canManageJobs: true,
+      canViewFinancials: true,
+      canManageStaff: true,
+      canManageInventory: true,
+      canAccessSettings: false,
+      canAccessSuperAdmin: false,
+      canAccessCustomerPortal: true,
+      canManageServices: true,
+      canManageContracts: true,
+    },
+  },
+  {
+    id: 'role-technician',
+    name: 'Field Service Technician',
+    code: 'technician',
+    description: 'Field service worker focusing on assigned job tickets, status updates & material usage',
+    isSystemRole: true,
+    permissions: {
+      canManageJobs: true,
+      canViewFinancials: false,
+      canManageStaff: false,
+      canManageInventory: false,
+      canAccessSettings: false,
+      canAccessSuperAdmin: false,
+      canAccessCustomerPortal: false,
+      canManageServices: false,
+      canManageContracts: false,
+    },
+  },
+];
 
 export const DEMO_PLANS: Plan[] = [
   {

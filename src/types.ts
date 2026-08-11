@@ -1,5 +1,26 @@
 export type UserRole = 'super_admin' | 'business_owner' | 'manager' | 'technician';
 
+export interface RolePermission {
+  canManageJobs: boolean;
+  canViewFinancials: boolean; // Invoices, Quotations, Payments, Expenses
+  canManageStaff: boolean;
+  canManageInventory: boolean;
+  canAccessSettings: boolean;
+  canAccessSuperAdmin: boolean;
+  canAccessCustomerPortal: boolean;
+  canManageServices: boolean;
+  canManageContracts: boolean;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  code: UserRole;
+  description: string;
+  isSystemRole?: boolean;
+  permissions: RolePermission;
+}
+
 export interface User {
   id: string;
   name: string;
