@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { RouteOptimizerModal } from '../components/RouteOptimizerModal';
 import {
   Briefcase,
   Users,
@@ -24,12 +23,7 @@ import {
   Zap,
   Receipt,
   X,
-  Navigation,
-  Trophy,
-  Award,
   Star,
-  Medal,
-  Flame,
   Target,
   ShieldCheck,
 } from 'lucide-react';
@@ -91,8 +85,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [custType, setCustType] = useState<'commercial' | 'individual'>('commercial');
 
   const [isQuickQuoteOpen, setIsQuickQuoteOpen] = useState(false);
-  const [isRouteOptimizerOpen, setIsRouteOptimizerOpen] = useState(false);
-  const [leaderboardTimeframe, setLeaderboardTimeframe] = useState<'week' | 'month' | 'all'>('month');
   const [quoteCustomerId, setQuoteCustomerId] = useState('');
   const [quoteDescription, setQuoteDescription] = useState('');
   const [quoteRate, setQuoteRate] = useState<number>(1500);
@@ -264,7 +256,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           )}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
           {/* Action 1: Add Customer */}
           <button
             onClick={() => setIsAddCustomerOpen(true)}
@@ -336,18 +328,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <span className="text-xs font-bold">Create Invoice</span>
             <span className="text-[10px] text-slate-400 dark:text-slate-500">Bill & payment</span>
-          </button>
-
-          {/* Action 6: AI Route Optimizer */}
-          <button
-            onClick={() => setIsRouteOptimizerOpen(true)}
-            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 hover:from-indigo-500 hover:to-purple-600 text-white transition-all group active:scale-95 cursor-pointer shadow-md hover:shadow-lg"
-          >
-            <div className="p-2 rounded-xl bg-white/20 text-amber-300 mb-1.5 group-hover:scale-110 transition-transform">
-              <Navigation className="w-4 h-4 animate-pulse" />
-            </div>
-            <span className="text-xs font-black">AI Route Optimizer</span>
-            <span className="text-[10px] text-indigo-200">Google Maps Dispatch</span>
           </button>
         </div>
       </div>
@@ -615,238 +595,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* AI Technician Route Dispatch Banner / Card */}
-      <div className="p-5 rounded-3xl bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-900 text-white shadow-lg relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-indigo-800/50">
-        <div className="space-y-1.5 max-w-2xl relative z-10">
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/30 text-amber-300 font-extrabold text-[11px] flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-amber-300" /> AI Route Optimization & Google Maps
-            </span>
-            <span className="text-xs text-indigo-200/80">Real-Time Field Logistics</span>
-          </div>
 
-          <h2 className="text-base font-black tracking-tight">
-            Sequence Daily Field Routes for Maximum Efficiency
-          </h2>
-          <p className="text-xs text-indigo-200/90 leading-relaxed">
-            Use Gemini AI & Google Maps to optimize technician drive times, avoid traffic congestion, reduce fuel consumption by up to 35%, and ensure high-priority sites are serviced first.
-          </p>
-
-          <div className="flex flex-wrap items-center gap-4 pt-1 text-[11px] text-indigo-300 font-semibold">
-            <span className="flex items-center gap-1">
-              <Navigation className="w-3.5 h-3.5 text-amber-300" /> Multi-Stop Sequencing
-            </span>
-            <span className="flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-emerald-400" /> Interactive Map Pins
-            </span>
-            <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-cyan-300" /> Turn-by-Turn GPS Navigation
-            </span>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setIsRouteOptimizerOpen(true)}
-          className="py-3 px-5 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs shadow-lg hover:shadow-xl transition-all flex items-center gap-2 shrink-0 active:scale-95 cursor-pointer relative z-10"
-        >
-          <Navigation className="w-4 h-4 text-slate-950" />
-          <span>Launch AI Route Optimizer</span>
-        </button>
-      </div>
-
-      {/* Performance Highlights & Technician Leaderboard */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 font-black shadow-md">
-              <Trophy className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-black text-slate-900 dark:text-slate-100">
-                  Performance Highlights
-                </h2>
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-extrabold text-[10px] uppercase tracking-wider flex items-center gap-1 border border-amber-300 dark:border-amber-700">
-                  <Flame className="w-3 h-3 text-amber-600 fill-amber-500 animate-pulse" /> Field Gamification
-                </span>
-              </div>
-              <p className="text-xs text-slate-500">
-                Top-performing field technicians ranked by completed service jobs, CSAT, & efficiency
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700 self-start sm:self-auto">
-            {(['week', 'month', 'all'] as const).map((tf) => (
-              <button
-                key={tf}
-                type="button"
-                onClick={() => setLeaderboardTimeframe(tf)}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  leaderboardTimeframe === tf
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
-              >
-                {tf === 'week' ? 'This Week' : tf === 'month' ? 'This Month' : 'All-Time'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Highlight Quick Stats Header */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-50 dark:from-indigo-950/40 dark:to-slate-800/40 border border-indigo-100 dark:border-indigo-900/40">
-            <div className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 text-xs font-bold mb-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Total Completed Jobs
-            </div>
-            <div className="text-xl font-black text-slate-900 dark:text-slate-100">
-              {jobs.filter((j) => j.status === 'completed' || j.status === 'verified').length}
-            </div>
-            <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
-              +18% vs last month
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-50 to-slate-50 dark:from-amber-950/40 dark:to-slate-800/40 border border-amber-100 dark:border-amber-900/40">
-            <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 text-xs font-bold mb-1">
-              <Star className="w-3.5 h-3.5 fill-amber-400" /> Avg CSAT Rating
-            </div>
-            <div className="text-xl font-black text-slate-900 dark:text-slate-100">
-              4.92 / 5.0
-            </div>
-            <div className="text-[10px] text-amber-700 dark:text-amber-300 font-bold mt-0.5">
-              98.4% satisfied clients
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-50 to-slate-50 dark:from-emerald-950/40 dark:to-slate-800/40 border border-emerald-100 dark:border-emerald-900/40">
-            <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-xs font-bold mb-1">
-              <Clock className="w-3.5 h-3.5" /> Avg Service Speed
-            </div>
-            <div className="text-xl font-black text-slate-900 dark:text-slate-100">
-              42 mins
-            </div>
-            <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
-              -12 mins response time
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-2xl bg-gradient-to-br from-purple-50 to-slate-50 dark:from-purple-950/40 dark:to-slate-800/40 border border-purple-100 dark:border-purple-900/40">
-            <div className="flex items-center gap-1.5 text-purple-600 dark:text-purple-400 text-xs font-bold mb-1">
-              <Award className="w-3.5 h-3.5" /> First-Time Fix Rate
-            </div>
-            <div className="text-xl font-black text-slate-900 dark:text-slate-100">
-              96.8%
-            </div>
-            <div className="text-[10px] text-purple-600 dark:text-purple-400 font-bold mt-0.5">
-              Zero recall record
-            </div>
-          </div>
-        </div>
-
-        {/* Technician Leaderboard Cards List */}
-        <div className="space-y-3 pt-2">
-          <div className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
-            <span>Technician Leaderboard Standings</span>
-            <span>Performance Badges & Score</span>
-          </div>
-
-          {staff
-            .filter((s) => s.role === 'technician' || s.role === 'business_owner')
-            .map((tech, idx) => {
-              const techJobs = jobs.filter((j) => j.assignedStaffId === tech.id);
-              const completedJobs = techJobs.filter(
-                (j) => j.status === 'completed' || j.status === 'verified' || j.status === 'closed'
-              );
-              const totalRevenue = completedJobs.reduce((sum, j) => sum + (j.estimatedAmount || 0), 0);
-
-              const rankIcons = ['🏆', '🥈', '🥉'];
-              const rankColors = [
-                'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 border-amber-300 shadow-md',
-                'bg-slate-200 text-slate-800 border-slate-300 dark:bg-slate-700 dark:text-slate-200',
-                'bg-amber-800/20 text-amber-900 dark:text-amber-300 border-amber-700/40',
-              ];
-
-              const rating = (4.85 + (idx % 3) * 0.05).toFixed(1);
-              const speedMins = 38 + idx * 4;
-              const onTime = 98 - idx * 2;
-
-              return (
-                <div
-                  key={tech.id}
-                  className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-                    idx === 0
-                      ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/60 shadow-xs'
-                      : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-3.5">
-                    {/* Rank Badge */}
-                    <div
-                      className={`w-9 h-9 rounded-2xl flex items-center justify-center font-black text-sm border shrink-0 ${
-                        rankColors[idx] || 'bg-slate-100 dark:bg-slate-800 text-slate-600 border-slate-200'
-                      }`}
-                    >
-                      {rankIcons[idx] || `#${idx + 1}`}
-                    </div>
-
-                    {/* Technician Info */}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
-                          {tech.name}
-                        </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
-                          {tech.skillCategory || 'Field Specialist'}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        <span className="flex items-center gap-1 font-bold text-slate-800 dark:text-slate-200">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                          {completedJobs.length} Completed Jobs
-                        </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold">
-                          <Star className="w-3.5 h-3.5 fill-amber-400" />
-                          {rating} / 5.0
-                        </span>
-                        <span>•</span>
-                        <span className="text-slate-600 dark:text-slate-300 font-medium">
-                          {curr}{totalRevenue.toLocaleString()} revenue
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Gamification Badges & Performance Bar */}
-                  <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                    {idx === 0 && (
-                      <span className="px-2.5 py-1 rounded-xl bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 font-bold text-[11px] border border-amber-300 dark:border-amber-700 flex items-center gap-1">
-                        🏆 Top Service Leader
-                      </span>
-                    )}
-                    {idx === 1 && (
-                      <span className="px-2.5 py-1 rounded-xl bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-200 font-bold text-[11px] border border-blue-300 dark:border-blue-700 flex items-center gap-1">
-                        ⚡ Speed Master ({speedMins}m avg)
-                      </span>
-                    )}
-                    {idx === 2 && (
-                      <span className="px-2.5 py-1 rounded-xl bg-purple-100 text-purple-900 dark:bg-purple-950 dark:text-purple-200 font-bold text-[11px] border border-purple-300 dark:border-purple-700 flex items-center gap-1">
-                        ⭐ 100% Client Rating
-                      </span>
-                    )}
-                    <div className="text-right pl-2 border-l border-slate-200 dark:border-slate-700">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase">Efficiency Rate</div>
-                      <div className="text-xs font-black text-indigo-600 dark:text-indigo-400">{onTime}% On-Time</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-        </div>
-      </div>
       <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -1177,11 +926,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       )}
-      {/* Route Optimizer Modal */}
-      <RouteOptimizerModal
-        isOpen={isRouteOptimizerOpen}
-        onClose={() => setIsRouteOptimizerOpen(false)}
-      />
     </div>
   );
 };

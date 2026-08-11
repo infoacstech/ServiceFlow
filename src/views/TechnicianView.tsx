@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Job, JobStatus } from '../types';
 import { DigitalSignatureCanvas } from '../components/DigitalSignatureCanvas';
-import { RouteOptimizerModal } from '../components/RouteOptimizerModal';
 import { VoiceNotesRecorder } from '../components/VoiceNotesRecorder';
 import {
   Briefcase,
@@ -42,7 +41,6 @@ export const TechnicianView: React.FC = () => {
 
   const [selectedJob, setSelectedJob] = useState<Job | null>(activeJob || null);
   const [completionStep, setCompletionStep] = useState<1 | 2 | 3 | 4>(1);
-  const [isRouteOptimizerOpen, setIsRouteOptimizerOpen] = useState(false);
 
   // Completion Form State
   const [problemFound, setProblemFound] = useState('');
@@ -122,32 +120,21 @@ export const TechnicianView: React.FC = () => {
         </div>
       </div>
 
-      {/* Quick Job Selector Bar & Route Optimizer Trigger */}
-      <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1">
-        <div className="flex items-center gap-2 overflow-x-auto">
-          {techJobs.map((j) => (
-            <button
-              key={j.id}
-              onClick={() => setSelectedJob(j)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${
-                selectedJob.id === j.id
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                  : 'bg-white dark:bg-slate-900 border-slate-200 text-slate-700'
-              }`}
-            >
-              {j.jobId}
-            </button>
-          ))}
-        </div>
-
-        <button
-          onClick={() => setIsRouteOptimizerOpen(true)}
-          className="px-3 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer active:scale-95"
-          title="Optimize daily job sequence with AI & Google Maps"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-slate-950" />
-          <span>AI Route Map</span>
-        </button>
+      {/* Quick Job Selector Bar */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {techJobs.map((j) => (
+          <button
+            key={j.id}
+            onClick={() => setSelectedJob(j)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${
+              selectedJob.id === j.id
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                : 'bg-white dark:bg-slate-900 border-slate-200 text-slate-700'
+            }`}
+          >
+            {j.jobId}
+          </button>
+        ))}
       </div>
 
       {/* Customer Location & Contact Card */}
@@ -416,12 +403,6 @@ export const TechnicianView: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* AI Route Optimizer Modal */}
-      <RouteOptimizerModal
-        isOpen={isRouteOptimizerOpen}
-        onClose={() => setIsRouteOptimizerOpen(false)}
-      />
     </div>
   );
 };
