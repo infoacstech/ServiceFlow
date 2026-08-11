@@ -72,54 +72,56 @@ const MainContent: React.FC = () => {
 
         {/* View Content Area */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          {activeTab === 'dashboard' && (
-            <DashboardView
-              setActiveTab={setActiveTab}
-              onNavigateWithFilter={handleNavigateWithFilter}
-              onOpenNewJob={handleOpenNewJob}
-            />
-          )}
-
-          {activeTab === 'customers' && <CustomersView />}
-
-          {activeTab === 'services' && <ServicesView />}
-
-          {activeTab === 'jobs' &&
-            (isTech ? (
-              <TechnicianView />
-            ) : (
-              <JobsView
-                isCreateModalOpen={isCreateJobOpen}
-                setIsCreateModalOpen={setIsCreateJobOpen}
-                initialFilter={jobsFilter}
+          <div key={activeTab} className="animate-in fade-in duration-200">
+            {activeTab === 'dashboard' && (
+              <DashboardView
+                setActiveTab={setActiveTab}
+                onNavigateWithFilter={handleNavigateWithFilter}
+                onOpenNewJob={handleOpenNewJob}
               />
-            ))}
+            )}
 
-          {activeTab === 'staff' && <StaffView />}
+            {activeTab === 'customers' && <CustomersView />}
 
-          {activeTab === 'inventory' && <InventoryView />}
+            {activeTab === 'services' && <ServicesView />}
 
-          {activeTab === 'quotations' && <QuotationsView />}
+            {activeTab === 'jobs' &&
+              (isTech ? (
+                <TechnicianView />
+              ) : (
+                <JobsView
+                  isCreateModalOpen={isCreateJobOpen}
+                  setIsCreateModalOpen={setIsCreateJobOpen}
+                  initialFilter={jobsFilter}
+                />
+              ))}
 
-          {activeTab === 'invoices' && <InvoicesView initialFilter={invoicesFilter} />}
+            {activeTab === 'staff' && <StaffView />}
 
-          {activeTab === 'payments' && <PaymentsView />}
+            {activeTab === 'inventory' && <InventoryView />}
 
-          {activeTab === 'contracts' && <ContractsView />}
+            {activeTab === 'quotations' && <QuotationsView />}
 
-          {activeTab === 'expenses' && <ExpensesView />}
+            {activeTab === 'invoices' && <InvoicesView initialFilter={invoicesFilter} />}
 
-          {activeTab === 'reports' && <ReportsView />}
+            {activeTab === 'payments' && <PaymentsView />}
 
-          {activeTab === 'ai_assistant' && <AIAssistantView />}
+            {activeTab === 'contracts' && <ContractsView />}
 
-          {activeTab === 'customer_portal' && <CustomerPortalView />}
+            {activeTab === 'expenses' && <ExpensesView />}
 
-          {activeTab === 'super_admin' && <SuperAdminView />}
+            {activeTab === 'reports' && <ReportsView />}
 
-          {activeTab === 'settings' && <SettingsView />}
+            {activeTab === 'ai_assistant' && <AIAssistantView />}
 
-          {activeTab === 'notifications' && <NotificationsView />}
+            {activeTab === 'customer_portal' && <CustomerPortalView />}
+
+            {activeTab === 'super_admin' && <SuperAdminView />}
+
+            {activeTab === 'settings' && <SettingsView />}
+
+            {activeTab === 'notifications' && <NotificationsView />}
+          </div>
         </main>
       </div>
 
