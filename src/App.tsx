@@ -11,6 +11,7 @@ import { OfflineSyncBanner } from './components/OfflineSyncBanner';
 import { AuthModal } from './components/AuthModal';
 import { AccessDeniedView } from './components/AccessDeniedView';
 import { PullToRefresh } from './components/PullToRefresh';
+import { PwaInstallPrompt } from './components/PwaInstallPrompt';
 
 import { DashboardView } from './views/DashboardView';
 import { CustomersView } from './views/CustomersView';
@@ -198,6 +199,7 @@ const MainContent: React.FC = () => {
         />
         <GlobalSearchModal onSelectTab={(tab) => setActiveTab(tab)} />
         <ActivityLogDrawer />
+        <PwaInstallPrompt />
         <ToastContainer />
       </div>
     </PullToRefresh>
