@@ -10,6 +10,7 @@ import { ActivityLogDrawer } from './components/ActivityLogDrawer';
 import { OfflineSyncBanner } from './components/OfflineSyncBanner';
 import { AuthModal } from './components/AuthModal';
 import { AccessDeniedView } from './components/AccessDeniedView';
+import { PullToRefresh } from './components/PullToRefresh';
 
 import { DashboardView } from './views/DashboardView';
 import { CustomersView } from './views/CustomersView';
@@ -98,106 +99,108 @@ const MainContent: React.FC = () => {
   const isTech = currentUser.role === 'technician';
 
   return (
-    <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
-      {/* Offline Sync Banner for Technicians */}
-      <OfflineSyncBanner />
+    <PullToRefresh>
+      <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
+        {/* Offline Sync Banner for Technicians */}
+        <OfflineSyncBanner />
 
-      {/* Top Navbar Header */}
-      <Navbar
-        onOpenOnboarding={() => setIsOnboardingOpen(true)}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-      />
+        {/* Top Navbar Header */}
+        <Navbar
+          onOpenOnboarding={() => setIsOnboardingOpen(true)}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+        />
 
-      {/* Main Workspace Layout */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto overflow-hidden">
-        {/* Desktop Sidebar */}
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+        {/* Main Workspace Layout */}
+        <div className="flex-1 flex max-w-7xl w-full mx-auto overflow-hidden">
+          {/* Desktop Sidebar */}
+          <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-        {/* View Content Area */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          <div key={activeTab} className="animate-in fade-in duration-200">
-            {!currentTabAccess.allowed ? (
-              <AccessDeniedView
-                requiredRoleLabel={currentTabAccess.label}
-                onSwitchAccount={() => setActiveTab('login')}
-              />
-            ) : (
-              <>
-                {activeTab === 'dashboard' && (
-                  <DashboardView
-                    setActiveTab={setActiveTab}
-                    onNavigateWithFilter={handleNavigateWithFilter}
-                    onOpenNewJob={handleOpenNewJob}
-                  />
-                )}
-
-                {activeTab === 'customers' && <CustomersView />}
-
-                {activeTab === 'services' && <ServicesView />}
-
-                {activeTab === 'jobs' &&
-                  (isTech ? (
-                    <TechnicianView />
-                  ) : (
-                    <JobsView
-                      isCreateModalOpen={isCreateJobOpen}
-                      setIsCreateModalOpen={setIsCreateJobOpen}
-                      initialFilter={jobsFilter}
+          {/* View Content Area */}
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+            <div key={activeTab} className="animate-in fade-in duration-200">
+              {!currentTabAccess.allowed ? (
+                <AccessDeniedView
+                  requiredRoleLabel={currentTabAccess.label}
+                  onSwitchAccount={() => setActiveTab('login')}
+                />
+              ) : (
+                <>
+                  {activeTab === 'dashboard' && (
+                    <DashboardView
+                      setActiveTab={setActiveTab}
+                      onNavigateWithFilter={handleNavigateWithFilter}
+                      onOpenNewJob={handleOpenNewJob}
                     />
-                  ))}
+                  )}
 
-                {activeTab === 'staff' && <StaffView />}
+                  {activeTab === 'customers' && <CustomersView />}
 
-                {activeTab === 'inventory' && <InventoryView />}
+                  {activeTab === 'services' && <ServicesView />}
 
-                {activeTab === 'quotations' && <QuotationsView />}
+                  {activeTab === 'jobs' &&
+                    (isTech ? (
+                      <TechnicianView />
+                    ) : (
+                      <JobsView
+                        isCreateModalOpen={isCreateJobOpen}
+                        setIsCreateModalOpen={setIsCreateJobOpen}
+                        initialFilter={jobsFilter}
+                      />
+                    ))}
 
-                {activeTab === 'invoices' && <InvoicesView initialFilter={invoicesFilter} />}
+                  {activeTab === 'staff' && <StaffView />}
 
-                {activeTab === 'payments' && <PaymentsView />}
+                  {activeTab === 'inventory' && <InventoryView />}
 
-                {activeTab === 'contracts' && <ContractsView />}
+                  {activeTab === 'quotations' && <QuotationsView />}
 
-                {activeTab === 'expenses' && <ExpensesView />}
+                  {activeTab === 'invoices' && <InvoicesView initialFilter={invoicesFilter} />}
 
-                {activeTab === 'reports' && <ReportsView />}
+                  {activeTab === 'payments' && <PaymentsView />}
 
-                {activeTab === 'ai_assistant' && <AIAssistantView />}
+                  {activeTab === 'contracts' && <ContractsView />}
 
-                {activeTab === 'customer_portal' && <CustomerPortalView />}
+                  {activeTab === 'expenses' && <ExpensesView />}
 
-                {activeTab === 'super_admin' && <SuperAdminView />}
+                  {activeTab === 'reports' && <ReportsView />}
 
-                {activeTab === 'settings' && <SettingsView />}
+                  {activeTab === 'ai_assistant' && <AIAssistantView />}
 
-                {activeTab === 'notifications' && <NotificationsView />}
+                  {activeTab === 'customer_portal' && <CustomerPortalView />}
 
-                {activeTab === 'login' && (
-                  <LoginView onLoginSuccess={() => setActiveTab(isTech ? 'jobs' : 'dashboard')} />
-                )}
-              </>
-            )}
-          </div>
-        </main>
+                  {activeTab === 'super_admin' && <SuperAdminView />}
+
+                  {activeTab === 'settings' && <SettingsView />}
+
+                  {activeTab === 'notifications' && <NotificationsView />}
+
+                  {activeTab === 'login' && (
+                    <LoginView onLoginSuccess={() => setActiveTab(isTech ? 'jobs' : 'dashboard')} />
+                  )}
+                </>
+              )}
+            </div>
+          </main>
+        </div>
+
+        {/* Mobile Bottom Navigation */}
+        <MobileNav activeTab={activeTab} setActiveTab={setActiveTab} />
+
+        {/* Global Modals & Toasts */}
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+        />
+        <OnboardingModal
+          isOpen={isOnboardingOpen}
+          onClose={() => setIsOnboardingOpen(false)}
+        />
+        <GlobalSearchModal onSelectTab={(tab) => setActiveTab(tab)} />
+        <ActivityLogDrawer />
+        <ToastContainer />
       </div>
-
-      {/* Mobile Bottom Navigation */}
-      <MobileNav activeTab={activeTab} setActiveTab={setActiveTab} />
-
-      {/* Global Modals & Toasts */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-      />
-      <OnboardingModal
-        isOpen={isOnboardingOpen}
-        onClose={() => setIsOnboardingOpen(false)}
-      />
-      <GlobalSearchModal onSelectTab={(tab) => setActiveTab(tab)} />
-      <ActivityLogDrawer />
-      <ToastContainer />
-    </div>
+    </PullToRefresh>
   );
 };
 

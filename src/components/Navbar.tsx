@@ -9,6 +9,7 @@ import {
   UserCheck,
   Check,
   RotateCcw,
+  RefreshCw,
   Sliders,
   ChevronDown,
   Sparkles,
@@ -46,10 +47,26 @@ export const Navbar: React.FC<NavbarProps> = ({
     theme,
     toggleTheme,
     setIsActivityLogOpen,
+    syncOfflineQueue,
+    showToast,
   } = useApp();
 
   type ActiveMenu = 'tenant' | 'role' | 'notif' | 'profile' | null;
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
+  const [isRefreshingPage, setIsRefreshingPage] = useState(false);
+
+  const handleHeaderRefresh = () => {
+    setIsRefreshingPage(true);
+    syncOfflineQueue();
+    showToast('Refreshing application & syncing latest data...', 'info');
+    setTimeout(() => {
+      setIsRefreshingPage(false);
+      showToast('App refreshed successfully!', 'success');
+      if (navigator.onLine) {
+        window.location.reload();
+      }
+    }, 600);
+  };
 
   const toggleMenu = (menu: ActiveMenu) => {
     setActiveMenu((prev) => (prev === menu ? null : menu));
@@ -239,6 +256,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             aria-label="Activity Log"
           >
             <History className="w-4 h-4" />
+          </button>
+
+          {/* Refresh App Button */}
+          <button
+            onClick={handleHeaderRefresh}
+            disabled={isRefreshingPage}
+            className="p-1.5 sm:p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors active:scale-95"
+            title="Refresh site & sync data"
+            aria-label="Refresh Site"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshingPage ? 'animate-spin text-indigo-600' : ''}`} />
           </button>
 
           {/* Dark / Light Theme Toggle */}
