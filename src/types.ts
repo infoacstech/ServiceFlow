@@ -32,6 +32,9 @@ export interface User {
   skills?: string[];
   joiningDate?: string;
   status: 'active' | 'inactive' | 'on_leave';
+  approvalStatus?: 'active' | 'pending' | 'rejected' | 'blocked' | 'suspended';
+  password?: string;
+  requestedDate?: string;
 }
 
 export interface Business {
@@ -50,7 +53,7 @@ export interface Business {
   currency: string; // Default '₹' or '$', '€', '£', etc.
   createdAt: string;
   planId: string;
-  status: 'active' | 'suspended' | 'trial';
+  status: 'active' | 'suspended' | 'pending' | 'rejected' | 'trial';
 }
 
 export interface Plan {

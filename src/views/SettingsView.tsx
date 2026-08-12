@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   Activity,
   ArrowUpRight,
+  KeyRound,
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
@@ -42,7 +43,47 @@ export const SettingsView: React.FC = () => {
     clearSyncLogs,
     toggleSimulateOffline,
     currentUser,
+    updateUserPassword,
+    showToast,
   } = useApp();
+
+  // Password Change State
+  const [currentPassInput, setCurrentPassInput] = useState('');
+  const [newPassInput, setNewPassInput] = useState('');
+  const [confirmPassInput, setConfirmPassInput] = useState('');
+  const [passChangeSuccess, setPassChangeSuccess] = useState(false);
+
+  const handlePasswordChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassInput.trim()) {
+      showToast('Please enter a new password', 'error');
+      return;
+    }
+
+    if (newPassInput.length < 4) {
+      showToast('Password must be at least 4 characters long', 'error');
+      return;
+    }
+
+    if (newPassInput !== confirmPassInput) {
+      showToast('New passwords do not match', 'error');
+      return;
+    }
+
+    // Verify current password if user already had a password
+    if (currentUser.password && currentPassInput !== currentUser.password) {
+      showToast('Current password is incorrect', 'error');
+      return;
+    }
+
+    updateUserPassword(currentUser.id, newPassInput.trim());
+    setPassChangeSuccess(true);
+    setCurrentPassInput('');
+    setNewPassInput('');
+    setConfirmPassInput('');
+    showToast('Your password has been updated successfully!', 'success');
+    setTimeout(() => setPassChangeSuccess(false), 3000);
+  };
 
   const [formData, setFormData] = useState({
     name: currentBusiness.name,
@@ -490,6 +531,73 @@ export const SettingsView: React.FC = () => {
             })
           )}
         </div>
+      </div>
+
+      {/* Change Password Card */}
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+        <div>
+          <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-indigo-600" /> Account Password & Security
+          </h2>
+          <p className="text-xs text-slate-500">
+            Change your account password. Logged in as <strong className="text-slate-700 dark:text-slate-200">{currentUser.name}</strong> ({currentUser.email || currentUser.phone}).
+          </p>
+        </div>
+
+        {passChangeSuccess && (
+          <div className="p-3 bg-emerald-50 text-emerald-800 rounded-2xl font-bold text-xs flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Password updated successfully!
+          </div>
+        )}
+
+        <form onSubmit={handlePasswordChange} className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          {currentUser.password && (
+            <div>
+              <label className="font-semibold block mb-1">Current Password *</label>
+              <input
+                type="password"
+                required
+                value={currentPassInput}
+                onChange={(e) => setCurrentPassInput(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 dark:border-slate-700 font-medium"
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="font-semibold block mb-1">New Password *</label>
+            <input
+              type="password"
+              required
+              value={newPassInput}
+              onChange={(e) => setNewPassInput(e.target.value)}
+              placeholder="Min 4 chars"
+              className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 dark:border-slate-700 font-medium"
+            />
+          </div>
+
+          <div>
+            <label className="font-semibold block mb-1">Confirm New Password *</label>
+            <input
+              type="password"
+              required
+              value={confirmPassInput}
+              onChange={(e) => setConfirmPassInput(e.target.value)}
+              placeholder="Repeat new password"
+              className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 dark:border-slate-700 font-medium"
+            />
+          </div>
+
+          <div className="sm:col-span-3 flex justify-end pt-2">
+            <button
+              type="submit"
+              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md flex items-center gap-2 cursor-pointer"
+            >
+              <KeyRound className="w-4 h-4" /> Update Password
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Global Theme & Appearance Preference */}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { User } from '../types';
 import {
   Phone,
   Mail,
@@ -12,8 +13,10 @@ import {
   Sparkles,
   Building2,
   KeyRound,
-  LogOut,
-  Smartphone,
+  UserPlus,
+  Clock,
+  Ban,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -30,84 +33,163 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     switchRole,
     currentUser,
     showToast,
-    addStaff,
-    currentBusiness,
+    registerUser,
   } = useApp();
 
-  const [authMode, setAuthMode] = useState<'phone' | 'email' | 'quick'>('phone');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'business_owner' | 'manager' | 'technician'>('technician');
-  const [newName, setNewName] = useState('');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'quick'>('login');
+
+  // Direct Login States
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // Direct Registration States
+  const [registerRole, setRegisterRole] = useState<'business_owner' | 'manager' | 'technician'>('business_owner');
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regBusinessId, setRegBusinessId] = useState(businesses[0]?.id || 'biz-1');
+  const [regBusinessName, setRegBusinessName] = useState('');
+  const [regBusinessType, setRegBusinessType] = useState('CCTV & Security');
+
+  const [pendingRegistrationSuccess, setPendingRegistrationSuccess] = useState<User | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSendOTP = (e: React.FormEvent) => {
+  const handleDirectLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phoneNumber || phoneNumber.length < 10) {
-      showToast('Please enter a valid 10-digit mobile number', 'error');
-      return;
-    }
-    setOtpSent(true);
-    setOtpCode('1234'); // Pre-fill default 4-digit code for fast testing
-    showToast(`OTP sent to +91 ${phoneNumber}! (Demo OTP: 1234)`, 'info');
-  };
-
-  const handleVerifyOTP = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (otpCode !== '1234' && otpCode.length < 4) {
-      showToast('Please enter valid 4-digit OTP (Try: 1234)', 'error');
+    const clean = loginIdentifier.trim().toLowerCase();
+    if (!clean) {
+      showToast('Please enter your email or mobile number', 'error');
       return;
     }
 
-    // Search existing user by phone number
     const matchedUser = (users || []).find(
-      (u) => u.phone.replace(/[^0-9]/g, '').endsWith(phoneNumber.replace(/[^0-9]/g, '').slice(-10))
+      (u) =>
+        u.email.toLowerCase() === clean ||
+        u.phone.replace(/[^0-9]/g, '').endsWith(clean.replace(/[^0-9]/g, '').slice(-10))
     );
 
-    if (matchedUser) {
-      setCurrentUser(matchedUser);
-      switchBusiness(matchedUser.businessId);
-      showToast(`Logged in successfully as ${matchedUser.name} (${matchedUser.role})`, 'success');
-      onClose();
-    } else {
-      // Create new staff/technician account with this phone number
-      const userName = newName || `Mobile User (${phoneNumber.slice(-4)})`;
-      const createdUser = addStaff({
-        name: userName,
-        email: `${phoneNumber}@serviflow.app`,
-        phone: `+91 ${phoneNumber}`,
-        role: selectedRole,
-        status: 'active',
-      });
-      setCurrentUser(createdUser);
-      showToast(`New account created & logged in for ${userName}`, 'success');
-      onClose();
-    }
-  };
-
-  const handleEmailLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) {
-      showToast('Please enter email address', 'error');
+    if (!matchedUser) {
+      showToast('No user account found with this email or mobile number.', 'error');
       return;
     }
 
-    const matchedUser = (users || []).find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (matchedUser) {
-      setCurrentUser(matchedUser);
-      switchBusiness(matchedUser.businessId);
-      showToast(`Welcome back, ${matchedUser.name}!`, 'success');
-      onClose();
+    if (matchedUser.password && loginPassword && matchedUser.password !== loginPassword) {
+      showToast('Incorrect password. Please try again.', 'error');
+      return;
+    }
+
+    const userBiz = (businesses || []).find((b) => b.id === matchedUser.businessId);
+
+    if (userBiz?.status === 'suspended') {
+      showToast('Your business account access has been suspended by the platform admin.', 'error');
+      return;
+    }
+
+    if (matchedUser.role === 'business_owner') {
+      const bizStatus = userBiz?.status || matchedUser.approvalStatus || 'active';
+      if (bizStatus === 'pending' || matchedUser.approvalStatus === 'pending') {
+        showToast('Your business registration is pending approval from the platform admin. You will be notified once approved.', 'error');
+        return;
+      }
+      if (bizStatus === 'rejected' || matchedUser.approvalStatus === 'rejected') {
+        showToast('Your registration was rejected by the platform admin.', 'error');
+        return;
+      }
+      if (bizStatus === 'suspended' || matchedUser.approvalStatus === 'suspended') {
+        showToast('Your business account access has been suspended by the platform admin.', 'error');
+        return;
+      }
+    } else if (matchedUser.role !== 'super_admin') {
+      const staffStatus = matchedUser.approvalStatus || 'active';
+      if (staffStatus === 'pending') {
+        showToast('Waiting for Owner approval. Contact your business owner to activate your account.', 'error');
+        return;
+      }
+      if (staffStatus === 'rejected') {
+        showToast('Your registration was rejected by the business owner.', 'error');
+        return;
+      }
+      if (staffStatus === 'blocked' || staffStatus === 'suspended') {
+        showToast('Your access has been blocked by the business owner. Contact them for details.', 'error');
+        return;
+      }
+    }
+
+    setCurrentUser(matchedUser);
+    switchBusiness(matchedUser.businessId);
+    showToast(`Welcome back, ${matchedUser.name}!`, 'success');
+    onClose();
+  };
+
+  const handleDirectRegistration = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regName.trim() || !regEmail.trim() || !regPhone.trim() || !regPassword.trim()) {
+      showToast('Please complete all required fields including password', 'error');
+      return;
+    }
+
+    const result = registerUser({
+      name: regName.trim(),
+      email: regEmail.trim(),
+      phone: regPhone.trim(),
+      password: regPassword,
+      role: registerRole,
+      businessId: registerRole !== 'business_owner' ? regBusinessId : undefined,
+      businessName: registerRole === 'business_owner' ? regBusinessName || `${regName.trim()}'s Services` : undefined,
+      businessType: registerRole === 'business_owner' ? regBusinessType : undefined,
+    });
+
+    if (result.isPending) {
+      setPendingRegistrationSuccess(result.user);
+      setRegName('');
+      setRegEmail('');
+      setRegPhone('');
+      setRegPassword('');
     } else {
-      showToast('No user account found with this email. Please check or use Quick Login.', 'error');
+      onClose();
     }
   };
 
-  const handleQuickLogin = (u: any) => {
+  const handleQuickLogin = (u: User) => {
+    const userBiz = (businesses || []).find((b) => b.id === u.businessId);
+
+    if (userBiz?.status === 'suspended') {
+      showToast('Your business account access has been suspended by the platform admin.', 'error');
+      return;
+    }
+
+    if (u.role === 'business_owner') {
+      const bizStatus = userBiz?.status || u.approvalStatus || 'active';
+      if (bizStatus === 'pending' || u.approvalStatus === 'pending') {
+        showToast('Your business registration is pending approval from the platform admin. You will be notified once approved.', 'error');
+        return;
+      }
+      if (bizStatus === 'rejected' || u.approvalStatus === 'rejected') {
+        showToast('Your registration was rejected by the platform admin.', 'error');
+        return;
+      }
+      if (bizStatus === 'suspended' || u.approvalStatus === 'suspended') {
+        showToast('Your business account access has been suspended by the platform admin.', 'error');
+        return;
+      }
+    } else if (u.role !== 'super_admin') {
+      const staffStatus = u.approvalStatus || 'active';
+      if (staffStatus === 'pending') {
+        showToast('Waiting for Owner approval. Contact your business owner to activate your account.', 'error');
+        return;
+      }
+      if (staffStatus === 'rejected') {
+        showToast('Your registration was rejected by the business owner.', 'error');
+        return;
+      }
+      if (staffStatus === 'blocked' || staffStatus === 'suspended') {
+        showToast('Your access has been blocked by the business owner. Contact them for details.', 'error');
+        return;
+      }
+    }
+
     setCurrentUser(u);
     switchBusiness(u.businessId);
     showToast(`Switched account to ${u.name} (${u.role.replace('_', ' ')})`, 'success');
@@ -115,20 +197,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
-              <Smartphone className="w-5 h-5" />
+              <KeyRound className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                User Sign In & Mobile Login
+                User Sign In & Registration
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Log in via Mobile Number or Email
+                Direct account access with password
               </p>
             </div>
           </div>
@@ -144,28 +226,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         <div className="grid grid-cols-3 p-2 bg-slate-100 dark:bg-slate-800/80 m-3 rounded-2xl text-xs font-medium">
           <button
             onClick={() => {
-              setAuthMode('phone');
-              setOtpSent(false);
+              setAuthMode('login');
+              setPendingRegistrationSuccess(null);
             }}
             className={`py-2 px-1 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-              authMode === 'phone'
+              authMode === 'login'
                 ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 font-semibold shadow-xs'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
-            <Phone className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Mobile Number</span>
+            <KeyRound className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Sign In</span>
           </button>
           <button
-            onClick={() => setAuthMode('email')}
+            onClick={() => {
+              setAuthMode('register');
+              setPendingRegistrationSuccess(null);
+            }}
             className={`py-2 px-1 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-              authMode === 'email'
+              authMode === 'register'
                 ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 font-semibold shadow-xs'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
-            <Mail className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Email Login</span>
+            <UserPlus className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Register</span>
           </button>
           <button
             onClick={() => setAuthMode('quick')}
@@ -176,151 +261,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             }`}
           >
             <UserCheck className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Staff Switch</span>
+            <span className="truncate">Demo Accounts</span>
           </button>
         </div>
 
         {/* Content Body */}
         <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
-          {/* Mobile Phone Auth Tab */}
-          {authMode === 'phone' && (
-            <div>
-              {!otpSent ? (
-                <form onSubmit={handleSendOTP} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Mobile Number (Phone Authentication)
-                    </label>
-                    <div className="relative flex items-center">
-                      <span className="absolute left-3 text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
-                        +91
-                      </span>
-                      <input
-                        type="tel"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                        placeholder="9876543210"
-                        maxLength={10}
-                        required
-                        className="w-full pl-16 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                      />
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-1.5">
-                      Technicians & Owners can enter their 10-digit mobile number to get instant OTP.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Your Name (Required if creating new account)
-                    </label>
-                    <input
-                      type="text"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      placeholder="e.g. Ramesh Kumar"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Select Role (if new user)
-                    </label>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {[
-                        { id: 'technician', label: 'Technician' },
-                        { id: 'manager', label: 'Manager' },
-                        { id: 'business_owner', label: 'Owner' },
-                        { id: 'super_admin', label: 'Super Admin' },
-                      ].map((r) => (
-                        <button
-                          key={r.id}
-                          type="button"
-                          onClick={() => {
-                            if (r.id === 'super_admin') {
-                              switchRole('super_admin');
-                              onClose();
-                            } else {
-                              setSelectedRole(r.id as any);
-                            }
-                          }}
-                          className={`py-2 text-[11px] rounded-xl border font-medium transition-all ${
-                            selectedRole === r.id
-                              ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                              : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                          }`}
-                        >
-                          {r.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md transition-all flex items-center justify-center gap-2"
-                  >
-                    <span>Get Verification OTP</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyOTP} className="space-y-4">
-                  <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-800 dark:text-indigo-300">
-                    <p className="font-semibold">OTP sent to +91 {phoneNumber}</p>
-                    <p className="text-[11px] mt-0.5 opacity-80">Use OTP: <strong className="font-mono text-indigo-900 dark:text-indigo-200">1234</strong> to verify instantly.</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Enter 4-Digit OTP Code
-                    </label>
-                    <input
-                      type="text"
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value)}
-                      placeholder="1234"
-                      maxLength={4}
-                      required
-                      className="w-full text-center tracking-[1em] font-mono font-bold text-lg px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-md transition-all flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Verify & Login</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setOtpSent(false)}
-                    className="w-full text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-center"
-                  >
-                    Change phone number
-                  </button>
-                </form>
-              )}
-            </div>
-          )}
-
-          {/* Email Login Tab */}
-          {authMode === 'email' && (
-            <form onSubmit={handleEmailLogin} className="space-y-4">
+          {/* Direct Sign In Tab */}
+          {authMode === 'login' && (
+            <form onSubmit={handleDirectLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Email Address
+                  Email or Phone Number
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
                   <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="rajesh@securitysolutions.com"
+                    type="text"
+                    value={loginIdentifier}
+                    onChange={(e) => setLoginIdentifier(e.target.value)}
+                    placeholder="rajesh@apexsecurity.com"
                     required
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                   />
@@ -335,8 +295,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   <Lock className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
                   <input
                     type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="••••••••"
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                   />
@@ -345,26 +305,168 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md transition-all flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
               >
-                <span>Sign In with Email</span>
+                <span>Sign In</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
           )}
 
-          {/* Quick Staff Select Tab */}
+          {/* Registration Tab */}
+          {authMode === 'register' && (
+            <div>
+              {pendingRegistrationSuccess ? (
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 rounded-2xl space-y-3">
+                  <div className="flex items-center gap-2 font-bold text-amber-900 dark:text-amber-100 text-sm">
+                    <Clock className="w-5 h-5 text-amber-600" />
+                    <span>Registration Pending Approval</span>
+                  </div>
+                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                    Account created for <strong>{pendingRegistrationSuccess.name}</strong> as{' '}
+                    <strong>{pendingRegistrationSuccess.role.replace('_', ' ')}</strong>.{' '}
+                    {pendingRegistrationSuccess.role === 'business_owner'
+                      ? 'Your business registration is pending approval from the platform admin. You will be notified once approved.'
+                      : 'You will be able to log in once your Business Owner approves your request.'}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setPendingRegistrationSuccess(null);
+                      setAuthMode('login');
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs"
+                  >
+                    Go to Sign In
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleDirectRegistration} className="space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Role
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setRegisterRole('business_owner')}
+                        className={`py-1.5 px-2 text-[11px] font-bold rounded-xl border ${
+                          registerRole === 'business_owner'
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        Owner
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRegisterRole('manager')}
+                        className={`py-1.5 px-2 text-[11px] font-bold rounded-xl border ${
+                          registerRole === 'manager'
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        Manager
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRegisterRole('technician')}
+                        className={`py-1.5 px-2 text-[11px] font-bold rounded-xl border ${
+                          registerRole === 'technician'
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        Technician
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <input
+                      type="text"
+                      value={regName}
+                      onChange={(e) => setRegName(e.target.value)}
+                      placeholder="Full Name *"
+                      required
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 outline-hidden"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="email"
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      placeholder="Email *"
+                      required
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 outline-hidden"
+                    />
+                    <input
+                      type="tel"
+                      value={regPhone}
+                      onChange={(e) => setRegPhone(e.target.value)}
+                      placeholder="Mobile Phone *"
+                      required
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 outline-hidden"
+                    />
+                  </div>
+
+                  {registerRole === 'business_owner' ? (
+                    <input
+                      type="text"
+                      value={regBusinessName}
+                      onChange={(e) => setRegBusinessName(e.target.value)}
+                      placeholder="Business Name *"
+                      required
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 outline-hidden"
+                    />
+                  ) : (
+                    <select
+                      value={regBusinessId}
+                      onChange={(e) => setRegBusinessId(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 outline-hidden"
+                    >
+                      {businesses.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  <div>
+                    <input
+                      type="password"
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      placeholder="Set Password *"
+                      required
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 outline-hidden"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>Create Account</span>
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+
+          {/* Quick Demo Select Tab */}
           {authMode === 'quick' && (
             <div className="space-y-3">
               <div className="p-3 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-2xl flex items-center justify-between">
                 <div>
                   <div className="text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
-                    <ShieldAlert className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                     <span>Super Admin Portal Access</span>
                   </div>
-                  <p className="text-[11px] text-purple-700 dark:text-purple-300 mt-0.5">
-                    Full control over all businesses, billing, and platform tenants.
-                  </p>
                 </div>
                 <button
                   type="button"
@@ -372,18 +474,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     switchRole('super_admin');
                     onClose();
                   }}
-                  className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-xs transition-all shrink-0"
+                  className="px-3 py-1.5 rounded-xl bg-purple-600 text-white font-semibold text-xs shrink-0"
                 >
-                  Login Super Admin
+                  Switch Super Admin
                 </button>
               </div>
 
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Or click any existing staff member / technician to switch:
-              </p>
               {(users || []).map((u) => {
                 const isCurrent = currentUser?.id === u.id;
-                const bizName = (businesses || []).find((b) => b.id === u.businessId)?.name || 'ServiceFlow';
+                const status = u.approvalStatus || 'active';
                 return (
                   <div
                     key={u.id}
@@ -391,7 +490,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
                       isCurrent
                         ? 'bg-indigo-50/80 dark:bg-indigo-950/60 border-indigo-400 dark:border-indigo-700'
-                        : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800 hover:bg-indigo-50/40 dark:hover:bg-slate-800'
+                        : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800 hover:bg-indigo-50/40'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -407,16 +506,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-2">
-                          <span className="capitalize">{u.role.replace('_', ' ')}</span>
-                          <span>•</span>
-                          <span className="truncate">{bizName}</span>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate capitalize">
+                          {u.role.replace('_', ' ')}
                         </div>
                       </div>
                     </div>
-                    <button className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold hover:underline shrink-0">
-                      Login
-                    </button>
+
+                    <div className="shrink-0 ml-2">
+                      {status === 'blocked' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-700">Blocked</span>
+                      ) : status === 'pending' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-700">Pending</span>
+                      ) : (
+                        <button className="text-xs text-indigo-600 font-bold hover:underline">Select</button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -426,7 +530,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
         {/* Footer */}
         <div className="p-3 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-100 dark:border-slate-800 text-center text-[11px] text-slate-500 dark:text-slate-400">
-          Logged in user: <strong className="text-slate-800 dark:text-slate-200">{currentUser.name}</strong> ({currentUser.role.replace('_', ' ')})
+          Logged in: <strong className="text-slate-800 dark:text-slate-200">{currentUser.name}</strong> ({currentUser.role.replace('_', ' ')})
         </div>
       </div>
     </div>

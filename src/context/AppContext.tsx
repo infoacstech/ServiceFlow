@@ -42,7 +42,8 @@ import {
   DEMO_PLANS,
   DEMO_ROLES,
 } from '../data/demoData';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { updatePassword as firebaseUpdatePassword } from 'firebase/auth';
 import { FirestoreService, firestoreService } from '../services/FirestoreService';
 import {
   collection,
@@ -63,11 +64,25 @@ interface AppContextType {
   currentBusiness: Business;
   setCurrentBusiness: (b: Business) => void;
   businesses: Business[];
+  users: User[];
   currentUser: User;
   setCurrentUser: (u: User) => void;
   switchRole: (role: UserRole) => void;
   switchBusiness: (businessId: string) => void;
-  createBusiness: (bData: Partial<Business>, serviceCategoryName?: string) => Business;
+  createBusiness: (bData: Partial<Business>, serviceCategoryName?: string, isPending?: boolean) => Business;
+  updateUserStatus: (userId: string, status: 'active' | 'pending' | 'rejected' | 'blocked' | 'suspended') => void;
+  updateBusinessAndOwnerStatus: (businessId: string, newStatus: 'active' | 'pending' | 'rejected' | 'suspended') => void;
+  updateUserPassword: (userId: string, newPass: string) => Promise<void>;
+  registerUser: (data: {
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+    role: UserRole;
+    businessId?: string;
+    businessName?: string;
+    businessType?: string;
+  }) => { user: User; isPending: boolean };
 
   // Data collections (filtered by current business when applicable)
   customers: Customer[];
@@ -760,7 +775,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Onboarding creation for a brand new business
-  const createBusiness = (bData: Partial<Business>, initialCategoryName = 'General Service') => {
+  const createBusiness = (
+    bData: Partial<Business>,
+    initialCategoryName = 'General Service',
+    isPending = false
+  ) => {
     const newBizId = `biz-${Date.now()}`;
     const newBiz: Business = {
       id: newBizId,
@@ -778,7 +797,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       currency: bData.currency || '₹',
       createdAt: new Date().toISOString().split('T')[0],
       planId: 'plan-pro',
-      status: 'active',
+      status: isPending ? 'pending' : 'active',
     };
 
     const ownerUser: User = {
@@ -788,7 +807,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       phone: newBiz.mobile,
       role: 'business_owner',
       businessId: newBizId,
-      status: 'active',
+      status: isPending ? 'inactive' : 'active',
+      approvalStatus: isPending ? 'pending' : 'active',
+      requestedDate: new Date().toISOString().split('T')[0],
     };
 
     const defaultCategory: ServiceCategory = {
@@ -814,9 +835,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveToFirestore('categories', defaultCategory.id, defaultCategory);
     saveToFirestore('services', defaultService.id, defaultService);
 
-    setCurrentBusiness(newBiz);
-    setCurrentUser(ownerUser);
-    showToast(`Welcome! Business "${newBiz.name}" onboarded and synced to Firestore.`, 'success');
+    if (!isPending) {
+      setCurrentBusiness(newBiz);
+      setCurrentUser(ownerUser);
+      showToast(`Welcome! Business "${newBiz.name}" onboarded and synced to Firestore.`, 'success');
+    }
     return newBiz;
   };
 
@@ -1165,16 +1188,187 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Recorded expense: ${currentBusiness.currency}${newExp.amount}`, 'success');
   };
 
-  // Staff Actions
+  // Staff & User Auth Actions
   const addStaff = (data: Omit<User, 'id' | 'businessId'>) => {
     const newStaff: User = {
       ...data,
       id: `usr-${Date.now()}`,
       businessId: currentBusiness.id,
+      approvalStatus: data.approvalStatus || 'active',
+      status: data.status || 'active',
     };
     saveToFirestore('users', newStaff.id, newStaff);
     showToast(`Staff member "${newStaff.name}" added`, 'success');
     return newStaff;
+  };
+
+  const updateBusinessAndOwnerStatus = (
+    businessId: string,
+    newStatus: 'active' | 'pending' | 'rejected' | 'suspended'
+  ) => {
+    saveToFirestore('businesses', businessId, { status: newStatus });
+
+    const ownerUsers = users.filter((u) => u.businessId === businessId && u.role === 'business_owner');
+    ownerUsers.forEach((owner) => {
+      const userUpdates: Partial<User> = {
+        approvalStatus: newStatus,
+        status: newStatus === 'active' ? 'active' : 'inactive',
+      };
+      saveToFirestore('users', owner.id, userUpdates);
+    });
+
+    const targetBiz = businesses.find((b) => b.id === businessId);
+    const bizName = targetBiz?.name || businessId;
+
+    if (newStatus === 'active') {
+      showToast(`Approved business registration for "${bizName}". Owner can now log in.`, 'success');
+      logActivity('Business Approved', 'staff', businessId, `Super Admin approved business ${bizName}`);
+    } else if (newStatus === 'rejected') {
+      showToast(`Rejected business registration for "${bizName}".`, 'info');
+      logActivity('Business Rejected', 'staff', businessId, `Super Admin rejected business ${bizName}`);
+    } else if (newStatus === 'suspended') {
+      showToast(`Suspended account access for business "${bizName}".`, 'error');
+      logActivity('Business Suspended', 'staff', businessId, `Super Admin suspended business ${bizName}`);
+    }
+  };
+
+  const updateUserStatus = (
+    userId: string,
+    newApprovalStatus: 'active' | 'pending' | 'rejected' | 'blocked' | 'suspended'
+  ) => {
+    const target = users.find((u) => u.id === userId);
+    if (!target) return;
+
+    const updates: Partial<User> = {
+      approvalStatus: newApprovalStatus,
+      status: newApprovalStatus === 'active' ? 'active' : 'inactive',
+    };
+
+    saveToFirestore('users', userId, updates);
+
+    if (newApprovalStatus === 'active') {
+      showToast(`Approved & activated account for ${target.name}`, 'success');
+      logActivity('User Approved', 'staff', userId, `Approved account access for ${target.name} (${target.role})`);
+    } else if (newApprovalStatus === 'rejected') {
+      showToast(`Rejected registration for ${target.name}`, 'info');
+      logActivity('User Rejected', 'staff', userId, `Rejected registration request for ${target.name}`);
+    } else if (newApprovalStatus === 'blocked') {
+      showToast(`Blocked account access for ${target.name}`, 'error');
+      logActivity('User Blocked', 'staff', userId, `Blocked user access for ${target.name}`);
+    } else {
+      showToast(`Updated user status for ${target.name}`, 'info');
+    }
+  };
+
+  const updateUserPassword = async (userId: string, newPassword: string) => {
+    saveToFirestore('users', userId, { password: newPassword });
+
+    if (auth.currentUser && currentUser.id === userId) {
+      try {
+        await firebaseUpdatePassword(auth.currentUser, newPassword);
+      } catch (err) {
+        console.warn('Firebase Auth update password warning:', err);
+      }
+    }
+
+    if (currentUser.id === userId) {
+      setCurrentUser((prev) => ({ ...prev, password: newPassword }));
+    }
+
+    showToast('Password updated successfully in Firebase Authentication & Firestore!', 'success');
+    logActivity('Password Changed', 'staff', userId, 'User updated account password');
+  };
+
+  const registerUser = (data: {
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+    role: UserRole;
+    businessId?: string;
+    businessName?: string;
+    businessType?: string;
+  }): { user: User; isPending: boolean } => {
+    if (data.role === 'business_owner') {
+      let targetBiz = businesses.find((b) => b.id === data.businessId);
+      if (!targetBiz) {
+        targetBiz = createBusiness(
+          {
+            name: data.businessName || `${data.name}'s Business`,
+            type: data.businessType || 'CCTV & Security',
+            email: data.email,
+            mobile: data.phone,
+          },
+          'General Service',
+          true
+        );
+      } else {
+        saveToFirestore('businesses', targetBiz.id, { status: 'pending' });
+      }
+
+      const newOwner: User = {
+        id: `usr-owner-${Date.now()}`,
+        name: data.name,
+        email: data.email,
+        phone: data.phone.startsWith('+') ? data.phone : `+91 ${data.phone}`,
+        role: 'business_owner',
+        businessId: targetBiz.id,
+        password: data.password,
+        joiningDate: new Date().toISOString().split('T')[0],
+        requestedDate: new Date().toISOString().split('T')[0],
+        status: 'inactive',
+        approvalStatus: 'pending',
+      };
+
+      saveToFirestore('users', newOwner.id, newOwner);
+
+      const notification: Notification = {
+        id: `notif-sa-${Date.now()}`,
+        businessId: 'all',
+        title: 'New Business Owner Registration Pending',
+        message: `${newOwner.name} registered business "${targetBiz.name}" (${targetBiz.type}) and is awaiting platform admin approval.`,
+        type: 'system',
+        read: false,
+        createdAt: new Date().toISOString(),
+        targetRoleId: 'super_admin',
+      };
+      saveToFirestore('notifications', notification.id, notification);
+
+      showToast('Your business registration is pending approval from the platform admin. You will be notified once approved.', 'info');
+      return { user: newOwner, isPending: true };
+    } else {
+      const bId = data.businessId || currentBusiness.id;
+      const newStaff: User = {
+        id: `usr-${Date.now()}`,
+        name: data.name,
+        email: data.email,
+        phone: data.phone.startsWith('+') ? data.phone : `+91 ${data.phone}`,
+        role: data.role,
+        businessId: bId,
+        password: data.password,
+        joiningDate: new Date().toISOString().split('T')[0],
+        requestedDate: new Date().toISOString().split('T')[0],
+        status: 'inactive',
+        approvalStatus: 'pending',
+      };
+
+      saveToFirestore('users', newStaff.id, newStaff);
+
+      const notification: Notification = {
+        id: `notif-${Date.now()}`,
+        businessId: bId,
+        title: 'New Account Approval Request',
+        message: `${newStaff.name} registered as ${newStaff.role.replace('_', ' ')} and is waiting for your approval.`,
+        type: 'system',
+        read: false,
+        createdAt: new Date().toISOString(),
+        targetRoleId: 'business_owner',
+      };
+      saveToFirestore('notifications', notification.id, notification);
+
+      showToast(`Registration submitted for ${newStaff.name}. Waiting for Owner approval.`, 'info');
+      return { user: newStaff, isPending: true };
+    }
   };
 
   const updateBusinessSettings = (updates: Partial<Business>) => {
@@ -1249,11 +1443,16 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentBusiness,
         setCurrentBusiness,
         businesses,
+        users,
         currentUser,
         setCurrentUser,
         switchRole,
         switchBusiness,
         createBusiness,
+        updateUserStatus,
+        updateBusinessAndOwnerStatus,
+        updateUserPassword,
+        registerUser,
 
         customers: filteredCustomers,
         categories: filteredCategories,
