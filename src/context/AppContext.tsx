@@ -43,11 +43,22 @@ import {
   DEMO_ROLES,
 } from '../data/demoData';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { updatePassword as firebaseUpdatePassword } from 'firebase/auth';
+import {
+  updatePassword as firebaseUpdatePassword,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInAnonymously,
+  signOut,
+  onAuthStateChanged,
+} from 'firebase/auth';
 import { FirestoreService, firestoreService } from '../services/FirestoreService';
 import {
   collection,
   doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
   setDoc,
   deleteDoc,
   onSnapshot,
@@ -65,9 +76,12 @@ interface AppContextType {
   setCurrentBusiness: (b: Business) => void;
   businesses: Business[];
   users: User[];
-  currentUser: User;
-  setCurrentUser: (u: User) => void;
-  switchRole: (role: UserRole) => void;
+  currentUser: User | null;
+  setCurrentUser: (u: User | null) => void;
+  isAuthInitializing: boolean;
+  loginUser: (u: User, password?: string) => Promise<User>;
+  logoutUser: () => Promise<void>;
+  switchRole: (role: UserRole) => Promise<void>;
   switchBusiness: (businessId: string) => void;
   createBusiness: (bData: Partial<Business>, serviceCategoryName?: string, isPending?: boolean) => Business;
   updateUserStatus: (userId: string, status: 'active' | 'pending' | 'rejected' | 'blocked' | 'suspended') => void;
@@ -259,7 +273,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentBusiness, setCurrentBusiness] = useState<Business>(DEMO_BUSINESSES[0]);
 
   const [users, setUsers] = useState<User[]>(DEMO_USERS);
-  const [currentUser, setCurrentUser] = useState<User>(DEMO_USERS[1]); // Rajesh (Owner)
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(true);
 
   const [customers, setCustomers] = useState<Customer[]>(DEMO_CUSTOMERS);
   const [categories, setCategories] = useState<ServiceCategory[]>(DEMO_CATEGORIES);
@@ -317,7 +332,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } else {
           const items = snapshot.docs.map((d) => d.data() as User);
           setUsers(items);
-          setCurrentUser((prev) => (prev ? items.find((u) => u.id === prev.id) || items[1] || items[0] || prev : items[0]));
+          setCurrentUser((prev) => (prev ? items.find((u) => u.id === prev.id || u.email.toLowerCase() === prev.email.toLowerCase()) || prev : null));
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'users')
@@ -557,6 +572,139 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
+  // -------------------------------------------------------------
+  // FIREBASE AUTH PERSISTENCE & SESSION RESTORATION
+  // -------------------------------------------------------------
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          let userRecord: User | null = null;
+
+          // 1. Re-fetch user document directly from Firestore
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          const userSnap = await getDoc(userDocRef);
+
+          if (userSnap.exists()) {
+            userRecord = userSnap.data() as User;
+          } else {
+            const targetEmail = firebaseUser.email || localStorage.getItem('serviflow_logged_in_email');
+            if (targetEmail) {
+              const q = query(collection(db, 'users'), where('email', '==', targetEmail.toLowerCase()));
+              const qSnap = await getDocs(q);
+              if (!qSnap.empty) {
+                userRecord = qSnap.docs[0].data() as User;
+              }
+            }
+          }
+
+          if (!userRecord) {
+            const targetEmail = firebaseUser.email || localStorage.getItem('serviflow_logged_in_email');
+            const targetUid = localStorage.getItem('serviflow_logged_in_uid');
+            userRecord =
+              users.find(
+                (u) =>
+                  u.email.toLowerCase() === targetEmail?.toLowerCase() ||
+                  u.id === targetUid ||
+                  u.id === firebaseUser.uid
+              ) || null;
+          }
+
+          if (userRecord) {
+            setCurrentUser(userRecord);
+            localStorage.setItem('serviflow_logged_in_email', userRecord.email);
+            localStorage.setItem('serviflow_logged_in_uid', userRecord.id);
+
+            const bizSnap = await getDoc(doc(db, 'businesses', userRecord.businessId));
+            if (bizSnap.exists()) {
+              setCurrentBusiness(bizSnap.data() as Business);
+            } else {
+              const biz = businesses.find((b) => b.id === userRecord?.businessId);
+              if (biz) setCurrentBusiness(biz);
+            }
+          } else {
+            setCurrentUser(null);
+          }
+        } catch (err) {
+          console.error('Error fetching user on auth change:', err);
+        }
+      } else {
+        setCurrentUser(null);
+        localStorage.removeItem('serviflow_logged_in_email');
+        localStorage.removeItem('serviflow_logged_in_uid');
+      }
+      setIsAuthInitializing(false);
+    });
+
+    return () => unsubscribe();
+  }, [users, businesses]);
+
+  const loginUser = async (userToLogin: User, password?: string): Promise<User> => {
+    try {
+      await saveToFirestore('users', userToLogin.id, userToLogin);
+
+      const email = userToLogin.email.toLowerCase();
+      const pass = password || userToLogin.password || 'ServiFlow@123';
+
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+      } catch (authErr: any) {
+        if (
+          authErr.code === 'auth/user-not-found' ||
+          authErr.code === 'auth/invalid-credential' ||
+          authErr.code === 'auth/invalid-email'
+        ) {
+          try {
+            const newAuth = await createUserWithEmailAndPassword(auth, email, pass);
+            if (newAuth.user.uid) {
+              await saveToFirestore('users', newAuth.user.uid, userToLogin);
+            }
+          } catch (createErr) {
+            if (!auth.currentUser) {
+              await signInAnonymously(auth);
+            }
+          }
+        } else if (!auth.currentUser) {
+          await signInAnonymously(auth);
+        }
+      }
+
+      localStorage.setItem('serviflow_logged_in_email', email);
+      localStorage.setItem('serviflow_logged_in_uid', auth.currentUser?.uid || userToLogin.id);
+
+      setCurrentUser(userToLogin);
+
+      const biz = businesses.find((b) => b.id === userToLogin.businessId);
+      if (biz) {
+        setCurrentBusiness(biz);
+      } else {
+        const bizSnap = await getDoc(doc(db, 'businesses', userToLogin.businessId));
+        if (bizSnap.exists()) {
+          setCurrentBusiness(bizSnap.data() as Business);
+        }
+      }
+
+      showToast(`Welcome back, ${userToLogin.name}!`, 'success');
+      return userToLogin;
+    } catch (err) {
+      console.error('Error logging in user:', err);
+      throw err;
+    }
+  };
+
+  const logoutUser = async (): Promise<void> => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.warn('Error signing out from Firebase Auth:', err);
+    }
+    localStorage.removeItem('serviflow_logged_in_email');
+    localStorage.removeItem('serviflow_logged_in_uid');
+    sessionStorage.removeItem('serviflow_active_tab');
+    setCurrentUser(null);
+    showToast('Signed out successfully.', 'info');
+  };
+
   const toggleSimulateOffline = () => {
     setIsSimulatedOffline((prev) => {
       const nextVal = !prev;
@@ -715,13 +863,13 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       entityId,
       description,
       timestamp: new Date().toISOString(),
-      userName: currentUser.name,
+      userName: currentUser?.name || 'System User',
     };
     saveToFirestore('activities', newLog.id, newLog);
   };
 
   // Switch role helper for live demo toggling
-  const switchRole = (role: UserRole) => {
+  const switchRole = async (role: UserRole) => {
     if (role === 'super_admin') {
       const adminUser = users.find((u) => u.role === 'super_admin') || {
         id: 'usr-admin',
@@ -732,9 +880,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         businessId: 'all',
         status: 'active' as const,
       };
-      setCurrentUser(adminUser);
-      saveToFirestore('users', adminUser.id, adminUser);
-      showToast('Switched to Super Admin Role', 'info');
+      await loginUser(adminUser, 'ServiFlow@123');
       return;
     }
 
@@ -749,10 +895,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         businessId: currentBusiness.id,
         status: 'active',
       };
-      saveToFirestore('users', target.id, target);
     }
-    setCurrentUser(target);
-    showToast(`Switched active role to: ${role.replace('_', ' ').toUpperCase()}`, 'info');
+    await loginUser(target, target.password || 'ServiFlow@123');
   };
 
   // Switch business tenant
@@ -844,19 +988,21 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Business-filtered helpers
-  const filteredCustomers = currentUser.role === 'super_admin' ? customers : customers.filter((c) => c.businessId === currentBusiness.id);
-  const filteredCategories = currentUser.role === 'super_admin' ? categories : categories.filter((c) => c.businessId === currentBusiness.id);
-  const filteredServices = currentUser.role === 'super_admin' ? services : services.filter((s) => s.businessId === currentBusiness.id);
-  const filteredJobs = currentUser.role === 'super_admin' ? jobs : jobs.filter((j) => j.businessId === currentBusiness.id);
-  const filteredInventory = currentUser.role === 'super_admin' ? inventory : inventory.filter((i) => i.businessId === currentBusiness.id);
-  const filteredQuotations = currentUser.role === 'super_admin' ? quotations : quotations.filter((q) => q.businessId === currentBusiness.id);
-  const filteredInvoices = currentUser.role === 'super_admin' ? invoices : invoices.filter((inv) => inv.businessId === currentBusiness.id);
-  const filteredPayments = currentUser.role === 'super_admin' ? payments : payments.filter((p) => p.businessId === currentBusiness.id);
-  const filteredContracts = currentUser.role === 'super_admin' ? contracts : contracts.filter((c) => c.businessId === currentBusiness.id);
-  const filteredExpenses = currentUser.role === 'super_admin' ? expenses : expenses.filter((e) => e.businessId === currentBusiness.id);
-  const filteredNotifications = currentUser.role === 'super_admin' ? notifications : notifications.filter((n) => n.businessId === currentBusiness.id);
-  const filteredActivityLogs = currentUser.role === 'super_admin' ? activityLogs : activityLogs.filter((a) => a.businessId === currentBusiness.id);
-  const filteredStaff = currentUser.role === 'super_admin' ? users : users.filter((u) => u.businessId === currentBusiness.id && u.role !== 'super_admin');
+  const isSuperAdminUser = currentUser?.role === 'super_admin';
+  const currBizId = currentBusiness?.id;
+  const filteredCustomers = isSuperAdminUser ? customers : customers.filter((c) => c.businessId === currBizId);
+  const filteredCategories = isSuperAdminUser ? categories : categories.filter((c) => c.businessId === currBizId);
+  const filteredServices = isSuperAdminUser ? services : services.filter((s) => s.businessId === currBizId);
+  const filteredJobs = isSuperAdminUser ? jobs : jobs.filter((j) => j.businessId === currBizId);
+  const filteredInventory = isSuperAdminUser ? inventory : inventory.filter((i) => i.businessId === currBizId);
+  const filteredQuotations = isSuperAdminUser ? quotations : quotations.filter((q) => q.businessId === currBizId);
+  const filteredInvoices = isSuperAdminUser ? invoices : invoices.filter((inv) => inv.businessId === currBizId);
+  const filteredPayments = isSuperAdminUser ? payments : payments.filter((p) => p.businessId === currBizId);
+  const filteredContracts = isSuperAdminUser ? contracts : contracts.filter((c) => c.businessId === currBizId);
+  const filteredExpenses = isSuperAdminUser ? expenses : expenses.filter((e) => e.businessId === currBizId);
+  const filteredNotifications = isSuperAdminUser ? notifications : notifications.filter((n) => n.businessId === currBizId);
+  const filteredActivityLogs = isSuperAdminUser ? activityLogs : activityLogs.filter((a) => a.businessId === currBizId);
+  const filteredStaff = isSuperAdminUser ? users : users.filter((u) => u.businessId === currBizId && u.role !== 'super_admin');
 
   // Customer Actions
   const addCustomer = (data: Omit<Customer, 'id' | 'businessId' | 'createdAt'>) => {
@@ -1263,7 +1409,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateUserPassword = async (userId: string, newPassword: string) => {
     saveToFirestore('users', userId, { password: newPassword });
 
-    if (auth.currentUser && currentUser.id === userId) {
+    if (auth.currentUser && currentUser?.id === userId) {
       try {
         await firebaseUpdatePassword(auth.currentUser, newPassword);
       } catch (err) {
@@ -1271,8 +1417,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    if (currentUser.id === userId) {
-      setCurrentUser((prev) => ({ ...prev, password: newPassword }));
+    if (currentUser?.id === userId) {
+      setCurrentUser((prev) => (prev ? { ...prev, password: newPassword } : null));
     }
 
     showToast('Password updated successfully in Firebase Authentication & Firestore!', 'success');
@@ -1382,7 +1528,20 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveToFirestore('notifications', id, { read: true });
   };
 
-  const getRolePermissions = (roleCode: UserRole): RolePermission => {
+  const getRolePermissions = (roleCode?: UserRole): RolePermission => {
+    if (!roleCode) {
+      return {
+        canManageJobs: false,
+        canViewFinancials: false,
+        canManageStaff: false,
+        canManageInventory: false,
+        canAccessSettings: false,
+        canAccessSuperAdmin: false,
+        canAccessCustomerPortal: false,
+        canManageServices: false,
+        canManageContracts: false,
+      };
+    }
     const r = (roles || []).find((role) => role.code === roleCode);
     if (r) return r.permissions;
     if (roleCode === 'super_admin') {
@@ -1446,6 +1605,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         users,
         currentUser,
         setCurrentUser,
+        isAuthInitializing,
+        loginUser,
+        logoutUser,
         switchRole,
         switchBusiness,
         createBusiness,

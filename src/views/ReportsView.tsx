@@ -1,16 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { BarChart3, TrendingUp, DollarSign, CheckCircle2, FileSpreadsheet, Calendar, PieChart } from 'lucide-react';
-import { DateRangePicker, DateRange } from '../components/DateRangePicker';
+import { DateRangePicker, DateRange, getPresetDates } from '../components/DateRangePicker';
 
 export const ReportsView: React.FC = () => {
   const { invoices, expenses, jobs, payments, currentBusiness } = useApp();
 
-  const [dateRange, setDateRange] = useState<DateRange>({
-    startDate: '',
-    endDate: '',
-    preset: 'this_month',
-  });
+  const [dateRange, setDateRange] = useState<DateRange>(() => getPresetDates('this_month'));
 
   const isDateInRange = (dateStr?: string) => {
     if (!dateStr) return true;

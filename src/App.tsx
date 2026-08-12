@@ -34,13 +34,76 @@ import { NotificationsView } from './views/NotificationsView';
 import { LoginView } from './views/LoginView';
 
 const MainContent: React.FC = () => {
-  const { currentUser, isAuthModalOpen, setIsAuthModalOpen, getRolePermissions } = useApp();
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const { currentUser, isAuthInitializing, isAuthModalOpen, setIsAuthModalOpen, getRolePermissions } = useApp();
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    return sessionStorage.getItem('serviflow_active_tab') || 'dashboard';
+  });
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isCreateJobOpen, setIsCreateJobOpen] = useState(false);
 
   const [jobsFilter, setJobsFilter] = useState<JobInitialFilter | null>(null);
   const [invoicesFilter, setInvoicesFilter] = useState<InvoiceInitialFilter | null>(null);
+
+  // Sync activeTab when user or auth state changes
+  React.useEffect(() => {
+    if (currentUser) {
+      const isTechUser = currentUser.role === 'technician';
+      const isSuperUser = currentUser.role === 'super_admin';
+      const savedTab = sessionStorage.getItem('serviflow_active_tab');
+
+      if (!savedTab || savedTab === 'login') {
+        const defaultTab = isTechUser ? 'jobs' : isSuperUser ? 'super_admin' : 'dashboard';
+        setActiveTab(defaultTab);
+        sessionStorage.setItem('serviflow_active_tab', defaultTab);
+      } else {
+        setActiveTab(savedTab);
+      }
+    } else if (!isAuthInitializing) {
+      setActiveTab('login');
+    }
+  }, [currentUser, isAuthInitializing]);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    if (currentUser) {
+      sessionStorage.setItem('serviflow_active_tab', tab);
+    }
+  };
+
+  // 1. Loading / Splash Screen while Firebase Auth is resolving
+  if (isAuthInitializing) {
+    return (
+      <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-indigo-600/30 mb-6 animate-pulse">
+          S
+        </div>
+        <h1 className="text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight mb-2">
+          ServiFlow Field Operations
+        </h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 max-w-sm">
+          Restoring authenticated session and tenant credentials from cloud database...
+        </p>
+        <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-indigo-600 dark:text-indigo-400 font-semibold text-xs shadow-sm">
+          <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <span>Authenticating Session...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Unauthenticated State (Logged Out or No Active Session)
+  if (!currentUser) {
+    return (
+      <PullToRefresh>
+        <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased">
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+            <LoginView onLoginSuccess={() => {}} />
+          </main>
+          <ToastContainer />
+        </div>
+      </PullToRefresh>
+    );
+  }
 
   const permissions = getRolePermissions(currentUser.role);
 
@@ -89,11 +152,11 @@ const MainContent: React.FC = () => {
     } else if (tab === 'invoices') {
       setInvoicesFilter(filter || null);
     }
-    setActiveTab(tab);
+    handleTabChange(tab);
   };
 
   const handleOpenNewJob = () => {
-    setActiveTab('jobs');
+    handleTabChange('jobs');
     setIsCreateJobOpen(true);
   };
 
@@ -109,13 +172,13 @@ const MainContent: React.FC = () => {
         <Navbar
           onOpenOnboarding={() => setIsOnboardingOpen(true)}
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={handleTabChange}
         />
 
         {/* Main Workspace Layout */}
         <div className="flex-1 flex max-w-7xl w-full mx-auto overflow-hidden">
           {/* Desktop Sidebar */}
-          <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+          <Sidebar activeTab={activeTab} setActiveTab={handleTabChange} />
 
           {/* View Content Area */}
           <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
@@ -123,13 +186,13 @@ const MainContent: React.FC = () => {
               {!currentTabAccess.allowed ? (
                 <AccessDeniedView
                   requiredRoleLabel={currentTabAccess.label}
-                  onSwitchAccount={() => setActiveTab('login')}
+                  onSwitchAccount={() => handleTabChange('login')}
                 />
               ) : (
                 <>
                   {activeTab === 'dashboard' && (
                     <DashboardView
-                      setActiveTab={setActiveTab}
+                      setActiveTab={handleTabChange}
                       onNavigateWithFilter={handleNavigateWithFilter}
                       onOpenNewJob={handleOpenNewJob}
                     />
@@ -177,7 +240,7 @@ const MainContent: React.FC = () => {
                   {activeTab === 'notifications' && <NotificationsView />}
 
                   {activeTab === 'login' && (
-                    <LoginView onLoginSuccess={() => setActiveTab(isTech ? 'jobs' : 'dashboard')} />
+                    <LoginView onLoginSuccess={() => handleTabChange(isTech ? 'jobs' : 'dashboard')} />
                   )}
                 </>
               )}
@@ -186,7 +249,7 @@ const MainContent: React.FC = () => {
         </div>
 
         {/* Mobile Bottom Navigation */}
-        <MobileNav activeTab={activeTab} setActiveTab={setActiveTab} />
+        <MobileNav activeTab={activeTab} setActiveTab={handleTabChange} />
 
         {/* Global Modals & Toasts */}
         <AuthModal
@@ -197,7 +260,7 @@ const MainContent: React.FC = () => {
           isOpen={isOnboardingOpen}
           onClose={() => setIsOnboardingOpen(false)}
         />
-        <GlobalSearchModal onSelectTab={(tab) => setActiveTab(tab)} />
+        <GlobalSearchModal onSelectTab={(tab) => handleTabChange(tab)} />
         <ActivityLogDrawer />
         <PwaInstallPrompt />
         <ToastContainer />

@@ -49,6 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     setIsActivityLogOpen,
     syncOfflineQueue,
     showToast,
+    logoutUser,
   } = useApp();
 
   type ActiveMenu = 'tenant' | 'role' | 'notif' | 'profile' | null;
@@ -368,6 +369,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40"
                 >
                   <RotateCcw className="w-3.5 h-3.5" /> Reset Demo Data
+                </button>
+
+                <button
+                  onClick={() => {
+                    logoutUser();
+                    closeAllMenus();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                >
+                  <LogOut className="w-3.5 h-3.5" /> Sign Out
                 </button>
               </div>
             )}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Job, JobPriority, JobStatus } from '../types';
-import { DateRangePicker, DateRange } from '../components/DateRangePicker';
+import { DateRangePicker, DateRange, getPresetDates } from '../components/DateRangePicker';
 import { VoiceNotesRecorder } from '../components/VoiceNotesRecorder';
 import {
   Briefcase,
@@ -53,9 +53,8 @@ export const JobsView: React.FC<JobsViewProps> = ({
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [staffFilter, setStaffFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRange>(() => {
-    if (initialFilter?.datePreset === 'today') {
-      const todayStr = new Date().toISOString().split('T')[0];
-      return { startDate: todayStr, endDate: todayStr, preset: 'today' };
+    if (initialFilter?.datePreset) {
+      return getPresetDates(initialFilter.datePreset);
     }
     return { startDate: '', endDate: '', preset: 'all' };
   });
@@ -65,11 +64,8 @@ export const JobsView: React.FC<JobsViewProps> = ({
       if (initialFilter.statusFilter !== undefined) {
         setStatusFilter(initialFilter.statusFilter);
       }
-      if (initialFilter.datePreset === 'today') {
-        const todayStr = new Date().toISOString().split('T')[0];
-        setDateRange({ startDate: todayStr, endDate: todayStr, preset: 'today' });
-      } else if (initialFilter.datePreset === 'all') {
-        setDateRange({ startDate: '', endDate: '', preset: 'all' });
+      if (initialFilter.datePreset) {
+        setDateRange(getPresetDates(initialFilter.datePreset));
       }
     }
   }, [initialFilter]);

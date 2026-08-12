@@ -14,6 +14,97 @@ interface DateRangePickerProps {
   align?: 'left' | 'right';
 }
 
+export const getPresetDates = (presetKey: string, customValue?: DateRange): DateRange => {
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+
+  switch (presetKey) {
+    case 'all':
+      return { startDate: '', endDate: '', preset: 'all' };
+    case 'today':
+      return { startDate: todayStr, endDate: todayStr, preset: 'today' };
+    case 'yesterday': {
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const yStr = yesterday.toISOString().split('T')[0];
+      return { startDate: yStr, endDate: yStr, preset: 'yesterday' };
+    }
+    case 'last_7_days': {
+      const start = new Date(today);
+      start.setDate(today.getDate() - 6);
+      return {
+        startDate: start.toISOString().split('T')[0],
+        endDate: todayStr,
+        preset: 'last_7_days',
+      };
+    }
+    case 'this_week': {
+      const start = new Date(today);
+      const day = start.getDay();
+      const diff = start.getDate() - day + (day === 0 ? -6 : 1); // Monday
+      start.setDate(diff);
+      const sStr = start.toISOString().split('T')[0];
+      return { startDate: sStr, endDate: todayStr, preset: 'this_week' };
+    }
+    case 'this_month': {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      const sStr = start.toISOString().split('T')[0];
+      return { startDate: sStr, endDate: todayStr, preset: 'this_month' };
+    }
+    case 'last_month': {
+      const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const end = new Date(today.getFullYear(), today.getMonth(), 0);
+      return {
+        startDate: start.toISOString().split('T')[0],
+        endDate: end.toISOString().split('T')[0],
+        preset: 'last_month',
+      };
+    }
+    case 'last_30_days': {
+      const start = new Date(today);
+      start.setDate(today.getDate() - 29);
+      return {
+        startDate: start.toISOString().split('T')[0],
+        endDate: todayStr,
+        preset: 'last_30_days',
+      };
+    }
+    case 'this_quarter': {
+      const currentQuarter = Math.floor(today.getMonth() / 3);
+      const start = new Date(today.getFullYear(), currentQuarter * 3, 1);
+      return {
+        startDate: start.toISOString().split('T')[0],
+        endDate: todayStr,
+        preset: 'this_quarter',
+      };
+    }
+    case 'last_quarter': {
+      const currentQuarter = Math.floor(today.getMonth() / 3);
+      const year = currentQuarter === 0 ? today.getFullYear() - 1 : today.getFullYear();
+      const quarterStartMonth = currentQuarter === 0 ? 9 : (currentQuarter - 1) * 3;
+      const start = new Date(year, quarterStartMonth, 1);
+      const end = new Date(year, quarterStartMonth + 3, 0);
+      return {
+        startDate: start.toISOString().split('T')[0],
+        endDate: end.toISOString().split('T')[0],
+        preset: 'last_quarter',
+      };
+    }
+    case 'this_year': {
+      const start = new Date(today.getFullYear(), 0, 1);
+      return { startDate: start.toISOString().split('T')[0], endDate: todayStr, preset: 'this_year' };
+    }
+    case 'custom':
+      return {
+        startDate: customValue?.startDate || '',
+        endDate: customValue?.endDate || '',
+        preset: 'custom',
+      };
+    default:
+      return { startDate: '', endDate: '', preset: 'all' };
+  }
+};
+
 export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   value,
   onChange,
@@ -43,12 +134,20 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
           return 'Today';
         case 'yesterday':
           return 'Yesterday';
+        case 'last_7_days':
+          return 'Last 7 Days';
         case 'this_week':
           return 'This Week';
         case 'this_month':
           return 'This Month';
         case 'last_month':
           return 'Last Month';
+        case 'last_30_days':
+          return 'Last 30 Days';
+        case 'this_quarter':
+          return 'This Quarter';
+        case 'last_quarter':
+          return 'Last Quarter';
         case 'this_year':
           return 'This Year';
         default:
@@ -68,57 +167,6 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     }
 
     return 'All Time';
-  };
-
-  const getTodayStr = () => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  };
-
-  const getPresetDates = (presetKey: string): DateRange => {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-
-    switch (presetKey) {
-      case 'all':
-        return { startDate: '', endDate: '', preset: 'all' };
-      case 'today':
-        return { startDate: todayStr, endDate: todayStr, preset: 'today' };
-      case 'yesterday': {
-        const yesterday = new Date(today);
-        yesterday.setDate(today.getDate() - 1);
-        const yStr = yesterday.toISOString().split('T')[0];
-        return { startDate: yStr, endDate: yStr, preset: 'yesterday' };
-      }
-      case 'this_week': {
-        const start = new Date(today);
-        const day = start.getDay();
-        const diff = start.getDate() - day + (day === 0 ? -6 : 1); // Monday
-        start.setDate(diff);
-        const sStr = start.toISOString().split('T')[0];
-        return { startDate: sStr, endDate: todayStr, preset: 'this_week' };
-      }
-      case 'this_month': {
-        const start = new Date(today.getFullYear(), today.getMonth(), 1);
-        const sStr = start.toISOString().split('T')[0];
-        return { startDate: sStr, endDate: todayStr, preset: 'this_month' };
-      }
-      case 'last_month': {
-        const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const end = new Date(today.getFullYear(), today.getMonth(), 0);
-        return {
-          startDate: start.toISOString().split('T')[0],
-          endDate: end.toISOString().split('T')[0],
-          preset: 'last_month',
-        };
-      }
-      case 'this_year': {
-        const start = new Date(today.getFullYear(), 0, 1);
-        return { startDate: start.toISOString().split('T')[0], endDate: todayStr, preset: 'this_year' };
-      }
-      default:
-        return { startDate: '', endDate: '', preset: 'all' };
-    }
   };
 
   const handleSelectPreset = (presetKey: string) => {
@@ -149,9 +197,13 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     { id: 'all', label: 'All Time' },
     { id: 'today', label: 'Today' },
     { id: 'yesterday', label: 'Yesterday' },
+    { id: 'last_7_days', label: 'Last 7 Days' },
     { id: 'this_week', label: 'This Week' },
     { id: 'this_month', label: 'This Month' },
     { id: 'last_month', label: 'Last Month' },
+    { id: 'last_30_days', label: 'Last 30 Days' },
+    { id: 'this_quarter', label: 'This Quarter' },
+    { id: 'last_quarter', label: 'Last Quarter' },
     { id: 'this_year', label: 'This Year' },
     { id: 'custom', label: 'Custom Range' },
   ];
@@ -185,13 +237,13 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
       {isOpen && (
         <div
-          className={`absolute top-full mt-2 z-50 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-3 space-y-3 ${
+          className={`absolute top-full mt-2 z-50 w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-3 space-y-3 ${
             align === 'right' ? 'right-0' : 'left-0'
           }`}
         >
           <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
             <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-indigo-600" /> Date Filter
+              <Clock className="w-3.5 h-3.5 text-indigo-600" /> Date Preset Selector
             </span>
             {hasFilter && (
               <button
@@ -219,8 +271,8 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
                       : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                   }`}
                 >
-                  <span>{p.label}</span>
-                  {isActive && <Check className="w-3 h-3" />}
+                  <span className="truncate">{p.label}</span>
+                  {isActive && <Check className="w-3 h-3 shrink-0 ml-1" />}
                 </button>
               );
             })}
@@ -264,3 +316,4 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     </div>
   );
 };
+

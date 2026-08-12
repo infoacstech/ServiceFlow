@@ -28,7 +28,7 @@ interface LoginViewProps {
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const {
     users,
-    setCurrentUser,
+    loginUser,
     businesses,
     switchBusiness,
     switchRole,
@@ -57,7 +57,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [pendingRegistrationSuccess, setPendingRegistrationSuccess] = useState<User | null>(null);
 
   // Handle Direct Password Login
-  const handleDirectLogin = (e: React.FormEvent) => {
+  const handleDirectLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanIdentifier = loginIdentifier.trim().toLowerCase();
 
@@ -125,11 +125,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       }
     }
 
-    // Status is 'active' -> Allow login
-    setCurrentUser(matchedUser);
-    switchBusiness(matchedUser.businessId);
-    showToast(`Welcome back, ${matchedUser.name}!`, 'success');
-    if (onLoginSuccess) onLoginSuccess();
+    // Status is 'active' -> Allow login via Firebase Auth & Firestore
+    try {
+      await loginUser(matchedUser, loginPassword);
+      if (onLoginSuccess) onLoginSuccess();
+    } catch (err) {
+      console.error('Login error:', err);
+    }
   };
 
   // Handle Direct Registration
@@ -169,7 +171,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   };
 
   // Quick Switch for Demo Accounts with status enforcement
-  const handleQuickSwitch = (u: User) => {
+  const handleQuickSwitch = async (u: User) => {
     const userBiz = (businesses || []).find((b) => b.id === u.businessId);
 
     if (userBiz?.status === 'suspended') {
@@ -207,10 +209,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       }
     }
 
-    setCurrentUser(u);
-    switchBusiness(u.businessId);
-    showToast(`Logged in as ${u.name} (${u.role.replace('_', ' ')})`, 'success');
-    if (onLoginSuccess) onLoginSuccess();
+    try {
+      await loginUser(u, u.password || 'ServiFlow@123');
+      if (onLoginSuccess) onLoginSuccess();
+    } catch (err) {
+      console.error('Quick switch login error:', err);
+    }
   };
 
   const handleSuperAdminLogin = () => {
