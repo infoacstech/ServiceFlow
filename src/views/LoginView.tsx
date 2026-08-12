@@ -242,16 +242,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             </p>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-base shrink-0">
-              {currentUser.name.substring(0, 2).toUpperCase()}
+          {currentUser && (
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-base shrink-0">
+                {currentUser.name ? currentUser.name.substring(0, 2).toUpperCase() : 'US'}
+              </div>
+              <div className="text-xs">
+                <div className="text-indigo-200 text-[10px] uppercase tracking-wider font-semibold">Currently Active</div>
+                <div className="font-bold text-white truncate max-w-[140px]">{currentUser.name || 'User'}</div>
+                <div className="text-indigo-300 capitalize text-[11px]">{currentUser.role ? currentUser.role.replace('_', ' ') : ''}</div>
+              </div>
             </div>
-            <div className="text-xs">
-              <div className="text-indigo-200 text-[10px] uppercase tracking-wider font-semibold">Currently Active</div>
-              <div className="font-bold text-white truncate max-w-[140px]">{currentUser.name}</div>
-              <div className="text-indigo-300 capitalize text-[11px]">{currentUser.role.replace('_', ' ')}</div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 

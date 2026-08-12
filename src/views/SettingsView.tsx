@@ -71,12 +71,14 @@ export const SettingsView: React.FC = () => {
     }
 
     // Verify current password if user already had a password
-    if (currentUser.password && currentPassInput !== currentUser.password) {
+    if (currentUser?.password && currentPassInput !== currentUser.password) {
       showToast('Current password is incorrect', 'error');
       return;
     }
 
-    updateUserPassword(currentUser.id, newPassInput.trim());
+    if (currentUser?.id) {
+      updateUserPassword(currentUser.id, newPassInput.trim());
+    }
     setPassChangeSuccess(true);
     setCurrentPassInput('');
     setNewPassInput('');
@@ -540,7 +542,7 @@ export const SettingsView: React.FC = () => {
             <KeyRound className="w-4 h-4 text-indigo-600" /> Account Password & Security
           </h2>
           <p className="text-xs text-slate-500">
-            Change your account password. Logged in as <strong className="text-slate-700 dark:text-slate-200">{currentUser.name}</strong> ({currentUser.email || currentUser.phone}).
+            Change your account password. Logged in as <strong className="text-slate-700 dark:text-slate-200">{currentUser?.name || 'User'}</strong> ({currentUser?.email || currentUser?.phone || ''}).
           </p>
         </div>
 
@@ -551,7 +553,7 @@ export const SettingsView: React.FC = () => {
         )}
 
         <form onSubmit={handlePasswordChange} className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-          {currentUser.password && (
+          {currentUser?.password && (
             <div>
               <label className="font-semibold block mb-1">Current Password *</label>
               <input

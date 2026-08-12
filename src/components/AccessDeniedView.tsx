@@ -12,8 +12,8 @@ export const AccessDeniedView: React.FC<AccessDeniedViewProps> = ({
   onSwitchAccount,
 }) => {
   const { currentUser, roles = [], getRolePermissions } = useApp();
-  const currentPermissions = getRolePermissions(currentUser.role);
-  const currentRoleObj = (roles || []).find((r) => r.code === currentUser.role);
+  const currentPermissions = getRolePermissions(currentUser?.role);
+  const currentRoleObj = (roles || []).find((r) => r.code === currentUser?.role);
 
   return (
     <div className="max-w-2xl mx-auto my-8 p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xl space-y-6 text-center animate-in fade-in">
@@ -29,7 +29,7 @@ export const AccessDeniedView: React.FC<AccessDeniedViewProps> = ({
           Access Restricted To {requiredRoleLabel}
         </h2>
         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-lg mx-auto">
-          Your active account role is <strong className="text-indigo-600 dark:text-indigo-400 capitalize">{currentUser.role.replace('_', ' ')}</strong> ({currentUser.name}), which is configured with targeted permissions in the Roles Database.
+          Your active account role is <strong className="text-indigo-600 dark:text-indigo-400 capitalize">{(currentUser?.role || 'Guest').replace('_', ' ')}</strong> ({currentUser?.name || 'Unknown User'}), which is configured with targeted permissions in the Roles Database.
         </p>
       </div>
 
@@ -39,11 +39,11 @@ export const AccessDeniedView: React.FC<AccessDeniedViewProps> = ({
           <div className="flex items-center gap-2">
             <UserCheck className="w-4 h-4 text-indigo-600" />
             <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
-              Active Role: {currentRoleObj?.name || currentUser.role}
+              Active Role: {currentRoleObj?.name || currentUser?.role || 'Guest'}
             </span>
           </div>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
-            {currentUser.role}
+            {currentUser?.role || 'none'}
           </span>
         </div>
         <p className="text-xs text-slate-600 dark:text-slate-400">

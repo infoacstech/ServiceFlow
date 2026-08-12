@@ -29,10 +29,10 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const { currentUser, getRolePermissions } = useApp();
-  const permissions = getRolePermissions(currentUser.role);
+  const permissions = getRolePermissions(currentUser?.role);
 
-  const isTech = currentUser.role === 'technician';
-  const isSuperAdmin = currentUser.role === 'super_admin';
+  const isTech = currentUser?.role === 'technician';
+  const isSuperAdmin = currentUser?.role === 'super_admin';
 
   const mainNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: permissions.canManageJobs || permissions.canViewFinancials },

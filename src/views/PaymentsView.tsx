@@ -15,7 +15,7 @@ export const PaymentsView: React.FC = () => {
   const filtered = (payments || []).filter((p) => {
     const cust = (customers || []).find((c) => c.id === p.customerId);
     const matchesSearch =
-      p.paymentNumber.toLowerCase().includes(search.toLowerCase()) ||
+      p.id.toLowerCase().includes(search.toLowerCase()) ||
       p.referenceNumber?.toLowerCase().includes(search.toLowerCase()) ||
       cust?.name.toLowerCase().includes(search.toLowerCase());
 
@@ -94,7 +94,7 @@ export const PaymentsView: React.FC = () => {
 
                 return (
                   <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <td className="p-3.5 font-extrabold text-indigo-600">{p.paymentNumber}</td>
+                    <td className="p-3.5 font-extrabold text-indigo-600">{p.id}</td>
                     <td className="p-3.5 font-bold text-slate-900 dark:text-slate-100">{customer?.name}</td>
                     <td className="p-3.5 text-slate-500 font-mono">{invoice?.invoiceNumber || 'INV-DIRECT'}</td>
                     <td className="p-3.5 text-slate-500">{p.date}</td>

@@ -746,7 +746,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const logEntry: ManualSyncLog = {
         id: `sync-log-${Date.now()}`,
         timestamp: nowISO,
-        technicianName: currentUser.name,
+        technicianName: currentUser?.name || 'Field Technician',
         status: 'OFFLINE_QUEUED',
         itemsProcessedCount: 0,
         triggerType,
@@ -783,7 +783,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const logEntry: ManualSyncLog = {
         id: `sync-log-${Date.now()}`,
         timestamp: nowISO,
-        technicianName: currentUser.name,
+        technicianName: currentUser?.name || 'Field Technician',
         status: 'SUCCESS',
         itemsProcessedCount: pendingSyncQueue.length,
         triggerType,
@@ -799,7 +799,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const logEntry: ManualSyncLog = {
         id: `sync-log-${Date.now()}`,
         timestamp: nowISO,
-        technicianName: currentUser.name,
+        technicianName: currentUser?.name || 'Field Technician',
         status: 'NO_CHANGES',
         itemsProcessedCount: 0,
         triggerType,
@@ -1202,7 +1202,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       quantity: qty,
       notes,
       date: new Date().toISOString().split('T')[0],
-      createdBy: currentUser.name,
+      createdBy: currentUser?.name || 'System User',
     };
     firestoreService.saveDocument<InventoryTransaction>('inventoryTransactions', newTx.id, newTx);
     showToast(`Inventory stock adjusted (${type.replace('_', ' ')})`, 'success');

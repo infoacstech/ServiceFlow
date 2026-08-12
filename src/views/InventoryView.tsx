@@ -8,7 +8,7 @@ export const InventoryView: React.FC = () => {
   const {
     inventory,
     addInventoryItem,
-    adjustStock,
+    updateInventoryStock,
     currentBusiness,
     showToast,
     logActivity,
@@ -105,8 +105,7 @@ export const InventoryView: React.FC = () => {
   const handleAdjustSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItem) return;
-    const qtyChange = adjustType === 'in' ? Number(adjustQty) : -Number(adjustQty);
-    adjustStock(selectedItem.id, qtyChange, adjustReason);
+    updateInventoryStock(selectedItem.id, Number(adjustQty), adjustType === 'in' ? 'stock_in' : 'stock_out', adjustReason);
     setIsStockAdjustOpen(false);
   };
 

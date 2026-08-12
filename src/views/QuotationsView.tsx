@@ -68,6 +68,7 @@ export const QuotationsView: React.FC = () => {
 
     addQuotation({
       customerId,
+      date: new Date().toISOString().split('T')[0],
       validUntil,
       notes,
       items: lineItems.map((item, idx) => ({

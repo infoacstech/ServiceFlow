@@ -530,7 +530,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
         {/* Footer */}
         <div className="p-3 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-100 dark:border-slate-800 text-center text-[11px] text-slate-500 dark:text-slate-400">
-          Logged in: <strong className="text-slate-800 dark:text-slate-200">{currentUser.name}</strong> ({currentUser.role.replace('_', ' ')})
+          Logged in: <strong className="text-slate-800 dark:text-slate-200">{currentUser?.name || 'Guest'}</strong> ({(currentUser?.role || 'Guest').replace('_', ' ')})
         </div>
       </div>
     </div>

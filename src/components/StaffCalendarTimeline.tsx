@@ -203,7 +203,7 @@ export const StaffCalendarTimeline: React.FC = () => {
                       {job.priority}
                     </span>
                   </div>
-                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{job.serviceName}</p>
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{(job as any).serviceName || job.description}</p>
                   <div className="text-[11px] text-slate-500 truncate flex items-center gap-1">
                     <UserIcon className="w-3 h-3 text-slate-400" /> {cust?.name || 'Customer'}
                   </div>
@@ -326,7 +326,7 @@ export const StaffCalendarTimeline: React.FC = () => {
                                     </div>
 
                                     <p className="text-[11px] font-bold truncate leading-tight mt-0.5">
-                                      {job.serviceName}
+                                      {(job as any).serviceName || job.description}
                                     </p>
 
                                     <div className="flex items-center justify-between text-[10px] opacity-80 mt-1">
@@ -371,7 +371,7 @@ export const StaffCalendarTimeline: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
-                    {selectedJob.jobId} - {selectedJob.serviceName}
+                    {selectedJob.jobId} - {(selectedJob as any).serviceName || selectedJob.description}
                   </h3>
                   <span className="text-xs text-slate-500 font-medium capitalize">
                     Status: {selectedJob.status.replace('_', ' ')}

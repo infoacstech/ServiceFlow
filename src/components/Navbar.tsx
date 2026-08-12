@@ -86,7 +86,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'super_admin', label: 'Super Admin', badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800' },
   ];
 
-  const currentRoleObj = rolesList.find((r) => r.id === currentUser.role) || rolesList[0];
+  const currentRoleObj = rolesList.find((r) => r.id === currentUser?.role) || rolesList[0];
 
   return (
     <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-2 sm:px-4 py-2 sm:py-2.5 transition-all">
@@ -109,19 +109,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               title="Switch business"
             >
               <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs overflow-hidden shrink-0">
-                {currentBusiness.logo ? (
+                {currentBusiness?.logo ? (
                   <img src={currentBusiness.logo} alt={currentBusiness.name} className="w-full h-full object-cover" />
                 ) : (
-                  currentBusiness.name.substring(0, 2).toUpperCase()
+                  (currentBusiness?.name || 'SF').substring(0, 2).toUpperCase()
                 )}
               </div>
               <div className="text-left max-w-[100px] xs:max-w-[130px] sm:max-w-[160px]">
                 <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1">
-                  <span className="truncate">{currentBusiness.name}</span>
+                  <span className="truncate">{currentBusiness?.name || 'ServiFlow'}</span>
                   <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
                 </div>
                 <div className="text-[10px] text-slate-500 hidden sm:block font-medium truncate">
-                  {currentBusiness.type}
+                  {currentBusiness?.type || 'Field Services'}
                 </div>
               </div>
             </button>
@@ -325,11 +325,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="w-8 h-8 rounded-xl bg-slate-200 dark:bg-slate-800 overflow-hidden ring-2 ring-slate-200 dark:ring-slate-700 hover:ring-indigo-500 transition-all shrink-0"
               title="User Profile & Settings"
             >
-              {currentUser.avatar ? (
-                <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
+              {currentUser?.avatar ? (
+                <img src={currentUser.avatar} alt={currentUser?.name || 'User'} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center font-bold text-xs text-slate-700 dark:text-slate-200">
-                  {currentUser.name.substring(0, 2).toUpperCase()}
+                  {(currentUser?.name || 'US').substring(0, 2).toUpperCase()}
                 </div>
               )}
             </button>
@@ -337,8 +337,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             {activeMenu === 'profile' && (
               <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 animate-in fade-in zoom-in-95">
                 <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 mb-1">
-                  <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{currentUser.name}</div>
-                  <div className="text-[10px] text-slate-400 truncate">{currentUser.email}</div>
+                  <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{currentUser?.name || 'Guest User'}</div>
+                  <div className="text-[10px] text-slate-400 truncate">{currentUser?.email || ''}</div>
                 </div>
 
                 <button

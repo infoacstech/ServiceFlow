@@ -29,11 +29,11 @@ interface MobileNavProps {
 
 export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab }) => {
   const { currentUser, getRolePermissions } = useApp();
-  const permissions = getRolePermissions(currentUser.role);
+  const permissions = getRolePermissions(currentUser?.role);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
-  const isTech = currentUser.role === 'technician';
-  const isSuperAdmin = currentUser.role === 'super_admin';
+  const isTech = currentUser?.role === 'technician';
+  const isSuperAdmin = currentUser?.role === 'super_admin';
 
   const bottomItems = isTech
     ? [

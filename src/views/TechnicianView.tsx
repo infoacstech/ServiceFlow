@@ -80,9 +80,16 @@ export const TechnicianView: React.FC = () => {
       solutionProvided: solutionProvided || 'Replaced damaged parts, calibrated unit, and verified live operating metrics.',
       customerRating: rating,
       customerSignature: signature,
-      materialsUsed: selectedMaterials,
-      photosBefore: [beforePhoto],
-      photosAfter: [afterPhoto],
+      materialsUsed: selectedMaterials.map((m) => {
+        const invItem = (inventory || []).find((i) => i.id === m.inventoryId);
+        return {
+          inventoryItemId: m.inventoryId,
+          name: invItem?.name || 'Spare Part',
+          quantity: m.quantity,
+          unitPrice: invItem?.sellingPrice || 0,
+        };
+      }),
+      afterPhotos: [afterPhoto],
     });
   };
 

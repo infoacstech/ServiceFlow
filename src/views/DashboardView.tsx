@@ -103,8 +103,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       email: custEmail,
       companyName: custCompany,
       address: custAddress || 'On-site address',
-      type: custType,
-      gstin: '',
+      city: 'Local',
+      state: 'State',
+      pin: '000000',
+      customerType: custType === 'commercial' ? 'commercial' : 'individual',
       notes: 'Added via Dashboard Quick Actions',
     });
 
@@ -140,7 +142,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           amount: totalAmount,
         },
       ],
-      totalAmount,
+      subtotal: rate,
+      taxTotal: (rate * tax) / 100,
+      discountTotal: 0,
+      grandTotal: totalAmount,
       status: 'sent',
       notes: quoteNotes,
     });

@@ -105,7 +105,7 @@ const MainContent: React.FC = () => {
     );
   }
 
-  const permissions = getRolePermissions(currentUser.role);
+  const permissions = getRolePermissions(currentUser?.role);
 
   const getTabAccess = (tab: string) => {
     switch (tab) {
@@ -160,7 +160,7 @@ const MainContent: React.FC = () => {
     setIsCreateJobOpen(true);
   };
 
-  const isTech = currentUser.role === 'technician';
+  const isTech = currentUser?.role === 'technician';
 
   return (
     <PullToRefresh>

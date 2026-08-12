@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Expense } from '../types';
+import { Expense, ExpenseCategory } from '../types';
 import { DollarSign, Plus, Search, Calendar, Tag, X } from 'lucide-react';
 
 export const ExpensesView: React.FC = () => {
@@ -18,7 +18,7 @@ export const ExpensesView: React.FC = () => {
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     addExpense({
-      category,
+      category: category as ExpenseCategory,
       amount: Number(amount),
       description,
       date,

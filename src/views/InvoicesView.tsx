@@ -61,7 +61,14 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
   const handleRecordPaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedInvoice) return;
-    recordPayment(selectedInvoice.id, Number(payAmount), payMethod, payRef);
+    recordPayment({
+      invoiceId: selectedInvoice.id,
+      customerId: selectedInvoice.customerId,
+      amount: Number(payAmount),
+      date: new Date().toISOString().split('T')[0],
+      method: payMethod as PaymentMethod,
+      referenceNumber: payRef,
+    });
     setIsPaymentModalOpen(false);
     setSelectedInvoice(null);
   };
@@ -76,6 +83,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
 
     addInvoice({
       customerId,
+      date: new Date().toISOString().split('T')[0],
       dueDate,
       notes: 'Thank you for choosing our services.',
       items: items.map((i, idx) => ({ ...i, id: `inv-item-${idx}` })),
@@ -101,7 +109,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
       statusFilter === 'all'
         ? true
         : statusFilter === 'pending'
-        ? inv.balanceAmount > 0 || inv.status === 'pending' || inv.status === 'partially_paid' || inv.status === 'overdue'
+        ? inv.balanceAmount > 0 || inv.status === 'pending' || inv.status === 'partial' || inv.status === 'overdue'
         : statusFilter === 'paid'
         ? inv.status === 'paid' && inv.balanceAmount === 0
         : inv.status === statusFilter;
