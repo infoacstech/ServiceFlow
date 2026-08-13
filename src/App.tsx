@@ -52,7 +52,7 @@ const MainContent: React.FC = () => {
       const savedTab = sessionStorage.getItem('serviflow_active_tab');
 
       if (!savedTab || savedTab === 'login') {
-        const defaultTab = isTechUser ? 'jobs' : isSuperUser ? 'super_admin' : 'dashboard';
+        const defaultTab = isSuperUser ? 'super_admin' : 'dashboard';
         setActiveTab(defaultTab);
         sessionStorage.setItem('serviflow_active_tab', defaultTab);
       } else {

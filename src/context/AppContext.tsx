@@ -185,6 +185,7 @@ interface AppContextType {
   addContract: (c: Omit<RecurringContract, 'id' | 'businessId' | 'contractNumber'>) => RecurringContract;
   addExpense: (e: Omit<Expense, 'id' | 'businessId'>) => void;
   addStaff: (st: Omit<User, 'id' | 'businessId'>) => User;
+  deleteStaff: (userId: string) => void;
   updateBusinessSettings: (updates: Partial<Business>) => void;
   updateBusinessProfile: (updates: Partial<Business>) => void;
 
@@ -1407,6 +1408,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newStaff;
   };
 
+  const deleteStaff = (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    if (!target) return;
+    deleteFromFirestore('users', userId);
+    logActivity('Staff Deleted', 'staff', userId, `Deleted staff member ${target.name || target.email}`);
+    showToast(`Deleted staff account "${target.name || target.email}"`, 'info');
+  };
+
   const updateBusinessAndOwnerStatus = (
     businessId: string,
     newStatus: 'active' | 'pending' | 'rejected' | 'suspended'
@@ -1738,6 +1747,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addContract,
         addExpense,
         addStaff,
+        deleteStaff,
         updateBusinessSettings,
         updateBusinessProfile: updateBusinessSettings,
         markNotificationRead,

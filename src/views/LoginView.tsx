@@ -155,6 +155,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
     // Status is 'active' -> Allow login via Firebase Auth & Firestore
     try {
+      sessionStorage.setItem('serviflow_active_tab', matchedUser.role === 'super_admin' ? 'super_admin' : 'dashboard');
       await loginUser(matchedUser, loginPassword);
       if (onLoginSuccess) onLoginSuccess();
     } catch (err) {

@@ -19,12 +19,14 @@ import {
   XCircle,
   AlertCircle,
   Lock,
+  Trash2,
 } from 'lucide-react';
 
 export const StaffView: React.FC = () => {
-  const { users, staff, jobs, currentBusiness, currentUser, roles, addStaff, updateUserStatus, showToast } = useApp();
+  const { users, staff, jobs, currentBusiness, currentUser, roles, addStaff, deleteStaff, updateUserStatus, showToast } = useApp();
   const [activeTab, setActiveTab] = useState<'calendar' | 'directory'>('calendar');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [deletingStaffUser, setDeletingStaffUser] = useState<User | null>(null);
 
   // Form states
   const [name, setName] = useState('');
@@ -183,9 +185,16 @@ export const StaffView: React.FC = () => {
                   </button>
                   <button
                     onClick={() => updateUserStatus(reqUser.id, 'rejected')}
-                    className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-rose-100 dark:bg-slate-800 dark:hover:bg-rose-950/50 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 font-bold text-xs flex items-center justify-center gap-1 transition-all"
+                    className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-amber-100 dark:bg-slate-800 dark:hover:bg-amber-950/50 text-slate-600 dark:text-slate-300 hover:text-amber-600 font-bold text-xs flex items-center justify-center gap-1 transition-all"
                   >
-                    <XCircle className="w-4 h-4" /> Reject
+                    Reject
+                  </button>
+                  <button
+                    onClick={() => setDeletingStaffUser(reqUser)}
+                    className="p-2 rounded-xl bg-slate-100 hover:bg-rose-100 dark:bg-slate-800 dark:hover:bg-rose-950/60 text-slate-500 hover:text-rose-600 transition-all"
+                    title="Delete registration request"
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -290,7 +299,7 @@ export const StaffView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Owner Controls (Block / Unblock / Approve) */}
+                  {/* Owner Controls (Block / Unblock / Approve / Delete) */}
                   {isOwnerOrAdmin && st.id !== currentUser?.id && st.role !== 'super_admin' && (
                     <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
                       {isPending ? (
@@ -303,7 +312,7 @@ export const StaffView: React.FC = () => {
                           </button>
                           <button
                             onClick={() => updateUserStatus(st.id, 'rejected')}
-                            className="py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-600 font-bold text-xs transition-all"
+                            className="py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-600 font-bold text-xs transition-all"
                           >
                             Reject
                           </button>
@@ -311,18 +320,26 @@ export const StaffView: React.FC = () => {
                       ) : isBlocked ? (
                         <button
                           onClick={() => updateUserStatus(st.id, 'active')}
-                          className="w-full py-1.5 px-3 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all"
+                          className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" /> Unblock Access
                         </button>
                       ) : (
                         <button
                           onClick={() => updateUserStatus(st.id, 'blocked')}
-                          className="w-full py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 dark:bg-slate-800 dark:hover:bg-rose-950/60 dark:hover:text-rose-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+                          className="flex-1 py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 dark:bg-slate-800 dark:hover:bg-rose-950/60 dark:hover:text-rose-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
                         >
-                          <Ban className="w-3.5 h-3.5 text-rose-500" /> Block User Access
+                          <Ban className="w-3.5 h-3.5 text-rose-500" /> Block Access
                         </button>
                       )}
+
+                      <button
+                        onClick={() => setDeletingStaffUser(st)}
+                        className="py-1.5 px-2.5 rounded-xl bg-slate-100 hover:bg-rose-100 dark:bg-slate-800 dark:hover:bg-rose-950/60 text-slate-500 hover:text-rose-600 transition-all"
+                        title="Delete staff account permanently"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                      </button>
                     </div>
                   )}
                 </div>
@@ -470,6 +487,51 @@ export const StaffView: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingStaffUser && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                  Delete Staff Account?
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Are you sure you want to delete <span className="font-bold text-slate-900 dark:text-slate-100">{deletingStaffUser.name || deletingStaffUser.email}</span>?
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-400 bg-rose-50/50 dark:bg-rose-950/30 p-3.5 rounded-2xl border border-rose-100 dark:border-rose-900/40">
+              This action will permanently delete their staff record and revoke login access across all devices.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingStaffUser(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteStaff(deletingStaffUser.id);
+                  setDeletingStaffUser(null);
+                }}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" /> Delete Permanently
+              </button>
+            </div>
           </div>
         </div>
       )}
