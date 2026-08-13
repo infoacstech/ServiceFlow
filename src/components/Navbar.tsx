@@ -148,7 +148,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     >
                       <div className="flex items-center gap-2.5 overflow-hidden">
                         <div className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-semibold shrink-0 overflow-hidden">
-                          {b.logo ? <img src={b.logo} alt="" className="w-full h-full object-cover" /> : b.name.substring(0, 2)}
+                          {b.logo ? <img src={b.logo} alt="" className="w-full h-full object-cover" /> : (b?.name || 'SF').substring(0, 2).toUpperCase()}
                         </div>
                         <div className="truncate">
                           <div className="text-xs font-medium truncate">{b.name}</div>
@@ -329,7 +329,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <img src={currentUser.avatar} alt={currentUser?.name || 'User'} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center font-bold text-xs text-slate-700 dark:text-slate-200">
-                  {(currentUser?.name || 'US').substring(0, 2).toUpperCase()}
+                  {(currentUser?.name || currentUser?.email || 'US').substring(0, 2).toUpperCase()}
                 </div>
               )}
             </button>

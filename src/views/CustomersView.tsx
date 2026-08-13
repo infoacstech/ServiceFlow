@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Customer } from '../types';
 import { CsvImportModal, CsvColumnMapping } from '../components/CsvImportModal';
+import { CustomerServiceSummary } from '../components/CustomerServiceSummary';
 import {
   Users,
   Plus,
@@ -45,8 +46,8 @@ export const CustomersView: React.FC = () => {
   const [filterType, setFilterType] = useState<'all' | 'commercial' | 'individual'>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [activeProfileTab, setActiveProfileTab] = useState<
-    'overview' | 'jobs' | 'quotations' | 'invoices' | 'payments' | 'contracts' | 'timeline'
-  >('overview');
+    'service_summary' | 'overview' | 'jobs' | 'quotations' | 'invoices' | 'payments' | 'contracts' | 'timeline'
+  >('service_summary');
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
@@ -296,6 +297,7 @@ export const CustomersView: React.FC = () => {
               {/* Profile Navigation Tabs */}
               <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 mb-4 overflow-x-auto">
                 {[
+                  { id: 'service_summary', label: 'Service & Invoices Hub', icon: Wrench },
                   { id: 'overview', label: 'Overview', icon: Building },
                   { id: 'jobs', label: 'Jobs', icon: Briefcase },
                   { id: 'quotations', label: 'Quotes', icon: FileText },
@@ -323,6 +325,10 @@ export const CustomersView: React.FC = () => {
               </div>
 
               {/* Tab Content */}
+              {activeProfileTab === 'service_summary' && (
+                <CustomerServiceSummary customer={selectedCustomer} />
+              )}
+
               {activeProfileTab === 'overview' && (
                 <div className="space-y-4 text-xs">
                   <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 space-y-2">

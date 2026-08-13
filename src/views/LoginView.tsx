@@ -69,8 +69,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     // Match existing user by email or phone
     const matchedUser = (users || []).find(
       (u) =>
-        u.email.toLowerCase() === cleanIdentifier ||
-        u.phone.replace(/[^0-9]/g, '').endsWith(cleanIdentifier.replace(/[^0-9]/g, '').slice(-10))
+        (u.email || '').toLowerCase() === cleanIdentifier ||
+        (u.phone || '').replace(/[^0-9]/g, '').endsWith(cleanIdentifier.replace(/[^0-9]/g, '').slice(-10))
     );
 
     if (!matchedUser) {
@@ -245,7 +245,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           {currentUser && (
             <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-base shrink-0">
-                {currentUser.name ? currentUser.name.substring(0, 2).toUpperCase() : 'US'}
+                {(currentUser?.name || currentUser?.email || 'US').substring(0, 2).toUpperCase()}
               </div>
               <div className="text-xs">
                 <div className="text-indigo-200 text-[10px] uppercase tracking-wider font-semibold">Currently Active</div>
@@ -438,8 +438,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       Registration Submitted & Pending Approval!
                     </h4>
                     <p className="text-xs text-amber-800 dark:text-amber-200 mt-1 leading-relaxed">
-                      Thank you, <strong>{pendingRegistrationSuccess.name}</strong>. Your account registration as{' '}
-                      <strong>{pendingRegistrationSuccess.role.replace('_', ' ')}</strong> has been created with status{' '}
+                      Thank you, <strong>{pendingRegistrationSuccess?.name || 'User'}</strong>. Your account registration as{' '}
+                      <strong>{(pendingRegistrationSuccess?.role || 'user').replace('_', ' ')}</strong> has been created with status{' '}
                       <span className="font-mono font-bold bg-amber-200 dark:bg-amber-900 px-1.5 py-0.5 rounded text-amber-950 dark:text-white">pending</span>.
                     </p>
                   </div>
@@ -709,11 +709,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-black text-sm text-slate-800 dark:text-slate-100 shrink-0">
-                          {u.name.substring(0, 2).toUpperCase()}
+                          {(u?.name || u?.email || 'US').substring(0, 2).toUpperCase()}
                         </div>
                         <div className="min-w-0">
                           <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1.5">
-                            <span>{u.name}</span>
+                            <span>{u?.name || u?.email || 'User'}</span>
                             {isCurrent && (
                               <span className="text-[9px] bg-indigo-600 text-white px-1.5 py-0.2 rounded font-semibold">
                                 Active
@@ -721,9 +721,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                             )}
                           </div>
                           <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate capitalize">
-                            {u.role.replace('_', ' ')} • {bizName}
+                            {(u?.role || 'user').replace('_', ' ')} • {bizName}
                           </div>
-                          <div className="text-[10px] font-mono text-slate-400 truncate">{u.phone}</div>
+                          <div className="text-[10px] font-mono text-slate-400 truncate">{u?.phone || ''}</div>
                         </div>
                       </div>
 

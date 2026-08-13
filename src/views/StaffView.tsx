@@ -147,17 +147,17 @@ export const StaffView: React.FC = () => {
                 className="bg-white dark:bg-slate-900 border border-amber-200/80 dark:border-amber-900/50 rounded-2xl p-4 flex flex-col justify-between space-y-3 shadow-xs"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 flex items-center justify-center font-extrabold text-sm shrink-0">
-                      {reqUser.name.substring(0, 2).toUpperCase()}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 flex items-center justify-center font-extrabold text-sm shrink-0">
+                        {(reqUser?.name || reqUser?.email || 'US').substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">{reqUser?.name || reqUser?.email || 'User'}</h3>
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 inline-block">
+                          Requested: {(reqUser?.role || 'user').replace('_', ' ')}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">{reqUser.name}</h3>
-                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 inline-block">
-                        Requested: {reqUser.role.replace('_', ' ')}
-                      </span>
-                    </div>
-                  </div>
                 </div>
 
                 <div className="space-y-1 text-xs text-slate-600 dark:text-slate-400">
@@ -224,21 +224,21 @@ export const StaffView: React.FC = () => {
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-2xl bg-slate-200 dark:bg-slate-800 overflow-hidden ring-2 ring-indigo-500/30 shrink-0">
                         {st.avatar ? (
-                          <img src={st.avatar} alt={st.name} className="w-full h-full object-cover" />
+                          <img src={st.avatar} alt={st.name || 'Staff'} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center font-bold text-slate-700 dark:text-slate-200">
-                            {st.name.substring(0, 2)}
+                            {(st?.name || st?.email || 'US').substring(0, 2).toUpperCase()}
                           </div>
                         )}
                       </div>
 
                       <div>
                         <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                          {st.name}
+                          {st?.name || st?.email || 'Staff'}
                         </h3>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
-                            {st.role.replace('_', ' ')}
+                            {(st?.role || 'staff').replace('_', ' ')}
                           </span>
                         </div>
                       </div>
