@@ -278,7 +278,17 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentBusiness, setCurrentBusiness] = useState<Business>(DEMO_BUSINESSES[0]);
 
   const [users, setUsers] = useState<User[]>(DEMO_USERS);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const savedSession = localStorage.getItem('serviflow_user_session');
+      if (savedSession) {
+        return JSON.parse(savedSession) as User;
+      }
+    } catch (e) {
+      console.warn('Could not parse stored session:', e);
+    }
+    return null;
+  });
   const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(true);
 
   const [customers, setCustomers] = useState<Customer[]>(DEMO_CUSTOMERS);
@@ -639,6 +649,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           if (userRecord) {
             setCurrentUser(userRecord);
+            localStorage.setItem('serviflow_user_session', JSON.stringify(userRecord));
             localStorage.setItem('serviflow_logged_in_email', userRecord.email);
             localStorage.setItem('serviflow_logged_in_uid', userRecord.id);
 
@@ -649,16 +660,25 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               const biz = businesses.find((b) => b.id === userRecord?.businessId);
               if (biz) setCurrentBusiness(biz);
             }
-          } else {
-            setCurrentUser(null);
           }
         } catch (err) {
           console.error('Error fetching user on auth change:', err);
         }
       } else {
-        setCurrentUser(null);
-        localStorage.removeItem('serviflow_logged_in_email');
-        localStorage.removeItem('serviflow_logged_in_uid');
+        // Fallback: Check if local session exists before wiping currentUser
+        const storedSession = localStorage.getItem('serviflow_user_session');
+        if (storedSession) {
+          try {
+            const parsedUser = JSON.parse(storedSession) as User;
+            setCurrentUser(parsedUser);
+            const biz = businesses.find((b) => b.id === parsedUser.businessId);
+            if (biz) setCurrentBusiness(biz);
+          } catch (e) {
+            setCurrentUser(null);
+          }
+        } else {
+          setCurrentUser(null);
+        }
       }
       setIsAuthInitializing(false);
     });
@@ -696,6 +716,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
+      localStorage.setItem('serviflow_user_session', JSON.stringify(userToLogin));
       localStorage.setItem('serviflow_logged_in_email', email);
       localStorage.setItem('serviflow_logged_in_uid', auth.currentUser?.uid || userToLogin.id);
 
@@ -725,6 +746,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err) {
       console.warn('Error signing out from Firebase Auth:', err);
     }
+    localStorage.removeItem('serviflow_user_session');
     localStorage.removeItem('serviflow_logged_in_email');
     localStorage.removeItem('serviflow_logged_in_uid');
     sessionStorage.removeItem('serviflow_active_tab');

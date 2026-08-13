@@ -1,26 +1,19 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { UserRole, User } from '../types';
+import { User } from '../types';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import {
-  Phone,
   Mail,
   Lock,
-  UserCheck,
-  ShieldAlert,
   ArrowRight,
-  CheckCircle2,
-  Sparkles,
   ShieldCheck,
   Building2,
   UserPlus,
   Clock,
-  Ban,
-  XCircle,
   KeyRound,
-  Briefcase,
-  AlertCircle,
+  UserCheck,
+  Sparkles,
 } from 'lucide-react';
 
 interface LoginViewProps {
@@ -32,20 +25,20 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     users,
     loginUser,
     businesses,
-    switchBusiness,
     switchRole,
     currentUser,
     showToast,
     registerUser,
   } = useApp();
 
-  const [authTab, setAuthTab] = useState<'login' | 'register' | 'super_admin' | 'quick'>('login');
+  const [authTab, setAuthTab] = useState<'login' | 'register' | 'super_admin'>('login');
 
-  // Direct Login Form States
-  const [loginIdentifier, setLoginIdentifier] = useState(''); // Email or Phone
+  // Sign In Form State
+  const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Direct Registration Form States
+  // Registration Form State
   const [registerRole, setRegisterRole] = useState<'business_owner' | 'manager' | 'technician'>('business_owner');
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
@@ -55,10 +48,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [regBusinessName, setRegBusinessName] = useState('');
   const [regBusinessType, setRegBusinessType] = useState('CCTV & Security');
 
-  // Registration Result Alert State
+  // Registration Success Alert State
   const [pendingRegistrationSuccess, setPendingRegistrationSuccess] = useState<User | null>(null);
 
-  // Handle Direct Password Login
+  // Handle Direct Sign In
   const handleDirectLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanIdentifier = loginIdentifier.trim().toLowerCase();
@@ -68,102 +61,111 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    // Match existing user by email or phone in state
-    let matchedUser = (users || []).find(
-      (u) =>
-        (u.email || '').toLowerCase() === cleanIdentifier ||
-        (u.phone || '').replace(/[^0-9]/g, '').endsWith(cleanIdentifier.replace(/[^0-9]/g, '').slice(-10))
-    );
+    setIsSubmitting(true);
 
-    // Multi-device fallback: Query Firestore directly if account isn't in local state memory yet
-    if (!matchedUser) {
-      try {
-        const qEmail = query(collection(db, 'users'), where('email', '==', cleanIdentifier));
-        const snapEmail = await getDocs(qEmail);
-        if (!snapEmail.empty) {
-          matchedUser = snapEmail.docs[0].data() as User;
-        } else {
-          // Try clean digits phone search
-          const digitsOnly = cleanIdentifier.replace(/[^0-9]/g, '');
-          if (digitsOnly.length >= 6) {
-            const allUsersSnap = await getDocs(collection(db, 'users'));
-            const foundDoc = allUsersSnap.docs.find((d) => {
-              const uData = d.data() as User;
-              return (uData.phone || '').replace(/[^0-9]/g, '').endsWith(digitsOnly.slice(-10));
-            });
-            if (foundDoc) {
-              matchedUser = foundDoc.data() as User;
+    try {
+      // Find user locally by email or phone
+      let matchedUser = (users || []).find(
+        (u) =>
+          (u.email || '').toLowerCase() === cleanIdentifier ||
+          (u.phone || '').replace(/[^0-9]/g, '').endsWith(cleanIdentifier.replace(/[^0-9]/g, '').slice(-10))
+      );
+
+      // Firestore fallback query if not in local memory yet
+      if (!matchedUser) {
+        try {
+          const qEmail = query(collection(db, 'users'), where('email', '==', cleanIdentifier));
+          const snapEmail = await getDocs(qEmail);
+          if (!snapEmail.empty) {
+            matchedUser = snapEmail.docs[0].data() as User;
+          } else {
+            const digitsOnly = cleanIdentifier.replace(/[^0-9]/g, '');
+            if (digitsOnly.length >= 6) {
+              const allUsersSnap = await getDocs(collection(db, 'users'));
+              const foundDoc = allUsersSnap.docs.find((d) => {
+                const uData = d.data() as User;
+                return (uData.phone || '').replace(/[^0-9]/g, '').endsWith(digitsOnly.slice(-10));
+              });
+              if (foundDoc) {
+                matchedUser = foundDoc.data() as User;
+              }
             }
           }
+        } catch (fsErr) {
+          console.warn('Firestore fallback user query error:', fsErr);
         }
-      } catch (fsErr) {
-        console.warn('Firestore fallback user query error:', fsErr);
       }
-    }
 
-    if (!matchedUser) {
-      showToast('No account found with this email or mobile phone. Please register first or check your spelling.', 'error');
-      return;
-    }
-
-    // Password Validation (if password set on user record)
-    if (matchedUser.password && loginPassword && matchedUser.password !== loginPassword) {
-      showToast('Incorrect password. Please try again.', 'error');
-      return;
-    }
-
-    // ENFORCE TWO-LAYER APPROVAL & ACCESS CHECKS
-    const userBiz = (businesses || []).find((b) => b.id === matchedUser.businessId);
-
-    // Business level status check
-    if (userBiz?.status === 'suspended') {
-      showToast('Your business account access has been suspended by the platform admin.', 'error');
-      return;
-    }
-
-    // Role-specific approval checks
-    if (matchedUser.role === 'business_owner') {
-      const bizStatus = userBiz?.status || matchedUser.approvalStatus || 'active';
-      if (bizStatus === 'pending' || matchedUser.approvalStatus === 'pending') {
-        showToast('Your business registration is pending approval from the platform admin. You will be notified once approved.', 'error');
+      if (!matchedUser) {
+        showToast('No account found with this email or mobile phone. Please check details or register.', 'error');
+        setIsSubmitting(false);
         return;
       }
-      if (bizStatus === 'rejected' || matchedUser.approvalStatus === 'rejected') {
-        showToast('Your registration was rejected by the platform admin.', 'error');
+
+      // Password Check
+      if (matchedUser.password && loginPassword && matchedUser.password !== loginPassword) {
+        showToast('Incorrect password. Please try again.', 'error');
+        setIsSubmitting(false);
         return;
       }
-      if (bizStatus === 'suspended' || matchedUser.approvalStatus === 'suspended') {
+
+      // Business & Status Checks
+      const userBiz = (businesses || []).find((b) => b.id === matchedUser.businessId);
+
+      if (userBiz?.status === 'suspended') {
         showToast('Your business account access has been suspended by the platform admin.', 'error');
+        setIsSubmitting(false);
         return;
       }
-    } else if (matchedUser.role !== 'super_admin') {
-      // Manager & Field Executive (Owner approval layer)
-      const staffStatus = matchedUser.approvalStatus || 'active';
-      if (staffStatus === 'pending') {
-        showToast('Waiting for Owner approval. Contact your business owner to activate your account.', 'error');
-        return;
-      }
-      if (staffStatus === 'rejected') {
-        showToast('Your registration was rejected by the business owner.', 'error');
-        return;
-      }
-      if (staffStatus === 'blocked' || staffStatus === 'suspended') {
-        showToast('Your access has been blocked by the business owner. Contact them for details.', 'error');
-        return;
-      }
-    }
 
-    // Status is 'active' -> Allow login via Firebase Auth & Firestore
-    try {
+      if (matchedUser.role === 'business_owner') {
+        const bizStatus = userBiz?.status || matchedUser.approvalStatus || 'active';
+        if (bizStatus === 'pending' || matchedUser.approvalStatus === 'pending') {
+          showToast('Your business registration is pending approval from the platform admin.', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+        if (bizStatus === 'rejected' || matchedUser.approvalStatus === 'rejected') {
+          showToast('Your registration was rejected by the platform admin.', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+        if (bizStatus === 'suspended' || matchedUser.approvalStatus === 'suspended') {
+          showToast('Your business account access has been suspended.', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+      } else if (matchedUser.role !== 'super_admin') {
+        const staffStatus = matchedUser.approvalStatus || 'active';
+        if (staffStatus === 'pending') {
+          showToast('Waiting for Owner approval. Contact your business owner to activate your account.', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+        if (staffStatus === 'rejected') {
+          showToast('Your registration was rejected by the business owner.', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+        if (staffStatus === 'blocked' || staffStatus === 'suspended') {
+          showToast('Your access has been blocked by the business owner.', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Execute Login & Set Active Tab
       sessionStorage.setItem('serviflow_active_tab', matchedUser.role === 'super_admin' ? 'super_admin' : 'dashboard');
       await loginUser(matchedUser, loginPassword);
       if (onLoginSuccess) onLoginSuccess();
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('Sign in error:', err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Handle Direct Registration
+  // Handle Account Registration
   const handleDirectRegistration = (e: React.FormEvent) => {
     e.preventDefault();
     if (!regName.trim() || !regEmail.trim() || !regPhone.trim() || !regPassword.trim()) {
@@ -176,7 +178,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    // Call registerUser from context
     const result = registerUser({
       name: regName.trim(),
       email: regEmail.trim(),
@@ -199,348 +200,177 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  // Quick Switch for Demo Accounts with status enforcement
-  const handleQuickSwitch = async (u: User) => {
-    const userBiz = (businesses || []).find((b) => b.id === u.businessId);
-
-    if (userBiz?.status === 'suspended') {
-      showToast('Your business account access has been suspended by the platform admin.', 'error');
-      return;
-    }
-
-    if (u.role === 'business_owner') {
-      const bizStatus = userBiz?.status || u.approvalStatus || 'active';
-      if (bizStatus === 'pending' || u.approvalStatus === 'pending') {
-        showToast('Your business registration is pending approval from the platform admin. You will be notified once approved.', 'error');
-        return;
-      }
-      if (bizStatus === 'rejected' || u.approvalStatus === 'rejected') {
-        showToast('Your registration was rejected by the platform admin.', 'error');
-        return;
-      }
-      if (bizStatus === 'suspended' || u.approvalStatus === 'suspended') {
-        showToast('Your business account access has been suspended by the platform admin.', 'error');
-        return;
-      }
-    } else if (u.role !== 'super_admin') {
-      const staffStatus = u.approvalStatus || 'active';
-      if (staffStatus === 'pending') {
-        showToast('Waiting for Owner approval. Contact your business owner to activate your account.', 'error');
-        return;
-      }
-      if (staffStatus === 'rejected') {
-        showToast('Your registration was rejected by the business owner.', 'error');
-        return;
-      }
-      if (staffStatus === 'blocked' || staffStatus === 'suspended') {
-        showToast('Your access has been blocked by the business owner. Contact them for details.', 'error');
-        return;
-      }
-    }
-
-    try {
-      await loginUser(u, u.password || 'ServiFlow@123');
-      if (onLoginSuccess) onLoginSuccess();
-    } catch (err) {
-      console.error('Quick switch login error:', err);
-    }
-  };
-
   const handleSuperAdminLogin = () => {
     switchRole('super_admin');
-    showToast('Switched to Super Admin Platform Dashboard!', 'success');
+    showToast('Authenticated as SaaS Super Admin', 'success');
     if (onLoginSuccess) onLoginSuccess();
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in py-2">
-      {/* Top Banner Header */}
-      <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/30 border border-indigo-400/30 text-indigo-200 text-xs font-semibold mb-3">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>ServiFlow SaaS Authentication & Access Panel</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-              Direct Account Sign In & Registration
-            </h1>
-            <p className="text-sm text-indigo-200 mt-1 max-w-xl">
-              No magic links or email invites required. Create account with your password or sign in directly.
-            </p>
+    <div className="min-h-[80vh] flex flex-col justify-center items-center py-6 px-4 animate-in fade-in">
+      <div className="w-full max-w-md space-y-6">
+        {/* Brand Header */}
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 mb-1">
+            <ShieldCheck className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+            ServiFlow
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium max-w-xs mx-auto">
+            Field Operations & Service Management System
+          </p>
+        </div>
+
+        {/* Main Clean Card */}
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xl p-6 sm:p-8 space-y-6">
+          {/* Top Auth Tab Selector */}
+          <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthTab('login');
+                setPendingRegistrationSuccess(null);
+              }}
+              className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                authTab === 'login'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>Sign In</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setAuthTab('register');
+                setPendingRegistrationSuccess(null);
+              }}
+              className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                authTab === 'register'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Create Account</span>
+            </button>
           </div>
 
-          {currentUser && (
-            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-base shrink-0">
-                {(currentUser?.name || currentUser?.email || 'US').substring(0, 2).toUpperCase()}
-              </div>
-              <div className="text-xs">
-                <div className="text-indigo-200 text-[10px] uppercase tracking-wider font-semibold">Currently Active</div>
-                <div className="font-bold text-white truncate max-w-[140px]">{currentUser.name || 'User'}</div>
-                <div className="text-indigo-300 capitalize text-[11px]">{currentUser.role ? currentUser.role.replace('_', ' ') : ''}</div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Main Login Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
-        {/* Left Options / Tabs Column */}
-        <div className="lg:col-span-4 p-5 bg-slate-50/80 dark:bg-slate-800/50 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 space-y-2">
-          <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-2 mb-3">
-            Authentication Mode
-          </h3>
-
-          <button
-            onClick={() => {
-              setAuthTab('login');
-              setPendingRegistrationSuccess(null);
-            }}
-            className={`w-full flex items-center gap-3 p-3.5 rounded-2xl text-xs font-semibold transition-all text-left ${
-              authTab === 'login'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700/60'
-            }`}
-          >
-            <div className={`p-2 rounded-xl ${authTab === 'login' ? 'bg-indigo-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-indigo-600 dark:text-indigo-400'}`}>
-              <KeyRound className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="font-bold">Direct Account Login</div>
-              <div className={`text-[10px] ${authTab === 'login' ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>
-                Email / Phone + Password
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => {
-              setAuthTab('register');
-              setPendingRegistrationSuccess(null);
-            }}
-            className={`w-full flex items-center gap-3 p-3.5 rounded-2xl text-xs font-semibold transition-all text-left ${
-              authTab === 'register'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700/60'
-            }`}
-          >
-            <div className={`p-2 rounded-xl ${authTab === 'register' ? 'bg-indigo-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-indigo-600 dark:text-indigo-400'}`}>
-              <UserPlus className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="font-bold">Create New Account</div>
-              <div className={`text-[10px] ${authTab === 'register' ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>
-                Owner, Manager, or Field Tech
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setAuthTab('super_admin')}
-            className={`w-full flex items-center gap-3 p-3.5 rounded-2xl text-xs font-semibold transition-all text-left ${
-              authTab === 'super_admin'
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                : 'bg-purple-50/60 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/40 text-purple-900 dark:text-purple-200 border border-purple-200 dark:border-purple-800/80'
-            }`}
-          >
-            <div className={`p-2 rounded-xl ${authTab === 'super_admin' ? 'bg-purple-500 text-white' : 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300'}`}>
-              <ShieldCheck className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="font-bold">Super Admin Access</div>
-              <div className={`text-[10px] ${authTab === 'super_admin' ? 'text-purple-100' : 'text-purple-600 dark:text-purple-400'}`}>
-                Platform Multi-Tenant Admin
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setAuthTab('quick')}
-            className={`w-full flex items-center gap-3 p-3.5 rounded-2xl text-xs font-semibold transition-all text-left ${
-              authTab === 'quick'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 border border-slate-200/60 dark:border-slate-700/60'
-            }`}
-          >
-            <div className={`p-2 rounded-xl ${authTab === 'quick' ? 'bg-indigo-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-indigo-600 dark:text-indigo-400'}`}>
-              <UserCheck className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="font-bold">Switch Demo Account</div>
-              <div className={`text-[10px] ${authTab === 'quick' ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>
-                Test Active / Pending / Blocked
-              </div>
-            </div>
-          </button>
-        </div>
-
-        {/* Right Form Content Column */}
-        <div className="lg:col-span-8 p-6 sm:p-8">
-          {/* TAB 1: Direct Password Login */}
+          {/* SIGN IN TAB */}
           {authTab === 'login' && (
-            <div className="space-y-6 max-w-md">
+            <form onSubmit={handleDirectLogin} className="space-y-4">
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <KeyRound className="w-5 h-5 text-indigo-600" />
-                  <span>Direct Account Sign In</span>
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Enter your Email address or Mobile phone number and password to log in.
-                </p>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Email Address or Mobile Phone
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={loginIdentifier}
+                    onChange={(e) => setLoginIdentifier(e.target.value)}
+                    placeholder="e.g. rajesh@apexsecurity.com or 9876543210"
+                    required
+                    className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
+                  />
+                </div>
               </div>
 
-              <form onSubmit={handleDirectLogin} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Email Address or Mobile Phone
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
-                    <input
-                      type="text"
-                      value={loginIdentifier}
-                      onChange={(e) => setLoginIdentifier(e.target.value)}
-                      placeholder="e.g. rajesh@apexsecurity.com or 9876543210"
-                      required
-                      className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                    />
-                  </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+                  <input
+                    type="password"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="Enter password"
+                    required
+                    className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
+                  />
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Account Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
-                    <input
-                      type="password"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                    />
-                  </div>
-                </div>
-
-                <div className="p-3 bg-indigo-50/60 dark:bg-indigo-950/40 rounded-xl border border-indigo-100 dark:border-indigo-900 text-[11px] text-indigo-800 dark:text-indigo-300 flex items-start gap-2">
-                  <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-indigo-600" />
-                  <span>
-                    <strong>Owner Approval Enforced:</strong> New Manager & Field Executive accounts require approval by the Business Owner before first login.
-                  </span>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
-                >
-                  <span>Sign In</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </form>
-            </div>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {isSubmitting ? (
+                  <span>Signing in...</span>
+                ) : (
+                  <>
+                    <span>Sign In</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
           )}
 
-          {/* TAB 2: Direct Registration (No Links) */}
+          {/* CREATE ACCOUNT TAB */}
           {authTab === 'register' && (
-            <div className="space-y-5 max-w-lg">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <UserPlus className="w-5 h-5 text-indigo-600" />
-                  <span>Direct Account Registration</span>
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Create your account with name, contact details, and set your own password. No magic links.
-                </p>
-              </div>
-
+            <div>
               {pendingRegistrationSuccess ? (
-                <div className="p-6 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 rounded-3xl space-y-4 animate-in fade-in">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md">
-                    <Clock className="w-6 h-6" />
+                <div className="p-5 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 rounded-2xl space-y-3 animate-in fade-in">
+                  <div className="flex items-center gap-3 text-amber-900 dark:text-amber-100">
+                    <Clock className="w-6 h-6 text-amber-600 shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-extrabold">Registration Pending Approval</h4>
+                      <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                        Your account request has been submitted successfully.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-base font-extrabold text-amber-900 dark:text-amber-100">
-                      Registration Submitted & Pending Approval!
-                    </h4>
-                    <p className="text-xs text-amber-800 dark:text-amber-200 mt-1 leading-relaxed">
-                      Thank you, <strong>{pendingRegistrationSuccess?.name || 'User'}</strong>. Your account registration as{' '}
-                      <strong>{(pendingRegistrationSuccess?.role || 'user').replace('_', ' ')}</strong> has been created with status{' '}
-                      <span className="font-mono font-bold bg-amber-200 dark:bg-amber-900 px-1.5 py-0.5 rounded text-amber-950 dark:text-white">pending</span>.
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white/80 dark:bg-slate-900/80 rounded-2xl text-xs text-slate-700 dark:text-slate-300 space-y-1">
-                    {pendingRegistrationSuccess.role === 'business_owner' ? (
-                      <p>• <strong>Platform Admin Approval Required:</strong> Your business registration is pending approval from the platform admin. You will be notified once approved.</p>
-                    ) : (
-                      <p>• <strong>Owner Approval Required:</strong> You cannot log in until the Business Owner approves your request.</p>
-                    )}
-                    <p>• <strong>Password Saved:</strong> Once approved, you can log in immediately using the password you just set.</p>
-                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed bg-white/70 dark:bg-slate-900/70 p-3 rounded-xl border border-amber-200/50">
+                    {pendingRegistrationSuccess.role === 'business_owner'
+                      ? 'Business owner registrations require platform administrator approval before login access is granted.'
+                      : 'Staff member accounts require approval by your Business Owner before first login.'}
+                  </p>
                   <button
                     onClick={() => {
                       setPendingRegistrationSuccess(null);
                       setAuthTab('login');
                     }}
-                    className="w-full py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition-all"
+                    className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs"
                   >
-                    Go to Login Page
+                    Back to Sign In
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleDirectRegistration} className="space-y-4">
-                  {/* Role Selector */}
+                <form onSubmit={handleDirectRegistration} className="space-y-3.5">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Select Registration Type *
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Account Type *
                     </label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={() => setRegisterRole('business_owner')}
-                        className={`p-3 text-left rounded-2xl border transition-all ${
+                        className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all text-center ${
                           registerRole === 'business_owner'
-                            ? 'bg-indigo-50/90 dark:bg-indigo-950/90 border-indigo-500 ring-1 ring-indigo-500 text-indigo-900 dark:text-indigo-200'
-                            : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                            ? 'bg-indigo-50 dark:bg-indigo-950/80 border-indigo-500 text-indigo-700 dark:text-indigo-300'
+                            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
                         }`}
                       >
-                        <div className="font-extrabold text-xs">Business Owner</div>
-                        <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
-                          Pending Admin Approval
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setRegisterRole('manager')}
-                        className={`p-3 text-left rounded-2xl border transition-all ${
-                          registerRole === 'manager'
-                            ? 'bg-indigo-50/90 dark:bg-indigo-950/90 border-indigo-500 ring-1 ring-indigo-500 text-indigo-900 dark:text-indigo-200'
-                            : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
-                        }`}
-                      >
-                        <div className="font-extrabold text-xs">Manager</div>
-                        <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
-                          Pending Owner Approval
-                        </div>
+                        Business Owner
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setRegisterRole('technician')}
-                        className={`p-3 text-left rounded-2xl border transition-all ${
-                          registerRole === 'technician'
-                            ? 'bg-indigo-50/90 dark:bg-indigo-950/90 border-indigo-500 ring-1 ring-indigo-500 text-indigo-900 dark:text-indigo-200'
-                            : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                        className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all text-center ${
+                          registerRole !== 'business_owner'
+                            ? 'bg-indigo-50 dark:bg-indigo-950/80 border-indigo-500 text-indigo-700 dark:text-indigo-300'
+                            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
                         }`}
                       >
-                        <div className="font-extrabold text-xs">Field Executive</div>
-                        <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
-                          Pending Owner Approval
-                        </div>
+                        Field Executive / Staff
                       </button>
                     </div>
                   </div>
@@ -555,11 +385,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       onChange={(e) => setRegName(e.target.value)}
                       placeholder="e.g. Rahul Sharma"
                       required
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                         Email Address *
@@ -570,31 +400,30 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         onChange={(e) => setRegEmail(e.target.value)}
                         placeholder="rahul@company.com"
                         required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                       />
                     </div>
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Mobile Phone Number *
+                        Mobile Phone *
                       </label>
                       <input
                         type="tel"
                         value={regPhone}
                         onChange={(e) => setRegPhone(e.target.value)}
-                        placeholder="+91 98765 43210"
+                        placeholder="9876543210"
                         required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                       />
                     </div>
                   </div>
 
-                  {/* Business Details vs Business Selector */}
                   {registerRole === 'business_owner' ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+                    <div className="space-y-2.5">
                       <div>
                         <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                          New Business Name *
+                          Business Name *
                         </label>
                         <input
                           type="text"
@@ -602,7 +431,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                           onChange={(e) => setRegBusinessName(e.target.value)}
                           placeholder="e.g. Apex Security Solutions"
                           required
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                         />
                       </div>
                       <div>
@@ -612,14 +441,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         <select
                           value={regBusinessType}
                           onChange={(e) => setRegBusinessType(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                         >
                           <option value="CCTV & Security">CCTV & Security Systems</option>
-                          <option value="Solar & Energy">Solar & Energy Solutions</option>
+                          <option value="Solar & Energy">Solar & Renewable Energy</option>
                           <option value="AC Service & HVAC">AC Service & HVAC</option>
                           <option value="Electrical Services">Electrical Services</option>
                           <option value="Plumbing Services">Plumbing Services</option>
-                          <option value="Computer & IT Repair">Computer & IT Services</option>
+                          <option value="Computer & IT Repair">Computer & IT Repair</option>
                         </select>
                       </div>
                     </div>
@@ -631,7 +460,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       <select
                         value={regBusinessId}
                         onChange={(e) => setRegBusinessId(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                       >
                         {businesses.map((b) => (
                           <option key={b.id} value={b.id}>
@@ -644,138 +473,72 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Set Your Account Password *
+                      Set Account Password *
                     </label>
                     <input
                       type="password"
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="Enter a secure password"
+                      placeholder="Password (min 4 characters)"
                       required
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                     />
                   </div>
 
                   <button
                     type="submit"
-                    className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
                   >
                     <UserPlus className="w-4 h-4" />
-                    <span>
-                      {registerRole === 'business_owner'
-                        ? 'Register Business & Sign In'
-                        : 'Submit Account Registration'}
-                    </span>
+                    <span>Create Account</span>
                   </button>
                 </form>
               )}
             </div>
           )}
 
-          {/* TAB 3: Super Admin */}
+          {/* SUPER ADMIN ACCORDION / TOGGLE */}
           {authTab === 'super_admin' && (
-            <div className="space-y-6 max-w-md">
-              <div className="p-4 rounded-2xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800/80">
-                <div className="flex items-center gap-2.5 text-purple-900 dark:text-purple-200 font-bold text-base">
-                  <ShieldCheck className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+            <div className="space-y-4 animate-in fade-in">
+              <div className="p-4 rounded-2xl bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800/80 space-y-2">
+                <div className="flex items-center gap-2 text-purple-900 dark:text-purple-200 font-extrabold text-sm">
+                  <ShieldCheck className="w-5 h-5 text-purple-600" />
                   <span>SaaS Platform Super Admin</span>
                 </div>
-                <p className="text-xs text-purple-700 dark:text-purple-300 mt-2 leading-relaxed">
-                  Super Admin role grants complete administrative control over all tenant businesses, global subscription billing, white-label settings, and system logs.
+                <p className="text-xs text-purple-700 dark:text-purple-300 leading-relaxed">
+                  Grants platform administrative access to manage all business tenants, owner approvals, and billing control.
                 </p>
               </div>
 
-              <div className="space-y-3">
-                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium space-y-1">
-                  <p>✔ Manage all registered businesses</p>
-                  <p>✔ View platform revenue analytics & SaaS billing</p>
-                  <p>✔ Create multi-tenant organizations</p>
-                </div>
-
-                <button
-                  onClick={handleSuperAdminLogin}
-                  className="w-full py-4 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-black text-sm shadow-lg shadow-purple-600/30 transition-all flex items-center justify-center gap-2"
-                >
-                  <ShieldCheck className="w-5 h-5" />
-                  <span>Log In as Super Admin</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleSuperAdminLogin}
+                className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/30 transition-all flex items-center justify-center gap-2"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Enter Super Admin Console</span>
+              </button>
             </div>
           )}
+        </div>
 
-          {/* TAB 4: Quick Switch */}
-          {authTab === 'quick' && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <UserCheck className="w-5 h-5 text-indigo-600" />
-                  <span>Quick Demo Staff Login</span>
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Click on any account below to test login logic (including Active, Pending, and Blocked checks):
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {(users || []).map((u) => {
-                  const isCurrent = currentUser?.id === u.id;
-                  const bizName = (businesses || []).find((b) => b.id === u.businessId)?.name || 'ServiFlow';
-                  const status = u.approvalStatus || 'active';
-
-                  return (
-                    <div
-                      key={u.id}
-                      onClick={() => handleQuickSwitch(u)}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                        isCurrent
-                          ? 'bg-indigo-50 dark:bg-indigo-950/80 border-indigo-500 shadow-xs'
-                          : status === 'blocked'
-                          ? 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-200/80 dark:border-rose-900/60'
-                          : status === 'pending'
-                          ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-200/80 dark:border-amber-900/60'
-                          : 'bg-slate-50/70 dark:bg-slate-800/60 border-slate-200/80 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-black text-sm text-slate-800 dark:text-slate-100 shrink-0">
-                          {(u?.name || u?.email || 'US').substring(0, 2).toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1.5">
-                            <span>{u?.name || u?.email || 'User'}</span>
-                            {isCurrent && (
-                              <span className="text-[9px] bg-indigo-600 text-white px-1.5 py-0.2 rounded font-semibold">
-                                Active
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate capitalize">
-                            {(u?.role || 'user').replace('_', ' ')} • {bizName}
-                          </div>
-                          <div className="text-[10px] font-mono text-slate-400 truncate">{u?.phone || ''}</div>
-                        </div>
-                      </div>
-
-                      <div className="shrink-0 ml-2">
-                        {status === 'blocked' ? (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
-                            Blocked
-                          </span>
-                        ) : status === 'pending' ? (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                            Pending
-                          </span>
-                        ) : (
-                          <button className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline">
-                            Login
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+        {/* Bottom Footer Link */}
+        <div className="text-center pt-1">
+          {authTab !== 'super_admin' ? (
+            <button
+              onClick={() => setAuthTab('super_admin')}
+              className="text-xs text-slate-400 hover:text-purple-600 font-semibold transition-colors flex items-center justify-center gap-1 mx-auto"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-500" />
+              <span>Platform Super Admin Access</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setAuthTab('login')}
+              className="text-xs text-slate-400 hover:text-indigo-600 font-semibold transition-colors flex items-center justify-center gap-1 mx-auto"
+            >
+              <span>← Back to Business Sign In</span>
+            </button>
           )}
         </div>
       </div>

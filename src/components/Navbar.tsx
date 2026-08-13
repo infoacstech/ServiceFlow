@@ -184,17 +184,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </button>
                   ))}
                 </div>
-                <div className="pt-2 mt-1 border-t border-slate-100 dark:border-slate-800">
-                  <button
-                    onClick={() => {
-                      onOpenOnboarding();
-                      closeAllMenus();
-                    }}
-                    className="w-full flex items-center justify-center gap-2 p-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs transition-all shadow-xs"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Onboard New Business
-                  </button>
-                </div>
+                {currentUser?.role === 'super_admin' && (
+                  <div className="pt-2 mt-1 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      onClick={() => {
+                        onOpenOnboarding();
+                        closeAllMenus();
+                      }}
+                      className="w-full flex items-center justify-center gap-2 p-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs transition-all shadow-xs"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Onboard New Business
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
