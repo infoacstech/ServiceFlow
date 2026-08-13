@@ -241,8 +241,10 @@ export const SuperAdminView: React.FC = () => {
                       </span>
                     </td>
                     <td className="p-4">
-                      <div className="font-bold text-slate-800 dark:text-slate-200">{owner?.name || b.email.split('@')[0]}</div>
-                      <div className="text-[10px] text-slate-500">{owner?.email || b.email}</div>
+                      <div className="font-bold text-slate-800 dark:text-slate-200">
+                        {owner?.name || (b.email ? b.email.split('@')[0] : 'Business Owner')}
+                      </div>
+                      <div className="text-[10px] text-slate-500">{owner?.email || b.email || 'N/A'}</div>
                     </td>
                     <td className="p-4 text-slate-500">
                       <div className="font-mono">{b.gstNumber || 'Unregistered'}</div>

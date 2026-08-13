@@ -104,7 +104,7 @@ export const StaffCalendarTimeline: React.FC = () => {
     );
 
     showToast(
-      `Job ${job.jobId} allocated to ${targetStaff?.name.split(' ')[0] || 'Staff'} on ${targetDateStr}`,
+      `Job ${job.jobId} allocated to ${targetStaff?.name?.split(' ')[0] || 'Staff'} on ${targetDateStr}`,
       'success'
     );
   };
