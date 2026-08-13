@@ -234,6 +234,10 @@ interface AppContextType {
   // Safe Clean State Testing Data Purge
   purgeAllTransactionalData: () => Promise<{ clearedCollections: string[]; totalDocsDeleted: number }>;
   purgeTenantTransactionalData: (businessId?: string) => Promise<{ clearedCollections: string[]; totalDocsDeleted: number }>;
+
+  // Tenant and User Deletion
+  deleteBusinessTenant: (businessId: string) => Promise<void>;
+  deleteUserAccount: (userId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -1212,6 +1216,71 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error('Tenant purge error:', err);
       showToast('Failed to purge tenant data: ' + String(err), 'error');
       return { clearedCollections: [], totalDocsDeleted: 0 };
+    }
+  };
+
+  const deleteBusinessTenant = async (businessId: string): Promise<void> => {
+    if (currentUser?.role !== 'super_admin') {
+      showToast('Unauthorized: Only Super Administrators can delete a business tenant.', 'error');
+      return;
+    }
+    const targetBiz = businesses.find((b) => b.id === businessId);
+    const bizName = targetBiz?.name || businessId;
+
+    try {
+      await FirestoreService.deleteBusinessAndTenant(businessId);
+      logSecurityEvent(
+        'BUSINESS_TENANT_DELETED',
+        'TENANT_ACCESS',
+        `Super Admin permanently deleted business tenant "${bizName}" (ID: ${businessId}) and all associated records.`,
+        businessId,
+        bizName
+      );
+      setBusinesses((prev) => prev.filter((b) => b.id !== businessId));
+      setUsers((prev) => prev.filter((u) => u.businessId !== businessId || u.role === 'super_admin'));
+
+      if (currentBusiness.id === businessId) {
+        const remaining = businesses.filter((b) => b.id !== businessId);
+        if (remaining.length > 0) {
+          setCurrentBusiness(remaining[0]);
+        } else {
+          setCurrentBusiness(DEFAULT_BLANK_BUSINESS);
+        }
+      }
+      showToast(`Business "${bizName}" and all associated data permanently deleted.`, 'success');
+    } catch (err) {
+      console.error('Error deleting business tenant:', err);
+      showToast('Failed to delete business: ' + String(err), 'error');
+      throw err;
+    }
+  };
+
+  const deleteUserAccount = async (userId: string): Promise<void> => {
+    if (currentUser?.role !== 'super_admin' && currentUser?.role !== 'business_owner') {
+      showToast('Unauthorized: Insufficient permissions to delete user.', 'error');
+      return;
+    }
+    const target = users.find((u) => u.id === userId);
+    if (!target) return;
+    if (target.role === 'super_admin' || target.email === 'admin@serviflow.io') {
+      showToast('Action Forbidden: The SaaS Super Admin account cannot be deleted.', 'error');
+      return;
+    }
+
+    try {
+      await FirestoreService.deleteUser(userId);
+      logSecurityEvent(
+        'USER_ACCOUNT_DELETED',
+        'AUTH',
+        `Deleted user account "${target.name}" (${target.email}, Role: ${target.role})`,
+        target.businessId
+      );
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      showToast(`User "${target.name}" deleted successfully.`, 'success');
+    } catch (err) {
+      console.error('Error deleting user account:', err);
+      showToast('Failed to delete user: ' + String(err), 'error');
+      throw err;
     }
   };
 
@@ -2264,6 +2333,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Safe Clean State Testing Data Purge
         purgeAllTransactionalData,
         purgeTenantTransactionalData,
+
+        // Tenant and User Deletion
+        deleteBusinessTenant,
+        deleteUserAccount,
       }}
     >
       {children}

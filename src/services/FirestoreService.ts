@@ -5,6 +5,7 @@ import {
   deleteDoc,
   onSnapshot,
   getDocs,
+  getDoc,
   writeBatch,
   query,
   where,
@@ -173,6 +174,63 @@ export class FirestoreService {
     }
 
     return { clearedCollections: cleared, totalDocsDeleted: totalDeleted };
+  }
+
+  /**
+   * Safely deletes a business tenant entirely, including all its associated users and transactional data,
+   * while strictly safeguarding the Super Admin account.
+   */
+  static async deleteBusinessAndTenant(businessId: string): Promise<void> {
+    if (!businessId || businessId === 'all') return;
+
+    // 1. Purge all transactional records for this business
+    await this.purgeTenantTransactionalData(businessId);
+
+    // 2. Delete all non-admin users for this business
+    try {
+      const usersQuery = query(collection(db, 'users'), where('businessId', '==', businessId));
+      const usersSnap = await getDocs(usersQuery);
+      if (!usersSnap.empty) {
+        const batch = writeBatch(db);
+        usersSnap.docs.forEach((d) => {
+          const uData = d.data() as User;
+          if (uData.role !== 'super_admin' && uData.email !== 'admin@serviflow.io') {
+            batch.delete(d.ref);
+          }
+        });
+        await batch.commit();
+      }
+    } catch (err) {
+      console.error(`Error deleting users for business ${businessId}:`, err);
+    }
+
+    // 3. Delete the business document itself
+    try {
+      await deleteDoc(doc(db, 'businesses', businessId));
+    } catch (err) {
+      console.error(`Error deleting business doc ${businessId}:`, err);
+    }
+  }
+
+  /**
+   * Safely deletes a single user, preventing deletion of Super Admin.
+   */
+  static async deleteUser(userId: string): Promise<void> {
+    if (!userId) return;
+    try {
+      const userRef = doc(db, 'users', userId);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const u = userSnap.data() as User;
+        if (u.role === 'super_admin' || u.email === 'admin@serviflow.io' || u.id === 'usr-admin') {
+          throw new Error('Cannot delete Super Admin account.');
+        }
+      }
+      await deleteDoc(userRef);
+    } catch (err) {
+      console.error(`Error deleting user ${userId}:`, err);
+      throw err;
+    }
   }
 
   // =========================================================================

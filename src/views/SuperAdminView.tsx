@@ -61,6 +61,8 @@ export const SuperAdminView: React.FC = () => {
     forcePasswordReset,
     purgeAllTransactionalData,
     purgeTenantTransactionalData,
+    deleteBusinessTenant,
+    deleteUserAccount,
     showToast,
   } = useApp();
 
@@ -81,6 +83,15 @@ export const SuperAdminView: React.FC = () => {
   const [purgeConfirmationText, setPurgeConfirmationText] = useState('');
   const [isPurgingInProgress, setIsPurgingInProgress] = useState(false);
   const [lastPurgeResult, setLastPurgeResult] = useState<{ clearedCollections: string[]; totalDocsDeleted: number } | null>(null);
+
+  // Business & Owner Deletion State
+  const [tenantToDelete, setTenantToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deleteTenantConfirmText, setDeleteTenantConfirmText] = useState('');
+  const [isDeletingTenant, setIsDeletingTenant] = useState(false);
+
+  const [isDeleteAllTenantsModalOpen, setIsDeleteAllTenantsModalOpen] = useState(false);
+  const [deleteAllConfirmText, setDeleteAllConfirmText] = useState('');
+  const [isDeletingAllTenants, setIsDeletingAllTenants] = useState(false);
 
   // Find pending owner/business registrations & pending staff
   const pendingOwners = users.filter(
@@ -166,6 +177,48 @@ export const SuperAdminView: React.FC = () => {
       console.error('Failed to execute clean data purge:', err);
     } finally {
       setIsPurgingInProgress(false);
+    }
+  };
+
+  const handleDeleteSingleTenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tenantToDelete) return;
+    if (deleteTenantConfirmText.trim().toUpperCase() !== 'DELETE') {
+      showToast('Safety Check Failed: Please type "DELETE" to confirm business removal.', 'error');
+      return;
+    }
+
+    setIsDeletingTenant(true);
+    try {
+      await deleteBusinessTenant(tenantToDelete.id);
+      setTenantToDelete(null);
+      setDeleteTenantConfirmText('');
+    } catch (err) {
+      console.error('Failed to delete tenant:', err);
+    } finally {
+      setIsDeletingTenant(false);
+    }
+  };
+
+  const handleDeleteAllTenants = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (deleteAllConfirmText.trim().toUpperCase() !== 'DELETE ALL') {
+      showToast('Safety Check Failed: Please type "DELETE ALL" to confirm wipe.', 'error');
+      return;
+    }
+
+    setIsDeletingAllTenants(true);
+    try {
+      for (const b of businesses) {
+        await deleteBusinessTenant(b.id);
+      }
+      setIsDeleteAllTenantsModalOpen(false);
+      setDeleteAllConfirmText('');
+      showToast('All business tenant accounts and dummy data successfully purged.', 'success');
+    } catch (err) {
+      console.error('Failed to delete all tenants:', err);
+    } finally {
+      setIsDeletingAllTenants(false);
     }
   };
 
@@ -415,6 +468,16 @@ export const SuperAdminView: React.FC = () => {
                             <XCircle className="w-3.5 h-3.5" />
                             <span>Reject</span>
                           </button>
+                          <button
+                            onClick={() => {
+                              setTenantToDelete({ id: item.businessId, name: item.businessName });
+                              setDeleteTenantConfirmText('');
+                            }}
+                            className="p-2 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/60 dark:hover:text-rose-400 font-bold transition-all cursor-pointer"
+                            title="Delete this registration and remove owner"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -476,6 +539,13 @@ export const SuperAdminView: React.FC = () => {
                               >
                                 <XCircle className="w-3 h-3" />
                                 Reject
+                              </button>
+                              <button
+                                onClick={() => deleteUserAccount(usr.id)}
+                                className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/60 dark:hover:text-rose-400 font-bold transition-all cursor-pointer"
+                                title="Delete user"
+                              >
+                                <Trash2 className="w-3 h-3" />
                               </button>
                             </div>
                           </td>
@@ -602,6 +672,18 @@ export const SuperAdminView: React.FC = () => {
                               <span>Suspend</span>
                             </button>
                           )}
+
+                          {/* Delete Business Tenant & Owner Button */}
+                          <button
+                            onClick={() => {
+                              setTenantToDelete({ id: b.id, name: b.name });
+                              setDeleteTenantConfirmText('');
+                            }}
+                            className="p-1.5 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/60 dark:hover:text-rose-400 font-bold transition-all cursor-pointer"
+                            title="Delete this business tenant, owner account, and all records"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -850,6 +932,91 @@ export const SuperAdminView: React.FC = () => {
               >
                 <Sparkles className="w-4 h-4" />
                 <span>Reset Selected Tenant Workspace</span>
+              </button>
+            </div>
+
+            {/* Option 3: Permanently Delete Specific Business & Owner */}
+            <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-rose-200 dark:border-rose-900/60 shadow-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-rose-700 text-white rounded-2xl shadow-md">
+                  <UserX className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                    Option C: Delete Business & Owner Account
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Permanently delete an unwanted test business, its owner, and all linked data.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Select Business / Owner to Delete:
+                </label>
+                <select
+                  value={selectedTenantForPurge}
+                  onChange={(e) => setSelectedTenantForPurge(e.target.value)}
+                  className="w-full p-3 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-slate-100"
+                >
+                  {businesses.map((b) => {
+                    const owner = users.find((u) => u.businessId === b.id && u.role === 'business_owner');
+                    return (
+                      <option key={b.id} value={b.id}>
+                        {b.name} — Owner: {owner?.name || 'N/A'} ({owner?.email || b.email || b.id})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <button
+                onClick={() => {
+                  const target = businesses.find((b) => b.id === selectedTenantForPurge) || businesses[0];
+                  if (target) {
+                    setTenantToDelete({ id: target.id, name: target.name });
+                    setDeleteTenantConfirmText('');
+                  }
+                }}
+                disabled={businesses.length === 0}
+                className="w-full py-3.5 px-4 bg-rose-700 hover:bg-rose-800 active:scale-[0.99] text-white font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete Selected Business & Owner</span>
+              </button>
+            </div>
+
+            {/* Option 4: Delete ALL Test Businesses & Owners */}
+            <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-red-400 dark:border-red-900 shadow-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-red-800 text-white rounded-2xl shadow-md">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                    Option D: Delete All {businesses.length} Test Businesses & Owners
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Wipes all test businesses & owners, leaving only 1 clean Super Admin account.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-red-50 dark:bg-red-950/40 rounded-2xl text-xs text-red-700 dark:text-red-300 leading-relaxed font-medium">
+                Instantly clears all {businesses.length} test businesses and their owners in 1 step. Perfect for starting completely fresh with a clean system.
+              </div>
+
+              <button
+                onClick={() => {
+                  setDeleteAllConfirmText('');
+                  setIsDeleteAllTenantsModalOpen(true);
+                }}
+                disabled={businesses.length === 0}
+                className="w-full py-3.5 px-4 bg-red-800 hover:bg-red-900 active:scale-[0.99] text-white font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete All {businesses.length} Test Businesses & Reset</span>
               </button>
             </div>
           </div>
@@ -1434,6 +1601,172 @@ export const SuperAdminView: React.FC = () => {
                     <>
                       <Trash2 className="w-4 h-4" />
                       <span>Confirm & Purge</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SINGLE TENANT & OWNER DELETE CONFIRMATION MODAL */}
+      {tenantToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-rose-600/40 max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="p-2.5 bg-rose-600 text-white rounded-2xl shadow-md">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-slate-100 text-base">
+                  Delete Business & Owner Account
+                </h3>
+                <p className="text-xs text-rose-600 dark:text-rose-400 font-bold truncate max-w-[260px]">
+                  {tenantToDelete.name} (ID: {tenantToDelete.id})
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleDeleteSingleTenant} className="space-y-4 text-xs">
+              <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 rounded-2xl border border-rose-200 dark:border-rose-900/60 text-slate-700 dark:text-slate-300 space-y-2">
+                <div className="font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-600" />
+                  <span>Permanent Business Removal Warning</span>
+                </div>
+                <p className="text-[11px] leading-relaxed">
+                  This action will permanently delete business <strong>{tenantToDelete.name}</strong>, its Business Owner account, staff users, and all associated customers, jobs, and invoices from Firestore.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Type <span className="font-mono text-rose-600 dark:text-rose-400 font-black">DELETE</span> to confirm:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={deleteTenantConfirmText}
+                  onChange={(e) => setDeleteTenantConfirmText(e.target.value)}
+                  placeholder="DELETE"
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono font-bold tracking-widest text-center"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  disabled={isDeletingTenant}
+                  onClick={() => {
+                    setTenantToDelete(null);
+                    setDeleteTenantConfirmText('');
+                  }}
+                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isDeletingTenant || deleteTenantConfirmText.trim().toUpperCase() !== 'DELETE'}
+                  className={`px-5 py-2 rounded-xl font-extrabold text-white flex items-center gap-2 shadow-md cursor-pointer transition-all ${
+                    deleteTenantConfirmText.trim().toUpperCase() === 'DELETE' && !isDeletingTenant
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : 'bg-slate-400 dark:bg-slate-700 cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  {isDeletingTenant ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Deleting Business...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      <span>Permanently Delete</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ALL TENANTS & OWNERS PURGE CONFIRMATION MODAL */}
+      {isDeleteAllTenantsModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-red-600/40 max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="p-2.5 bg-red-800 text-white rounded-2xl shadow-md">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-slate-100 text-base">
+                  Delete All {businesses.length} Test Businesses & Owners
+                </h3>
+                <p className="text-xs text-red-600 dark:text-red-400 font-bold">
+                  Reset SaaS System to 1 Fresh Super Admin
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleDeleteAllTenants} className="space-y-4 text-xs">
+              <div className="p-3.5 bg-red-50 dark:bg-red-950/40 rounded-2xl border border-red-200 dark:border-red-900/60 text-slate-700 dark:text-slate-300 space-y-2">
+                <div className="font-bold text-red-700 dark:text-red-400 flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                  <span>Master Platform Purge Warning</span>
+                </div>
+                <p className="text-[11px] leading-relaxed">
+                  This will permanently delete all {businesses.length} registered business tenants, all test owner and staff accounts, and all operational records from Firestore. Your <strong>Super Admin (admin@serviflow.io)</strong> master account will remain 100% safe.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Type <span className="font-mono text-red-600 dark:text-red-400 font-black">DELETE ALL</span> to confirm:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={deleteAllConfirmText}
+                  onChange={(e) => setDeleteAllConfirmText(e.target.value)}
+                  placeholder="DELETE ALL"
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono font-bold tracking-widest text-center"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  disabled={isDeletingAllTenants}
+                  onClick={() => {
+                    setIsDeleteAllTenantsModalOpen(false);
+                    setDeleteAllConfirmText('');
+                  }}
+                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isDeletingAllTenants || deleteAllConfirmText.trim().toUpperCase() !== 'DELETE ALL'}
+                  className={`px-5 py-2 rounded-xl font-extrabold text-white flex items-center gap-2 shadow-md cursor-pointer transition-all ${
+                    deleteAllConfirmText.trim().toUpperCase() === 'DELETE ALL' && !isDeletingAllTenants
+                      ? 'bg-red-800 hover:bg-red-900'
+                      : 'bg-slate-400 dark:bg-slate-700 cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  {isDeletingAllTenants ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Deleting All Tenants...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      <span>Confirm & Purge All</span>
                     </>
                   )}
                 </button>
