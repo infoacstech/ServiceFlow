@@ -46,6 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     businesses,
     switchBusiness,
     currentUser,
+    users,
     switchRole,
     notifications,
     markNotificationRead,
@@ -63,6 +64,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   type ActiveMenu = 'tenant' | 'role' | 'notif' | 'profile' | null;
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
   const [isRefreshingPage, setIsRefreshingPage] = useState(false);
+
+  const ownerUser = (users || []).find(
+    (u) => u.businessId === currentBusiness?.id && u.role === 'business_owner'
+  );
 
   const [voiceEnabled, setVoiceEnabled] = useState(isVoiceNotificationEnabled());
 
@@ -124,67 +129,67 @@ export const Navbar: React.FC<NavbarProps> = ({
       )}
 
       <div className="flex items-center justify-between gap-1.5 sm:gap-3 max-w-7xl mx-auto relative z-50">
-        {/* Left: Brand / Tenant Selector */}
+        {/* Left: Brand / Tenant Display */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Tenant Switcher Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => toggleMenu('tenant')}
-              className="flex items-center gap-1.5 sm:gap-2 p-1 sm:p-1.5 sm:pr-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors border border-slate-200/60 dark:border-slate-700/60 text-left"
-              title="Switch business"
-            >
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs overflow-hidden shrink-0">
-                {currentBusiness?.logo ? (
-                  <img src={currentBusiness.logo} alt={currentBusiness.name} className="w-full h-full object-cover" />
-                ) : (
-                  (currentBusiness?.name || 'SF').substring(0, 2).toUpperCase()
-                )}
-              </div>
-              <div className="text-left max-w-[100px] xs:max-w-[130px] sm:max-w-[160px]">
-                <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1">
-                  <span className="truncate">{currentBusiness?.name || 'ServiFlow'}</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
+          {currentUser?.role === 'super_admin' ? (
+            /* Tenant Switcher Dropdown (Super Admin Only) */
+            <div className="relative">
+              <button
+                onClick={() => toggleMenu('tenant')}
+                className="flex items-center gap-1.5 sm:gap-2 p-1 sm:p-1.5 sm:pr-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors border border-slate-200/60 dark:border-slate-700/60 text-left"
+                title="Switch business"
+              >
+                <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs overflow-hidden shrink-0">
+                  {currentBusiness?.logo ? (
+                    <img src={currentBusiness.logo} alt={currentBusiness.name} className="w-full h-full object-cover" />
+                  ) : (
+                    (currentBusiness?.name || 'SF').substring(0, 2).toUpperCase()
+                  )}
                 </div>
-                <div className="text-[10px] text-slate-500 hidden sm:block font-medium truncate">
-                  {currentBusiness?.type || 'Field Services'}
+                <div className="text-left max-w-[100px] xs:max-w-[130px] sm:max-w-[160px]">
+                  <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1">
+                    <span className="truncate">{currentBusiness?.name || 'ServiFlow'}</span>
+                    <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
+                  </div>
+                  <div className="text-[10px] text-slate-500 hidden sm:block font-medium truncate">
+                    {currentBusiness?.type || 'Field Services'}
+                  </div>
                 </div>
-              </div>
-            </button>
+              </button>
 
-            {/* Tenant Dropdown */}
-            {activeMenu === 'tenant' && (
-              <div className="absolute left-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 animate-in fade-in zoom-in-95">
-                <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Switch Active Business
-                </div>
-                <div className="space-y-1 my-1 max-h-60 overflow-y-auto">
-                  {businesses.map((b) => (
-                    <button
-                      key={b.id}
-                      onClick={() => {
-                        switchBusiness(b.id);
-                        closeAllMenus();
-                      }}
-                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors ${
-                        b.id === currentBusiness.id
-                          ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-medium'
-                          : 'hover:bg-slate-100 dark:hover:bg-slate-800/70 text-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 overflow-hidden">
-                        <div className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-semibold shrink-0 overflow-hidden">
-                          {b.logo ? <img src={b.logo} alt="" className="w-full h-full object-cover" /> : (b?.name || 'SF').substring(0, 2).toUpperCase()}
+              {/* Tenant Dropdown */}
+              {activeMenu === 'tenant' && (
+                <div className="absolute left-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 animate-in fade-in zoom-in-95">
+                  <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Switch Active Business
+                  </div>
+                  <div className="space-y-1 my-1 max-h-60 overflow-y-auto">
+                    {businesses.map((b) => (
+                      <button
+                        key={b.id}
+                        onClick={() => {
+                          switchBusiness(b.id);
+                          closeAllMenus();
+                        }}
+                        className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors ${
+                          b.id === currentBusiness.id
+                            ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-medium'
+                            : 'hover:bg-slate-100 dark:hover:bg-slate-800/70 text-slate-700 dark:text-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 overflow-hidden">
+                          <div className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-xs font-semibold shrink-0 overflow-hidden">
+                            {b.logo ? <img src={b.logo} alt="" className="w-full h-full object-cover" /> : (b?.name || 'SF').substring(0, 2).toUpperCase()}
+                          </div>
+                          <div className="truncate">
+                            <div className="text-xs font-medium truncate">{b.name}</div>
+                            <div className="text-[10px] text-slate-500">{b.type}</div>
+                          </div>
                         </div>
-                        <div className="truncate">
-                          <div className="text-xs font-medium truncate">{b.name}</div>
-                          <div className="text-[10px] text-slate-500">{b.type}</div>
-                        </div>
-                      </div>
-                      {b.id === currentBusiness.id && <Check className="w-4 h-4 text-indigo-600 shrink-0" />}
-                    </button>
-                  ))}
-                </div>
-                {currentUser?.role === 'super_admin' && (
+                        {b.id === currentBusiness.id && <Check className="w-4 h-4 text-indigo-600 shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
                   <div className="pt-2 mt-1 border-t border-slate-100 dark:border-slate-800">
                     <button
                       onClick={() => {
@@ -196,10 +201,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <Plus className="w-3.5 h-3.5" /> Onboard New Business
                     </button>
                   </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Static Display for Business Owners / Staff / Technicians */
+            <div className="flex items-center gap-2 p-1.5 px-3 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60 text-left">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs overflow-hidden shrink-0">
+                {currentBusiness?.logo ? (
+                  <img src={currentBusiness.logo} alt={currentBusiness.name} className="w-full h-full object-cover" />
+                ) : (
+                  (currentBusiness?.name || 'SF').substring(0, 2).toUpperCase()
                 )}
               </div>
-            )}
-          </div>
+              <div className="text-left max-w-[130px] xs:max-w-[170px] sm:max-w-[210px]">
+                <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                  {currentBusiness?.name || 'ServiFlow'}
+                </div>
+                <div className="text-[10px] text-slate-500 font-semibold truncate">
+                  {ownerUser?.name ? `Owner: ${ownerUser.name}` : (currentBusiness?.type || 'Field Services')}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Center: Search Trigger */}

@@ -26,6 +26,7 @@ import { playJobVoiceNotification, speakText } from '../utils/audioNotification'
 export interface JobInitialFilter {
   datePreset?: string;
   statusFilter?: string;
+  priorityFilter?: string;
 }
 
 interface JobsViewProps {
@@ -52,7 +53,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>(initialFilter?.statusFilter || 'all');
-  const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [priorityFilter, setPriorityFilter] = useState<string>(initialFilter?.priorityFilter || 'all');
   const [staffFilter, setStaffFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     if (initialFilter?.datePreset) {
@@ -65,6 +66,9 @@ export const JobsView: React.FC<JobsViewProps> = ({
     if (initialFilter) {
       if (initialFilter.statusFilter !== undefined) {
         setStatusFilter(initialFilter.statusFilter);
+      }
+      if (initialFilter.priorityFilter !== undefined) {
+        setPriorityFilter(initialFilter.priorityFilter);
       }
       if (initialFilter.datePreset) {
         setDateRange(getPresetDates(initialFilter.datePreset));
@@ -111,7 +115,12 @@ export const JobsView: React.FC<JobsViewProps> = ({
         : statusFilter === 'pending_active'
         ? j.status !== 'completed' && j.status !== 'closed' && j.status !== 'cancelled'
         : j.status === statusFilter;
-    const matchesPriority = priorityFilter === 'all' || j.priority === priorityFilter;
+    const matchesPriority =
+      priorityFilter === 'all'
+        ? true
+        : priorityFilter === 'urgent_high'
+        ? j.priority === 'urgent' || j.priority === 'high'
+        : j.priority === priorityFilter;
     const matchesStaff = staffFilter === 'all' || j.assignedStaffId === staffFilter;
 
     const matchesDate = (() => {

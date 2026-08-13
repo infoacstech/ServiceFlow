@@ -26,6 +26,9 @@ import {
   Star,
   Target,
   ShieldCheck,
+  Search,
+  Filter,
+  ExternalLink,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -92,6 +95,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [quoteNotes, setQuoteNotes] = useState('Payment 50% advance upon quotation approval.');
 
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Urgent Jobs & Today's Revenue Quick Access Filtered List Modal States
+  const [isUrgentModalOpen, setIsUrgentModalOpen] = useState(false);
+  const [urgentTabFilter, setUrgentTabFilter] = useState<'all' | 'pending' | 'unassigned'>('all');
+  const [urgentSearch, setUrgentSearch] = useState('');
+
+  const [isRevenueModalOpen, setIsRevenueModalOpen] = useState(false);
+  const [revenueTabFilter, setRevenueTabFilter] = useState<'all' | 'paid' | 'pending'>('all');
+  const [revenueSearch, setRevenueSearch] = useState('');
 
   const handleAddCustomerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,6 +196,59 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const totalSales = invoices.reduce((sum, inv) => sum + inv.grandTotal, 0);
   const pendingPayments = invoices.reduce((sum, inv) => sum + inv.balanceAmount, 0);
+
+  // Urgent Jobs calculations & modal filters
+  const urgentJobsList = jobs.filter((j) => j.priority === 'urgent' || j.priority === 'high');
+  const activeUrgentJobs = urgentJobsList.filter(
+    (j) => j.status !== 'completed' && j.status !== 'closed' && j.status !== 'cancelled'
+  );
+  const unassignedUrgentJobs = urgentJobsList.filter(
+    (j) => !j.assignedStaffId && j.status !== 'completed' && j.status !== 'closed' && j.status !== 'cancelled'
+  );
+
+  const filteredUrgentModalJobs = urgentJobsList.filter((job) => {
+    const customer = customers.find((c) => c.id === job.customerId);
+    const searchLow = urgentSearch.toLowerCase();
+    const matchesSearch =
+      !urgentSearch ||
+      job.jobId.toLowerCase().includes(searchLow) ||
+      job.description.toLowerCase().includes(searchLow) ||
+      job.location.toLowerCase().includes(searchLow) ||
+      (customer?.name || '').toLowerCase().includes(searchLow) ||
+      (customer?.companyName || '').toLowerCase().includes(searchLow);
+
+    const matchesTab =
+      urgentTabFilter === 'all'
+        ? true
+        : urgentTabFilter === 'pending'
+        ? job.status !== 'completed' && job.status !== 'closed' && job.status !== 'cancelled'
+        : !job.assignedStaffId && job.status !== 'completed' && job.status !== 'closed' && job.status !== 'cancelled';
+
+    return matchesSearch && matchesTab;
+  });
+
+  // Revenue Invoices calculation & modal filters
+  const todayPaidInvoices = invoices.filter((inv) => inv.status === 'paid' || inv.paidAmount > 0);
+
+  const filteredRevenueModalInvoices = invoices.filter((inv) => {
+    const customer = customers.find((c) => c.id === inv.customerId);
+    const searchLow = revenueSearch.toLowerCase();
+    const matchesSearch =
+      !revenueSearch ||
+      inv.invoiceNumber.toLowerCase().includes(searchLow) ||
+      (customer?.name || '').toLowerCase().includes(searchLow) ||
+      (customer?.companyName || '').toLowerCase().includes(searchLow) ||
+      (inv.notes || '').toLowerCase().includes(searchLow);
+
+    const matchesTab =
+      revenueTabFilter === 'all'
+        ? true
+        : revenueTabFilter === 'paid'
+        ? inv.status === 'paid' || inv.paidAmount > 0
+        : inv.status !== 'paid' && inv.balanceAmount > 0;
+
+    return matchesSearch && matchesTab;
+  });
 
   const lowStockItems = inventory.filter((item) => item.currentStock <= item.minStock);
   const expiringContracts = contracts.filter((c) => c.status === 'expiring_soon' || c.status === 'expired');
@@ -334,6 +399,147 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-xs font-bold">Create Invoice</span>
             <span className="text-[10px] text-slate-400 dark:text-slate-500">Bill & payment</span>
           </button>
+        </div>
+      </div>
+
+      {/* Interactive Featured Summary Cards: Urgent Jobs & Today's Revenue */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Urgent Jobs Interactive Summary Card */}
+        <div
+          onClick={() => setIsUrgentModalOpen(true)}
+          className="relative p-5 rounded-3xl bg-gradient-to-br from-rose-50 via-amber-50/40 to-white dark:from-rose-950/40 dark:via-amber-950/20 dark:to-slate-900 border-2 border-rose-200 dark:border-rose-800/80 hover:border-rose-400 dark:hover:border-rose-600 shadow-sm hover:shadow-xl transition-all cursor-pointer group overflow-hidden"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="relative p-3 rounded-2xl bg-rose-600 text-white shadow-md shadow-rose-600/30 shrink-0">
+                <AlertTriangle className="w-6 h-6 animate-pulse" />
+                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-rose-600 border-2 border-white dark:border-slate-900"></span>
+                </span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/80 px-2.5 py-0.5 rounded-full">
+                    High Priority Dispatch
+                  </span>
+                </div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 mt-0.5 group-hover:text-rose-600 transition-colors">
+                  Urgent Jobs Summary
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Critical tickets requiring immediate technician dispatch & resolution
+                </p>
+              </div>
+            </div>
+
+            <div className="text-right shrink-0">
+              <div className="text-2xl font-black text-rose-600 dark:text-rose-400">
+                {urgentJobsList.length}
+              </div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Total Urgent
+              </div>
+            </div>
+          </div>
+
+          {/* Metric Quick Stats Pills */}
+          <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-rose-200/60 dark:border-rose-900/40">
+            <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Active Pending</div>
+              <div className="text-sm font-extrabold text-amber-600 dark:text-amber-400">{activeUrgentJobs.length}</div>
+            </div>
+
+            <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Unassigned Techs</div>
+              <div className="text-sm font-extrabold text-rose-600 dark:text-rose-400">{unassignedUrgentJobs.length}</div>
+            </div>
+
+            <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Est. Job Value</div>
+              <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                {curr}{urgentJobsList.reduce((sum, j) => sum + j.estimatedAmount, 0).toLocaleString()}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Action Footer */}
+          <div className="mt-3 flex items-center justify-between text-xs font-bold text-rose-600 dark:text-rose-400 pt-1">
+            <span className="flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5" /> Quick Access Filtered List
+            </span>
+            <span className="inline-flex items-center gap-1 bg-rose-600 text-white text-[11px] font-bold px-3 py-1 rounded-xl group-hover:bg-rose-700 transition-colors shadow-xs">
+              View List <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </span>
+          </div>
+        </div>
+
+        {/* Today's Revenue Interactive Summary Card */}
+        <div
+          onClick={() => setIsRevenueModalOpen(true)}
+          className="relative p-5 rounded-3xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-white dark:from-emerald-950/40 dark:via-teal-950/20 dark:to-slate-900 border-2 border-emerald-200 dark:border-emerald-800/80 hover:border-emerald-400 dark:hover:border-emerald-600 shadow-sm hover:shadow-xl transition-all cursor-pointer group overflow-hidden"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-emerald-600 text-white shadow-md shadow-emerald-600/30 shrink-0">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/80 px-2.5 py-0.5 rounded-full">
+                    Live Billing Collections
+                  </span>
+                </div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 mt-0.5 group-hover:text-emerald-600 transition-colors">
+                  Today's Revenue Summary
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Payment receipts, paid invoices, & real-time daily cash inflows
+                </p>
+              </div>
+            </div>
+
+            <div className="text-right shrink-0">
+              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                {curr}{todayPayments.toLocaleString()}
+              </div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Collected Revenue
+              </div>
+            </div>
+          </div>
+
+          {/* Metric Quick Stats Pills */}
+          <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-emerald-200/60 dark:border-emerald-900/40">
+            <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Paid Invoices</div>
+              <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">{todayPaidInvoices.length}</div>
+            </div>
+
+            <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Total Invoiced</div>
+              <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                {curr}{totalSales.toLocaleString()}
+              </div>
+            </div>
+
+            <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Pending Due</div>
+              <div className="text-sm font-extrabold text-rose-600 dark:text-rose-400">
+                {curr}{pendingPayments.toLocaleString()}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Action Footer */}
+          <div className="mt-3 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 pt-1">
+            <span className="flex items-center gap-1.5">
+              <Receipt className="w-3.5 h-3.5" /> Quick Access Receipts & Transactions
+            </span>
+            <span className="inline-flex items-center gap-1 bg-emerald-600 text-white text-[11px] font-bold px-3 py-1 rounded-xl group-hover:bg-emerald-700 transition-colors shadow-xs">
+              View Receipts <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </span>
+          </div>
         </div>
       </div>
 
@@ -928,6 +1134,338 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Urgent Jobs Quick Access Modal */}
+      {isUrgentModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col border border-slate-200 dark:border-slate-800 shadow-2xl relative overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-5 bg-gradient-to-r from-rose-500/10 via-amber-500/5 to-transparent dark:from-rose-950/40 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-rose-600 text-white shadow-md shadow-rose-600/30">
+                  <AlertTriangle className="w-5 h-5 animate-bounce" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-lg">Urgent & High Priority Jobs</h3>
+                    <span className="text-xs bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 font-bold px-2.5 py-0.5 rounded-full">
+                      {filteredUrgentModalJobs.length} Tickets
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Quick dispatch list for high priority service calls</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsUrgentModalOpen(false)}
+                className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Filter Tabs & Search Bar */}
+            <div className="p-4 bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200/80 dark:border-slate-800 space-y-3 shrink-0">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                {/* Tabs */}
+                <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-200 dark:border-slate-700/80">
+                  <button
+                    onClick={() => setUrgentTabFilter('all')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      urgentTabFilter === 'all'
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    }`}
+                  >
+                    All Urgent ({urgentJobsList.length})
+                  </button>
+                  <button
+                    onClick={() => setUrgentTabFilter('pending')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      urgentTabFilter === 'pending'
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    }`}
+                  >
+                    Active Pending ({activeUrgentJobs.length})
+                  </button>
+                  <button
+                    onClick={() => setUrgentTabFilter('unassigned')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      urgentTabFilter === 'unassigned'
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    }`}
+                  >
+                    Unassigned ({unassignedUrgentJobs.length})
+                  </button>
+                </div>
+
+                {/* Search Input */}
+                <div className="relative flex-1 max-w-xs">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={urgentSearch}
+                    onChange={(e) => setUrgentSearch(e.target.value)}
+                    placeholder="Search urgent job ID, customer..."
+                    className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-rose-500 outline-hidden"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* List Scroll Area */}
+            <div className="p-4 overflow-y-auto space-y-3 flex-1">
+              {filteredUrgentModalJobs.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 dark:text-slate-400 space-y-2">
+                  <AlertTriangle className="w-8 h-8 text-rose-400 mx-auto opacity-50" />
+                  <p className="text-xs font-bold">No urgent jobs matching your criteria.</p>
+                </div>
+              ) : (
+                filteredUrgentModalJobs.map((job) => {
+                  const customer = customers.find((c) => c.id === job.customerId);
+                  const tech = staff.find((s) => s.id === job.assignedStaffId);
+
+                  return (
+                    <div
+                      key={job.id}
+                      className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 hover:border-rose-300 dark:hover:border-rose-700 transition-all space-y-2.5 shadow-xs"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-slate-900 dark:text-slate-100">{job.jobId}</span>
+                          <span
+                            className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                              job.priority === 'urgent'
+                                ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 animate-pulse'
+                                : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                            }`}
+                          >
+                            {job.priority} priority
+                          </span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                              job.status === 'completed'
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                                : 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                            }`}
+                          >
+                            {job.status.replace('_', ' ')}
+                          </span>
+                        </div>
+
+                        <span className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">
+                          {curr}{job.estimatedAmount}
+                        </span>
+                      </div>
+
+                      <div>
+                        <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          {customer?.name || 'Customer'} {customer?.companyName && `(${customer.companyName})`}
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5 line-clamp-1">
+                          {job.description}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                        <div className="flex items-center gap-3">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-slate-400" />
+                            {job.scheduledDate} ({job.scheduledTime})
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-slate-400" />
+                            {job.location}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            Tech: {tech ? tech.name : <span className="text-rose-600 dark:text-rose-400 font-bold">⚠️ Unassigned</span>}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                Showing <span className="font-bold text-slate-800 dark:text-slate-200">{filteredUrgentModalJobs.length}</span> urgent tickets
+              </div>
+
+              <button
+                onClick={() => {
+                  setIsUrgentModalOpen(false);
+                  navigate('jobs', { priorityFilter: 'urgent_high' });
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-all shadow-md active:scale-95 cursor-pointer"
+              >
+                Open Full Jobs Board (Filtered) <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Today's Revenue Quick Access Modal */}
+      {isRevenueModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col border border-slate-200 dark:border-slate-800 shadow-2xl relative overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-5 bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent dark:from-emerald-950/40 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-emerald-600 text-white shadow-md shadow-emerald-600/30">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-lg">Today's Revenue & Receipts</h3>
+                    <span className="text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-bold px-2.5 py-0.5 rounded-full">
+                      {curr}{filteredRevenueModalInvoices.reduce((sum, i) => sum + i.paidAmount, 0).toLocaleString()} Collected
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Paid billing transactions and customer payment receipts</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsRevenueModalOpen(false)}
+                className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Filter Tabs & Search Bar */}
+            <div className="p-4 bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200/80 dark:border-slate-800 space-y-3 shrink-0">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                {/* Tabs */}
+                <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-200 dark:border-slate-700/80">
+                  <button
+                    onClick={() => setRevenueTabFilter('all')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      revenueTabFilter === 'all'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    }`}
+                  >
+                    All Invoices ({invoices.length})
+                  </button>
+                  <button
+                    onClick={() => setRevenueTabFilter('paid')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      revenueTabFilter === 'paid'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    }`}
+                  >
+                    Paid Receipts ({todayPaidInvoices.length})
+                  </button>
+                  <button
+                    onClick={() => setRevenueTabFilter('pending')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      revenueTabFilter === 'pending'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    }`}
+                  >
+                    Pending Collection ({invoices.filter((i) => i.status !== 'paid').length})
+                  </button>
+                </div>
+
+                {/* Search Input */}
+                <div className="relative flex-1 max-w-xs">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={revenueSearch}
+                    onChange={(e) => setRevenueSearch(e.target.value)}
+                    placeholder="Search invoice #, customer name..."
+                    className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs focus:ring-2 focus:ring-emerald-500 outline-hidden"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* List Scroll Area */}
+            <div className="p-4 overflow-y-auto space-y-3 flex-1">
+              {filteredRevenueModalInvoices.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 dark:text-slate-400 space-y-2">
+                  <Receipt className="w-8 h-8 text-emerald-400 mx-auto opacity-50" />
+                  <p className="text-xs font-bold">No invoice transactions matching your filter.</p>
+                </div>
+              ) : (
+                filteredRevenueModalInvoices.map((inv) => {
+                  const customer = customers.find((c) => c.id === inv.customerId);
+
+                  return (
+                    <div
+                      key={inv.id}
+                      className="p-4 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all space-y-2 shadow-xs"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-slate-900 dark:text-slate-100">{inv.invoiceNumber}</span>
+                          <span
+                            className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                              inv.status === 'paid'
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                                : inv.status === 'partial'
+                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                : 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                            }`}
+                          >
+                            {inv.status}
+                          </span>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-xs font-black text-emerald-600 dark:text-emerald-400">
+                            Collected: {curr}{inv.paidAmount}
+                          </div>
+                          <div className="text-[10px] text-slate-400">
+                            Grand Total: {curr}{inv.grandTotal}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        {customer?.name || 'Customer'} {customer?.companyName && `(${customer.companyName})`}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500 pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                        <span>Issued Date: {inv.date} (Due: {inv.dueDate})</span>
+                        {inv.notes && <span className="truncate max-w-xs text-slate-400">{inv.notes}</span>}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                Total Filtered Revenue: <span className="font-extrabold text-emerald-600">{curr}{filteredRevenueModalInvoices.reduce((sum, i) => sum + i.paidAmount, 0).toLocaleString()}</span>
+              </div>
+
+              <button
+                onClick={() => {
+                  setIsRevenueModalOpen(false);
+                  navigate('invoices', { statusFilter: 'paid' });
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-md active:scale-95 cursor-pointer"
+              >
+                Open Invoices Module (Filtered) <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       )}

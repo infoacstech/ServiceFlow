@@ -48,8 +48,31 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [regBusinessName, setRegBusinessName] = useState('');
   const [regBusinessType, setRegBusinessType] = useState('CCTV & Security');
 
+  // Selected Organization state for custom logo preview on sign-in
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('');
+
   // Registration Success Alert State
   const [pendingRegistrationSuccess, setPendingRegistrationSuccess] = useState<User | null>(null);
+
+  // Auto-detect business based on email/phone matching or selection
+  const cleanId = loginIdentifier.trim().toLowerCase();
+  const matchedUser = (users || []).find(
+    (u) =>
+      cleanId.length >= 3 &&
+      ((u.email || '').toLowerCase() === cleanId ||
+        (u.phone || '').replace(/[^0-9]/g, '').endsWith(cleanId.replace(/[^0-9]/g, '').slice(-10)))
+  );
+
+  let activeBusiness = null;
+  if (authTab === 'register' && registerRole !== 'business_owner') {
+    activeBusiness = businesses.find((b) => b.id === regBusinessId) || null;
+  } else if (matchedUser) {
+    activeBusiness = businesses.find((b) => b.id === matchedUser.businessId) || null;
+  } else if (selectedOrgId) {
+    activeBusiness = businesses.find((b) => b.id === selectedOrgId) || null;
+  } else if (businesses.length > 0 && businesses[0]?.logo) {
+    activeBusiness = businesses[0];
+  }
 
   // Handle Direct Sign In
   const handleDirectLogin = async (e: React.FormEvent) => {
@@ -211,14 +234,27 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       <div className="w-full max-w-md space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 mb-1">
-            <ShieldCheck className="w-8 h-8" />
-          </div>
+          {activeBusiness?.logo ? (
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border-2 border-indigo-500/30 p-1.5 shadow-lg shadow-indigo-500/10 mb-1 overflow-hidden transition-all">
+              <img
+                src={activeBusiness.logo}
+                alt={activeBusiness.name}
+                className="w-full h-full object-contain rounded-xl"
+              />
+            </div>
+          ) : (
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 mb-1">
+              <ShieldCheck className="w-8 h-8" />
+            </div>
+          )}
+
           <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
-            ServiFlow
+            {activeBusiness?.name || 'ServiFlow'}
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium max-w-xs mx-auto">
-            Field Operations & Service Management System
+            {activeBusiness?.name
+              ? `${activeBusiness.name} Employee Portal`
+              : 'Field Operations & Service Management System'}
           </p>
         </div>
 
@@ -262,6 +298,33 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           {/* SIGN IN TAB */}
           {authTab === 'login' && (
             <form onSubmit={handleDirectLogin} className="space-y-4">
+              {businesses.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Company Organization (Optional)
+                    </label>
+                    {activeBusiness?.logo && (
+                      <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md flex items-center gap-1">
+                        <Building2 className="w-3 h-3" /> Custom Logo
+                      </span>
+                    )}
+                  </div>
+                  <select
+                    value={selectedOrgId || activeBusiness?.id || ''}
+                    onChange={(e) => setSelectedOrgId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                  >
+                    <option value="">Auto-Detect from Email/Mobile</option>
+                    {businesses.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                   Email Address or Mobile Phone

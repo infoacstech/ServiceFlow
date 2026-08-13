@@ -183,14 +183,77 @@ export const SettingsView: React.FC = () => {
             />
           </div>
 
-          <div className="col-span-2">
-            <label className="font-semibold block mb-1">Business Logo Image URL</label>
-            <input
-              type="text"
-              value={formData.logo}
-              onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
-              className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 dark:border-slate-700"
-            />
+          <div className="col-span-2 p-4 bg-slate-50/80 dark:bg-slate-800/50 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">
+            <div>
+              <label className="font-bold text-slate-800 dark:text-slate-200 block mb-0.5">
+                Company Branding Logo *
+              </label>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Upload a small company logo image. This logo will be displayed on the Login Page for your employees and technicians when signing in.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              {/* Logo Preview */}
+              <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center p-1 shadow-xs shrink-0 overflow-hidden relative group">
+                {formData.logo ? (
+                  <img src={formData.logo} alt="Company Logo" className="w-full h-full object-contain rounded-xl" />
+                ) : (
+                  <div className="text-center text-slate-400 text-[10px] font-bold">No Logo</div>
+                )}
+              </div>
+
+              {/* Upload Controls */}
+              <div className="flex-1 space-y-2 w-full">
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer shadow-xs transition-colors inline-flex items-center gap-1.5">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 3 * 1024 * 1024) {
+                            alert('Image file is too large. Please select an image under 3MB.');
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const result = event.target?.result as string;
+                            if (result) {
+                              setFormData((prev) => ({ ...prev, logo: result }));
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                    <span>Upload Logo Image</span>
+                  </label>
+
+                  {formData.logo && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, logo: '' })}
+                      className="px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 hover:bg-rose-100 font-semibold text-xs transition-colors"
+                    >
+                      Remove Logo
+                    </button>
+                  )}
+                </div>
+
+                <div>
+                  <input
+                    type="text"
+                    value={formData.logo}
+                    onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
+                    placeholder="Or paste image URL (e.g., https://example.com/logo.png)"
+                    className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           <div>
