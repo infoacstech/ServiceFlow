@@ -44,8 +44,14 @@ export const SettingsView: React.FC = () => {
     toggleSimulateOffline,
     currentUser,
     updateUserPassword,
+    purgeTenantTransactionalData,
     showToast,
   } = useApp();
+
+  // Reset Workspace Modal / Action State
+  const [isResetTenantModalOpen, setIsResetTenantModalOpen] = useState(false);
+  const [resetTenantConfirmText, setResetTenantConfirmText] = useState('');
+  const [isResettingTenant, setIsResettingTenant] = useState(false);
 
   // Password Change State
   const [currentPassInput, setCurrentPassInput] = useState('');
@@ -665,6 +671,31 @@ export const SettingsView: React.FC = () => {
         </form>
       </div>
 
+      {/* Reset Testing Data Card */}
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-rose-200/80 dark:border-rose-900/60 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-rose-600" /> Workspace Clean Testing Data Reset
+            </h2>
+            <p className="text-xs text-slate-500">
+              Clear demo customers, jobs, invoices, and expenses for <strong className="text-slate-700 dark:text-slate-200">{currentBusiness.name}</strong> only. Your login credentials, business settings, and staff profiles will remain safe.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setResetTenantConfirmText('');
+              setIsResetTenantModalOpen(true);
+            }}
+            className="px-4 py-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <Trash2 className="w-4 h-4 text-rose-600" />
+            <span>Reset Workspace Data</span>
+          </button>
+        </div>
+      </div>
+
       {/* Global Theme & Appearance Preference */}
       <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
         <div>
@@ -722,6 +753,98 @@ export const SettingsView: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Tenant Reset Confirmation Modal */}
+      {isResetTenantModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-rose-500/40 max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="p-2.5 bg-rose-600 text-white rounded-2xl shadow-md">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-slate-100 text-base">
+                  Reset Workspace Testing Data
+                </h3>
+                <p className="text-xs text-rose-600 dark:text-rose-400 font-bold">{currentBusiness.name}</p>
+              </div>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (resetTenantConfirmText.trim().toUpperCase() !== 'RESET') {
+                  showToast('Please type RESET to confirm workspace data reset.', 'error');
+                  return;
+                }
+                setIsResettingTenant(true);
+                try {
+                  await purgeTenantTransactionalData(currentBusiness.id);
+                  setIsResetTenantModalOpen(false);
+                  setResetTenantConfirmText('');
+                } finally {
+                  setIsResettingTenant(false);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+                This will delete all test customers, jobs, orders, invoices, and payments for <strong>{currentBusiness.name}</strong>. Your settings and user login will remain safe.
+              </p>
+
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Type <span className="font-mono text-rose-600 dark:text-rose-400 font-black">RESET</span> to confirm:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={resetTenantConfirmText}
+                  onChange={(e) => setResetTenantConfirmText(e.target.value)}
+                  placeholder="RESET"
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono font-bold tracking-widest text-center"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  disabled={isResettingTenant}
+                  onClick={() => {
+                    setIsResetTenantModalOpen(false);
+                    setResetTenantConfirmText('');
+                  }}
+                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isResettingTenant || resetTenantConfirmText.trim().toUpperCase() !== 'RESET'}
+                  className={`px-5 py-2 rounded-xl font-extrabold text-white flex items-center gap-2 shadow-md cursor-pointer transition-all ${
+                    resetTenantConfirmText.trim().toUpperCase() === 'RESET' && !isResettingTenant
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : 'bg-slate-400 dark:bg-slate-700 cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  {isResettingTenant ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Resetting Workspace...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      <span>Confirm Reset</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

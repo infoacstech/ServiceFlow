@@ -4,6 +4,10 @@ import {
   setDoc,
   deleteDoc,
   onSnapshot,
+  getDocs,
+  writeBatch,
+  query,
+  where,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import {
@@ -77,6 +81,98 @@ export class FirestoreService {
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `${collectionName}/${id}`);
     }
+  }
+
+  /**
+   * Safely purges all dummy/test transactional records across all transactional collections,
+   * PRESERVING Super Admin accounts, Business Owner users, Business settings, Roles, and System policies.
+   */
+  static async purgeAllTransactionalData(): Promise<{ clearedCollections: string[]; totalDocsDeleted: number }> {
+    const transactionalCollections = [
+      'customers',
+      'jobs',
+      'services',
+      'categories',
+      'inventory',
+      'inventoryTransactions',
+      'quotations',
+      'invoices',
+      'payments',
+      'contracts',
+      'expenses',
+      'notifications',
+      'activities',
+      'manualSyncLogs',
+    ];
+
+    let totalDeleted = 0;
+    const cleared: string[] = [];
+
+    for (const colName of transactionalCollections) {
+      try {
+        const snap = await getDocs(collection(db, colName));
+        if (!snap.empty) {
+          const batch = writeBatch(db);
+          snap.docs.forEach((d) => {
+            batch.delete(d.ref);
+            totalDeleted++;
+          });
+          await batch.commit();
+          cleared.push(colName);
+        }
+      } catch (err) {
+        console.error(`Error purging collection ${colName}:`, err);
+      }
+    }
+
+    return { clearedCollections: cleared, totalDocsDeleted: totalDeleted };
+  }
+
+  /**
+   * Tenant-isolated data purge: clears transactional records belonging only to the specified business ID.
+   */
+  static async purgeTenantTransactionalData(businessId: string): Promise<{ clearedCollections: string[]; totalDocsDeleted: number }> {
+    if (!businessId || businessId === 'all') return { clearedCollections: [], totalDocsDeleted: 0 };
+
+    const tenantCollections = [
+      'customers',
+      'jobs',
+      'services',
+      'categories',
+      'inventory',
+      'inventoryTransactions',
+      'quotations',
+      'invoices',
+      'payments',
+      'contracts',
+      'expenses',
+      'notifications',
+      'activities',
+      'manualSyncLogs',
+    ];
+
+    let totalDeleted = 0;
+    const cleared: string[] = [];
+
+    for (const colName of tenantCollections) {
+      try {
+        const q = query(collection(db, colName), where('businessId', '==', businessId));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const batch = writeBatch(db);
+          snap.docs.forEach((d) => {
+            batch.delete(d.ref);
+            totalDeleted++;
+          });
+          await batch.commit();
+          cleared.push(colName);
+        }
+      } catch (err) {
+        console.error(`Error purging tenant collection ${colName} for business ${businessId}:`, err);
+      }
+    }
+
+    return { clearedCollections: cleared, totalDocsDeleted: totalDeleted };
   }
 
   // =========================================================================

@@ -20,12 +20,33 @@ import {
   AlertOctagon,
   Eye,
   ShieldAlert,
+  Trash2,
+  Sparkles,
+  Database,
+  RefreshCw,
+  AlertTriangle,
+  Layers,
+  Check,
 } from 'lucide-react';
 
 export const SuperAdminView: React.FC = () => {
   const {
     businesses,
     users,
+    customers,
+    jobs,
+    services,
+    categories,
+    inventory,
+    quotations,
+    invoices,
+    payments,
+    contracts,
+    expenses,
+    notifications,
+    activityLogs,
+    roles,
+    plans,
     switchBusiness,
     updateBusinessAndOwnerStatus,
     updateUserStatus,
@@ -38,10 +59,13 @@ export const SuperAdminView: React.FC = () => {
     securityAuditLogs,
     revokeUserSession,
     forcePasswordReset,
+    purgeAllTransactionalData,
+    purgeTenantTransactionalData,
+    showToast,
   } = useApp();
 
   const [activeTabSection, setActiveTabSection] = useState<
-    'approvals' | 'tenants' | 'support' | 'settings' | 'audit' | 'sessions'
+    'approvals' | 'tenants' | 'cleanup' | 'support' | 'settings' | 'audit' | 'sessions'
   >('approvals');
 
   // Support Session Dialog State
@@ -49,6 +73,14 @@ export const SuperAdminView: React.FC = () => {
   const [supportReason, setSupportReason] = useState<string>('');
   const [supportDuration, setSupportDuration] = useState<number>(30);
   const [supportAccessMode, setSupportAccessMode] = useState<'read_only' | 'full_support'>('read_only');
+
+  // Purge / Clean Reset Modal State
+  const [isPurgeModalOpen, setIsPurgeModalOpen] = useState(false);
+  const [purgeTargetMode, setPurgeTargetMode] = useState<'global' | 'tenant'>('global');
+  const [selectedTenantForPurge, setSelectedTenantForPurge] = useState<string>(businesses[0]?.id || '');
+  const [purgeConfirmationText, setPurgeConfirmationText] = useState('');
+  const [isPurgingInProgress, setIsPurgingInProgress] = useState(false);
+  const [lastPurgeResult, setLastPurgeResult] = useState<{ clearedCollections: string[]; totalDocsDeleted: number } | null>(null);
 
   // Find pending owner/business registrations & pending staff
   const pendingOwners = users.filter(
@@ -112,6 +144,31 @@ export const SuperAdminView: React.FC = () => {
     setSupportModalBiz(null);
   };
 
+  const handleExecutePurge = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (purgeConfirmationText.trim().toUpperCase() !== 'RESET') {
+      showToast('Safety Check Failed: Please type "RESET" to confirm the action.', 'error');
+      return;
+    }
+
+    setIsPurgingInProgress(true);
+    try {
+      let result;
+      if (purgeTargetMode === 'global') {
+        result = await purgeAllTransactionalData();
+      } else {
+        result = await purgeTenantTransactionalData(selectedTenantForPurge);
+      }
+      setLastPurgeResult(result);
+      setIsPurgeModalOpen(false);
+      setPurgeConfirmationText('');
+    } catch (err) {
+      console.error('Failed to execute clean data purge:', err);
+    } finally {
+      setIsPurgingInProgress(false);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-12 animate-in fade-in">
       {/* Top Banner Header */}
@@ -173,6 +230,18 @@ export const SuperAdminView: React.FC = () => {
         >
           <Building2 className="w-4 h-4" />
           <span>Tenant Businesses ({businesses.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTabSection('cleanup')}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTabSection === 'cleanup'
+              ? 'bg-rose-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-300" />
+          <span>Clean State & Data Purge</span>
         </button>
 
         <button
@@ -541,6 +610,270 @@ export const SuperAdminView: React.FC = () => {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* SECTION: Clean State & Data Purge Console */}
+      {activeTabSection === 'cleanup' && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* Top Info Banner */}
+          <div className="bg-gradient-to-r from-rose-900 via-purple-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 border border-rose-500/30 shadow-lg relative overflow-hidden">
+            <div className="relative z-10 space-y-2">
+              <div className="inline-flex items-center gap-2 bg-rose-500/20 text-rose-300 px-3 py-1 rounded-full border border-rose-500/30 text-xs font-semibold">
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>Clean Testing Environment Utility</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black">
+                Reset ServiFlow to Clean Testing State
+              </h2>
+              <p className="text-xs sm:text-sm text-rose-200/80 max-w-2xl leading-relaxed">
+                Safely wipe out dummy sample transactions, test customers, demo jobs, mock invoices, and synthetic inventory history while strictly preserving all Super Admin credentials, Business Owner accounts, plans, roles, and security configs.
+              </p>
+            </div>
+          </div>
+
+          {/* Real-time Collections Footprint */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Transactional Data Status */}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 rounded-xl">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                      Transactional & Demo Entities
+                    </h3>
+                    <p className="text-[11px] text-slate-500">Will be permanently erased during clean reset</p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Status</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800 flex flex-col justify-between">
+                  <span className="text-slate-500 text-[11px]">Customers</span>
+                  <span className="text-lg font-black text-slate-900 dark:text-slate-100 mt-1">{customers.length}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800 flex flex-col justify-between">
+                  <span className="text-slate-500 text-[11px]">Jobs / Orders</span>
+                  <span className="text-lg font-black text-slate-900 dark:text-slate-100 mt-1">{jobs.length}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800 flex flex-col justify-between">
+                  <span className="text-slate-500 text-[11px]">Invoices</span>
+                  <span className="text-lg font-black text-slate-900 dark:text-slate-100 mt-1">{invoices.length}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800 flex flex-col justify-between">
+                  <span className="text-slate-500 text-[11px]">Quotations</span>
+                  <span className="text-lg font-black text-slate-900 dark:text-slate-100 mt-1">{quotations.length}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800 flex flex-col justify-between">
+                  <span className="text-slate-500 text-[11px]">Payments Recorded</span>
+                  <span className="text-lg font-black text-slate-900 dark:text-slate-100 mt-1">{payments.length}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800 flex flex-col justify-between">
+                  <span className="text-slate-500 text-[11px]">Expenses</span>
+                  <span className="text-lg font-black text-slate-900 dark:text-slate-100 mt-1">{expenses.length}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800 flex flex-col justify-between">
+                  <span className="text-slate-500 text-[11px]">Inventory Items</span>
+                  <span className="text-lg font-black text-slate-900 dark:text-slate-100 mt-1">{inventory.length}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800 flex flex-col justify-between">
+                  <span className="text-slate-500 text-[11px]">Services Catalog</span>
+                  <span className="text-lg font-black text-slate-900 dark:text-slate-100 mt-1">{services.length}</span>
+                </div>
+
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800 flex flex-col justify-between">
+                  <span className="text-slate-500 text-[11px]">AMC Contracts</span>
+                  <span className="text-lg font-black text-slate-900 dark:text-slate-100 mt-1">{contracts.length}</span>
+                </div>
+              </div>
+
+              {customers.length === 0 && jobs.length === 0 && invoices.length === 0 ? (
+                <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-2xl flex items-center gap-2.5 text-xs text-emerald-800 dark:text-emerald-300 font-semibold">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <span>Transactional database is 100% clean & ready for real testing.</span>
+                </div>
+              ) : (
+                <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl flex items-center gap-2.5 text-xs text-amber-800 dark:text-amber-300 font-semibold">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                  <span>Found {customers.length + jobs.length + invoices.length + quotations.length + payments.length + inventory.length} test records that can be purged.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Preserved Master Data */}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 rounded-xl">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                      Preserved System Master Architecture
+                    </h3>
+                    <p className="text-[11px] text-slate-500">100% Protected & untouched during any reset</p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Protected</span>
+              </div>
+
+              <div className="space-y-2.5 text-xs">
+                <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    <span className="font-bold text-slate-800 dark:text-slate-200">Super Admin & Platform Admins</span>
+                  </div>
+                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">admin@serviflow.io</span>
+                </div>
+
+                <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    <span className="font-bold text-slate-800 dark:text-slate-200">Tenant Businesses & Master Profiles</span>
+                  </div>
+                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">{businesses.length} Businesses</span>
+                </div>
+
+                <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    <span className="font-bold text-slate-800 dark:text-slate-200">Business Owners & Registered Users</span>
+                  </div>
+                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">{users.length} Users</span>
+                </div>
+
+                <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    <span className="font-bold text-slate-800 dark:text-slate-200">Subscription Plans & Billing Config</span>
+                  </div>
+                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">{plans.length} Tier Plans</span>
+                </div>
+
+                <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    <span className="font-bold text-slate-800 dark:text-slate-200">System Roles & Permissions Matrix</span>
+                  </div>
+                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">{roles.length} Role Profiles</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Launchers */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Option 1: Global Reset */}
+            <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-rose-300 dark:border-rose-900/60 shadow-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-rose-600 text-white rounded-2xl shadow-md">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                    Option A: Global Clean State Wipe
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Wipes dummy records across all collections for all test accounts simultaneously.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                Recommended before initiating full end-to-end user acceptance testing. Resets all dashboards to zero without logging out your admin session.
+              </div>
+
+              <button
+                onClick={() => {
+                  setPurgeTargetMode('global');
+                  setPurgeConfirmationText('');
+                  setIsPurgeModalOpen(true);
+                }}
+                className="w-full py-3.5 px-4 bg-rose-600 hover:bg-rose-700 active:scale-[0.99] text-white font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Execute Global Clean Reset</span>
+              </button>
+            </div>
+
+            {/* Option 2: Tenant-Specific Purge */}
+            <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-md">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                    Option B: Isolated Tenant Data Reset
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Target only one specific business workspace without affecting others.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Select Target Business Workspace:
+                </label>
+                <select
+                  value={selectedTenantForPurge}
+                  onChange={(e) => setSelectedTenantForPurge(e.target.value)}
+                  className="w-full p-3 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-slate-100"
+                >
+                  {businesses.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} (ID: {b.id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                onClick={() => {
+                  setPurgeTargetMode('tenant');
+                  setPurgeConfirmationText('');
+                  setIsPurgeModalOpen(true);
+                }}
+                className="w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-extrabold rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Reset Selected Tenant Workspace</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Last Purge Result Badge */}
+          {lastPurgeResult && (
+            <div className="p-4 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-3xl flex items-center justify-between text-xs text-emerald-900 dark:text-emerald-200">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <div>
+                  <span className="font-extrabold">Clean State Activated Successfully: </span>
+                  <span>
+                    Purged {lastPurgeResult.totalDocsDeleted} documents across collections ({lastPurgeResult.clearedCollections.join(', ')}).
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setLastPurgeResult(null)}
+                className="font-bold underline text-[11px] text-emerald-700 dark:text-emerald-300"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1016,6 +1349,93 @@ export const SuperAdminView: React.FC = () => {
                   className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-md"
                 >
                   Start Audited Session
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CLEAN STATE DATA PURGE CONFIRMATION MODAL */}
+      {isPurgeModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-rose-500/40 max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="p-2.5 bg-rose-600 text-white rounded-2xl shadow-md">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-slate-100 text-base">
+                  Confirm Clean State Reset
+                </h3>
+                <p className="text-xs text-rose-600 dark:text-rose-400 font-bold">
+                  {purgeTargetMode === 'global'
+                    ? 'Global Platform Test Data Wipe'
+                    : `Workspace: ${businesses.find((b) => b.id === selectedTenantForPurge)?.name || selectedTenantForPurge}`}
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleExecutePurge} className="space-y-4 text-xs">
+              <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 rounded-2xl border border-rose-200 dark:border-rose-900/60 text-slate-700 dark:text-slate-300 space-y-2">
+                <div className="font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-600" />
+                  <span>Permanent Purge Warning</span>
+                </div>
+                <p className="text-[11px] leading-relaxed">
+                  {purgeTargetMode === 'global'
+                    ? 'This action will permanently delete all customers, jobs, invoices, quotations, payments, stock logs, and expenses. Super Admin, Business Owners, plans, and roles will remain intact.'
+                    : 'This action will wipe transactional records for the chosen tenant only. Other businesses will NOT be affected.'}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Type <span className="font-mono text-rose-600 dark:text-rose-400 font-black">RESET</span> to confirm:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={purgeConfirmationText}
+                  onChange={(e) => setPurgeConfirmationText(e.target.value)}
+                  placeholder="RESET"
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono font-bold tracking-widest text-center"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  disabled={isPurgingInProgress}
+                  onClick={() => {
+                    setIsPurgeModalOpen(false);
+                    setPurgeConfirmationText('');
+                  }}
+                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isPurgingInProgress || purgeConfirmationText.trim().toUpperCase() !== 'RESET'}
+                  className={`px-5 py-2 rounded-xl font-extrabold text-white flex items-center gap-2 shadow-md cursor-pointer transition-all ${
+                    purgeConfirmationText.trim().toUpperCase() === 'RESET' && !isPurgingInProgress
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : 'bg-slate-400 dark:bg-slate-700 cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  {isPurgingInProgress ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Purging Data...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      <span>Confirm & Purge</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

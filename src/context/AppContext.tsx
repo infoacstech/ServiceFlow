@@ -230,6 +230,10 @@ interface AppContextType {
 
   revokeUserSession: (userId: string) => void;
   forcePasswordReset: (userId: string) => void;
+
+  // Safe Clean State Testing Data Purge
+  purgeAllTransactionalData: () => Promise<{ clearedCollections: string[]; totalDocsDeleted: number }>;
+  purgeTenantTransactionalData: (businessId?: string) => Promise<{ clearedCollections: string[]; totalDocsDeleted: number }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -1152,6 +1156,62 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (target) {
       logSecurityEvent('PASSWORD_RESET_TRIGGERED', 'AUTH', `Triggered emergency password reset flow for user ${target.name} (${target.email}).`, target.businessId);
       showToast(`Password reset notification & token issued for ${target.email}`, 'success');
+    }
+  };
+
+  // -------------------------------------------------------------
+  // SAFE CLEAN TESTING DATA PURGE ENGINE
+  // -------------------------------------------------------------
+  const purgeAllTransactionalData = async (): Promise<{ clearedCollections: string[]; totalDocsDeleted: number }> => {
+    try {
+      const res = await FirestoreService.purgeAllTransactionalData();
+      logSecurityEvent(
+        'PURGE_ALL_TRANSACTIONAL_DATA',
+        'SETTINGS',
+        `Super Admin wiped ${res.totalDocsDeleted} dummy transactional records across collections: ${res.clearedCollections.join(', ')}`
+      );
+      setCustomers([]);
+      setJobs([]);
+      setServices([]);
+      setCategories([]);
+      setInventory([]);
+      setInventoryTransactions([]);
+      setQuotations([]);
+      setInvoices([]);
+      setPayments([]);
+      setContracts([]);
+      setExpenses([]);
+      setNotifications([]);
+      setActivityLogs([]);
+      setManualSyncLogs([]);
+
+      showToast(`Clean State Active: Purged ${res.totalDocsDeleted} dummy records. Database is now in clean state for real testing.`, 'success');
+      return res;
+    } catch (err) {
+      console.error('Purge error:', err);
+      showToast('Failed to purge transactional data: ' + String(err), 'error');
+      return { clearedCollections: [], totalDocsDeleted: 0 };
+    }
+  };
+
+  const purgeTenantTransactionalData = async (
+    businessId = currentBusiness.id
+  ): Promise<{ clearedCollections: string[]; totalDocsDeleted: number }> => {
+    try {
+      const res = await FirestoreService.purgeTenantTransactionalData(businessId);
+      logSecurityEvent(
+        'PURGE_TENANT_TRANSACTIONAL_DATA',
+        'TENANT_ACCESS',
+        `Cleared ${res.totalDocsDeleted} tenant records for business ID: ${businessId}`,
+        businessId,
+        currentBusiness.name
+      );
+      showToast(`Clean State Active: Purged ${res.totalDocsDeleted} records for ${currentBusiness.name}.`, 'success');
+      return res;
+    } catch (err) {
+      console.error('Tenant purge error:', err);
+      showToast('Failed to purge tenant data: ' + String(err), 'error');
+      return { clearedCollections: [], totalDocsDeleted: 0 };
     }
   };
 
@@ -2200,6 +2260,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         logSecurityEvent,
         revokeUserSession,
         forcePasswordReset,
+
+        // Safe Clean State Testing Data Purge
+        purgeAllTransactionalData,
+        purgeTenantTransactionalData,
       }}
     >
       {children}
