@@ -22,10 +22,6 @@ service cloud.firestore {
       );
     }
 
-    function isOwnerOrSameBusiness(businessId) {
-      return isSuperAdmin() || isSameBusiness(businessId);
-    }
-
     // Business collection
     match /businesses/{businessId} {
       allow read: if isAuthenticated();
@@ -82,7 +78,7 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
-    // Super Admin System Collections
+    // Super Admin System Collections & Immutable Security Logs
     match /supportSessions/{sessionId} {
       allow read, write: if isAuthenticated();
     }
@@ -91,7 +87,9 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
     match /securityAuditLogs/{logId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false; // Immutable audit trail - deletion strictly blocked
     }
     match /roles/{roleId} {
       allow read: if isAuthenticated();

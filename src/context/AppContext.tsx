@@ -810,6 +810,28 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const loginUser = async (userToLogin: User, password?: string): Promise<User> => {
     try {
+      // SECURITY GUARD: Block suspended, rejected, pending, or inactive accounts
+      if (userToLogin.approvalStatus === 'pending' && userToLogin.role !== 'super_admin') {
+        showToast('Access Restricted: Your Business Owner account registration is pending platform admin approval.', 'error');
+        throw new Error('Account pending approval');
+      }
+      if (
+        (userToLogin.approvalStatus === 'blocked' ||
+          userToLogin.approvalStatus === 'suspended' ||
+          userToLogin.approvalStatus === 'rejected' ||
+          userToLogin.status === 'inactive') &&
+        userToLogin.role !== 'super_admin'
+      ) {
+        showToast('Access Blocked: Your account access has been suspended or revoked.', 'error');
+        throw new Error('Account access suspended or blocked');
+      }
+
+      const targetBiz = businesses.find((b) => b.id === userToLogin.businessId);
+      if (targetBiz && (targetBiz.status === 'suspended' || targetBiz.status === 'rejected') && userToLogin.role !== 'super_admin') {
+        showToast('Tenant Suspended: Your business account has been suspended by the SaaS platform administrator.', 'error');
+        throw new Error('Business tenant suspended');
+      }
+
       await saveToFirestore('users', userToLogin.id, userToLogin);
 
       const email = userToLogin.email.toLowerCase();
@@ -1224,19 +1246,29 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Switch business tenant
   const switchBusiness = (bId: string) => {
+    // SECURITY GUARD: Only Super Admin or active Support Session can switch business tenants
+    if (currentUser?.role !== 'super_admin' && (!activeSupportSession || activeSupportSession.targetBusinessId !== bId)) {
+      showToast('Unauthorized: Only Super Administrators with an active support session can switch business tenants.', 'error');
+      return;
+    }
+
     const target = businesses.find((b) => b.id === bId);
     if (target) {
       setCurrentBusiness(target);
-      const bUser = users.find((u) => u.businessId === bId && u.role === 'business_owner') || {
-        id: `usr-owner-${bId}`,
-        name: `${target.name} Owner`,
-        email: target.email,
-        phone: target.mobile,
-        role: 'business_owner' as UserRole,
-        businessId: bId,
-        status: 'active' as const,
-      };
-      setCurrentUser(bUser);
+      if (currentUser?.role === 'super_admin') {
+        logSecurityEvent('TENANT_SWITCHED', 'TENANT_ACCESS', `Super Admin switched context to business "${target.name}" (ID: ${bId})`, bId, target.name);
+      } else {
+        const bUser = users.find((u) => u.businessId === bId && u.role === 'business_owner') || {
+          id: `usr-owner-${bId}`,
+          name: `${target.name} Owner`,
+          email: target.email,
+          phone: target.mobile,
+          role: 'business_owner' as UserRole,
+          businessId: bId,
+          status: 'active' as const,
+        };
+        setCurrentUser(bUser);
+      }
       showToast(`Switched active tenant to: ${target.name}`, 'success');
     }
   };
@@ -1329,6 +1361,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Customer Actions
   const addCustomer = (data: Omit<Customer, 'id' | 'businessId' | 'createdAt'>) => {
+    if (checkReadOnlySupportGuard()) return;
     const id = `cust-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newCust: Customer = {
       ...data,
@@ -1343,17 +1376,30 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateCustomer = (id: string, updates: Partial<Customer>) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = customers.find((c) => c.id === id);
+    if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot modify customer belonging to another tenant business.', 'error');
+      return;
+    }
     firestoreService.updateCustomer(id, updates);
     showToast('Customer information updated & synced to Firestore', 'success');
   };
 
   const deleteCustomer = (id: string) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = customers.find((c) => c.id === id);
+    if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot delete customer belonging to another tenant business.', 'error');
+      return;
+    }
     firestoreService.deleteCustomer(id);
     showToast('Customer deleted from Firestore', 'info');
   };
 
   // Services Actions
   const addServiceCategory = (name: string, description?: string) => {
+    if (checkReadOnlySupportGuard()) return;
     const newCat: ServiceCategory = {
       id: `cat-${Date.now()}`,
       businessId: currentBusiness.id,
@@ -1366,6 +1412,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addService = (data: Omit<Service, 'id' | 'businessId'>) => {
+    if (checkReadOnlySupportGuard()) return;
     const newSrv: Service = {
       ...data,
       id: `srv-${Date.now()}`,
@@ -1376,17 +1423,30 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateService = (id: string, updates: Partial<Service>) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = services.find((s) => s.id === id);
+    if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot modify service belonging to another tenant business.', 'error');
+      return;
+    }
     firestoreService.saveDocument<Service>('services', id, updates);
     showToast('Service details updated', 'success');
   };
 
   const deleteService = (id: string) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = services.find((s) => s.id === id);
+    if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot delete service belonging to another tenant business.', 'error');
+      return;
+    }
     firestoreService.deleteDocument('services', id);
     showToast('Service removed', 'info');
   };
 
   // Job Actions
   const addJob = (data: Omit<Job, 'id' | 'businessId' | 'jobId' | 'createdAt'>) => {
+    if (checkReadOnlySupportGuard()) return;
     const count = filteredJobs.length + 101;
     const jobId = `JOB-${new Date().getFullYear()}-${count}`;
     const id = `job-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
@@ -1424,6 +1484,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateJob = (id: string, updates: Partial<Job>) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = jobs.find((j) => j.id === id);
+    if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot modify job belonging to another tenant business.', 'error');
+      return;
+    }
     if (isActuallyOffline) {
       addToSyncQueue('update_job', id, updates, 'Updated job schedule/assignment');
       showToast('Offline Mode: Saved locally and queued for sync.', 'info');
@@ -1448,6 +1514,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateJobStatus = (id: string, status: JobStatus) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = jobs.find((j) => j.id === id);
+    if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot update job belonging to another tenant business.', 'error');
+      return;
+    }
     if (isActuallyOffline) {
       addToSyncQueue('update_job_status', id, { status }, `Job status changed to ${status.replace('_', ' ')}`);
       showToast(`Offline Mode: Status updated to ${status.replace('_', ' ')} (queued)`, 'info');
@@ -1459,13 +1531,24 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteJob = (id: string) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = jobs.find((j) => j.id === id);
+    if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot delete job belonging to another tenant business.', 'error');
+      return;
+    }
     firestoreService.deleteJob(id);
     logActivity('Job Deleted', 'job', id, 'Deleted job record from Firestore');
     showToast('Job deleted from Firestore', 'info');
   };
 
   const startJob = (id: string, beforePhotos: string[], notes?: string) => {
+    if (checkReadOnlySupportGuard()) return;
     const existingJob = jobs.find((j) => j.id === id);
+    if (existingJob && existingJob.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot start job belonging to another tenant business.', 'error');
+      return;
+    }
     const startUpdates = {
       status: 'started' as const,
       beforePhotos: beforePhotos.length > 0 ? beforePhotos : (existingJob?.beforePhotos || []),
@@ -1495,6 +1578,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       materialsUsed?: JobMaterialUsed[];
     }
   ) => {
+    if (checkReadOnlySupportGuard()) return;
+    const existingJob = jobs.find((j) => j.id === id);
+    if (existingJob && existingJob.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot complete job belonging to another tenant business.', 'error');
+      return;
+    }
     if (data.materialsUsed && data.materialsUsed.length > 0) {
       data.materialsUsed.forEach((used) => {
         const item = inventory.find((i) => i.id === used.inventoryItemId);
@@ -1529,6 +1618,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Inventory Actions
   const addInventoryItem = (data: Omit<InventoryItem, 'id' | 'businessId'>) => {
+    if (checkReadOnlySupportGuard()) return;
     const newItem: InventoryItem = {
       ...data,
       id: `inv-${Date.now()}`,
@@ -1544,7 +1634,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     type: 'stock_in' | 'stock_out' | 'adjustment',
     notes?: string
   ) => {
+    if (checkReadOnlySupportGuard()) return;
     const item = inventory.find((i) => i.id === id);
+    if (item && item.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot adjust inventory belonging to another tenant business.', 'error');
+      return;
+    }
     if (item) {
       const diff = type === 'stock_out' ? -qty : qty;
       const newStock = Math.max(0, item.currentStock + diff);
@@ -1566,6 +1661,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Quotation Actions
   const addQuotation = (data: Omit<Quotation, 'id' | 'businessId' | 'quotationNumber'>) => {
+    if (checkReadOnlySupportGuard()) return;
     const num = `QT-${new Date().getFullYear()}-${filteredQuotations.length + 101}`;
     const newQt: Quotation = {
       ...data,
@@ -1580,13 +1676,24 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateQuotationStatus = (id: string, status: Quotation['status']) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = quotations.find((q) => q.id === id);
+    if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot modify quotation belonging to another tenant business.', 'error');
+      return;
+    }
     firestoreService.saveDocument<Quotation>('quotations', id, { status });
     showToast(`Quotation status changed to ${status}`, 'info');
   };
 
   const convertQuotationToInvoice = (quotationId: string) => {
+    if (checkReadOnlySupportGuard()) return;
     const qt = quotations.find((q) => q.id === quotationId);
     if (!qt) throw new Error('Quotation not found');
+    if (qt.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot convert quotation belonging to another tenant business.', 'error');
+      return;
+    }
 
     const invNum = `INV-${new Date().getFullYear()}-${filteredInvoices.length + 101}`;
     const newInv: Invoice = {
@@ -1617,6 +1724,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Invoice Actions
   const addInvoice = (data: Omit<Invoice, 'id' | 'businessId' | 'invoiceNumber'>) => {
+    if (checkReadOnlySupportGuard()) return;
     const num = `INV-${new Date().getFullYear()}-${filteredInvoices.length + 101}`;
     const id = `invc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newInv: Invoice = {
@@ -1632,12 +1740,19 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteInvoice = (id: string) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = invoices.find((i) => i.id === id);
+    if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot delete invoice belonging to another tenant business.', 'error');
+      return;
+    }
     firestoreService.deleteInvoice(id);
     logActivity('Invoice Deleted', 'invoice', id, 'Deleted invoice record from Firestore');
     showToast('Invoice deleted from Firestore', 'info');
   };
 
   const recordPayment = (data: Omit<Payment, 'id' | 'businessId'>) => {
+    if (checkReadOnlySupportGuard()) return;
     const newPmt: Payment = {
       ...data,
       id: `pmt-${Date.now()}`,
@@ -1648,6 +1763,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const inv = invoices.find((i) => i.id === data.invoiceId);
     if (inv) {
+      if (inv.businessId !== currentBusiness.id && !isSuperAdminUser) {
+        showToast('Unauthorized: Cannot record payment for invoice belonging to another tenant business.', 'error');
+        return;
+      }
       const newPaid = inv.paidAmount + data.amount;
       const newBalance = Math.max(0, inv.grandTotal - newPaid);
       const newStatus: Invoice['status'] =
@@ -1666,6 +1785,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Contract Actions
   const addContract = (data: Omit<RecurringContract, 'id' | 'businessId' | 'contractNumber'>) => {
+    if (checkReadOnlySupportGuard()) return;
     const num = `AMC-${new Date().getFullYear()}-${filteredContracts.length + 101}`;
     const newContract: RecurringContract = {
       ...data,
@@ -1681,6 +1801,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Expense Actions
   const addExpense = (data: Omit<Expense, 'id' | 'businessId'>) => {
+    if (checkReadOnlySupportGuard()) return;
     const newExp: Expense = {
       ...data,
       id: `exp-${Date.now()}`,
@@ -1692,6 +1813,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Staff & User Auth Actions
   const addStaff = (data: Omit<User, 'id' | 'businessId'>) => {
+    if (checkReadOnlySupportGuard()) return;
     const newStaff: User = {
       ...data,
       id: `usr-${Date.now()}`,
@@ -1705,8 +1827,13 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteStaff = (userId: string) => {
+    if (checkReadOnlySupportGuard()) return;
     const target = users.find((u) => u.id === userId);
     if (!target) return;
+    if (target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot delete staff account belonging to another tenant business.', 'error');
+      return;
+    }
     deleteFromFirestore('users', userId);
     logActivity('Staff Deleted', 'staff', userId, `Deleted staff member ${target.name || target.email}`);
     showToast(`Deleted staff account "${target.name || target.email}"`, 'info');

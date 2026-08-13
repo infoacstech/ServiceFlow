@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { SystemSettings } from '../types';
 import {
   ShieldCheck,
   Building2,
