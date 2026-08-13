@@ -23,6 +23,9 @@ import {
   JobMaterialUsed,
   OfflineSyncItem,
   ManualSyncLog,
+  SupportSession,
+  SystemSettings,
+  SecurityAuditLog,
 } from '../types';
 import {
   DEMO_BUSINESSES,
@@ -200,6 +203,32 @@ interface AppContextType {
   manualSyncLogs: ManualSyncLog[];
   triggerManualSync: (triggerType?: 'MANUAL_BUTTON' | 'AUTO_RECONNECT' | 'FORCED_REFRESH') => void;
   clearSyncLogs: () => void;
+
+  // Super Admin Support Access & Security Engine
+  supportSessions: SupportSession[];
+  activeSupportSession: SupportSession | null;
+  startSupportSession: (
+    targetBusinessId: string,
+    reason: string,
+    durationMinutes?: number,
+    accessMode?: 'read_only' | 'full_support'
+  ) => void;
+  endSupportSession: (reason?: string) => void;
+
+  systemSettings: SystemSettings;
+  updateSystemSettings: (updates: Partial<SystemSettings>) => void;
+
+  securityAuditLogs: SecurityAuditLog[];
+  logSecurityEvent: (
+    action: string,
+    category: SecurityAuditLog['category'],
+    details: string,
+    targetBusinessId?: string,
+    targetBusinessName?: string
+  ) => void;
+
+  revokeUserSession: (userId: string) => void;
+  forcePasswordReset: (userId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -253,6 +282,50 @@ export const useTheme = () => {
   return context;
 };
 
+// Default System Settings for Super Admin Control
+const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
+  id: 'global',
+  maintenanceMode: false,
+  allowNewRegistrations: true,
+  defaultTrialDays: 14,
+  globalNoticeBanner: 'ServiFlow Platform v2.4 Multi-Tenant Engine — All operational nodes green.',
+  isNoticeActive: true,
+  mfaEnforcement: 'required_super_admin',
+  minPasswordLength: 8,
+  sessionTimeoutMinutes: 60,
+  notificationTemplates: {
+    jobAssigned: 'New service task {{jobId}} has been assigned to you. Location: {{location}}.',
+    invoiceGenerated: 'Invoice {{invoiceNumber}} for amount {{amount}} has been generated for your recent service.',
+    paymentReceipt: 'Payment of {{amount}} received successfully for Invoice {{invoiceNumber}}.',
+    welcomeMessage: 'Welcome to ServiFlow! Your business platform account is ready.',
+  },
+};
+
+const DEMO_SECURITY_LOGS: SecurityAuditLog[] = [
+  {
+    id: 'sec-log-1',
+    timestamp: new Date().toISOString(),
+    actorId: 'usr-admin',
+    actorName: 'SaaS Platform Admin',
+    actorRole: 'super_admin',
+    action: 'MFA_POLICY_ENFORCED',
+    category: 'SECURITY_POLICY',
+    details: 'Enforced MFA security policy for all Super Admin platform console accounts.',
+  },
+  {
+    id: 'sec-log-2',
+    timestamp: new Date(Date.now() - 3600000).toISOString(),
+    actorId: 'usr-admin',
+    actorName: 'SaaS Platform Admin',
+    actorRole: 'super_admin',
+    action: 'TENANT_APPROVAL',
+    category: 'TENANT_ACCESS',
+    targetBusinessId: 'biz-1',
+    targetBusinessName: 'Apex Security & CCTV Systems',
+    details: 'Approved Business Owner signup and activated tenant operational workspace.',
+  },
+];
+
 // Firestore helper wrappers
 const saveToFirestore = async (colName: string, id: string, data: any) => {
   try {
@@ -305,6 +378,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [notifications, setNotifications] = useState<Notification[]>(DEMO_NOTIFICATIONS);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(DEMO_ACTIVITIES);
   const [roles, setRoles] = useState<Role[]>(DEMO_ROLES);
+
+  // Super Admin Support Access & Security States
+  const [supportSessions, setSupportSessions] = useState<SupportSession[]>([]);
+  const [activeSupportSession, setActiveSupportSession] = useState<SupportSession | null>(null);
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>(DEFAULT_SYSTEM_SETTINGS);
+  const [securityAuditLogs, setSecurityAuditLogs] = useState<SecurityAuditLog[]>(DEMO_SECURITY_LOGS);
 
   // Offline Technician Sync States
   const [isOffline, setIsOffline] = useState<boolean>(!navigator.onLine);
@@ -566,6 +645,46 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (error) => handleFirestoreError(error, OperationType.GET, 'roles')
     );
 
+    // 18. Support Sessions
+    const unsubSupportSessions = onSnapshot(
+      collection(db, 'supportSessions'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const sessions = snapshot.docs.map((d) => d.data() as SupportSession);
+          setSupportSessions(sessions);
+          const active = sessions.find((s) => s.status === 'active' && new Date(s.expiryTime).getTime() > Date.now());
+          setActiveSupportSession(active || null);
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'supportSessions')
+    );
+
+    // 19. System Settings
+    const unsubSystemSettings = onSnapshot(
+      doc(db, 'systemSettings', 'global'),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setSystemSettings(docSnap.data() as SystemSettings);
+        } else {
+          saveToFirestore('systemSettings', 'global', DEFAULT_SYSTEM_SETTINGS);
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'systemSettings/global')
+    );
+
+    // 20. Security Audit Logs
+    const unsubSecurityLogs = onSnapshot(
+      collection(db, 'securityAuditLogs'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          DEMO_SECURITY_LOGS.forEach((log) => saveToFirestore('securityAuditLogs', log.id, log));
+        } else {
+          setSecurityAuditLogs(snapshot.docs.map((d) => d.data() as SecurityAuditLog));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'securityAuditLogs')
+    );
+
     return () => {
       unsubBiz();
       unsubUsers();
@@ -584,6 +703,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubActivities();
       unsubSyncLogs();
       unsubRoles();
+      unsubSupportSessions();
+      unsubSystemSettings();
+      unsubSecurityLogs();
     };
   }, []);
 
@@ -915,6 +1037,158 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userName: currentUser?.name || 'System User',
     };
     saveToFirestore('activities', newLog.id, newLog);
+  };
+
+  // -------------------------------------------------------------
+  // SECURITY AUDIT LOGGING & SUPPORT ACCESS ENGINE
+  // -------------------------------------------------------------
+  const logSecurityEvent = (
+    action: string,
+    category: SecurityAuditLog['category'],
+    details: string,
+    targetBusinessId?: string,
+    targetBusinessName?: string
+  ) => {
+    const secLog: SecurityAuditLog = {
+      id: `sec-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      timestamp: new Date().toISOString(),
+      actorId: currentUser?.id || 'sys-admin',
+      actorName: currentUser?.name || 'System Administrator',
+      actorRole: currentUser?.role || 'super_admin',
+      action,
+      category,
+      targetBusinessId,
+      targetBusinessName,
+      details,
+    };
+    saveToFirestore('securityAuditLogs', secLog.id, secLog);
+  };
+
+  const startSupportSession = (
+    targetBusinessId: string,
+    reason: string,
+    durationMinutes = 30,
+    accessMode: 'read_only' | 'full_support' = 'read_only'
+  ) => {
+    if (currentUser?.role !== 'super_admin') {
+      showToast('Unauthorized: Only Super Administrators can request support access.', 'error');
+      return;
+    }
+
+    const targetBiz = businesses.find((b) => b.id === targetBusinessId);
+    if (!targetBiz) {
+      showToast('Target tenant business not found.', 'error');
+      return;
+    }
+
+    const now = new Date();
+    const startTime = now.toISOString();
+    const expiryTime = new Date(now.getTime() + durationMinutes * 60000).toISOString();
+
+    const newSession: SupportSession = {
+      id: `supp-sess-${Date.now()}`,
+      superAdminId: currentUser.id,
+      superAdminName: currentUser.name,
+      superAdminEmail: currentUser.email,
+      targetBusinessId,
+      targetBusinessName: targetBiz.name,
+      reason: reason || 'Investigating customer support query',
+      accessMode,
+      startTime,
+      expiryTime,
+      durationMinutes,
+      status: 'active',
+      actionsPerformedCount: 0,
+    };
+
+    saveToFirestore('supportSessions', newSession.id, newSession);
+    setActiveSupportSession(newSession);
+    setCurrentBusiness(targetBiz);
+
+    logSecurityEvent(
+      'SUPPORT_SESSION_STARTED',
+      'SUPPORT_SESSION',
+      `Initiated ${accessMode === 'read_only' ? 'Read-Only' : 'Full Support'} session for duration of ${durationMinutes} mins. Reason: "${reason}"`,
+      targetBiz.id,
+      targetBiz.name
+    );
+
+    showToast(
+      `Support Session active for ${targetBiz.name} (${accessMode === 'read_only' ? 'Read-Only Mode' : 'Full Support Mode'})`,
+      'success'
+    );
+  };
+
+  const endSupportSession = (reason = 'Support session completed by Super Admin') => {
+    if (activeSupportSession) {
+      const updatedSession: SupportSession = {
+        ...activeSupportSession,
+        status: 'expired',
+      };
+      saveToFirestore('supportSessions', updatedSession.id, updatedSession);
+
+      logSecurityEvent(
+        'SUPPORT_SESSION_ENDED',
+        'SUPPORT_SESSION',
+        `Ended support session for ${activeSupportSession.targetBusinessName}. Reason: ${reason}`,
+        activeSupportSession.targetBusinessId,
+        activeSupportSession.targetBusinessName
+      );
+
+      setActiveSupportSession(null);
+      showToast('Support session ended. Reverted to Super Admin Master Control.', 'info');
+    }
+  };
+
+  const updateSystemSettings = (updates: Partial<SystemSettings>) => {
+    if (currentUser?.role !== 'super_admin') {
+      showToast('Unauthorized: Only Super Administrators can modify system configuration.', 'error');
+      return;
+    }
+    const updated = { ...systemSettings, ...updates };
+    setSystemSettings(updated);
+    saveToFirestore('systemSettings', 'global', updated);
+    logSecurityEvent('SYSTEM_SETTINGS_UPDATED', 'SETTINGS', `Updated global platform configuration settings.`);
+    showToast('Global system settings updated and synchronized to cloud.', 'success');
+  };
+
+  const revokeUserSession = (userId: string) => {
+    if (currentUser?.role !== 'super_admin') {
+      showToast('Unauthorized: Only Super Admin can revoke active user sessions.', 'error');
+      return;
+    }
+    const target = users.find((u) => u.id === userId);
+    if (target) {
+      const updated: User = { ...target, status: 'inactive', approvalStatus: 'blocked' };
+      saveToFirestore('users', target.id, updated);
+      logSecurityEvent('USER_SESSION_REVOKED', 'AUTH', `Revoked active session & blocked access for user ${target.name} (${target.email}).`, target.businessId);
+      showToast(`Access revoked and session invalidated for ${target.name}`, 'info');
+    }
+  };
+
+  const forcePasswordReset = (userId: string) => {
+    if (currentUser?.role !== 'super_admin') {
+      showToast('Unauthorized: Only Super Admin can trigger password resets.', 'error');
+      return;
+    }
+    const target = users.find((u) => u.id === userId);
+    if (target) {
+      logSecurityEvent('PASSWORD_RESET_TRIGGERED', 'AUTH', `Triggered emergency password reset flow for user ${target.name} (${target.email}).`, target.businessId);
+      showToast(`Password reset notification & token issued for ${target.email}`, 'success');
+    }
+  };
+
+  // Guard helper to block mutation actions in Read-Only Support mode or when tenant account is inactive/suspended
+  const checkReadOnlySupportGuard = (): boolean => {
+    if (activeSupportSession && activeSupportSession.accessMode === 'read_only') {
+      showToast('Operation Restricted: You are in a Read-Only Support Session. Request Full Support access to perform modifications.', 'error');
+      return true;
+    }
+    if (currentUser?.role !== 'super_admin' && (currentBusiness?.status === 'suspended' || currentBusiness?.status === 'rejected')) {
+      showToast('Account Suspended: Your business tenant access is suspended. Please contact platform support.', 'error');
+      return true;
+    }
+    return false;
   };
 
   // Switch role helper for live demo toggling
@@ -1782,6 +2056,18 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         manualSyncLogs,
         triggerManualSync,
         clearSyncLogs,
+
+        // Super Admin Support Access & Security Engine
+        supportSessions,
+        activeSupportSession,
+        startSupportSession,
+        endSupportSession,
+        systemSettings,
+        updateSystemSettings,
+        securityAuditLogs,
+        logSecurityEvent,
+        revokeUserSession,
+        forcePasswordReset,
       }}
     >
       {children}

@@ -1,25 +1,57 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   ShieldCheck,
   Building2,
   Users,
-  DollarSign,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
   Clock,
   Ban,
   RotateCcw,
-  ArrowRight,
-  Sparkles,
+  Headphones,
+  Lock,
+  Unlock,
+  Sliders,
+  FileText,
+  KeyRound,
+  UserX,
+  AlertOctagon,
+  Eye,
+  ShieldAlert,
 } from 'lucide-react';
 
 export const SuperAdminView: React.FC = () => {
-  const { businesses, users, switchBusiness, updateBusinessAndOwnerStatus } = useApp();
+  const {
+    businesses,
+    users,
+    switchBusiness,
+    updateBusinessAndOwnerStatus,
+    supportSessions,
+    activeSupportSession,
+    startSupportSession,
+    endSupportSession,
+    systemSettings,
+    updateSystemSettings,
+    securityAuditLogs,
+    revokeUserSession,
+    forcePasswordReset,
+  } = useApp();
+
+  const [activeTabSection, setActiveTabSection] = useState<
+    'approvals' | 'tenants' | 'support' | 'settings' | 'audit' | 'sessions'
+  >('approvals');
+
+  // Support Session Dialog State
+  const [supportModalBiz, setSupportModalBiz] = useState<{ id: string; name: string } | null>(null);
+  const [supportReason, setSupportReason] = useState<string>('');
+  const [supportDuration, setSupportDuration] = useState<number>(30);
+  const [supportAccessMode, setSupportAccessMode] = useState<'read_only' | 'full_support'>('read_only');
 
   // Find pending owner/business registrations
-  const pendingOwners = users.filter((u) => u.role === 'business_owner' && u.approvalStatus === 'pending');
+  const pendingOwners = users.filter(
+    (u) => u.role === 'business_owner' && u.approvalStatus === 'pending'
+  );
   const pendingBusinessIds = Array.from(
     new Set([
       ...businesses.filter((b) => b.status === 'pending').map((b) => b.id),
@@ -32,12 +64,16 @@ export const SuperAdminView: React.FC = () => {
     const owner = users.find((u) => u.businessId === bId && u.role === 'business_owner');
     return {
       businessId: bId,
-      businessName: biz?.name || owner?.name ? `${owner?.name}'s Business` : 'New Business',
+      businessName: biz?.name || (owner?.name ? `${owner.name}'s Business` : 'New Business'),
       type: biz?.type || 'General Service',
       ownerName: owner?.name || 'Unknown Owner',
       ownerEmail: owner?.email || biz?.email || 'N/A',
       ownerPhone: owner?.phone || biz?.mobile || 'N/A',
-      dateRegistered: owner?.requestedDate || owner?.joiningDate || biz?.createdAt || new Date().toISOString().split('T')[0],
+      dateRegistered:
+        owner?.requestedDate ||
+        owner?.joiningDate ||
+        biz?.createdAt ||
+        new Date().toISOString().split('T')[0],
       ownerId: owner?.id,
     };
   });
@@ -46,26 +82,142 @@ export const SuperAdminView: React.FC = () => {
   const suspendedCount = businesses.filter((b) => b.status === 'suspended').length;
   const pendingCount = pendingRegistrations.length;
 
+  const handleOpenSupportModal = (bId: string, bName: string) => {
+    setSupportModalBiz({ id: bId, name: bName });
+    setSupportReason('');
+    setSupportDuration(30);
+    setSupportAccessMode('read_only');
+  };
+
+  const handleConfirmStartSupportSession = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supportModalBiz) return;
+    if (!supportReason.trim()) {
+      alert('Please provide a mandatory justification/reason for accessing customer tenant data.');
+      return;
+    }
+    startSupportSession(
+      supportModalBiz.id,
+      supportReason,
+      supportDuration,
+      supportAccessMode
+    );
+    setSupportModalBiz(null);
+  };
+
   return (
     <div className="space-y-6 pb-12 animate-in fade-in">
-      {/* Header Banner */}
+      {/* Top Banner Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 space-y-1">
           <div className="inline-flex items-center gap-2 bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full border border-purple-500/30 text-xs font-semibold mb-1">
             <ShieldCheck className="w-4 h-4 text-purple-300" />
-            <span>SaaS Super Administrator Console</span>
+            <span>SaaS Super Administrator Master Console</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Platform Master Control & Owner Approvals
+            Platform Security, Support & Tenant Control
           </h1>
-          <p className="text-xs sm:text-sm text-purple-200/80 max-w-xl">
-            Review new Business Owner signups, approve tenant activations, and suspend or restore platform access.
+          <p className="text-xs sm:text-sm text-purple-200/80 max-w-2xl">
+            Manage tenant signups, request audited time-limited support access, configure global system policies, and review platform security logs.
           </p>
         </div>
+
+        {activeSupportSession && (
+          <div className="relative z-10 bg-amber-500/20 border border-amber-400/40 p-3.5 rounded-2xl flex flex-col gap-1 text-xs">
+            <span className="font-extrabold text-amber-300 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
+              <ShieldAlert className="w-4 h-4 text-amber-400" />
+              Active Support Mode
+            </span>
+            <span className="font-bold text-white">
+              {activeSupportSession.targetBusinessName}
+            </span>
+            <button
+              onClick={() => endSupportSession('Super Admin ended session from master console')}
+              className="mt-1 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-[11px] transition-all"
+            >
+              End Support Access
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Stats Cards */}
+      {/* Navigation Tabs Bar */}
+      <div className="flex items-center gap-2 overflow-x-auto p-1.5 bg-slate-200/60 dark:bg-slate-900/80 rounded-2xl border border-slate-300/60 dark:border-slate-800 text-xs font-bold scrollbar-none">
+        <button
+          onClick={() => setActiveTabSection('approvals')}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTabSection === 'approvals'
+              ? 'bg-amber-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          <span>Pending Registrations ({pendingCount})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTabSection('tenants')}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTabSection === 'tenants'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Building2 className="w-4 h-4" />
+          <span>Tenant Businesses ({businesses.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTabSection('support')}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTabSection === 'support'
+              ? 'bg-purple-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Headphones className="w-4 h-4" />
+          <span>Audited Support Access</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTabSection('settings')}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTabSection === 'settings'
+              ? 'bg-slate-800 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Sliders className="w-4 h-4" />
+          <span>System Settings & MFA</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTabSection('audit')}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTabSection === 'audit'
+              ? 'bg-emerald-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>Security Audit Logs</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTabSection('sessions')}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTabSection === 'sessions'
+              ? 'bg-rose-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <UserX className="w-4 h-4" />
+          <span>Active Sessions & Security Controls</span>
+        </button>
+      </div>
+
+      {/* Stats Quick Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
           <div className="flex items-center justify-between mb-2">
@@ -114,77 +266,575 @@ export const SuperAdminView: React.FC = () => {
         </div>
       </div>
 
-      {/* SECTION 1: Pending Business Owner Approvals Panel */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-amber-200/80 dark:border-amber-900/60 shadow-md overflow-hidden">
-        <div className="p-5 bg-amber-50/80 dark:bg-amber-950/30 border-b border-amber-200/60 dark:border-amber-900/60 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-500 text-white rounded-xl shadow-xs">
-              <Clock className="w-5 h-5" />
+      {/* SECTION 1: Pending Owner Approvals */}
+      {activeTabSection === 'approvals' && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-amber-200/80 dark:border-amber-900/60 shadow-md overflow-hidden">
+          <div className="p-5 bg-amber-50/80 dark:bg-amber-950/30 border-b border-amber-200/60 dark:border-amber-900/60 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-500 text-white rounded-xl shadow-xs">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-extrabold text-amber-950 dark:text-amber-100">
+                  Pending Business Owner Registrations
+                </h2>
+                <p className="text-xs text-amber-800/80 dark:text-amber-300">
+                  New Business Owners must be approved by Super Admin before they can log in.
+                </p>
+              </div>
+            </div>
+
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100">
+              {pendingCount} Pending
+            </span>
+          </div>
+
+          {pendingRegistrations.length === 0 ? (
+            <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-xs">
+              <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-500 mb-2 opacity-80" />
+              <p className="font-bold text-slate-700 dark:text-slate-300">No Pending Business Approvals</p>
+              <p className="mt-1 text-[11px]">All new Business Owner signups have been processed.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-amber-100/40 dark:bg-amber-950/50 text-amber-950 dark:text-amber-200 font-bold uppercase">
+                  <tr>
+                    <th className="p-4">Business Name</th>
+                    <th className="p-4">Category</th>
+                    <th className="p-4">Owner Name</th>
+                    <th className="p-4">Email / Phone</th>
+                    <th className="p-4">Date Registered</th>
+                    <th className="p-4 text-right">Super Admin Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-amber-100/60 dark:divide-slate-800">
+                  {pendingRegistrations.map((item) => (
+                    <tr key={item.businessId} className="hover:bg-amber-50/40 dark:hover:bg-slate-800/60 transition-colors">
+                      <td className="p-4 font-bold text-slate-900 dark:text-slate-100">{item.businessName}</td>
+                      <td className="p-4">
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                          {item.type}
+                        </span>
+                      </td>
+                      <td className="p-4 font-bold text-slate-800 dark:text-slate-200">{item.ownerName}</td>
+                      <td className="p-4 text-slate-600 dark:text-slate-400">
+                        <div>{item.ownerEmail}</div>
+                        <div className="text-[10px] text-slate-400">{item.ownerPhone}</div>
+                      </td>
+                      <td className="p-4 text-slate-500 font-mono text-[11px]">{item.dateRegistered}</td>
+                      <td className="p-4 text-right">
+                        <div className="inline-flex items-center gap-2 justify-end">
+                          <button
+                            onClick={() => updateBusinessAndOwnerStatus(item.businessId, 'active')}
+                            className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Approve</span>
+                          </button>
+                          <button
+                            onClick={() => updateBusinessAndOwnerStatus(item.businessId, 'rejected')}
+                            className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>Reject</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SECTION 2: All Business Tenants */}
+      {activeTabSection === 'tenants' && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm">
+          <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div>
+              <h2 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                Registered Business Tenants & Access Control
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                View onboarded companies, request audited time-limited support access, or suspend access.
+              </p>
+            </div>
+            <span className="text-xs font-bold text-slate-500">{businesses.length} Total</span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-bold uppercase">
+                <tr>
+                  <th className="p-4">Business Name</th>
+                  <th className="p-4">Industry Type</th>
+                  <th className="p-4">Owner / Email</th>
+                  <th className="p-4">GSTIN / Contact</th>
+                  <th className="p-4">Platform Status</th>
+                  <th className="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {businesses.map((b) => {
+                  const owner = users.find((u) => u.businessId === b.id && u.role === 'business_owner');
+                  const isPending = b.status === 'pending' || owner?.approvalStatus === 'pending';
+                  const isSuspended = b.status === 'suspended' || owner?.approvalStatus === 'suspended';
+                  const isRejected = b.status === 'rejected' || owner?.approvalStatus === 'rejected';
+
+                  return (
+                    <tr key={b.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                      <td className="p-4 font-extrabold text-slate-900 dark:text-slate-100">
+                        <div>{b.name}</div>
+                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">ID: {b.id}</div>
+                      </td>
+                      <td className="p-4">
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
+                          {b.type}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <div className="font-bold text-slate-800 dark:text-slate-200">
+                          {owner?.name || (b.email ? b.email.split('@')[0] : 'Business Owner')}
+                        </div>
+                        <div className="text-[10px] text-slate-500">{owner?.email || b.email || 'N/A'}</div>
+                      </td>
+                      <td className="p-4 text-slate-500">
+                        <div className="font-mono">{b.gstNumber || 'Unregistered'}</div>
+                        <div className="text-[10px] text-slate-400">{b.mobile}</div>
+                      </td>
+                      <td className="p-4">
+                        {isPending ? (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 uppercase tracking-wider">
+                            PENDING APPROVAL
+                          </span>
+                        ) : isSuspended ? (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-200 uppercase tracking-wider">
+                            SUSPENDED
+                          </span>
+                        ) : isRejected ? (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                            REJECTED
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 uppercase tracking-wider">
+                            ACTIVE
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="inline-flex items-center gap-2 justify-end">
+                          {/* Time-Limited Audited Support Request Button */}
+                          <button
+                            onClick={() => handleOpenSupportModal(b.id, b.name)}
+                            className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                            title="Request temporary audited support access to customer data"
+                          >
+                            <Headphones className="w-3.5 h-3.5" />
+                            <span>Support Access</span>
+                          </button>
+
+                          {/* Suspend / Restore Toggle Button */}
+                          {isSuspended ? (
+                            <button
+                              onClick={() => updateBusinessAndOwnerStatus(b.id, 'active')}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Restore</span>
+                            </button>
+                          ) : isPending ? (
+                            <button
+                              onClick={() => updateBusinessAndOwnerStatus(b.id, 'active')}
+                              className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Approve</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => updateBusinessAndOwnerStatus(b.id, 'suspended')}
+                              className="px-3 py-1.5 rounded-xl border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/60 font-bold text-xs transition-all flex items-center gap-1 cursor-pointer"
+                            >
+                              <Ban className="w-3.5 h-3.5" />
+                              <span>Suspend</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 3: Time-Limited Support Access Management */}
+      {activeTabSection === 'support' && (
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-purple-200/80 dark:border-purple-900/60 p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-purple-600 text-white rounded-2xl shadow-md">
+                <Headphones className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">
+                  Zero-Trust Audited Support Access Engine
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Super Admins do not possess permanent unrestricted backdoor access to tenant data. All support sessions require reason justification, are strictly time-bound, and default to Read-Only mode.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-2xl border border-purple-200/50 dark:border-purple-900/40">
+                <div className="text-xs font-bold text-purple-900 dark:text-purple-300 flex items-center gap-1.5 mb-1">
+                  <Clock className="w-4 h-4 text-purple-600" />
+                  Time-Limited Sessions
+                </div>
+                <p className="text-[11px] text-purple-800/80 dark:text-purple-300/80">
+                  Sessions auto-expire after 15, 30, or 60 minutes with live top-bar countdown.
+                </p>
+              </div>
+
+              <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-2xl border border-amber-200/50 dark:border-amber-900/40">
+                <div className="text-xs font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5 mb-1">
+                  <Lock className="w-4 h-4 text-amber-600" />
+                  Read-Only Default
+                </div>
+                <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80">
+                  Default mode prevents unintended modifications to customer records during diagnostic checks.
+                </p>
+              </div>
+
+              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-2xl border border-emerald-200/50 dark:border-emerald-900/40">
+                <div className="text-xs font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5 mb-1">
+                  <FileText className="w-4 h-4 text-emerald-600" />
+                  Immutable Audit Log
+                </div>
+                <p className="text-[11px] text-emerald-800/80 dark:text-emerald-300/80">
+                  Every support access request, reason, duration, and action is permanently recorded in security logs.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Support Sessions Log Table */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm">
+            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                Recent Support Access History & Active Sessions
+              </h3>
+              <span className="text-xs text-slate-500 font-bold">{supportSessions.length} Total Sessions</span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-bold uppercase">
+                  <tr>
+                    <th className="p-4">Target Business</th>
+                    <th className="p-4">Admin Email</th>
+                    <th className="p-4">Reason / Justification</th>
+                    <th className="p-4">Mode</th>
+                    <th className="p-4">Expiry Time</th>
+                    <th className="p-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {supportSessions.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-6 text-center text-slate-400">
+                        No support sessions recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    supportSessions.map((session) => (
+                      <tr key={session.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <td className="p-4 font-bold text-slate-900 dark:text-slate-100">
+                          {session.targetBusinessName}
+                        </td>
+                        <td className="p-4 text-slate-600 dark:text-slate-400">{session.superAdminEmail}</td>
+                        <td className="p-4 text-slate-700 dark:text-slate-300 italic">"{session.reason}"</td>
+                        <td className="p-4">
+                          {session.accessMode === 'read_only' ? (
+                            <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200 font-bold text-[10px]">
+                              READ-ONLY
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200 font-bold text-[10px]">
+                              FULL SUPPORT
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4 font-mono text-slate-500 text-[11px]">
+                          {new Date(session.expiryTime).toLocaleTimeString()}
+                        </td>
+                        <td className="p-4">
+                          {session.status === 'active' ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-purple-600 text-white animate-pulse">
+                              ACTIVE NOW
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                              EXPIRED
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 4: Platform System Settings & MFA */}
+      {activeTabSection === 'settings' && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm space-y-6">
+          <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+            <div className="p-2.5 bg-slate-800 text-white rounded-2xl">
+              <Sliders className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-amber-950 dark:text-amber-100">
-                Pending Business Owner Registrations
+              <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
+                Global SaaS Platform Settings & Multi-Factor Auth (MFA)
               </h2>
-              <p className="text-xs text-amber-800/80 dark:text-amber-300">
-                New Business Owners must be approved by Super Admin before they can log in.
+              <p className="text-xs text-slate-500">
+                Configure platform-wide security rules, MFA enforcement policies, and global system maintenance toggles.
               </p>
             </div>
           </div>
 
-          <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100">
-            {pendingCount} Pending
-          </span>
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Security Policies */}
+            <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-4">
+              <h3 className="font-bold text-xs uppercase text-slate-500 tracking-wider flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-purple-600" />
+                MFA & Authentication Enforcements
+              </h3>
 
-        {pendingRegistrations.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-xs">
-            <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-500 mb-2 opacity-80" />
-            <p className="font-bold text-slate-700 dark:text-slate-300">No Pending Business Approvals</p>
-            <p className="mt-1 text-[11px]">All new Business Owner signups have been processed.</p>
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Multi-Factor Authentication (MFA) Enforcement
+                  </label>
+                  <select
+                    value={systemSettings.mfaEnforcement}
+                    onChange={(e) =>
+                      updateSystemSettings({
+                        mfaEnforcement: e.target.value as SystemSettings['mfaEnforcement'],
+                      })
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-medium"
+                  >
+                    <option value="optional">Optional for All Users</option>
+                    <option value="required_super_admin">Mandatory for Super Admins Only</option>
+                    <option value="required_business_owners">Mandatory for Super Admins & Business Owners</option>
+                    <option value="required_all">Mandatory Platform-Wide for All Staff</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Minimum Password Strength (Length)
+                  </label>
+                  <input
+                    type="number"
+                    min={6}
+                    max={32}
+                    value={systemSettings.minPasswordLength}
+                    onChange={(e) => updateSystemSettings({ minPasswordLength: parseInt(e.target.value) || 8 })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Session Inactivity Timeout (Minutes)
+                  </label>
+                  <input
+                    type="number"
+                    min={5}
+                    max={480}
+                    value={systemSettings.sessionTimeoutMinutes}
+                    onChange={(e) =>
+                      updateSystemSettings({ sessionTimeoutMinutes: parseInt(e.target.value) || 60 })
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-mono text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Platform Operational Toggles */}
+            <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-4">
+              <h3 className="font-bold text-xs uppercase text-slate-500 tracking-wider flex items-center gap-2">
+                <AlertOctagon className="w-4 h-4 text-amber-600" />
+                Operational System Switches
+              </h3>
+
+              <div className="space-y-4 text-xs">
+                <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                  <div>
+                    <div className="font-bold text-slate-900 dark:text-slate-100">Maintenance Mode</div>
+                    <div className="text-[10px] text-slate-500">Temporarily block non-admin logins</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={systemSettings.maintenanceMode}
+                    onChange={(e) => updateSystemSettings({ maintenanceMode: e.target.checked })}
+                    className="w-5 h-5 accent-purple-600 rounded cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
+                  <div>
+                    <div className="font-bold text-slate-900 dark:text-slate-100 font-sans">Allow New Business Signups</div>
+                    <div className="text-[10px] text-slate-500">Enable self-service Business Owner onboarding</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={systemSettings.allowNewRegistrations}
+                    onChange={(e) => updateSystemSettings({ allowNewRegistrations: e.target.checked })}
+                    className="w-5 h-5 accent-purple-600 rounded cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Global System Announcement Banner Text
+                  </label>
+                  <input
+                    type="text"
+                    value={systemSettings.globalNoticeBanner}
+                    onChange={(e) => updateSystemSettings({ globalNoticeBanner: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-        ) : (
+        </div>
+      )}
+
+      {/* SECTION 5: Security Audit Logs */}
+      {activeTabSection === 'audit' && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm">
+          <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div>
+              <h2 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                Security Audit Logs & Compliance Trail
+              </h2>
+              <p className="text-xs text-slate-500">
+                Real-time immutable security logs for all platform admin events, support access requests, and user status changes.
+              </p>
+            </div>
+            <span className="text-xs font-bold text-slate-500">{securityAuditLogs.length} Events</span>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-amber-100/40 dark:bg-amber-950/50 text-amber-950 dark:text-amber-200 font-bold uppercase">
+              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-bold uppercase">
                 <tr>
-                  <th className="p-4">Business Name</th>
+                  <th className="p-4">Timestamp</th>
+                  <th className="p-4">Actor</th>
+                  <th className="p-4">Action Event</th>
                   <th className="p-4">Category</th>
-                  <th className="p-4">Owner Name</th>
-                  <th className="p-4">Email / Phone</th>
-                  <th className="p-4">Date Registered</th>
-                  <th className="p-4 text-right">Super Admin Action</th>
+                  <th className="p-4">Target Business</th>
+                  <th className="p-4">Details</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-amber-100/60 dark:divide-slate-800">
-                {pendingRegistrations.map((item) => (
-                  <tr key={item.businessId} className="hover:bg-amber-50/40 dark:hover:bg-slate-800/60 transition-colors">
-                    <td className="p-4 font-bold text-slate-900 dark:text-slate-100">{item.businessName}</td>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {securityAuditLogs.map((log) => (
+                  <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <td className="p-4 font-mono text-[11px] text-slate-500">
+                      {new Date(log.timestamp).toLocaleString()}
+                    </td>
                     <td className="p-4">
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                        {item.type}
+                      <div className="font-bold text-slate-800 dark:text-slate-200">{log.actorName}</div>
+                      <div className="text-[10px] text-slate-400">{log.actorRole}</div>
+                    </td>
+                    <td className="p-4 font-mono font-bold text-purple-700 dark:text-purple-300">
+                      {log.action}
+                    </td>
+                    <td className="p-4">
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 font-bold text-[10px] text-slate-700 dark:text-slate-300">
+                        {log.category}
                       </span>
                     </td>
-                    <td className="p-4 font-bold text-slate-800 dark:text-slate-200">{item.ownerName}</td>
-                    <td className="p-4 text-slate-600 dark:text-slate-400">
-                      <div>{item.ownerEmail}</div>
-                      <div className="text-[10px] text-slate-400">{item.ownerPhone}</div>
+                    <td className="p-4 font-medium text-slate-700 dark:text-slate-300">
+                      {log.targetBusinessName || 'N/A'}
                     </td>
-                    <td className="p-4 text-slate-500 font-mono text-[11px]">{item.dateRegistered}</td>
+                    <td className="p-4 text-slate-600 dark:text-slate-400">{log.details}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 6: Active User Sessions & Security Controls */}
+      {activeTabSection === 'sessions' && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm">
+          <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div>
+              <h2 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                User Session Invalidation & Password Reset Controls
+              </h2>
+              <p className="text-xs text-slate-500">
+                Revoke active user sessions, block suspicious logins, or issue emergency password resets.
+              </p>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-bold uppercase">
+                <tr>
+                  <th className="p-4">User Name</th>
+                  <th className="p-4">Role</th>
+                  <th className="p-4">Email / Phone</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4 text-right">Emergency Security Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {users.map((u) => (
+                  <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <td className="p-4 font-bold text-slate-900 dark:text-slate-100">{u.name}</td>
+                    <td className="p-4 font-semibold text-indigo-600 dark:text-indigo-400 uppercase text-[10px]">
+                      {u.role}
+                    </td>
+                    <td className="p-4 text-slate-600 dark:text-slate-400">{u.email}</td>
+                    <td className="p-4">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                        {u.status}
+                      </span>
+                    </td>
                     <td className="p-4 text-right">
                       <div className="inline-flex items-center gap-2 justify-end">
                         <button
-                          onClick={() => updateBusinessAndOwnerStatus(item.businessId, 'active')}
-                          className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs transition-all flex items-center gap-1.5"
+                          onClick={() => forcePasswordReset(u.id)}
+                          className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs transition-all flex items-center gap-1 cursor-pointer"
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Approve</span>
+                          <KeyRound className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Reset Password</span>
                         </button>
+
                         <button
-                          onClick={() => updateBusinessAndOwnerStatus(item.businessId, 'rejected')}
-                          className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-xs transition-all flex items-center gap-1.5"
+                          onClick={() => revokeUserSession(u.id)}
+                          className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1 cursor-pointer"
                         >
-                          <XCircle className="w-3.5 h-3.5" />
-                          <span>Reject</span>
+                          <UserX className="w-3.5 h-3.5" />
+                          <span>Revoke Session</span>
                         </button>
                       </div>
                     </td>
@@ -193,137 +843,114 @@ export const SuperAdminView: React.FC = () => {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* SECTION 2: All Registered Business Tenants & Access Revocation Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm">
-        <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-          <div>
-            <h2 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
-              Registered Business Tenants & Access Control
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              View all onboarded companies, inspect tenant contexts, or suspend / restore access.
-            </p>
+      {/* SUPPORT ACCESS REASON MODAL */}
+      {supportModalBiz && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-purple-500/30 max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="p-2 bg-purple-600 text-white rounded-xl">
+                <Headphones className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-slate-100 text-base">
+                  Request Audited Support Session
+                </h3>
+                <p className="text-xs text-slate-500">Target Tenant: {supportModalBiz.name}</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleConfirmStartSupportSession} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Support Request Reason / Ticket ID <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={supportReason}
+                  onChange={(e) => setSupportReason(e.target.value)}
+                  placeholder="e.g. Support Ticket #8492 — Customer reported invoice calculation query needing diagnostic inspection"
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Access Duration
+                </label>
+                <select
+                  value={supportDuration}
+                  onChange={(e) => setSupportDuration(parseInt(e.target.value))}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold"
+                >
+                  <option value={15}>15 Minutes</option>
+                  <option value={30}>30 Minutes (Recommended)</option>
+                  <option value={60}>60 Minutes</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Access Mode Permission
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSupportAccessMode('read_only')}
+                    className={`p-3 rounded-xl border font-bold text-left transition-all ${
+                      supportAccessMode === 'read_only'
+                        ? 'border-purple-600 bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Lock className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Read-Only</span>
+                    </div>
+                    <p className="text-[10px] font-normal text-slate-500">Safest mode. Inspect data without mutating records.</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSupportAccessMode('full_support')}
+                    className={`p-3 rounded-xl border font-bold text-left transition-all ${
+                      supportAccessMode === 'full_support'
+                        ? 'border-purple-600 bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Unlock className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>Full Support</span>
+                    </div>
+                    <p className="text-[10px] font-normal text-slate-500">Allows record edits to resolve configuration issues.</p>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setSupportModalBiz(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-md"
+                >
+                  Start Audited Session
+                </button>
+              </div>
+            </form>
           </div>
-          <span className="text-xs font-bold text-slate-500">{businesses.length} Total</span>
         </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-bold uppercase">
-              <tr>
-                <th className="p-4">Business Name</th>
-                <th className="p-4">Industry Type</th>
-                <th className="p-4">Owner / Email</th>
-                <th className="p-4">GSTIN / Contact</th>
-                <th className="p-4">Platform Status</th>
-                <th className="p-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {businesses.map((b) => {
-                const owner = users.find((u) => u.businessId === b.id && u.role === 'business_owner');
-                const isPending = b.status === 'pending' || owner?.approvalStatus === 'pending';
-                const isSuspended = b.status === 'suspended' || owner?.approvalStatus === 'suspended';
-                const isRejected = b.status === 'rejected' || owner?.approvalStatus === 'rejected';
-
-                return (
-                  <tr key={b.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <td className="p-4 font-extrabold text-slate-900 dark:text-slate-100">
-                      <div>{b.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">ID: {b.id}</div>
-                    </td>
-                    <td className="p-4">
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
-                        {b.type}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <div className="font-bold text-slate-800 dark:text-slate-200">
-                        {owner?.name || (b.email ? b.email.split('@')[0] : 'Business Owner')}
-                      </div>
-                      <div className="text-[10px] text-slate-500">{owner?.email || b.email || 'N/A'}</div>
-                    </td>
-                    <td className="p-4 text-slate-500">
-                      <div className="font-mono">{b.gstNumber || 'Unregistered'}</div>
-                      <div className="text-[10px] text-slate-400">{b.mobile}</div>
-                    </td>
-                    <td className="p-4">
-                      {isPending ? (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 uppercase tracking-wider">
-                          PENDING APPROVAL
-                        </span>
-                      ) : isSuspended ? (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-200 uppercase tracking-wider">
-                          SUSPENDED
-                        </span>
-                      ) : isRejected ? (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                          REJECTED
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 uppercase tracking-wider">
-                          ACTIVE
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="inline-flex items-center gap-2 justify-end">
-                        {/* Suspend / Restore Toggle Button */}
-                        {isSuspended ? (
-                          <button
-                            onClick={() => updateBusinessAndOwnerStatus(b.id, 'active')}
-                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1"
-                            title="Restore access for this business owner"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            <span>Restore Access</span>
-                          </button>
-                        ) : isPending ? (
-                          <button
-                            onClick={() => updateBusinessAndOwnerStatus(b.id, 'active')}
-                            className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Approve</span>
-                          </button>
-                        ) : isRejected ? (
-                          <button
-                            onClick={() => updateBusinessAndOwnerStatus(b.id, 'active')}
-                            className="px-3 py-1.5 rounded-xl bg-slate-600 hover:bg-slate-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            <span>Reactivate</span>
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => updateBusinessAndOwnerStatus(b.id, 'suspended')}
-                            className="px-3 py-1.5 rounded-xl border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/60 font-bold text-xs transition-all flex items-center gap-1"
-                            title="Block / suspend account access for this business owner"
-                          >
-                            <Ban className="w-3.5 h-3.5" />
-                            <span>Suspend Access</span>
-                          </button>
-                        )}
-
-                        {/* Inspect Tenant Context Button */}
-                        <button
-                          onClick={() => switchBusiness(b.id)}
-                          className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 shadow-xs transition-all"
-                        >
-                          Inspect Tenant
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

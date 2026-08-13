@@ -342,3 +342,52 @@ export interface ManualSyncLog {
   networkLatencyMs?: number;
 }
 
+export interface SupportSession {
+  id: string;
+  superAdminId: string;
+  superAdminName: string;
+  superAdminEmail: string;
+  targetBusinessId: string;
+  targetBusinessName: string;
+  reason: string;
+  accessMode: 'read_only' | 'full_support';
+  startTime: string; // ISO string
+  expiryTime: string; // ISO string
+  durationMinutes: number;
+  status: 'active' | 'expired' | 'revoked';
+  actionsPerformedCount: number;
+}
+
+export interface SystemSettings {
+  id: string;
+  maintenanceMode: boolean;
+  allowNewRegistrations: boolean;
+  defaultTrialDays: number;
+  globalNoticeBanner: string;
+  isNoticeActive: boolean;
+  mfaEnforcement: 'optional' | 'required_super_admin' | 'required_all';
+  minPasswordLength: number;
+  sessionTimeoutMinutes: number;
+  notificationTemplates: {
+    jobAssigned: string;
+    invoiceGenerated: string;
+    paymentReceipt: string;
+    welcomeMessage: string;
+  };
+}
+
+export interface SecurityAuditLog {
+  id: string;
+  timestamp: string;
+  actorId: string;
+  actorName: string;
+  actorRole: UserRole;
+  action: string;
+  category: 'AUTH' | 'TENANT_ACCESS' | 'PERMISSION' | 'SUBSCRIPTION' | 'SETTINGS' | 'SUPPORT_SESSION' | 'SECURITY_POLICY';
+  targetBusinessId?: string;
+  targetBusinessName?: string;
+  details: string;
+  ipAddress?: string;
+}
+
+

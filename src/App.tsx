@@ -8,6 +8,7 @@ import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { ToastContainer } from './components/ToastContainer';
 import { ActivityLogDrawer } from './components/ActivityLogDrawer';
 import { OfflineSyncBanner } from './components/OfflineSyncBanner';
+import { SupportSessionBanner } from './components/SupportSessionBanner';
 import { AuthModal } from './components/AuthModal';
 import { AccessDeniedView } from './components/AccessDeniedView';
 import { PullToRefresh } from './components/PullToRefresh';
@@ -165,6 +166,9 @@ const MainContent: React.FC = () => {
   return (
     <PullToRefresh>
       <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
+        {/* Super Admin Support Access Active Banner */}
+        <SupportSessionBanner />
+
         {/* Offline Sync Banner for Technicians */}
         <OfflineSyncBanner />
 

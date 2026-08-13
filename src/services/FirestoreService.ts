@@ -300,6 +300,21 @@ export class FirestoreService {
   static async logActivity(log: ActivityLog): Promise<void> {
     await this.saveDocument<ActivityLog>('activities', log.id, log);
   }
+
+  // =========================================================================
+  // SUPPORT SESSIONS & SECURITY AUDIT LOGGING
+  // =========================================================================
+  static async logSecurityAudit(log: any): Promise<void> {
+    await this.saveDocument('securityAuditLogs', log.id, log);
+  }
+
+  static async saveSupportSession(session: any): Promise<void> {
+    await this.saveDocument('supportSessions', session.id, session);
+  }
+
+  static async saveSystemSettings(settings: any): Promise<void> {
+    await this.saveDocument('systemSettings', settings.id || 'global', settings);
+  }
 }
 
 export const firestoreService = FirestoreService;

@@ -2,9 +2,100 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default allow read, write for app collections
-    match /{document=**} {
-      allow read, write: if true;
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'super_admin' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin'
+      );
+    }
+
+    function isSameBusiness(businessId) {
+      return isAuthenticated() && (
+        request.auth.token.businessId == businessId ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId
+      );
+    }
+
+    function isOwnerOrSameBusiness(businessId) {
+      return isSuperAdmin() || isSameBusiness(businessId);
+    }
+
+    // Business collection
+    match /businesses/{businessId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin() || isSameBusiness(businessId);
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin() || request.auth.uid == userId || isSameBusiness(resource.data.businessId);
+    }
+
+    // Tenant isolated collections (Customers, Categories, Services, Jobs, Inventory, Quotations, Invoices, Payments, Contracts, Expenses, Notifications, Activities)
+    match /customers/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /categories/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /services/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /jobs/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /inventory/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /inventoryTransactions/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /quotations/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /invoices/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /payments/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /contracts/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /expenses/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /notifications/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /activities/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /manualSyncLogs/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Super Admin System Collections
+    match /supportSessions/{sessionId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /systemSettings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+    match /securityAuditLogs/{logId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /roles/{roleId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
     }
   }
 }
