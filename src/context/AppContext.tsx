@@ -1330,11 +1330,27 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     saveToFirestore('businesses', newBiz.id, newBiz);
-    saveToFirestore('users', ownerUser.id, ownerUser);
     saveToFirestore('categories', defaultCategory.id, defaultCategory);
     saveToFirestore('services', defaultService.id, defaultService);
 
+    setBusinesses((prev) => [...prev.filter((b) => b.id !== newBiz.id), newBiz]);
+    setCategories((prev) => [...prev.filter((c) => c.id !== defaultCategory.id), defaultCategory]);
+    setServices((prev) => [...prev.filter((s) => s.id !== defaultService.id), defaultService]);
+
     if (!isPending) {
+      const ownerUser: User = {
+        id: `usr-owner-${newBizId}`,
+        name: `${newBiz.name} Admin`,
+        email: newBiz.email,
+        phone: newBiz.mobile,
+        role: 'business_owner',
+        businessId: newBizId,
+        status: 'active',
+        approvalStatus: 'active',
+        requestedDate: new Date().toISOString().split('T')[0],
+      };
+      saveToFirestore('users', ownerUser.id, ownerUser);
+      setUsers((prev) => [...prev.filter((u) => u.id !== ownerUser.id), ownerUser]);
       setCurrentBusiness(newBiz);
       setCurrentUser(ownerUser);
       showToast(`Welcome! Business "${newBiz.name}" onboarded and synced to Firestore.`, 'success');
@@ -1844,6 +1860,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     newStatus: 'active' | 'pending' | 'rejected' | 'suspended'
   ) => {
     saveToFirestore('businesses', businessId, { status: newStatus });
+    setBusinesses((prev) =>
+      prev.map((b) => (b.id === businessId ? { ...b, status: newStatus } : b))
+    );
 
     const ownerUsers = users.filter((u) => u.businessId === businessId && u.role === 'business_owner');
     ownerUsers.forEach((owner) => {
@@ -1853,6 +1872,18 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       saveToFirestore('users', owner.id, userUpdates);
     });
+
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.businessId === businessId && u.role === 'business_owner'
+          ? {
+              ...u,
+              approvalStatus: newStatus,
+              status: newStatus === 'active' ? 'active' : 'inactive',
+            }
+          : u
+      )
+    );
 
     const targetBiz = businesses.find((b) => b.id === businessId);
     const bizName = targetBiz?.name || businessId;
@@ -1882,6 +1913,17 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     saveToFirestore('users', userId, updates);
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === userId
+          ? {
+              ...u,
+              approvalStatus: newApprovalStatus,
+              status: newApprovalStatus === 'active' ? 'active' : 'inactive',
+            }
+          : u
+      )
+    );
 
     if (newApprovalStatus === 'active') {
       showToast(`Approved & activated account for ${target.name}`, 'success');
@@ -1941,6 +1983,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         );
       } else {
         saveToFirestore('businesses', targetBiz.id, { status: 'pending' });
+        targetBiz = { ...targetBiz, status: 'pending' };
+        setBusinesses((prev) =>
+          prev.map((b) => (b.id === targetBiz!.id ? { ...b, status: 'pending' } : b))
+        );
       }
 
       const newOwner: User = {
@@ -1958,6 +2004,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       saveToFirestore('users', newOwner.id, newOwner);
+      setUsers((prev) => [...prev.filter((u) => u.id !== newOwner.id), newOwner]);
 
       const notification: Notification = {
         id: `notif-sa-${Date.now()}`,
@@ -1970,6 +2017,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         targetRoleId: 'super_admin',
       };
       saveToFirestore('notifications', notification.id, notification);
+      setNotifications((prev) => [notification, ...prev]);
 
       showToast('Your business registration is pending approval from the platform admin. You will be notified once approved.', 'info');
       return { user: newOwner, isPending: true };
@@ -1990,6 +2038,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       saveToFirestore('users', newStaff.id, newStaff);
+      setUsers((prev) => [...prev.filter((u) => u.id !== newStaff.id), newStaff]);
 
       const notification: Notification = {
         id: `notif-${Date.now()}`,
@@ -2002,6 +2051,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         targetRoleId: 'business_owner',
       };
       saveToFirestore('notifications', notification.id, notification);
+      setNotifications((prev) => [notification, ...prev]);
 
       showToast(`Registration submitted for ${newStaff.name}. Waiting for Owner approval.`, 'info');
       return { user: newStaff, isPending: true };

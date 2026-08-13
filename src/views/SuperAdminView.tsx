@@ -28,6 +28,7 @@ export const SuperAdminView: React.FC = () => {
     users,
     switchBusiness,
     updateBusinessAndOwnerStatus,
+    updateUserStatus,
     supportSessions,
     activeSupportSession,
     startSupportSession,
@@ -49,9 +50,12 @@ export const SuperAdminView: React.FC = () => {
   const [supportDuration, setSupportDuration] = useState<number>(30);
   const [supportAccessMode, setSupportAccessMode] = useState<'read_only' | 'full_support'>('read_only');
 
-  // Find pending owner/business registrations
+  // Find pending owner/business registrations & pending staff
   const pendingOwners = users.filter(
     (u) => u.role === 'business_owner' && u.approvalStatus === 'pending'
+  );
+  const pendingStaffUsers = users.filter(
+    (u) => u.role !== 'business_owner' && u.role !== 'super_admin' && u.approvalStatus === 'pending'
   );
   const pendingBusinessIds = Array.from(
     new Set([
@@ -62,7 +66,9 @@ export const SuperAdminView: React.FC = () => {
 
   const pendingRegistrations = pendingBusinessIds.map((bId) => {
     const biz = businesses.find((b) => b.id === bId);
-    const owner = users.find((u) => u.businessId === bId && u.role === 'business_owner');
+    const owner =
+      users.find((u) => u.businessId === bId && u.role === 'business_owner' && u.approvalStatus === 'pending') ||
+      users.find((u) => u.businessId === bId && u.role === 'business_owner');
     return {
       businessId: bId,
       businessName: biz?.name || (owner?.name ? `${owner.name}'s Business` : 'New Business'),
@@ -81,7 +87,7 @@ export const SuperAdminView: React.FC = () => {
 
   const activeCount = businesses.filter((b) => b.status === 'active' || b.status === 'trial').length;
   const suspendedCount = businesses.filter((b) => b.status === 'suspended').length;
-  const pendingCount = pendingRegistrations.length;
+  const pendingCount = pendingRegistrations.length + pendingStaffUsers.length;
 
   const handleOpenSupportModal = (bId: string, bName: string) => {
     setSupportModalBiz({ id: bId, name: bName });
@@ -346,6 +352,70 @@ export const SuperAdminView: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {pendingStaffUsers.length > 0 && (
+            <div className="mt-6 border-t border-amber-200/60 dark:border-amber-900/60 pt-4 px-5 pb-5">
+              <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-2">
+                <Users className="w-4 h-4 text-amber-600" />
+                Pending Staff & Technician Account Requests ({pendingStaffUsers.length})
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold uppercase">
+                    <tr>
+                      <th className="p-3">Staff Name</th>
+                      <th className="p-3">Role</th>
+                      <th className="p-3">Assigned Business</th>
+                      <th className="p-3">Email / Phone</th>
+                      <th className="p-3">Requested Date</th>
+                      <th className="p-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {pendingStaffUsers.map((usr) => {
+                      const biz = businesses.find((b) => b.id === usr.businessId);
+                      return (
+                        <tr key={usr.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                          <td className="p-3 font-bold text-slate-900 dark:text-slate-100">{usr.name}</td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 capitalize">
+                              {usr.role.replace('_', ' ')}
+                            </span>
+                          </td>
+                          <td className="p-3 font-semibold text-slate-700 dark:text-slate-300">
+                            {biz?.name || usr.businessId}
+                          </td>
+                          <td className="p-3 text-slate-600 dark:text-slate-400">
+                            <div>{usr.email}</div>
+                            <div className="text-[10px] text-slate-400">{usr.phone}</div>
+                          </td>
+                          <td className="p-3 font-mono text-[11px] text-slate-500">{usr.requestedDate || usr.joiningDate}</td>
+                          <td className="p-3 text-right">
+                            <div className="inline-flex items-center gap-2 justify-end">
+                              <button
+                                onClick={() => updateUserStatus(usr.id, 'active')}
+                                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                              >
+                                <CheckCircle2 className="w-3 h-3" />
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => updateUserStatus(usr.id, 'rejected')}
+                                className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                              >
+                                <XCircle className="w-3 h-3" />
+                                Reject
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

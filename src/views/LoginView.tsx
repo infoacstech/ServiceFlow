@@ -315,9 +315,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     onChange={(e) => setSelectedOrgId(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                   >
-                    <option value="">Auto-Detect from Email/Mobile</option>
-                    {businesses.map((b) => (
-                      <option key={b.id} value={b.id}>
+                    <option key="auto-detect-org" value="">Auto-Detect from Email/Mobile</option>
+                    {businesses.map((b, idx) => (
+                      <option key={b.id ? `org-${b.id}-${idx}` : `biz-opt-${idx}`} value={b.id}>
                         {b.name} ({b.type})
                       </option>
                     ))}
@@ -525,8 +525,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         onChange={(e) => setRegBusinessId(e.target.value)}
                         className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                       >
-                        {businesses.map((b) => (
-                          <option key={b.id} value={b.id}>
+                        {businesses.map((b, idx) => (
+                          <option key={b.id ? `reg-org-${b.id}-${idx}` : `reg-biz-${idx}`} value={b.id}>
                             {b.name} ({b.type})
                           </option>
                         ))}
