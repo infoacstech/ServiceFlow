@@ -102,10 +102,10 @@ export const SuperAdminView: React.FC = () => {
   );
   const pendingBusinessIds = Array.from(
     new Set([
-      ...businesses.filter((b) => b.status === 'pending').map((b) => b.id),
-      ...pendingOwners.map((u) => u.businessId),
+      ...businesses.filter((b) => b.status === 'pending').map((b) => b.id).filter(Boolean),
+      ...pendingOwners.map((u) => u.businessId).filter(Boolean),
     ])
-  );
+  ) as string[];
 
   const pendingRegistrations = pendingBusinessIds.map((bId) => {
     const biz = businesses.find((b) => b.id === bId);
@@ -438,8 +438,8 @@ export const SuperAdminView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-amber-100/60 dark:divide-slate-800">
-                  {pendingRegistrations.map((item) => (
-                    <tr key={item.businessId} className="hover:bg-amber-50/40 dark:hover:bg-slate-800/60 transition-colors">
+                  {pendingRegistrations.map((item, idx) => (
+                    <tr key={item.businessId || item.ownerId || `pending-reg-${idx}`} className="hover:bg-amber-50/40 dark:hover:bg-slate-800/60 transition-colors">
                       <td className="p-4 font-bold text-slate-900 dark:text-slate-100">{item.businessName}</td>
                       <td className="p-4">
                         <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
@@ -506,10 +506,10 @@ export const SuperAdminView: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {pendingStaffUsers.map((usr) => {
+                    {pendingStaffUsers.map((usr, idx) => {
                       const biz = businesses.find((b) => b.id === usr.businessId);
                       return (
-                        <tr key={usr.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <tr key={usr.id || `pending-staff-${idx}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                           <td className="p-3 font-bold text-slate-900 dark:text-slate-100">{usr.name}</td>
                           <td className="p-3">
                             <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 capitalize">
@@ -588,14 +588,14 @@ export const SuperAdminView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {businesses.map((b) => {
+                {businesses.map((b, idx) => {
                   const owner = users.find((u) => u.businessId === b.id && u.role === 'business_owner');
                   const isPending = b.status === 'pending' || owner?.approvalStatus === 'pending';
                   const isSuspended = b.status === 'suspended' || owner?.approvalStatus === 'suspended';
                   const isRejected = b.status === 'rejected' || owner?.approvalStatus === 'rejected';
 
                   return (
-                    <tr key={b.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <tr key={b.id || `biz-row-${idx}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="p-4 font-extrabold text-slate-900 dark:text-slate-100">
                         <div>{b.name}</div>
                         <div className="text-[10px] text-slate-400 font-mono mt-0.5">ID: {b.id}</div>
@@ -914,8 +914,8 @@ export const SuperAdminView: React.FC = () => {
                   onChange={(e) => setSelectedTenantForPurge(e.target.value)}
                   className="w-full p-3 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-slate-100"
                 >
-                  {businesses.map((b) => (
-                    <option key={b.id} value={b.id}>
+                  {businesses.map((b, idx) => (
+                    <option key={b.id || `purge-opt-${idx}`} value={b.id}>
                       {b.name} (ID: {b.id})
                     </option>
                   ))}
@@ -960,10 +960,10 @@ export const SuperAdminView: React.FC = () => {
                   onChange={(e) => setSelectedTenantForPurge(e.target.value)}
                   className="w-full p-3 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-slate-100"
                 >
-                  {businesses.map((b) => {
+                  {businesses.map((b, idx) => {
                     const owner = users.find((u) => u.businessId === b.id && u.role === 'business_owner');
                     return (
-                      <option key={b.id} value={b.id}>
+                      <option key={b.id || `del-opt-${idx}`} value={b.id}>
                         {b.name} — Owner: {owner?.name || 'N/A'} ({owner?.email || b.email || b.id})
                       </option>
                     );
@@ -1124,8 +1124,8 @@ export const SuperAdminView: React.FC = () => {
                       </td>
                     </tr>
                   ) : (
-                    supportSessions.map((session) => (
-                      <tr key={session.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    supportSessions.map((session, idx) => (
+                      <tr key={session.id || `support-session-${idx}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                         <td className="p-4 font-bold text-slate-900 dark:text-slate-100">
                           {session.targetBusinessName}
                         </td>
@@ -1323,8 +1323,8 @@ export const SuperAdminView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {securityAuditLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                {securityAuditLogs.map((log, idx) => (
+                  <tr key={log.id || `audit-log-${idx}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                     <td className="p-4 font-mono text-[11px] text-slate-500">
                       {new Date(log.timestamp).toLocaleString()}
                     </td>
@@ -1378,8 +1378,8 @@ export const SuperAdminView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                {users.map((u, idx) => (
+                  <tr key={u.id || `usr-session-${idx}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                     <td className="p-4 font-bold text-slate-900 dark:text-slate-100">{u.name}</td>
                     <td className="p-4 font-semibold text-indigo-600 dark:text-indigo-400 uppercase text-[10px]">
                       {u.role}

@@ -164,9 +164,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                     Switch Active Business
                   </div>
                   <div className="space-y-1 my-1 max-h-60 overflow-y-auto">
-                    {businesses.map((b) => (
+                    {businesses.map((b, idx) => (
                       <button
-                        key={b.id}
+                        key={b.id || `nav-biz-${idx}`}
                         onClick={() => {
                           switchBusiness(b.id);
                           closeAllMenus();
@@ -345,9 +345,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {notifications.length === 0 ? (
                     <div className="text-center py-6 text-xs text-slate-400">No notifications</div>
                   ) : (
-                    notifications.map((n) => (
+                    notifications.map((n, idx) => (
                       <div
-                        key={n.id}
+                        key={n.id || `nav-notif-${idx}`}
                         onClick={() => markNotificationRead(n.id)}
                         className={`p-2.5 rounded-xl border text-xs transition-colors cursor-pointer relative group ${
                           n.read
