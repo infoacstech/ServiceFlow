@@ -240,44 +240,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right Controls */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-          {/* Live Role Switcher Pill */}
-          <div className="relative">
-            <button
-              onClick={() => toggleMenu('role')}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-1 rounded-full text-xs font-medium border shadow-xs transition-all ${currentRoleObj.badgeColor}`}
-              title="Switch user role"
-            >
-              <UserCheck className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden xs:inline">{currentRoleObj.label}</span>
-              <ChevronDown className="w-3 h-3 opacity-70 shrink-0" />
-            </button>
-
-            {activeMenu === 'role' && (
-              <div className="absolute right-0 sm:right-0 mt-2 w-56 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 animate-in fade-in zoom-in-95">
-                <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Test Role Switcher
-                </div>
-                <div className="space-y-1">
-                  {rolesList.map((r) => (
-                    <button
-                      key={r.id}
-                      onClick={() => {
-                        switchRole(r.id);
-                        closeAllMenus();
-                      }}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                        currentUser.role === r.id
-                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-semibold'
-                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                      }`}
-                    >
-                      <span>{r.label}</span>
-                      {currentUser.role === r.id && <Check className="w-3.5 h-3.5 text-indigo-600" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+          {/* User Role Badge */}
+          <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1 rounded-full text-xs font-medium border shadow-xs transition-all ${currentRoleObj.badgeColor}">
+            <UserCheck className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden xs:inline">{currentRoleObj.label}</span>
           </div>
 
           {/* AI Assistant Quick Tab */}
@@ -452,16 +418,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   <Sliders className="w-3.5 h-3.5" /> Business Settings
-                </button>
-
-                <button
-                  onClick={() => {
-                    resetDemoData();
-                    closeAllMenus();
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" /> Reset Demo Data
                 </button>
 
                 <button

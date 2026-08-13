@@ -2,20 +2,13 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { User } from '../types';
 import {
-  Phone,
   Mail,
   Lock,
-  UserCheck,
-  ShieldAlert,
   X,
   ArrowRight,
-  CheckCircle2,
-  Sparkles,
-  Building2,
   KeyRound,
   UserPlus,
   Clock,
-  Ban,
   ShieldCheck,
 } from 'lucide-react';
 
@@ -31,12 +24,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     businesses,
     switchBusiness,
     switchRole,
-    currentUser,
     showToast,
     registerUser,
   } = useApp();
 
-  const [authMode, setAuthMode] = useState<'login' | 'register' | 'quick'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'super_admin'>('login');
 
   // Direct Login States
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -48,7 +40,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
-  const [regBusinessId, setRegBusinessId] = useState(businesses[0]?.id || 'biz-1');
+  const [regBusinessId, setRegBusinessId] = useState(businesses[0]?.id || '');
   const [regBusinessName, setRegBusinessName] = useState('');
   const [regBusinessType, setRegBusinessType] = useState('CCTV & Security');
 
@@ -90,7 +82,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     if (matchedUser.role === 'business_owner') {
       const bizStatus = userBiz?.status || matchedUser.approvalStatus || 'active';
       if (bizStatus === 'pending' || matchedUser.approvalStatus === 'pending') {
-        showToast('Your business registration is pending approval from the platform admin. You will be notified once approved.', 'error');
+        showToast('Your business registration is pending approval from the platform admin.', 'error');
         return;
       }
       if (bizStatus === 'rejected' || matchedUser.approvalStatus === 'rejected') {
@@ -98,7 +90,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         return;
       }
       if (bizStatus === 'suspended' || matchedUser.approvalStatus === 'suspended') {
-        showToast('Your business account access has been suspended by the platform admin.', 'error');
+        showToast('Your business account access has been suspended.', 'error');
         return;
       }
     } else if (matchedUser.role !== 'super_admin') {
@@ -112,13 +104,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         return;
       }
       if (staffStatus === 'blocked' || staffStatus === 'suspended') {
-        showToast('Your access has been blocked by the business owner. Contact them for details.', 'error');
+        showToast('Your access has been blocked by the business owner.', 'error');
         return;
       }
     }
 
     setCurrentUser(matchedUser);
-    switchBusiness(matchedUser.businessId);
+    if (matchedUser.businessId && matchedUser.businessId !== 'all') {
+      switchBusiness(matchedUser.businessId);
+    }
     showToast(`Welcome back, ${matchedUser.name}!`, 'success');
     onClose();
   };
@@ -152,47 +146,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleQuickLogin = (u: User) => {
-    const userBiz = (businesses || []).find((b) => b.id === u.businessId);
-
-    if (userBiz?.status === 'suspended') {
-      showToast('Your business account access has been suspended by the platform admin.', 'error');
-      return;
-    }
-
-    if (u.role === 'business_owner') {
-      const bizStatus = userBiz?.status || u.approvalStatus || 'active';
-      if (bizStatus === 'pending' || u.approvalStatus === 'pending') {
-        showToast('Your business registration is pending approval from the platform admin. You will be notified once approved.', 'error');
-        return;
-      }
-      if (bizStatus === 'rejected' || u.approvalStatus === 'rejected') {
-        showToast('Your registration was rejected by the platform admin.', 'error');
-        return;
-      }
-      if (bizStatus === 'suspended' || u.approvalStatus === 'suspended') {
-        showToast('Your business account access has been suspended by the platform admin.', 'error');
-        return;
-      }
-    } else if (u.role !== 'super_admin') {
-      const staffStatus = u.approvalStatus || 'active';
-      if (staffStatus === 'pending') {
-        showToast('Waiting for Owner approval. Contact your business owner to activate your account.', 'error');
-        return;
-      }
-      if (staffStatus === 'rejected') {
-        showToast('Your registration was rejected by the business owner.', 'error');
-        return;
-      }
-      if (staffStatus === 'blocked' || staffStatus === 'suspended') {
-        showToast('Your access has been blocked by the business owner. Contact them for details.', 'error');
-        return;
-      }
-    }
-
-    setCurrentUser(u);
-    switchBusiness(u.businessId);
-    showToast(`Switched account to ${u.name} (${u.role.replace('_', ' ')})`, 'success');
+  const handleSuperAdminLogin = () => {
+    switchRole('super_admin');
+    showToast('Authenticated as SaaS Super Admin', 'success');
     onClose();
   };
 
@@ -210,7 +166,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 User Sign In & Registration
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Direct account access with password
+                Direct account access with credentials
               </p>
             </div>
           </div>
@@ -223,7 +179,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Tab Switcher */}
-        <div className="grid grid-cols-3 p-2 bg-slate-100 dark:bg-slate-800/80 m-3 rounded-2xl text-xs font-medium">
+        <div className="grid grid-cols-3 p-1.5 bg-slate-100 dark:bg-slate-800/80 m-3 rounded-2xl text-xs font-medium">
           <button
             onClick={() => {
               setAuthMode('login');
@@ -253,15 +209,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             <span className="truncate">Register</span>
           </button>
           <button
-            onClick={() => setAuthMode('quick')}
+            onClick={() => {
+              setAuthMode('super_admin');
+              setPendingRegistrationSuccess(null);
+            }}
             className={`py-2 px-1 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-              authMode === 'quick'
-                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 font-semibold shadow-xs'
+              authMode === 'super_admin'
+                ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 font-semibold shadow-xs'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
-            <UserCheck className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Demo Accounts</span>
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-purple-500" />
+            <span className="truncate">Super Admin</span>
           </button>
         </div>
 
@@ -272,7 +231,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             <form onSubmit={handleDirectLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Email or Phone Number
+                  Email Address or Mobile Phone
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
@@ -280,7 +239,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     type="text"
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="rajesh@apexsecurity.com"
+                    placeholder="e.g. name@company.com or 9876543210"
                     required
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                   />
@@ -297,7 +256,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     type="password"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="Enter password"
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                   />
                 </div>
@@ -323,7 +282,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     <span>Registration Pending Approval</span>
                   </div>
                   <p className="text-xs text-amber-800 dark:text-amber-200">
-                    Account created for <strong>{pendingRegistrationSuccess.name}</strong> as{' '}
+                    Account request submitted for <strong>{pendingRegistrationSuccess.name}</strong> as{' '}
                     <strong>{pendingRegistrationSuccess.role.replace('_', ' ')}</strong>.{' '}
                     {pendingRegistrationSuccess.role === 'business_owner'
                       ? 'Your business registration is pending approval from the platform admin. You will be notified once approved.'
@@ -421,9 +380,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                       required
                       className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 outline-hidden"
                     />
-                  ) : (
+                  ) : businesses.length > 0 ? (
                     <select
-                      value={regBusinessId}
+                      value={regBusinessId || businesses[0]?.id}
                       onChange={(e) => setRegBusinessId(e.target.value)}
                       className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 outline-hidden"
                     >
@@ -433,7 +392,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                         </option>
                       ))}
                     </select>
-                  )}
+                  ) : null}
 
                   <div>
                     <input
@@ -458,79 +417,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             </div>
           )}
 
-          {/* Quick Demo Select Tab */}
-          {authMode === 'quick' && (
+          {/* Super Admin Access Tab */}
+          {authMode === 'super_admin' && (
             <div className="space-y-3">
-              <div className="p-3 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-2xl flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                    <span>Super Admin Portal Access</span>
-                  </div>
+              <div className="p-4 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-2xl space-y-2">
+                <div className="text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span>Platform Super Admin</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    switchRole('super_admin');
-                    onClose();
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-purple-600 text-white font-semibold text-xs shrink-0"
-                >
-                  Switch Super Admin
-                </button>
+                <p className="text-xs text-purple-700 dark:text-purple-300">
+                  Access platform-wide administrative controls, manage multi-tenant registrations, and oversee tenant operations.
+                </p>
               </div>
-
-              {(users || []).map((u) => {
-                const isCurrent = currentUser?.id === u.id;
-                const status = u.approvalStatus || 'active';
-                return (
-                  <div
-                    key={u.id}
-                    onClick={() => handleQuickLogin(u)}
-                    className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                      isCurrent
-                        ? 'bg-indigo-50/80 dark:bg-indigo-950/60 border-indigo-400 dark:border-indigo-700'
-                        : 'bg-slate-50/60 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800 hover:bg-indigo-50/40'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-xl bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-xs text-slate-700 dark:text-slate-200 shrink-0">
-                        {u.name.substring(0, 2).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1.5">
-                          <span>{u.name}</span>
-                          {isCurrent && (
-                            <span className="text-[10px] bg-indigo-600 text-white px-1.5 py-0.2 rounded-md font-medium">
-                              Active
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate capitalize">
-                          {u.role.replace('_', ' ')}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="shrink-0 ml-2">
-                      {status === 'blocked' ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-700">Blocked</span>
-                      ) : status === 'pending' ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-700">Pending</span>
-                      ) : (
-                        <button className="text-xs text-indigo-600 font-bold hover:underline">Select</button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              <button
+                type="button"
+                onClick={handleSuperAdminLogin}
+                className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Enter Super Admin Console</span>
+              </button>
             </div>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-3 bg-slate-50 dark:bg-slate-800/80 border-t border-slate-100 dark:border-slate-800 text-center text-[11px] text-slate-500 dark:text-slate-400">
-          Logged in: <strong className="text-slate-800 dark:text-slate-200">{currentUser?.name || 'Guest'}</strong> ({(currentUser?.role || 'Guest').replace('_', ' ')})
         </div>
       </div>
     </div>

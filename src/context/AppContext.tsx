@@ -44,6 +44,7 @@ import {
   DEMO_ACTIVITIES,
   DEMO_PLANS,
   DEMO_ROLES,
+  SUPER_ADMIN_USER,
 } from '../data/demoData';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import {
@@ -343,14 +344,31 @@ const deleteFromFirestore = async (colName: string, id: string) => {
   }
 };
 
+const DEFAULT_BLANK_BUSINESS: Business = {
+  id: 'biz-default',
+  name: 'ServiFlow Workspace',
+  type: 'Field Service & Operations',
+  mobile: '',
+  whatsapp: '',
+  email: '',
+  address: '',
+  city: '',
+  state: '',
+  pin: '',
+  currency: '₹',
+  createdAt: new Date().toISOString().split('T')[0],
+  planId: 'plan-starter',
+  status: 'active',
+};
+
 const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { theme, toggleTheme } = useTheme();
 
   // State arrays populated directly via real-time Firestore onSnapshot listeners
-  const [businesses, setBusinesses] = useState<Business[]>(DEMO_BUSINESSES);
-  const [currentBusiness, setCurrentBusiness] = useState<Business>(DEMO_BUSINESSES[0]);
+  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [currentBusiness, setCurrentBusiness] = useState<Business>(DEFAULT_BLANK_BUSINESS);
 
-  const [users, setUsers] = useState<User[]>(DEMO_USERS);
+  const [users, setUsers] = useState<User[]>([SUPER_ADMIN_USER]);
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       const savedSession = localStorage.getItem('serviflow_user_session');
@@ -364,19 +382,19 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(true);
 
-  const [customers, setCustomers] = useState<Customer[]>(DEMO_CUSTOMERS);
-  const [categories, setCategories] = useState<ServiceCategory[]>(DEMO_CATEGORIES);
-  const [services, setServices] = useState<Service[]>(DEMO_SERVICES);
-  const [jobs, setJobs] = useState<Job[]>(DEMO_JOBS);
-  const [inventory, setInventory] = useState<InventoryItem[]>(DEMO_INVENTORY);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [categories, setCategories] = useState<ServiceCategory[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>([]);
-  const [quotations, setQuotations] = useState<Quotation[]>(DEMO_QUOTATIONS);
-  const [invoices, setInvoices] = useState<Invoice[]>(DEMO_INVOICES);
-  const [payments, setPayments] = useState<Payment[]>(DEMO_PAYMENTS);
-  const [contracts, setContracts] = useState<RecurringContract[]>(DEMO_CONTRACTS);
-  const [expenses, setExpenses] = useState<Expense[]>(DEMO_EXPENSES);
-  const [notifications, setNotifications] = useState<Notification[]>(DEMO_NOTIFICATIONS);
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(DEMO_ACTIVITIES);
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [contracts, setContracts] = useState<RecurringContract[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [roles, setRoles] = useState<Role[]>(DEMO_ROLES);
 
   // Super Admin Support Access & Security States
@@ -401,19 +419,20 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isInitialJobsLoadRef = React.useRef(true);
 
   // -------------------------------------------------------------
-  // REAL-TIME FIRESTORE SUBSCRIPTIONS & AUTOMATIC SEEDING
+  // REAL-TIME FIRESTORE SUBSCRIPTIONS (NO MOCK/DEMO DATA SEEDING)
   // -------------------------------------------------------------
   useEffect(() => {
     // 1. Businesses
     const unsubBiz = onSnapshot(
       collection(db, 'businesses'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_BUSINESSES.forEach((b) => saveToFirestore('businesses', b.id, b));
-        } else {
-          const items = snapshot.docs.map((d) => d.data() as Business);
-          setBusinesses(items);
-          setCurrentBusiness((prev) => (prev ? items.find((b) => b.id === prev.id) || items[0] || prev : items[0]));
+        const items = snapshot.docs.map((d) => d.data() as Business);
+        setBusinesses(items);
+        if (items.length > 0) {
+          setCurrentBusiness((prev) => {
+            const found = items.find((b) => b.id === prev.id);
+            return found || items[0];
+          });
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'businesses')
@@ -423,13 +442,20 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubUsers = onSnapshot(
       collection(db, 'users'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_USERS.forEach((u) => saveToFirestore('users', u.id, u));
+        const items = snapshot.docs.map((d) => d.data() as User);
+        // Ensure Super Admin user exists in database
+        const hasSuperAdmin = items.some(
+          (u) => u.role === 'super_admin' || u.email === 'admin@serviflow.io'
+        );
+        if (!hasSuperAdmin) {
+          saveToFirestore('users', SUPER_ADMIN_USER.id, SUPER_ADMIN_USER);
+          setUsers([SUPER_ADMIN_USER, ...items]);
         } else {
-          const items = snapshot.docs.map((d) => d.data() as User);
           setUsers(items);
-          setCurrentUser((prev) => (prev ? items.find((u) => u.id === prev.id || u.email.toLowerCase() === prev.email.toLowerCase()) || prev : null));
         }
+        setCurrentUser((prev) =>
+          prev ? items.find((u) => u.id === prev.id || u.email.toLowerCase() === prev.email.toLowerCase()) || prev : null
+        );
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'users')
     );
@@ -438,11 +464,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubCustomers = onSnapshot(
       collection(db, 'customers'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_CUSTOMERS.forEach((c) => saveToFirestore('customers', c.id, c));
-        } else {
-          setCustomers(snapshot.docs.map((d) => d.data() as Customer));
-        }
+        setCustomers(snapshot.docs.map((d) => d.data() as Customer));
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'customers')
     );
@@ -451,11 +473,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubCategories = onSnapshot(
       collection(db, 'categories'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_CATEGORIES.forEach((cat) => saveToFirestore('categories', cat.id, cat));
-        } else {
-          setCategories(snapshot.docs.map((d) => d.data() as ServiceCategory));
-        }
+        setCategories(snapshot.docs.map((d) => d.data() as ServiceCategory));
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'categories')
     );
@@ -464,11 +482,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubServices = onSnapshot(
       collection(db, 'services'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_SERVICES.forEach((s) => saveToFirestore('services', s.id, s));
-        } else {
-          setServices(snapshot.docs.map((d) => d.data() as Service));
-        }
+        setServices(snapshot.docs.map((d) => d.data() as Service));
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'services')
     );
@@ -477,31 +491,27 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubJobs = onSnapshot(
       collection(db, 'jobs'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_JOBS.forEach((j) => saveToFirestore('jobs', j.id, j));
+        const loadedJobs = snapshot.docs.map((d) => d.data() as Job);
+
+        // Audio & Voice Notifications for real-time new jobs or staff assignments
+        if (!isInitialJobsLoadRef.current) {
+          snapshot.docChanges().forEach((change) => {
+            if (change.type === 'added') {
+              const newJ = change.doc.data() as Job;
+              const assignedStaffName = (users || []).find((u) => u.id === newJ.assignedStaffId)?.name;
+              playJobVoiceNotification(
+                newJ.jobId,
+                newJ.description || 'New Service Task',
+                newJ.location,
+                assignedStaffName
+              );
+            }
+          });
         } else {
-          const loadedJobs = snapshot.docs.map((d) => d.data() as Job);
-
-          // Audio & Voice Notifications for real-time new jobs or staff assignments
-          if (!isInitialJobsLoadRef.current) {
-            snapshot.docChanges().forEach((change) => {
-              if (change.type === 'added') {
-                const newJ = change.doc.data() as Job;
-                const assignedStaffName = (users || []).find((u) => u.id === newJ.assignedStaffId)?.name;
-                playJobVoiceNotification(
-                  newJ.jobId,
-                  newJ.description || 'New Service Task',
-                  newJ.location,
-                  assignedStaffName
-                );
-              }
-            });
-          } else {
-            isInitialJobsLoadRef.current = false;
-          }
-
-          setJobs(loadedJobs);
+          isInitialJobsLoadRef.current = false;
         }
+
+        setJobs(loadedJobs);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'jobs')
     );
@@ -510,11 +520,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubInventory = onSnapshot(
       collection(db, 'inventory'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_INVENTORY.forEach((i) => saveToFirestore('inventory', i.id, i));
-        } else {
-          setInventory(snapshot.docs.map((d) => d.data() as InventoryItem));
-        }
+        setInventory(snapshot.docs.map((d) => d.data() as InventoryItem));
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'inventory')
     );
@@ -523,9 +529,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubInvTx = onSnapshot(
       collection(db, 'inventoryTransactions'),
       (snapshot) => {
-        if (!snapshot.empty) {
-          setInventoryTransactions(snapshot.docs.map((d) => d.data() as InventoryTransaction));
-        }
+        setInventoryTransactions(snapshot.docs.map((d) => d.data() as InventoryTransaction));
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'inventoryTransactions')
     );
@@ -534,11 +538,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubQuotations = onSnapshot(
       collection(db, 'quotations'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_QUOTATIONS.forEach((q) => saveToFirestore('quotations', q.id, q));
-        } else {
-          setQuotations(snapshot.docs.map((d) => d.data() as Quotation));
-        }
+        setQuotations(snapshot.docs.map((d) => d.data() as Quotation));
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'quotations')
     );
@@ -547,11 +547,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubInvoices = onSnapshot(
       collection(db, 'invoices'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_INVOICES.forEach((inv) => saveToFirestore('invoices', inv.id, inv));
-        } else {
-          setInvoices(snapshot.docs.map((d) => d.data() as Invoice));
-        }
+        setInvoices(snapshot.docs.map((d) => d.data() as Invoice));
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'invoices')
     );
@@ -560,11 +556,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubPayments = onSnapshot(
       collection(db, 'payments'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_PAYMENTS.forEach((p) => saveToFirestore('payments', p.id, p));
-        } else {
-          setPayments(snapshot.docs.map((d) => d.data() as Payment));
-        }
+        setPayments(snapshot.docs.map((d) => d.data() as Payment));
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'payments')
     );
@@ -573,11 +565,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubContracts = onSnapshot(
       collection(db, 'contracts'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_CONTRACTS.forEach((c) => saveToFirestore('contracts', c.id, c));
-        } else {
-          setContracts(snapshot.docs.map((d) => d.data() as RecurringContract));
-        }
+        setContracts(snapshot.docs.map((d) => d.data() as RecurringContract));
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'contracts')
     );
@@ -586,11 +574,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubExpenses = onSnapshot(
       collection(db, 'expenses'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_EXPENSES.forEach((e) => saveToFirestore('expenses', e.id, e));
-        } else {
-          setExpenses(snapshot.docs.map((d) => d.data() as Expense));
-        }
+        setExpenses(snapshot.docs.map((d) => d.data() as Expense));
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'expenses')
     );
@@ -599,11 +583,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubNotifications = onSnapshot(
       collection(db, 'notifications'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_NOTIFICATIONS.forEach((n) => saveToFirestore('notifications', n.id, n));
-        } else {
-          setNotifications(snapshot.docs.map((d) => d.data() as Notification));
-        }
+        setNotifications(snapshot.docs.map((d) => d.data() as Notification));
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'notifications')
     );
@@ -612,11 +592,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubActivities = onSnapshot(
       collection(db, 'activities'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_ACTIVITIES.forEach((a) => saveToFirestore('activities', a.id, a));
-        } else {
-          setActivityLogs(snapshot.docs.map((d) => d.data() as ActivityLog));
-        }
+        setActivityLogs(snapshot.docs.map((d) => d.data() as ActivityLog));
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'activities')
     );
@@ -625,9 +601,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubSyncLogs = onSnapshot(
       collection(db, 'manualSyncLogs'),
       (snapshot) => {
-        if (!snapshot.empty) {
-          setManualSyncLogs(snapshot.docs.map((d) => d.data() as ManualSyncLog));
-        }
+        setManualSyncLogs(snapshot.docs.map((d) => d.data() as ManualSyncLog));
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'manualSyncLogs')
     );
@@ -636,10 +610,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubRoles = onSnapshot(
       collection(db, 'roles'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_ROLES.forEach((r) => saveToFirestore('roles', r.id, r));
-        } else {
+        if (!snapshot.empty) {
           setRoles(snapshot.docs.map((d) => d.data() as Role));
+        } else {
+          DEMO_ROLES.forEach((r) => saveToFirestore('roles', r.id, r));
+          setRoles(DEMO_ROLES);
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'roles')
@@ -649,12 +624,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubSupportSessions = onSnapshot(
       collection(db, 'supportSessions'),
       (snapshot) => {
-        if (!snapshot.empty) {
-          const sessions = snapshot.docs.map((d) => d.data() as SupportSession);
-          setSupportSessions(sessions);
-          const active = sessions.find((s) => s.status === 'active' && new Date(s.expiryTime).getTime() > Date.now());
-          setActiveSupportSession(active || null);
-        }
+        const sessions = snapshot.docs.map((d) => d.data() as SupportSession);
+        setSupportSessions(sessions);
+        const active = sessions.find((s) => s.status === 'active' && new Date(s.expiryTime).getTime() > Date.now());
+        setActiveSupportSession(active || null);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'supportSessions')
     );
@@ -676,11 +649,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubSecurityLogs = onSnapshot(
       collection(db, 'securityAuditLogs'),
       (snapshot) => {
-        if (snapshot.empty) {
-          DEMO_SECURITY_LOGS.forEach((log) => saveToFirestore('securityAuditLogs', log.id, log));
-        } else {
-          setSecurityAuditLogs(snapshot.docs.map((d) => d.data() as SecurityAuditLog));
-        }
+        setSecurityAuditLogs(snapshot.docs.map((d) => d.data() as SecurityAuditLog));
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'securityAuditLogs')
     );
@@ -1025,21 +994,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetDemoData = () => {
-    DEMO_BUSINESSES.forEach((b) => saveToFirestore('businesses', b.id, b));
-    DEMO_USERS.forEach((u) => saveToFirestore('users', u.id, u));
-    DEMO_CUSTOMERS.forEach((c) => saveToFirestore('customers', c.id, c));
-    DEMO_CATEGORIES.forEach((cat) => saveToFirestore('categories', cat.id, cat));
-    DEMO_SERVICES.forEach((s) => saveToFirestore('services', s.id, s));
-    DEMO_JOBS.forEach((j) => saveToFirestore('jobs', j.id, j));
-    DEMO_INVENTORY.forEach((i) => saveToFirestore('inventory', i.id, i));
-    DEMO_QUOTATIONS.forEach((q) => saveToFirestore('quotations', q.id, q));
-    DEMO_INVOICES.forEach((inv) => saveToFirestore('invoices', inv.id, inv));
-    DEMO_PAYMENTS.forEach((p) => saveToFirestore('payments', p.id, p));
-    DEMO_CONTRACTS.forEach((ct) => saveToFirestore('contracts', ct.id, ct));
-    DEMO_EXPENSES.forEach((e) => saveToFirestore('expenses', e.id, e));
-    DEMO_NOTIFICATIONS.forEach((n) => saveToFirestore('notifications', n.id, n));
-    DEMO_ACTIVITIES.forEach((a) => saveToFirestore('activities', a.id, a));
-    showToast('Reset data to initial state & synced to Firestore', 'success');
+    showToast('Data synchronized with latest cloud Firestore state.', 'info');
   };
 
   const logActivity = (
