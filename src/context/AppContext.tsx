@@ -53,6 +53,10 @@ import {
 } from 'firebase/auth';
 import { FirestoreService, firestoreService } from '../services/FirestoreService';
 import {
+  playJobVoiceNotification,
+  playCustomVoiceNotification,
+} from '../utils/audioNotification';
+import {
   collection,
   doc,
   getDoc,
@@ -304,6 +308,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
+  const isInitialJobsLoadRef = React.useRef(true);
+
   // -------------------------------------------------------------
   // REAL-TIME FIRESTORE SUBSCRIPTIONS & AUTOMATIC SEEDING
   // -------------------------------------------------------------
@@ -384,7 +390,27 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (snapshot.empty) {
           DEMO_JOBS.forEach((j) => saveToFirestore('jobs', j.id, j));
         } else {
-          setJobs(snapshot.docs.map((d) => d.data() as Job));
+          const loadedJobs = snapshot.docs.map((d) => d.data() as Job);
+
+          // Audio & Voice Notifications for real-time new jobs or staff assignments
+          if (!isInitialJobsLoadRef.current) {
+            snapshot.docChanges().forEach((change) => {
+              if (change.type === 'added') {
+                const newJ = change.doc.data() as Job;
+                const assignedStaffName = (users || []).find((u) => u.id === newJ.assignedStaffId)?.name;
+                playJobVoiceNotification(
+                  newJ.jobId,
+                  newJ.description || 'New Service Task',
+                  newJ.location,
+                  assignedStaffName
+                );
+              }
+            });
+          } else {
+            isInitialJobsLoadRef.current = false;
+          }
+
+          setJobs(loadedJobs);
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'jobs')
@@ -1074,9 +1100,29 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       jobId,
       createdAt: new Date().toISOString().split('T')[0],
     };
+
     firestoreService.saveDocument<Job>('jobs', newJob.id, newJob);
+
+    // Broadcast instant Notification doc in Firestore for staff members
+    const assignedStaff = (users || []).find((u) => u.id === data.assignedStaffId);
+    const newNotif: Notification = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      businessId: currentBusiness.id,
+      title: `New Job Issued: ${jobId}`,
+      message: `New service job ${jobId} (${data.description}) assigned${assignedStaff ? ' to ' + assignedStaff.name : ''}. Scheduled for ${data.scheduledDate}`,
+      type: 'job',
+      read: false,
+      createdAt: new Date().toISOString(),
+      targetRoleId: 'technician',
+    };
+    saveToFirestore('notifications', newNotif.id, newNotif);
+
     logActivity('Job Created', 'job', newJob.id, `Created job ${jobId}`);
-    showToast(`Job ${jobId} created & synced to Firestore!`, 'success');
+
+    // Instant voice notification audio chime & speech
+    playJobVoiceNotification(jobId, data.description || 'New Service Task', data.location, assignedStaff?.name);
+
+    showToast(`Job ${jobId} issued & staff notified with voice alert!`, 'success');
     return newJob;
   };
 
@@ -1086,6 +1132,19 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast('Offline Mode: Saved locally and queued for sync.', 'info');
     } else {
       firestoreService.updateJob(id, updates);
+
+      // If technician was updated or status changed, notify & speak
+      const existingJ = jobs.find((j) => j.id === id);
+      if (existingJ && updates.assignedStaffId && updates.assignedStaffId !== existingJ.assignedStaffId) {
+        const assignedStaff = (users || []).find((u) => u.id === updates.assignedStaffId);
+        playJobVoiceNotification(
+          existingJ.jobId,
+          `Reassigned: ${existingJ.description}`,
+          existingJ.location,
+          assignedStaff?.name
+        );
+      }
+
       logActivity('Job Updated', 'job', id, 'Updated job assignment and schedule');
       showToast('Job updated & synced to Firestore', 'success');
     }

@@ -18,9 +18,17 @@ import {
   History,
   LogOut,
   Smartphone,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { ThemeToggle } from './ThemeToggle';
+import {
+  isVoiceNotificationEnabled,
+  setVoiceNotificationEnabled,
+  playCustomVoiceNotification,
+  speakText,
+} from '../utils/audioNotification';
 
 interface NavbarProps {
   onOpenOnboarding: () => void;
@@ -55,6 +63,23 @@ export const Navbar: React.FC<NavbarProps> = ({
   type ActiveMenu = 'tenant' | 'role' | 'notif' | 'profile' | null;
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
   const [isRefreshingPage, setIsRefreshingPage] = useState(false);
+
+  const [voiceEnabled, setVoiceEnabled] = useState(isVoiceNotificationEnabled());
+
+  const handleToggleVoice = () => {
+    const nextVal = !voiceEnabled;
+    setVoiceEnabled(nextVal);
+    setVoiceNotificationEnabled(nextVal);
+    if (nextVal) {
+      showToast('Voice Alert Notifications Active!', 'success');
+      playCustomVoiceNotification(
+        'Voice Notification Active',
+        'Instant voice alerts enabled for job issues and assignments.'
+      );
+    } else {
+      showToast('Voice Notifications Muted.', 'info');
+    }
+  };
 
   const handleHeaderRefresh = () => {
     setIsRefreshingPage(true);
@@ -273,6 +298,24 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Dark / Light Theme Toggle */}
           <ThemeToggle />
 
+          {/* Voice Notification Toggle / Test Button */}
+          <button
+            onClick={handleToggleVoice}
+            className={`p-1.5 sm:p-2 rounded-xl transition-all border ${
+              voiceEnabled
+                ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800'
+                : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 border-transparent'
+            }`}
+            title={voiceEnabled ? 'Voice Alerts Active (Click to Mute or Test)' : 'Voice Alerts Muted (Click to Enable)'}
+            aria-label="Voice Alerts"
+          >
+            {voiceEnabled ? (
+              <Volume2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 animate-pulse" />
+            ) : (
+              <VolumeX className="w-4 h-4" />
+            )}
+          </button>
+
           {/* Notifications Bell */}
           <div className="relative">
             <button
@@ -289,7 +332,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             {activeMenu === 'notif' && (
               <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-3 z-50 animate-in fade-in zoom-in-95">
                 <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 mb-2">
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100">Notifications</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100">Notifications</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        playCustomVoiceNotification('Notification Summary', `You have ${unreadNotifs.length} unread notifications.`);
+                      }}
+                      className="p-1 text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-600 hover:bg-indigo-100 rounded-lg font-medium flex items-center gap-1"
+                      title="Speak Summary"
+                    >
+                      <Volume2 className="w-3 h-3" /> Read All
+                    </button>
+                  </div>
                   <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-600 px-2 py-0.5 rounded-full font-semibold">
                     {unreadNotifs.length} new
                   </span>
@@ -302,13 +357,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <div
                         key={n.id}
                         onClick={() => markNotificationRead(n.id)}
-                        className={`p-2.5 rounded-xl border text-xs transition-colors cursor-pointer ${
+                        className={`p-2.5 rounded-xl border text-xs transition-colors cursor-pointer relative group ${
                           n.read
                             ? 'bg-slate-50/50 dark:bg-slate-950/50 border-slate-100 dark:border-slate-800 text-slate-500'
                             : 'bg-indigo-50/60 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800 text-slate-900 dark:text-slate-100 font-medium'
                         }`}
                       >
-                        <div className="font-semibold text-slate-900 dark:text-slate-100 mb-0.5">{n.title}</div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="font-semibold text-slate-900 dark:text-slate-100 mb-0.5">{n.title}</div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              speakText(`${n.title}. ${n.message}`);
+                            }}
+                            className="p-1 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-400 shrink-0"
+                            title="Speak out loud"
+                          >
+                            <Volume2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                         <div className="text-[11px] text-slate-600 dark:text-slate-400 leading-tight">{n.message}</div>
                       </div>
                     ))

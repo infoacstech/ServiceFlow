@@ -19,7 +19,9 @@ import {
   LayoutGrid,
   List,
   Eye,
+  Volume2,
 } from 'lucide-react';
+import { playJobVoiceNotification, speakText } from '../utils/audioNotification';
 
 export interface JobInitialFilter {
   datePreset?: string;
@@ -266,9 +268,26 @@ export const JobsView: React.FC<JobsViewProps> = ({
                           className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-indigo-500 transition-all cursor-pointer space-y-2 group"
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 group-hover:underline">
-                              {job.jobId}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 group-hover:underline">
+                                {job.jobId}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  playJobVoiceNotification(
+                                    job.jobId,
+                                    job.description || 'Service Task',
+                                    job.location,
+                                    tech?.name
+                                  );
+                                }}
+                                className="p-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 transition-colors"
+                                title="Play voice alert for this job"
+                              >
+                                <Volume2 className="w-3 h-3" />
+                              </button>
+                            </div>
                             <span
                               className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
                                 job.priority === 'urgent'
@@ -333,7 +352,26 @@ export const JobsView: React.FC<JobsViewProps> = ({
                       onClick={() => setSelectedJob(job)}
                       className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
                     >
-                      <td className="p-3.5 font-extrabold text-indigo-600">{job.jobId}</td>
+                      <td className="p-3.5 font-extrabold text-indigo-600">
+                        <div className="flex items-center gap-1.5">
+                          <span>{job.jobId}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              playJobVoiceNotification(
+                                job.jobId,
+                                job.description || 'Service Task',
+                                job.location,
+                                tech?.name
+                              );
+                            }}
+                            className="p-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 transition-colors"
+                            title="Play voice alert for this job"
+                          >
+                            <Volume2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </td>
                       <td className="p-3.5 font-bold text-slate-900 dark:text-slate-100">{cust?.name}</td>
                       <td className="p-3.5 text-slate-600 max-w-xs truncate">{job.description}</td>
                       <td className="p-3.5 text-slate-700 font-medium">{tech?.name || 'Unassigned'}</td>
@@ -361,7 +399,22 @@ export const JobsView: React.FC<JobsViewProps> = ({
           <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-6 border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b pb-3">
               <div>
-                <span className="text-xs font-bold text-indigo-600">{selectedJob.jobId}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-indigo-600">{selectedJob.jobId}</span>
+                  <button
+                    onClick={() => {
+                      const custName = (customers || []).find((c) => c.id === selectedJob.customerId)?.name || '';
+                      const techName = (staff || []).find((s) => s.id === selectedJob.assignedStaffId)?.name || 'Unassigned';
+                      speakText(
+                        `Job Number ${selectedJob.jobId} for ${custName}. Service issue: ${selectedJob.description}. Assigned technician: ${techName}. Location: ${selectedJob.location}. Scheduled: ${selectedJob.scheduledDate}.`
+                      );
+                    }}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 font-semibold text-[11px] transition-all"
+                    title="Listen to job summary voice voice"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" /> Speak Voice Details
+                  </button>
+                </div>
                 <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
                   {(customers || []).find((c) => c.id === selectedJob.customerId)?.name}
                 </h3>

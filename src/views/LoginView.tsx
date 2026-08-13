@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { UserRole, User } from '../types';
+import { db } from '../lib/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import {
   Phone,
   Mail,
@@ -66,15 +68,41 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    // Match existing user by email or phone
-    const matchedUser = (users || []).find(
+    // Match existing user by email or phone in state
+    let matchedUser = (users || []).find(
       (u) =>
         (u.email || '').toLowerCase() === cleanIdentifier ||
         (u.phone || '').replace(/[^0-9]/g, '').endsWith(cleanIdentifier.replace(/[^0-9]/g, '').slice(-10))
     );
 
+    // Multi-device fallback: Query Firestore directly if account isn't in local state memory yet
     if (!matchedUser) {
-      showToast('No user account found with this email or mobile phone number.', 'error');
+      try {
+        const qEmail = query(collection(db, 'users'), where('email', '==', cleanIdentifier));
+        const snapEmail = await getDocs(qEmail);
+        if (!snapEmail.empty) {
+          matchedUser = snapEmail.docs[0].data() as User;
+        } else {
+          // Try clean digits phone search
+          const digitsOnly = cleanIdentifier.replace(/[^0-9]/g, '');
+          if (digitsOnly.length >= 6) {
+            const allUsersSnap = await getDocs(collection(db, 'users'));
+            const foundDoc = allUsersSnap.docs.find((d) => {
+              const uData = d.data() as User;
+              return (uData.phone || '').replace(/[^0-9]/g, '').endsWith(digitsOnly.slice(-10));
+            });
+            if (foundDoc) {
+              matchedUser = foundDoc.data() as User;
+            }
+          }
+        }
+      } catch (fsErr) {
+        console.warn('Firestore fallback user query error:', fsErr);
+      }
+    }
+
+    if (!matchedUser) {
+      showToast('No account found with this email or mobile phone. Please register first or check your spelling.', 'error');
       return;
     }
 

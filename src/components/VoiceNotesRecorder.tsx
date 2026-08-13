@@ -325,14 +325,34 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
             )}
 
             {transcript && (
-              <button
-                type="button"
-                onClick={() => setTranscript('')}
-                className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950 transition-colors cursor-pointer"
-                title="Clear transcript"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const SpeechSynthesisAPI = window.speechSynthesis;
+                    if (SpeechSynthesisAPI) {
+                      window.speechSynthesis.cancel();
+                      const u = new SpeechSynthesisUtterance(transcript);
+                      u.rate = 0.95;
+                      window.speechSynthesis.speak(u);
+                    }
+                  }}
+                  className="p-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950 rounded-xl transition-colors cursor-pointer flex items-center gap-1 font-semibold text-xs"
+                  title="Listen to dictated transcript out loud"
+                >
+                  <Volume2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Listen</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTranscript('')}
+                  className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950 transition-colors cursor-pointer"
+                  title="Clear transcript"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </>
             )}
           </div>
 

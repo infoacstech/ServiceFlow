@@ -23,6 +23,7 @@ import {
   Trash2,
   Check,
   Upload,
+  Wrench,
 } from 'lucide-react';
 
 export const CustomersView: React.FC = () => {
