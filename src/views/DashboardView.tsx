@@ -253,20 +253,42 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const lowStockItems = inventory.filter((item) => item.currentStock <= item.minStock);
   const expiringContracts = contracts.filter((c) => c.status === 'expiring_soon' || c.status === 'expired');
 
-  // Chart Data
-  const salesChartData = [
-    { month: 'Apr', sales: 42000, collections: 38000 },
-    { month: 'May', sales: 58000, collections: 52000 },
-    { month: 'Jun', sales: 64000, collections: 61000 },
-    { month: 'Jul', sales: 79000, collections: 73000 },
-    { month: 'Aug', sales: totalSales || 88000, collections: todayPayments || 82000 },
-  ];
+  // Dynamic Rolling Monthly Sales & Collections Chart Data
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const now = new Date();
+  const salesChartData = Array.from({ length: 5 }).map((_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (4 - i), 1);
+    const mIndex = d.getMonth();
+    const yStr = d.getFullYear();
+    const monthLabel = monthNames[mIndex];
+    const prefix = `${yStr}-${String(mIndex + 1).padStart(2, '0')}`;
+
+    const monthSales = invoices
+      .filter((inv) => (inv.date || '').startsWith(prefix))
+      .reduce((sum, inv) => sum + (Number(inv.grandTotal) || 0), 0);
+
+    const monthCollections = invoices
+      .filter((inv) => (inv.date || '').startsWith(prefix))
+      .reduce((sum, inv) => sum + (Number(inv.paidAmount) || 0), 0);
+
+    return {
+      month: monthLabel,
+      sales: monthSales,
+      collections: monthCollections,
+    };
+  });
+
+  const completedJobsCount = jobs.filter((j) => j.status === 'completed' || j.status === 'closed').length;
+  const inProgressJobsCount = jobs.filter((j) => j.status === 'in_progress').length;
+  const assignedJobsCount = jobs.filter((j) => j.status === 'assigned').length;
+  const newJobsCount = jobs.filter((j) => j.status === 'new').length;
+  const totalWorkflowJobs = completedJobsCount + inProgressJobsCount + assignedJobsCount + newJobsCount;
 
   const jobStatusData = [
-    { name: 'Completed', value: completedJobs.length || 8, color: '#10b981' },
-    { name: 'In Progress', value: jobs.filter((j) => j.status === 'in_progress').length || 4, color: '#3b82f6' },
-    { name: 'Assigned', value: jobs.filter((j) => j.status === 'assigned').length || 3, color: '#f59e0b' },
-    { name: 'New', value: jobs.filter((j) => j.status === 'new').length || 2, color: '#8b5cf6' },
+    { name: 'Completed', value: completedJobsCount, color: '#10b981' },
+    { name: 'In Progress', value: inProgressJobsCount, color: '#3b82f6' },
+    { name: 'Assigned', value: assignedJobsCount, color: '#f59e0b' },
+    { name: 'New', value: newJobsCount, color: '#8b5cf6' },
   ];
 
   return (
@@ -765,24 +787,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <p className="text-xs text-slate-500 mb-4">Breakdown by current workflow status</p>
 
             <div className="h-44 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={jobStatusData} cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={4} dataKey="value">
-                    {jobStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#0f172a',
-                      borderColor: '#1e293b',
-                      borderRadius: '12px',
-                      color: '#fff',
-                      fontSize: '11px',
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              {totalWorkflowJobs === 0 ? (
+                <div className="h-full w-full flex flex-col items-center justify-center text-center p-4">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mb-2">
+                    <Briefcase className="w-6 h-6" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300">0 Active Jobs</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">All test/dummy data has been cleaned</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={jobStatusData.filter((d) => d.value > 0)} cx="50%" cy="50%" innerRadius={45} outerRadius={65} paddingAngle={4} dataKey="value">
+                      {jobStatusData.filter((d) => d.value > 0).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#0f172a',
+                        borderColor: '#1e293b',
+                        borderRadius: '12px',
+                        color: '#fff',
+                        fontSize: '11px',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
 

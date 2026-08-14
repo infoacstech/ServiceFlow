@@ -2052,6 +2052,31 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     businessName?: string;
     businessType?: string;
   }): { user: User; isPending: boolean } => {
+    const normalizedEmail = (data.email || '').trim().toLowerCase();
+    const cleanPhoneDigits = (data.phone || '').replace(/[^0-9]/g, '');
+
+    // 1. Strict Duplicate Account Check: Prevent duplicate email or mobile number
+    const existingAccount = users.find((u) => {
+      const uEmail = (u.email || '').trim().toLowerCase();
+      const uPhoneDigits = (u.phone || '').replace(/[^0-9]/g, '');
+      const isEmailMatch = uEmail && normalizedEmail && uEmail === normalizedEmail;
+      const isPhoneMatch =
+        cleanPhoneDigits.length >= 10 &&
+        uPhoneDigits.length >= 10 &&
+        uPhoneDigits.slice(-10) === cleanPhoneDigits.slice(-10);
+      return isEmailMatch || isPhoneMatch;
+    });
+
+    if (existingAccount) {
+      const matchedField =
+        existingAccount.email?.trim().toLowerCase() === normalizedEmail
+          ? `Email address (${data.email})`
+          : `Mobile number (${data.phone})`;
+      const errorMsg = `${matchedField} is already registered. Please go to the Login tab to access your account.`;
+      showToast(errorMsg, 'error');
+      throw new Error(errorMsg);
+    }
+
     if (data.role === 'business_owner') {
       let targetBiz = businesses.find((b) => b.id === data.businessId);
       if (!targetBiz) {

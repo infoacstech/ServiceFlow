@@ -1,4 +1,26 @@
-// Utility for instant audio chimes and voice notifications for new jobs & updates
+// Utility for crystal-clear audio chimes and multi-language voice notifications
+// Supports Hindi, Marathi, Gujarati, English, etc. with natural speech synthesis
+
+export type VoiceLanguageCode = 'hi-IN' | 'en-IN' | 'en-US' | 'mr-IN' | 'gu-IN' | 'bn-IN' | 'ta-IN' | 'te-IN' | 'kn-IN';
+
+export interface VoiceLanguageOption {
+  code: VoiceLanguageCode;
+  name: string;
+  nativeName: string;
+  flag: string;
+}
+
+export const SUPPORTED_VOICE_LANGUAGES: VoiceLanguageOption[] = [
+  { code: 'hi-IN', name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳' },
+  { code: 'en-IN', name: 'English (India)', nativeName: 'English (IN)', flag: '🇮🇳' },
+  { code: 'en-US', name: 'English (US)', nativeName: 'English (US)', flag: '🇺🇸' },
+  { code: 'mr-IN', name: 'Marathi', nativeName: 'मराठी', flag: '🇮🇳' },
+  { code: 'gu-IN', name: 'Gujarati', nativeName: 'ગુજરાતી', flag: '🇮🇳' },
+  { code: 'bn-IN', name: 'Bengali', nativeName: 'বাংলা', flag: '🇮🇳' },
+  { code: 'ta-IN', name: 'Tamil', nativeName: 'தமிழ்', flag: '🇮🇳' },
+  { code: 'te-IN', name: 'Telugu', nativeName: 'తెలుగు', flag: '🇮🇳' },
+  { code: 'kn-IN', name: 'Kannada', nativeName: 'ಕನ್ನಡ', flag: '🇮🇳' },
+];
 
 // Global Audio Context singleton
 let audioCtx: AudioContext | null = null;
@@ -18,7 +40,7 @@ function getAudioContext(): AudioContext | null {
 }
 
 /**
- * Plays a pleasant dual-tone chime sound (Ding-Dong) using Web Audio API oscillator
+ * Plays a pleasant high-fidelity chime sound using Web Audio API
  */
 export function playNotificationChime(): void {
   try {
@@ -27,28 +49,28 @@ export function playNotificationChime(): void {
 
     const now = ctx.currentTime;
 
-    // Tone 1 (High pitch - 587.33 Hz / D5)
+    // Harmonic Tone 1 (D5 - 587.33 Hz)
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
     osc1.type = 'sine';
     osc1.frequency.setValueAtTime(587.33, now);
-    gain1.gain.setValueAtTime(0.3, now);
+    gain1.gain.setValueAtTime(0.28, now);
     gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
     osc1.connect(gain1);
     gain1.connect(ctx.destination);
     osc1.start(now);
     osc1.stop(now + 0.35);
 
-    // Tone 2 (Higher pitch - 880 Hz / A5)
+    // Harmonic Tone 2 (A5 - 880 Hz)
     const osc2 = ctx.createOscillator();
     const gain2 = ctx.createGain();
     osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(880, now + 0.15);
-    gain2.gain.setValueAtTime(0.35, now + 0.15);
+    osc2.frequency.setValueAtTime(880, now + 0.12);
+    gain2.gain.setValueAtTime(0.32, now + 0.12);
     gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
     osc2.connect(gain2);
     gain2.connect(ctx.destination);
-    osc2.start(now + 0.15);
+    osc2.start(now + 0.12);
     osc2.stop(now + 0.55);
   } catch (err) {
     console.warn('Audio chime play error:', err);
@@ -56,7 +78,7 @@ export function playNotificationChime(): void {
 }
 
 /**
- * Checks if voice notifications are enabled in user settings
+ * Checks if voice notifications are enabled
  */
 export function isVoiceNotificationEnabled(): boolean {
   if (typeof localStorage === 'undefined') return true;
@@ -74,31 +96,53 @@ export function setVoiceNotificationEnabled(enabled: boolean): void {
 }
 
 /**
- * Speaks text using Web Speech API window.speechSynthesis
+ * Gets currently selected voice language
  */
-export function speakText(text: string, options?: { rate?: number; pitch?: number; lang?: string }): void {
+export function getSelectedVoiceLanguage(): VoiceLanguageCode {
+  if (typeof localStorage === 'undefined') return 'hi-IN';
+  const saved = localStorage.getItem('serviflow_voice_language') as VoiceLanguageCode;
+  return saved || 'hi-IN';
+}
+
+/**
+ * Sets user preferred voice language
+ */
+export function setSelectedVoiceLanguage(lang: VoiceLanguageCode): void {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('serviflow_voice_language', lang);
+  }
+}
+
+/**
+ * High-quality Speech Synthesis using native browser Speech API with language fallback
+ */
+export function speakText(text: string, options?: { rate?: number; pitch?: number; lang?: VoiceLanguageCode }): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     console.warn('Speech synthesis not supported in this browser.');
     return;
   }
 
   try {
-    // Cancel any ongoing speech to avoid overlapping queue overload
     window.speechSynthesis.cancel();
 
+    const targetLang = options?.lang || getSelectedVoiceLanguage();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = options?.rate || 1.0;
+    utterance.rate = options?.rate || 0.95;
     utterance.pitch = options?.pitch || 1.0;
-    utterance.lang = options?.lang || 'en-US';
+    utterance.lang = targetLang;
 
-    // Pick a natural English voice if available
+    // Pick best matching natural voice
     const voices = window.speechSynthesis.getVoices();
-    const preferredVoice = voices.find(
-      (v) => (v.lang.startsWith('en') || v.lang.startsWith('hi')) && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Karen'))
-    ) || voices.find((v) => v.lang.startsWith('en'));
+    const langPrefix = targetLang.split('-')[0];
 
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
+    const matchedVoice =
+      voices.find((v) => v.lang === targetLang && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Premium'))) ||
+      voices.find((v) => v.lang === targetLang) ||
+      voices.find((v) => v.lang.startsWith(langPrefix)) ||
+      voices.find((v) => v.lang.startsWith('en'));
+
+    if (matchedVoice) {
+      utterance.voice = matchedVoice;
     }
 
     window.speechSynthesis.speak(utterance);
@@ -108,7 +152,7 @@ export function speakText(text: string, options?: { rate?: number; pitch?: numbe
 }
 
 /**
- * Triggers instant chime + voice announcement for new jobs or job updates
+ * Triggers instant chime + multi-language voice announcement for Job Assignment
  */
 export function playJobVoiceNotification(
   jobId: string,
@@ -118,23 +162,86 @@ export function playJobVoiceNotification(
 ): void {
   if (!isVoiceNotificationEnabled()) return;
 
-  // Play audio chime first
   playNotificationChime();
 
-  // Clean title for speech
-  const cleanTitle = title.replace(/[^\w\s]/gi, ' ');
-  const speechMessage = `New Job Alert! Job number ${jobId}. ${cleanTitle}.${
-    location ? ` Location: ${location}.` : ''
-  }${technicianName ? ` Assigned to ${technicianName}.` : ''}`;
+  const lang = getSelectedVoiceLanguage();
+  const cleanTitle = (title || 'Service Task').replace(/[^\w\s]/gi, ' ');
+  let speechMessage = '';
 
-  // Slight delay after chime before speaking
+  if (lang.startsWith('hi')) {
+    // Hindi
+    speechMessage = `नया काम असाइन हुआ! जॉब नंबर ${jobId}. ${cleanTitle}.${
+      technicianName ? ` तकनीशियन ${technicianName} को असाइन किया गया है.` : ''
+    }${location ? ` लोकेशन: ${location}.` : ''}`;
+  } else if (lang.startsWith('mr')) {
+    // Marathi
+    speechMessage = `नवीन काम सोपवले! जॉब नंबर ${jobId}. ${cleanTitle}.${
+      technicianName ? ` तंत्रज्ञ ${technicianName} यांना सोपवले आहे.` : ''
+    }`;
+  } else if (lang.startsWith('gu')) {
+    // Gujarati
+    speechMessage = `નવું કામ સોંપાયું! જોબ નંબર ${jobId}. ${cleanTitle}.${
+      technicianName ? ` ટેકનિશિયન ${technicianName} ને સોંપેલ છે.` : ''
+    }`;
+  } else {
+    // English
+    speechMessage = `New Job Assigned! Job number ${jobId}. ${cleanTitle}.${
+      technicianName ? ` Assigned to ${technicianName}.` : ''
+    }${location ? ` Location: ${location}.` : ''}`;
+  }
+
   setTimeout(() => {
-    speakText(speechMessage, { rate: 0.95, pitch: 1.05 });
+    speakText(speechMessage, { rate: 0.95, pitch: 1.05, lang });
   }, 350);
 }
 
 /**
- * Triggers instant chime + custom voice announcement
+ * Triggers instant chime + multi-language voice alert for Payments & Transactions
+ */
+export function playTransactionVoiceNotification(
+  type: 'payment' | 'invoice' | 'quotation',
+  amount: number | string,
+  partyName?: string,
+  referenceId?: string
+): void {
+  if (!isVoiceNotificationEnabled()) return;
+
+  playNotificationChime();
+
+  const lang = getSelectedVoiceLanguage();
+  let speechMessage = '';
+
+  if (type === 'payment') {
+    if (lang.startsWith('hi')) {
+      speechMessage = `पेमेंट प्राप्त हुआ! ₹${amount} की राशि ${partyName ? partyName + ' से' : ''} सफलतापूर्वक रिकॉर्ड हुई.`;
+    } else if (lang.startsWith('mr')) {
+      speechMessage = `पेमेंट मिळाले! ₹${amount} रक्कम ${partyName ? partyName + ' कडून' : ''} प्राप्त झाली.`;
+    } else if (lang.startsWith('gu')) {
+      speechMessage = `પેમેન્ટ મળ્યું! ₹${amount} રકમ ${partyName ? partyName + ' તરફથી' : ''} સફળતાપૂર્વક નોંધાઈ.`;
+    } else {
+      speechMessage = `Payment Received! Amount of ₹${amount} received ${partyName ? 'from ' + partyName : ''}.`;
+    }
+  } else if (type === 'invoice') {
+    if (lang.startsWith('hi')) {
+      speechMessage = `नया इनवॉइस ${referenceId ? '#' + referenceId : ''} जनरेट हुआ ₹${amount} का.`;
+    } else {
+      speechMessage = `New Invoice ${referenceId ? '#' + referenceId : ''} generated for ₹${amount}.`;
+    }
+  } else {
+    if (lang.startsWith('hi')) {
+      speechMessage = `नया कोटेशन ${referenceId ? '#' + referenceId : ''} जारी किया गया.`;
+    } else {
+      speechMessage = `New Quotation ${referenceId ? '#' + referenceId : ''} prepared for ${partyName || 'Customer'}.`;
+    }
+  }
+
+  setTimeout(() => {
+    speakText(speechMessage, { rate: 0.95, pitch: 1.0, lang });
+  }, 350);
+}
+
+/**
+ * Triggers custom voice notification
  */
 export function playCustomVoiceNotification(heading: string, detail: string): void {
   if (!isVoiceNotificationEnabled()) return;
