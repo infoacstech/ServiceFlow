@@ -105,30 +105,38 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
     try {
       // Find user locally by email or phone
-      let matchedUser = (users || []).find(
-        (u) =>
-          (u.email || '').toLowerCase() === cleanIdentifier ||
-          (u.phone || '').replace(/[^0-9]/g, '').endsWith(cleanIdentifier.replace(/[^0-9]/g, '').slice(-10))
-      );
+      const cleanDigits = cleanIdentifier.replace(/[^0-9]/g, '');
+      const isEmailInput = cleanIdentifier.includes('@');
+      let matchedUser = (users || []).find((u) => {
+        const uEmail = (u.email || '').trim().toLowerCase();
+        const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
+        if (isEmailInput) {
+          return uEmail === cleanIdentifier;
+        }
+        if (cleanDigits.length >= 10) {
+          return uPhone.length >= 10 && uPhone.slice(-10) === cleanDigits.slice(-10);
+        }
+        return uEmail === cleanIdentifier;
+      });
 
       // Firestore fallback query if not in local memory yet
       if (!matchedUser) {
         try {
-          const qEmail = query(collection(db, 'users'), where('email', '==', cleanIdentifier));
-          const snapEmail = await getDocs(qEmail);
-          if (!snapEmail.empty) {
-            matchedUser = snapEmail.docs[0].data() as User;
-          } else {
-            const digitsOnly = cleanIdentifier.replace(/[^0-9]/g, '');
-            if (digitsOnly.length >= 6) {
-              const allUsersSnap = await getDocs(collection(db, 'users'));
-              const foundDoc = allUsersSnap.docs.find((d) => {
-                const uData = d.data() as User;
-                return (uData.phone || '').replace(/[^0-9]/g, '').endsWith(digitsOnly.slice(-10));
-              });
-              if (foundDoc) {
-                matchedUser = foundDoc.data() as User;
-              }
+          if (isEmailInput) {
+            const qEmail = query(collection(db, 'users'), where('email', '==', cleanIdentifier));
+            const snapEmail = await getDocs(qEmail);
+            if (!snapEmail.empty) {
+              matchedUser = snapEmail.docs[0].data() as User;
+            }
+          } else if (cleanDigits.length >= 10) {
+            const allUsersSnap = await getDocs(collection(db, 'users'));
+            const foundDoc = allUsersSnap.docs.find((d) => {
+              const uData = d.data() as User;
+              const uPhoneDigits = (uData.phone || '').replace(/[^0-9]/g, '');
+              return uPhoneDigits.length >= 10 && uPhoneDigits.slice(-10) === cleanDigits.slice(-10);
+            });
+            if (foundDoc) {
+              matchedUser = foundDoc.data() as User;
             }
           }
         } catch (fsErr) {

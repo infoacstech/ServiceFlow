@@ -70,11 +70,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       return;
     }
 
-    const matchedUser = (users || []).find(
-      (u) =>
-        u.email.toLowerCase() === clean ||
-        u.phone.replace(/[^0-9]/g, '').endsWith(clean.replace(/[^0-9]/g, '').slice(-10))
-    );
+    const cleanDigits = clean.replace(/[^0-9]/g, '');
+    const isEmailInput = clean.includes('@');
+    const matchedUser = (users || []).find((u) => {
+      const uEmail = (u.email || '').trim().toLowerCase();
+      const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
+      if (isEmailInput) {
+        return uEmail === clean;
+      }
+      if (cleanDigits.length >= 10) {
+        return uPhone.length >= 10 && uPhone.slice(-10) === cleanDigits.slice(-10);
+      }
+      return uEmail === clean;
+    });
 
     if (!matchedUser) {
       showToast('No user account found with this email or mobile number.', 'error');

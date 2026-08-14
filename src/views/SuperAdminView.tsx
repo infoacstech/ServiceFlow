@@ -95,10 +95,17 @@ export const SuperAdminView: React.FC = () => {
 
   // Find pending owner/business registrations & pending staff
   const pendingOwners = users.filter(
-    (u) => u.role === 'business_owner' && u.approvalStatus === 'pending'
+    (u) =>
+      u.role === 'business_owner' &&
+      (u.approvalStatus === 'pending' ||
+        (u.status === 'inactive' && u.approvalStatus !== 'rejected' && u.approvalStatus !== 'blocked'))
   );
   const pendingStaffUsers = users.filter(
-    (u) => u.role !== 'business_owner' && u.role !== 'super_admin' && u.approvalStatus === 'pending'
+    (u) =>
+      u.role !== 'business_owner' &&
+      u.role !== 'super_admin' &&
+      (u.approvalStatus === 'pending' ||
+        (u.status === 'inactive' && u.approvalStatus !== 'rejected' && u.approvalStatus !== 'blocked'))
   );
   const pendingBusinessIds = Array.from(
     new Set([
@@ -111,7 +118,8 @@ export const SuperAdminView: React.FC = () => {
     const biz = businesses.find((b) => b.id === bId);
     const owner =
       users.find((u) => u.businessId === bId && u.role === 'business_owner' && u.approvalStatus === 'pending') ||
-      users.find((u) => u.businessId === bId && u.role === 'business_owner');
+      users.find((u) => u.businessId === bId && u.role === 'business_owner') ||
+      users.find((u) => u.businessId === bId);
     return {
       businessId: bId,
       businessName: biz?.name || (owner?.name ? `${owner.name}'s Business` : 'New Business'),
