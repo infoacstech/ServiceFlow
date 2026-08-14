@@ -88,9 +88,10 @@ export const QuotationsView: React.FC = () => {
 
   const filtered = (quotations || []).filter((q) => {
     const cust = (customers || []).find((c) => c.id === q.customerId);
+    const s = (search || '').toLowerCase();
     return (
-      q.quotationNumber.toLowerCase().includes(search.toLowerCase()) ||
-      cust?.name.toLowerCase().includes(search.toLowerCase())
+      (q.quotationNumber || '').toLowerCase().includes(s) ||
+      (cust?.name || '').toLowerCase().includes(s)
     );
   });
 

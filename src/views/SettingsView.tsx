@@ -129,17 +129,20 @@ export const SettingsView: React.FC = () => {
     }, 600);
   };
 
-  const filteredLogs = manualSyncLogs.filter((log) => {
+  const filteredLogs = (manualSyncLogs || []).filter((log) => {
     const matchesFilter = logFilter === 'ALL' || log.status === logFilter;
+    const q = (searchQuery || '').trim().toLowerCase();
     const matchesQuery =
-      searchQuery.trim() === '' ||
-      log.details.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.technicianName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.itemsSynced?.some(
-        (item) =>
-          item.jobId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.description.toLowerCase().includes(searchQuery.toLowerCase())
+      q === '' ||
+      (log.details || '').toLowerCase().includes(q) ||
+      (log.technicianName || '').toLowerCase().includes(q) ||
+      (log.id || '').toLowerCase().includes(q) ||
+      Boolean(
+        log.itemsSynced?.some(
+          (item) =>
+            (item.jobId || '').toLowerCase().includes(q) ||
+            (item.description || '').toLowerCase().includes(q)
+        )
       );
 
     return matchesFilter && matchesQuery;

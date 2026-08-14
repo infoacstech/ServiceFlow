@@ -23,14 +23,14 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ onSelectTa
 
   if (!isSearchOpen) return null;
 
-  const q = query.toLowerCase().trim();
+  const q = (query || '').toLowerCase().trim();
 
-  const matchingCustomers = q ? customers.filter((c) => c.name.toLowerCase().includes(q) || c.mobile.includes(q)) : [];
-  const matchingJobs = q ? jobs.filter((j) => j.jobId.toLowerCase().includes(q) || j.description.toLowerCase().includes(q)) : [];
-  const matchingInvoices = q ? invoices.filter((inv) => inv.invoiceNumber.toLowerCase().includes(q)) : [];
-  const matchingQuotes = q ? quotations.filter((qt) => qt.quotationNumber.toLowerCase().includes(q)) : [];
-  const matchingInventory = q ? inventory.filter((item) => item.name.toLowerCase().includes(q) || item.sku.toLowerCase().includes(q)) : [];
-  const matchingStaff = q ? staff.filter((st) => st.name.toLowerCase().includes(q) || st.role.includes(q)) : [];
+  const matchingCustomers = q ? (customers || []).filter((c) => (c.name || '').toLowerCase().includes(q) || (c.mobile || '').includes(q)) : [];
+  const matchingJobs = q ? (jobs || []).filter((j) => (j.jobId || '').toLowerCase().includes(q) || (j.description || '').toLowerCase().includes(q)) : [];
+  const matchingInvoices = q ? (invoices || []).filter((inv) => (inv.invoiceNumber || '').toLowerCase().includes(q)) : [];
+  const matchingQuotes = q ? (quotations || []).filter((qt) => (qt.quotationNumber || '').toLowerCase().includes(q)) : [];
+  const matchingInventory = q ? (inventory || []).filter((item) => (item.name || '').toLowerCase().includes(q) || (item.sku || '').toLowerCase().includes(q)) : [];
+  const matchingStaff = q ? (staff || []).filter((st) => (st.name || '').toLowerCase().includes(q) || (st.role || '').includes(q)) : [];
 
   const handleResultClick = (tab: string) => {
     onSelectTab(tab);

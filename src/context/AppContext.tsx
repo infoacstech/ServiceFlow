@@ -467,7 +467,13 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setUsers(items);
         }
         setCurrentUser((prev) =>
-          prev ? items.find((u) => u.id === prev.id || u.email.toLowerCase() === prev.email.toLowerCase()) || prev : null
+          prev
+            ? items.find(
+                (u) =>
+                  u.id === prev.id ||
+                  (Boolean(u.email) && Boolean(prev.email) && (u.email || '').trim().toLowerCase() === (prev.email || '').trim().toLowerCase())
+              ) || prev
+            : null
         );
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'users')
@@ -745,7 +751,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             userRecord =
               users.find(
                 (u) =>
-                  u.email.toLowerCase() === targetEmail?.toLowerCase() ||
+                  (Boolean(u.email) && Boolean(targetEmail) && (u.email || '').toLowerCase() === (targetEmail || '').toLowerCase()) ||
                   u.id === targetUid ||
                   u.id === firebaseUser.uid
               ) || null;
@@ -816,7 +822,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       await saveToFirestore('users', userToLogin.id, userToLogin);
 
-      const email = userToLogin.email.toLowerCase();
+      const email = (userToLogin.email || '').trim().toLowerCase();
       const pass = password || userToLogin.password || 'ServiFlow@123';
 
       try {
@@ -1323,7 +1329,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       target = {
         id: `usr-${role}-${Date.now()}`,
         name: `${role.replace('_', ' ').toUpperCase()} User`,
-        email: `${role}@${currentBusiness.name.toLowerCase().replace(/[^a-z]/g, '')}.com`,
+        email: `${role}@${(currentBusiness?.name || 'business').toLowerCase().replace(/[^a-z0-9]/g, '') || 'service'}.com`,
         phone: currentBusiness.mobile,
         role: role,
         businessId: currentBusiness.id,

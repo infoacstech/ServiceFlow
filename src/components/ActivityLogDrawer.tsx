@@ -33,12 +33,13 @@ export const ActivityLogDrawer: React.FC = () => {
   if (!isActivityLogOpen) return null;
 
   // Filter activity logs
-  const filteredLogs = activityLogs.filter((log) => {
+  const filteredLogs = (activityLogs || []).filter((log) => {
+    const s = (searchTerm || '').toLowerCase();
     const matchesSearch =
-      log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.entityId.toLowerCase().includes(searchTerm.toLowerCase());
+      (log.action || '').toLowerCase().includes(s) ||
+      (log.description || '').toLowerCase().includes(s) ||
+      (log.userName || '').toLowerCase().includes(s) ||
+      (log.entityId || '').toLowerCase().includes(s);
 
     const matchesEntity = selectedEntity === 'all' || log.entityType === selectedEntity;
 

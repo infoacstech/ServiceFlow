@@ -104,11 +104,12 @@ export const JobsView: React.FC<JobsViewProps> = ({
     'closed',
   ];
 
-  const filteredJobs = jobs.filter((j) => {
+  const filteredJobs = (jobs || []).filter((j) => {
+    const s = (search || '').toLowerCase();
     const matchesSearch =
-      j.jobId.toLowerCase().includes(search.toLowerCase()) ||
-      j.description.toLowerCase().includes(search.toLowerCase()) ||
-      j.location.toLowerCase().includes(search.toLowerCase());
+      (j.jobId || '').toLowerCase().includes(s) ||
+      (j.description || '').toLowerCase().includes(s) ||
+      (j.location || '').toLowerCase().includes(s);
     const matchesStatus =
       statusFilter === 'all'
         ? true

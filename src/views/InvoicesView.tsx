@@ -101,9 +101,10 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
 
   const filtered = (invoices || []).filter((inv) => {
     const cust = (customers || []).find((c) => c.id === inv.customerId);
+    const s = (search || '').toLowerCase();
     const matchesSearch =
-      inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
-      cust?.name.toLowerCase().includes(search.toLowerCase());
+      (inv.invoiceNumber || '').toLowerCase().includes(s) ||
+      (cust?.name || '').toLowerCase().includes(s);
 
     const matchesStatus =
       statusFilter === 'all'

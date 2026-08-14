@@ -78,12 +78,14 @@ export const InventoryView: React.FC = () => {
     category: 'General Parts',
   });
 
-  const filtered = inventory.filter(
-    (item) =>
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      item.sku.toLowerCase().includes(search.toLowerCase()) ||
-      item.category.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = (inventory || []).filter((item) => {
+    const s = (search || '').toLowerCase();
+    return (
+      (item.name || '').toLowerCase().includes(s) ||
+      (item.sku || '').toLowerCase().includes(s) ||
+      (item.category || '').toLowerCase().includes(s)
+    );
+  });
 
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();

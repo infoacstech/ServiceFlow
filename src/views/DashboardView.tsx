@@ -820,7 +820,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
             {jobStatusData.map((item) => {
-              const statusKey = item.name.toLowerCase().replace(' ', '_');
+              const statusKey = (item.name || '').toLowerCase().replace(' ', '_');
               return (
                 <div
                   key={item.name}

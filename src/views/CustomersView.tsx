@@ -116,11 +116,12 @@ export const CustomersView: React.FC = () => {
     customerType: 'commercial',
   });
 
-  const filtered = customers.filter((c) => {
+  const filtered = (customers || []).filter((c) => {
+    const s = (search || '').toLowerCase();
     const matchesSearch =
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.mobile.includes(search) ||
-      (c.companyName && c.companyName.toLowerCase().includes(search.toLowerCase()));
+      (c.name || '').toLowerCase().includes(s) ||
+      (c.mobile || '').includes(search || '') ||
+      Boolean(c.companyName && c.companyName.toLowerCase().includes(s));
     const matchesType = filterType === 'all' || c.customerType === filterType;
     return matchesSearch && matchesType;
   });

@@ -14,10 +14,11 @@ export const PaymentsView: React.FC = () => {
 
   const filtered = (payments || []).filter((p) => {
     const cust = (customers || []).find((c) => c.id === p.customerId);
+    const s = (search || '').toLowerCase();
     const matchesSearch =
-      p.id.toLowerCase().includes(search.toLowerCase()) ||
-      p.referenceNumber?.toLowerCase().includes(search.toLowerCase()) ||
-      cust?.name.toLowerCase().includes(search.toLowerCase());
+      (p.id || '').toLowerCase().includes(s) ||
+      (p.referenceNumber || '').toLowerCase().includes(s) ||
+      (cust?.name || '').toLowerCase().includes(s);
 
     const matchesDate = (() => {
       if (!p.date) return true;
