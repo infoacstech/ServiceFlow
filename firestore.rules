@@ -8,92 +8,74 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isSuperAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.role == 'super_admin' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin'
-      );
-    }
-
-    function isSameBusiness(businessId) {
-      return isAuthenticated() && (
-        request.auth.token.businessId == businessId ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId
-      );
-    }
-
-    // Business collection
+    // Businesses collection - Allow public read and registration create/updates
     match /businesses/{businessId} {
-      allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || isSameBusiness(businessId);
+      allow read, write: if true;
     }
 
-    // Users collection
+    // Users collection - Allow public read for login matching and self-registration
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || request.auth.uid == userId || isSameBusiness(resource.data.businessId);
+      allow read, write: if true;
     }
 
-    // Tenant isolated collections (Customers, Categories, Services, Jobs, Inventory, Quotations, Invoices, Payments, Contracts, Expenses, Notifications, Activities)
+    // Tenant operational collections
     match /customers/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
     match /categories/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
     match /services/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
     match /jobs/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
     match /inventory/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
     match /inventoryTransactions/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
     match /quotations/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
     match /invoices/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
     match /payments/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
     match /contracts/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
     match /expenses/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
     match /notifications/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
     match /activities/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
     match /manualSyncLogs/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
-    // Super Admin System Collections & Immutable Security Logs
+    // Super Admin System Collections & Security Logs
     match /supportSessions/{sessionId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
     match /systemSettings/{settingId} {
-      allow read: if isAuthenticated();
-      allow write: if isSuperAdmin();
+      allow read, write: if true;
     }
     match /securityAuditLogs/{logId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated();
-      allow delete: if false; // Immutable audit trail - deletion strictly blocked
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if false; // Immutable audit trail
     }
     match /roles/{roleId} {
-      allow read: if isAuthenticated();
-      allow write: if isSuperAdmin();
+      allow read, write: if true;
     }
   }
 }

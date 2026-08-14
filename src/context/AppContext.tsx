@@ -91,7 +91,12 @@ interface AppContextType {
   logoutUser: () => Promise<void>;
   switchRole: (role: UserRole) => Promise<void>;
   switchBusiness: (businessId: string) => void;
-  createBusiness: (bData: Partial<Business>, serviceCategoryName?: string, isPending?: boolean) => Business;
+  createBusiness: (
+    bData: Partial<Business>,
+    serviceCategoryName?: string,
+    isPending?: boolean,
+    ownerData?: { name?: string; email?: string; phone?: string; password?: string }
+  ) => Business;
   updateUserStatus: (userId: string, status: 'active' | 'pending' | 'rejected' | 'blocked' | 'suspended') => void;
   updateBusinessAndOwnerStatus: (businessId: string, newStatus: 'active' | 'pending' | 'rejected' | 'suspended') => void;
   updateUserPassword: (userId: string, newPass: string) => Promise<void>;
@@ -1361,9 +1366,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const createBusiness = (
     bData: Partial<Business>,
     initialCategoryName = 'General Service',
-    isPending = false
+    isPending = false,
+    ownerData?: { name?: string; email?: string; phone?: string; password?: string }
   ) => {
-    const newBizId = `biz-${Date.now()}`;
+    const newBizId = bData.id || `biz-${Date.now()}`;
     const newBiz: Business = {
       id: newBizId,
       name: bData.name || 'New Service Business',
@@ -1383,16 +1389,24 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: isPending ? 'pending' : 'active',
     };
 
+    const ownerName = ownerData?.name || (newBiz.email ? newBiz.email.split('@')[0] : `${newBiz.name} Admin`);
+    const ownerEmail = ownerData?.email || newBiz.email;
+    const rawPhone = ownerData?.phone || newBiz.mobile;
+    const ownerPhone = rawPhone.startsWith('+') ? rawPhone : `+91 ${rawPhone}`;
+    const ownerPassword = ownerData?.password || '1234';
+
     const ownerUser: User = {
       id: `usr-owner-${newBizId}`,
-      name: `${newBiz.name} Admin`,
-      email: newBiz.email,
-      phone: newBiz.mobile,
+      name: ownerName,
+      email: ownerEmail,
+      phone: ownerPhone,
       role: 'business_owner',
       businessId: newBizId,
+      password: ownerPassword,
       status: isPending ? 'inactive' : 'active',
       approvalStatus: isPending ? 'pending' : 'active',
       requestedDate: new Date().toISOString().split('T')[0],
+      joiningDate: new Date().toISOString().split('T')[0],
     };
 
     const defaultCategory: ServiceCategory = {
@@ -1414,27 +1428,16 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     saveToFirestore('businesses', newBiz.id, newBiz);
+    saveToFirestore('users', ownerUser.id, ownerUser);
     saveToFirestore('categories', defaultCategory.id, defaultCategory);
     saveToFirestore('services', defaultService.id, defaultService);
 
     setBusinesses((prev) => [...prev.filter((b) => b.id !== newBiz.id), newBiz]);
+    setUsers((prev) => [...prev.filter((u) => u.id !== ownerUser.id), ownerUser]);
     setCategories((prev) => [...prev.filter((c) => c.id !== defaultCategory.id), defaultCategory]);
     setServices((prev) => [...prev.filter((s) => s.id !== defaultService.id), defaultService]);
 
     if (!isPending) {
-      const ownerUser: User = {
-        id: `usr-owner-${newBizId}`,
-        name: `${newBiz.name} Admin`,
-        email: newBiz.email,
-        phone: newBiz.mobile,
-        role: 'business_owner',
-        businessId: newBizId,
-        status: 'active',
-        approvalStatus: 'active',
-        requestedDate: new Date().toISOString().split('T')[0],
-      };
-      saveToFirestore('users', ownerUser.id, ownerUser);
-      setUsers((prev) => [...prev.filter((u) => u.id !== ownerUser.id), ownerUser]);
       setCurrentBusiness(newBiz);
       setCurrentUser(ownerUser);
       showToast(`Welcome! Business "${newBiz.name}" onboarded and synced to Firestore.`, 'success');
@@ -2079,6 +2082,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (data.role === 'business_owner') {
       let targetBiz = businesses.find((b) => b.id === data.businessId);
+      let newOwner: User;
+
       if (!targetBiz) {
         targetBiz = createBusiness(
           {
@@ -2088,32 +2093,50 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             mobile: data.phone,
           },
           'General Service',
-          true
+          true,
+          {
+            name: data.name,
+            email: data.email,
+            phone: data.phone,
+            password: data.password,
+          }
         );
+        newOwner = {
+          id: `usr-owner-${targetBiz.id}`,
+          name: data.name,
+          email: data.email,
+          phone: data.phone.startsWith('+') ? data.phone : `+91 ${data.phone}`,
+          role: 'business_owner',
+          businessId: targetBiz.id,
+          password: data.password,
+          joiningDate: new Date().toISOString().split('T')[0],
+          requestedDate: new Date().toISOString().split('T')[0],
+          status: 'inactive',
+          approvalStatus: 'pending',
+        };
       } else {
         saveToFirestore('businesses', targetBiz.id, { status: 'pending' });
         targetBiz = { ...targetBiz, status: 'pending' };
         setBusinesses((prev) =>
           prev.map((b) => (b.id === targetBiz!.id ? { ...b, status: 'pending' } : b))
         );
+
+        newOwner = {
+          id: `usr-owner-${Date.now()}`,
+          name: data.name,
+          email: data.email,
+          phone: data.phone.startsWith('+') ? data.phone : `+91 ${data.phone}`,
+          role: 'business_owner',
+          businessId: targetBiz.id,
+          password: data.password,
+          joiningDate: new Date().toISOString().split('T')[0],
+          requestedDate: new Date().toISOString().split('T')[0],
+          status: 'inactive',
+          approvalStatus: 'pending',
+        };
+        saveToFirestore('users', newOwner.id, newOwner);
+        setUsers((prev) => [...prev.filter((u) => u.id !== newOwner.id), newOwner]);
       }
-
-      const newOwner: User = {
-        id: `usr-owner-${Date.now()}`,
-        name: data.name,
-        email: data.email,
-        phone: data.phone.startsWith('+') ? data.phone : `+91 ${data.phone}`,
-        role: 'business_owner',
-        businessId: targetBiz.id,
-        password: data.password,
-        joiningDate: new Date().toISOString().split('T')[0],
-        requestedDate: new Date().toISOString().split('T')[0],
-        status: 'inactive',
-        approvalStatus: 'pending',
-      };
-
-      saveToFirestore('users', newOwner.id, newOwner);
-      setUsers((prev) => [...prev.filter((u) => u.id !== newOwner.id), newOwner]);
 
       const notification: Notification = {
         id: `notif-sa-${Date.now()}`,

@@ -27,6 +27,8 @@ import {
   AlertTriangle,
   Layers,
   Check,
+  Plus,
+  UserPlus,
 } from 'lucide-react';
 
 export const SuperAdminView: React.FC = () => {
@@ -48,6 +50,7 @@ export const SuperAdminView: React.FC = () => {
     roles,
     plans,
     switchBusiness,
+    createBusiness,
     updateBusinessAndOwnerStatus,
     updateUserStatus,
     supportSessions,
@@ -69,6 +72,19 @@ export const SuperAdminView: React.FC = () => {
   const [activeTabSection, setActiveTabSection] = useState<
     'approvals' | 'tenants' | 'cleanup' | 'support' | 'settings' | 'audit' | 'sessions'
   >('approvals');
+
+  // Add / Onboard Tenant Modal State
+  const [isAddTenantModalOpen, setIsAddTenantModalOpen] = useState(false);
+  const [isCreatingTenant, setIsCreatingTenant] = useState(false);
+  const [newTenantForm, setNewTenantForm] = useState({
+    businessName: '',
+    industryType: 'CCTV & Security',
+    ownerName: '',
+    ownerEmail: '',
+    ownerPhone: '',
+    ownerPassword: '1234',
+    initialStatus: 'active' as 'active' | 'pending',
+  });
 
   // Support Session Dialog State
   const [supportModalBiz, setSupportModalBiz] = useState<{ id: string; name: string } | null>(null);
@@ -92,6 +108,88 @@ export const SuperAdminView: React.FC = () => {
   const [isDeleteAllTenantsModalOpen, setIsDeleteAllTenantsModalOpen] = useState(false);
   const [deleteAllConfirmText, setDeleteAllConfirmText] = useState('');
   const [isDeletingAllTenants, setIsDeletingAllTenants] = useState(false);
+
+  // Quick Simulation of Test Registration Request
+  const handleSimulateTestRegistration = () => {
+    const timestamp = Date.now().toString().slice(-4);
+    const testBiz = createBusiness(
+      {
+        name: `Apex Smart Security ${timestamp}`,
+        type: 'CCTV & Security',
+        email: `contact${timestamp}@apexsmart.com`,
+        mobile: `987654${timestamp}`,
+      },
+      'CCTV Installation',
+      true,
+      {
+        name: `Ramesh Sharma ${timestamp}`,
+        email: `ramesh${timestamp}@apexsmart.com`,
+        phone: `987654${timestamp}`,
+        password: '1234',
+      }
+    );
+    showToast(`Test registration for "${testBiz.name}" created and pending approval!`, 'success');
+  };
+
+  const handleOnboardTenantSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTenantForm.businessName.trim()) {
+      showToast('Please enter business name', 'error');
+      return;
+    }
+    if (!newTenantForm.ownerName.trim()) {
+      showToast('Please enter owner name', 'error');
+      return;
+    }
+    if (!newTenantForm.ownerEmail.trim()) {
+      showToast('Please enter owner email', 'error');
+      return;
+    }
+
+    setIsCreatingTenant(true);
+    try {
+      const isPending = newTenantForm.initialStatus === 'pending';
+      const createdBiz = createBusiness(
+        {
+          name: newTenantForm.businessName.trim(),
+          type: newTenantForm.industryType,
+          email: newTenantForm.ownerEmail.trim(),
+          mobile: newTenantForm.ownerPhone.trim() || '9876543210',
+        },
+        'General Service',
+        isPending,
+        {
+          name: newTenantForm.ownerName.trim(),
+          email: newTenantForm.ownerEmail.trim(),
+          phone: newTenantForm.ownerPhone.trim() || '9876543210',
+          password: newTenantForm.ownerPassword.trim() || '1234',
+        }
+      );
+
+      setIsAddTenantModalOpen(false);
+      setNewTenantForm({
+        businessName: '',
+        industryType: 'CCTV & Security',
+        ownerName: '',
+        ownerEmail: '',
+        ownerPhone: '',
+        ownerPassword: '1234',
+        initialStatus: 'active',
+      });
+
+      showToast(
+        isPending
+          ? `Tenant "${createdBiz.name}" submitted as Pending Approval.`
+          : `Tenant "${createdBiz.name}" onboarded and active immediately!`,
+        'success'
+      );
+    } catch (err) {
+      console.error('Failed to onboard tenant:', err);
+      showToast('Error creating tenant', 'error');
+    } finally {
+      setIsCreatingTenant(false);
+    }
+  };
 
   // Find pending owner/business registrations & pending staff
   const pendingOwners = users.filter(
@@ -406,7 +504,7 @@ export const SuperAdminView: React.FC = () => {
       {/* SECTION 1: Pending Owner Approvals */}
       {activeTabSection === 'approvals' && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-amber-200/80 dark:border-amber-900/60 shadow-md overflow-hidden">
-          <div className="p-5 bg-amber-50/80 dark:bg-amber-950/30 border-b border-amber-200/60 dark:border-amber-900/60 flex items-center justify-between">
+          <div className="p-5 bg-amber-50/80 dark:bg-amber-950/30 border-b border-amber-200/60 dark:border-amber-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-amber-500 text-white rounded-xl shadow-xs">
                 <Clock className="w-5 h-5" />
@@ -421,16 +519,83 @@ export const SuperAdminView: React.FC = () => {
               </div>
             </div>
 
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100">
-              {pendingCount} Pending
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSimulateTestRegistration}
+                className="px-3 py-1.5 rounded-xl bg-amber-200/80 hover:bg-amber-300 text-amber-950 dark:bg-amber-900/80 dark:hover:bg-amber-800 dark:text-amber-100 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                title="Create a sample pending registration request to test approval flow"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300" />
+                <span>Simulate Test Request</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setNewTenantForm({
+                    businessName: '',
+                    industryType: 'CCTV & Security',
+                    ownerName: '',
+                    ownerEmail: '',
+                    ownerPhone: '',
+                    ownerPassword: '1234',
+                    initialStatus: 'pending',
+                  });
+                  setIsAddTenantModalOpen(true);
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Onboard / Add Tenant</span>
+              </button>
+
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100">
+                {pendingCount} Pending
+              </span>
+            </div>
           </div>
 
           {pendingRegistrations.length === 0 ? (
-            <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-xs">
-              <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-500 mb-2 opacity-80" />
-              <p className="font-bold text-slate-700 dark:text-slate-300">No Pending Business Approvals</p>
-              <p className="mt-1 text-[11px]">All new Business Owner signups have been processed.</p>
+            <div className="p-10 text-center text-slate-500 dark:text-slate-400 space-y-4">
+              <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">No Pending Business Approvals</p>
+                <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto">
+                  All business signup requests have been reviewed. When a new business registers from the login page, their request will appear here for 1-click approval.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleSimulateTestRegistration}
+                  className="px-4 py-2 rounded-xl bg-amber-100 dark:bg-amber-950/80 hover:bg-amber-200 dark:hover:bg-amber-900 text-amber-900 dark:text-amber-200 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-600" />
+                  <span>Create Test Registration Request</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewTenantForm({
+                      businessName: '',
+                      industryType: 'CCTV & Security',
+                      ownerName: '',
+                      ownerEmail: '',
+                      ownerPhone: '',
+                      ownerPassword: '1234',
+                      initialStatus: 'active',
+                    });
+                    setIsAddTenantModalOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Onboard New Tenant Directly</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -571,7 +736,7 @@ export const SuperAdminView: React.FC = () => {
       {/* SECTION 2: All Business Tenants */}
       {activeTabSection === 'tenants' && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm">
-          <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
                 Registered Business Tenants & Access Control
@@ -580,7 +745,28 @@ export const SuperAdminView: React.FC = () => {
                 View onboarded companies, request audited time-limited support access, or suspend access.
               </p>
             </div>
-            <span className="text-xs font-bold text-slate-500">{businesses.length} Total</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setNewTenantForm({
+                    businessName: '',
+                    industryType: 'CCTV & Security',
+                    ownerName: '',
+                    ownerEmail: '',
+                    ownerPhone: '',
+                    ownerPassword: '1234',
+                    initialStatus: 'active',
+                  });
+                  setIsAddTenantModalOpen(true);
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Onboard New Tenant</span>
+              </button>
+              <span className="text-xs font-bold text-slate-500">{businesses.length} Total</span>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -666,7 +852,7 @@ export const SuperAdminView: React.FC = () => {
                           ) : isPending ? (
                             <button
                               onClick={() => updateBusinessAndOwnerStatus(b.id, 'active')}
-                              className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1 cursor-pointer"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               <span>Approve</span>
@@ -1775,6 +1961,210 @@ export const SuperAdminView: React.FC = () => {
                     <>
                       <Trash2 className="w-4 h-4" />
                       <span>Confirm & Purge All</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* ONBOARD NEW TENANT / BUSINESS OWNER MODAL */}
+      {isAddTenantModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-indigo-200 dark:border-indigo-900/60 max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-600 text-white rounded-2xl shadow-md">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 dark:text-slate-100 text-base">
+                    Onboard New Business Tenant
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Create a company profile and business owner login credentials
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddTenantModalOpen(false)}
+                className="p-1 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleOnboardTenantSubmit} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Company / Business Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newTenantForm.businessName}
+                    onChange={(e) => setNewTenantForm({ ...newTenantForm, businessName: e.target.value })}
+                    placeholder="e.g. Apex Security Solutions"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Industry / Service Category
+                  </label>
+                  <select
+                    value={newTenantForm.industryType}
+                    onChange={(e) => setNewTenantForm({ ...newTenantForm, industryType: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                  >
+                    <option value="CCTV & Security">CCTV & Security</option>
+                    <option value="Solar Installation">Solar Installation</option>
+                    <option value="AC & HVAC Service">AC & HVAC Service</option>
+                    <option value="Electrical Contracting">Electrical Contracting</option>
+                    <option value="Plumbing & Sanitation">Plumbing & Sanitation</option>
+                    <option value="Fire Safety & Alarms">Fire Safety & Alarms</option>
+                    <option value="IT & Networking">IT & Networking</option>
+                    <option value="Home Automation">Home Automation</option>
+                    <option value="General Field Service">General Field Service</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                <div className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2">
+                  Business Owner Credentials
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                      Owner Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newTenantForm.ownerName}
+                      onChange={(e) => setNewTenantForm({ ...newTenantForm, ownerName: e.target.value })}
+                      placeholder="e.g. Rajesh Kumar"
+                      className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                      Owner Mobile Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={newTenantForm.ownerPhone}
+                      onChange={(e) => setNewTenantForm({ ...newTenantForm, ownerPhone: e.target.value })}
+                      placeholder="9876543210"
+                      className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                      Owner Email (Login ID) *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={newTenantForm.ownerEmail}
+                      onChange={(e) => setNewTenantForm({ ...newTenantForm, ownerEmail: e.target.value })}
+                      placeholder="owner@business.com"
+                      className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                      Default Password
+                    </label>
+                    <input
+                      type="text"
+                      value={newTenantForm.ownerPassword}
+                      onChange={(e) => setNewTenantForm({ ...newTenantForm, ownerPassword: e.target.value })}
+                      placeholder="1234"
+                      className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Initial Approval Status
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label
+                    className={`p-2.5 rounded-xl border flex items-center gap-2 cursor-pointer transition-all ${
+                      newTenantForm.initialStatus === 'active'
+                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-100 font-bold'
+                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="initialStatus"
+                      value="active"
+                      checked={newTenantForm.initialStatus === 'active'}
+                      onChange={() => setNewTenantForm({ ...newTenantForm, initialStatus: 'active' })}
+                      className="hidden"
+                    />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Active Immediately</span>
+                  </label>
+
+                  <label
+                    className={`p-2.5 rounded-xl border flex items-center gap-2 cursor-pointer transition-all ${
+                      newTenantForm.initialStatus === 'pending'
+                        ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100 font-bold'
+                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="initialStatus"
+                      value="pending"
+                      checked={newTenantForm.initialStatus === 'pending'}
+                      onChange={() => setNewTenantForm({ ...newTenantForm, initialStatus: 'pending' })}
+                      className="hidden"
+                    />
+                    <Clock className="w-4 h-4 text-amber-600" />
+                    <span>Pending Approval</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  disabled={isCreatingTenant}
+                  onClick={() => setIsAddTenantModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isCreatingTenant}
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 font-extrabold text-white flex items-center gap-2 shadow-md cursor-pointer transition-all"
+                >
+                  {isCreatingTenant ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Creating Tenant...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Create & Onboard Tenant</span>
                     </>
                   )}
                 </button>
