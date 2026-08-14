@@ -340,6 +340,28 @@ const DEMO_SECURITY_LOGS: SecurityAuditLog[] = [
   },
 ];
 
+// LocalStorage cache helpers for instant load & offline resiliency
+const loadCache = <T,>(key: string, fallback: T): T => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed !== undefined && parsed !== null) return parsed;
+    }
+  } catch (e) {
+    console.warn(`Error loading cache for ${key}:`, e);
+  }
+  return fallback;
+};
+
+const saveCache = (key: string, data: any) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.warn(`Error saving cache for ${key}:`, e);
+  }
+};
+
 // Firestore helper wrappers
 const saveToFirestore = async (colName: string, id: string, data: any) => {
   try {
@@ -377,11 +399,17 @@ const DEFAULT_BLANK_BUSINESS: Business = {
 const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { theme, toggleTheme } = useTheme();
 
-  // State arrays populated directly via real-time Firestore onSnapshot listeners
-  const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [currentBusiness, setCurrentBusiness] = useState<Business>(DEFAULT_BLANK_BUSINESS);
+  // State arrays populated from cache and synchronized in real-time with Firestore
+  const [businesses, setBusinesses] = useState<Business[]>(() =>
+    loadCache('serviflow_businesses_cache', [])
+  );
+  const [currentBusiness, setCurrentBusiness] = useState<Business>(() =>
+    loadCache('serviflow_current_biz_cache', DEFAULT_BLANK_BUSINESS)
+  );
 
-  const [users, setUsers] = useState<User[]>([SUPER_ADMIN_USER]);
+  const [users, setUsers] = useState<User[]>(() =>
+    loadCache('serviflow_users_cache', [SUPER_ADMIN_USER])
+  );
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       const savedSession = localStorage.getItem('serviflow_user_session');
@@ -395,32 +423,68 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(true);
 
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [categories, setCategories] = useState<ServiceCategory[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>([]);
-  const [quotations, setQuotations] = useState<Quotation[]>([]);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [contracts, setContracts] = useState<RecurringContract[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [roles, setRoles] = useState<Role[]>(DEMO_ROLES);
+  const [customers, setCustomers] = useState<Customer[]>(() =>
+    loadCache('serviflow_customers_cache', [])
+  );
+  const [categories, setCategories] = useState<ServiceCategory[]>(() =>
+    loadCache('serviflow_categories_cache', [])
+  );
+  const [services, setServices] = useState<Service[]>(() =>
+    loadCache('serviflow_services_cache', [])
+  );
+  const [jobs, setJobs] = useState<Job[]>(() =>
+    loadCache('serviflow_jobs_cache', [])
+  );
+  const [inventory, setInventory] = useState<InventoryItem[]>(() =>
+    loadCache('serviflow_inventory_cache', [])
+  );
+  const [inventoryTransactions, setInventoryTransactions] = useState<InventoryTransaction[]>(() =>
+    loadCache('serviflow_inv_tx_cache', [])
+  );
+  const [quotations, setQuotations] = useState<Quotation[]>(() =>
+    loadCache('serviflow_quotations_cache', [])
+  );
+  const [invoices, setInvoices] = useState<Invoice[]>(() =>
+    loadCache('serviflow_invoices_cache', [])
+  );
+  const [payments, setPayments] = useState<Payment[]>(() =>
+    loadCache('serviflow_payments_cache', [])
+  );
+  const [contracts, setContracts] = useState<RecurringContract[]>(() =>
+    loadCache('serviflow_contracts_cache', [])
+  );
+  const [expenses, setExpenses] = useState<Expense[]>(() =>
+    loadCache('serviflow_expenses_cache', [])
+  );
+  const [notifications, setNotifications] = useState<Notification[]>(() =>
+    loadCache('serviflow_notifications_cache', [])
+  );
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(() =>
+    loadCache('serviflow_activity_logs_cache', [])
+  );
+  const [roles, setRoles] = useState<Role[]>(() =>
+    loadCache('serviflow_roles_cache', DEMO_ROLES)
+  );
 
   // Super Admin Support Access & Security States
-  const [supportSessions, setSupportSessions] = useState<SupportSession[]>([]);
+  const [supportSessions, setSupportSessions] = useState<SupportSession[]>(() =>
+    loadCache('serviflow_support_sessions_cache', [])
+  );
   const [activeSupportSession, setActiveSupportSession] = useState<SupportSession | null>(null);
-  const [systemSettings, setSystemSettings] = useState<SystemSettings>(DEFAULT_SYSTEM_SETTINGS);
-  const [securityAuditLogs, setSecurityAuditLogs] = useState<SecurityAuditLog[]>(DEMO_SECURITY_LOGS);
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>(() =>
+    loadCache('serviflow_system_settings_cache', DEFAULT_SYSTEM_SETTINGS)
+  );
+  const [securityAuditLogs, setSecurityAuditLogs] = useState<SecurityAuditLog[]>(() =>
+    loadCache('serviflow_security_logs_cache', DEMO_SECURITY_LOGS)
+  );
 
   // Offline Technician Sync States
   const [isOffline, setIsOffline] = useState<boolean>(!navigator.onLine);
   const [isSimulatedOffline, setIsSimulatedOffline] = useState<boolean>(false);
   const [pendingSyncQueue, setPendingSyncQueue] = useState<OfflineSyncItem[]>([]);
-  const [manualSyncLogs, setManualSyncLogs] = useState<ManualSyncLog[]>([]);
+  const [manualSyncLogs, setManualSyncLogs] = useState<ManualSyncLog[]>(() =>
+    loadCache('serviflow_manual_sync_logs_cache', [])
+  );
 
   const isActuallyOffline = isOffline || isSimulatedOffline;
 
@@ -432,19 +496,28 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isInitialJobsLoadRef = React.useRef(true);
 
   // -------------------------------------------------------------
-  // REAL-TIME FIRESTORE SUBSCRIPTIONS (NO MOCK/DEMO DATA SEEDING)
+  // REAL-TIME FIRESTORE SUBSCRIPTIONS (WITH PERSISTENT LOCAL CACHE)
   // -------------------------------------------------------------
   useEffect(() => {
     // 1. Businesses
     const unsubBiz = onSnapshot(
       collection(db, 'businesses'),
       (snapshot) => {
-        const items = snapshot.docs.map((d) => d.data() as Business);
-        setBusinesses(items);
-        if (items.length > 0) {
+        const cloudItems = snapshot.docs.map((d) => d.data() as Business);
+        setBusinesses((prev) => {
+          const map = new Map<string, Business>();
+          prev.forEach((b) => map.set(b.id, b));
+          cloudItems.forEach((b) => map.set(b.id, b));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_businesses_cache', merged);
+          return merged;
+        });
+        if (cloudItems.length > 0) {
           setCurrentBusiness((prev) => {
-            const found = items.find((b) => b.id === prev.id);
-            return found || items[0];
+            const found = cloudItems.find((b) => b.id === prev.id);
+            const active = found || cloudItems[0];
+            saveCache('serviflow_current_biz_cache', active);
+            return active;
           });
         }
       },
@@ -455,26 +528,36 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubUsers = onSnapshot(
       collection(db, 'users'),
       (snapshot) => {
-        const items = snapshot.docs.map((d) => d.data() as User);
+        const cloudItems = snapshot.docs.map((d) => d.data() as User);
+        setUsers((prev) => {
+          const map = new Map<string, User>();
+          map.set(SUPER_ADMIN_USER.id, SUPER_ADMIN_USER);
+          prev.forEach((u) => map.set(u.id, u));
+          cloudItems.forEach((u) => map.set(u.id, u));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_users_cache', merged);
+          return merged;
+        });
+
         // Ensure Super Admin user exists in database
-        const hasSuperAdmin = items.some(
+        const hasSuperAdmin = cloudItems.some(
           (u) => u.role === 'super_admin' || u.email === 'admin@serviflow.io'
         );
         if (!hasSuperAdmin) {
           saveToFirestore('users', SUPER_ADMIN_USER.id, SUPER_ADMIN_USER);
-          setUsers([SUPER_ADMIN_USER, ...items]);
-        } else {
-          setUsers(items);
         }
-        setCurrentUser((prev) =>
-          prev
-            ? items.find(
-                (u) =>
-                  u.id === prev.id ||
-                  (Boolean(u.email) && Boolean(prev.email) && (u.email || '').trim().toLowerCase() === (prev.email || '').trim().toLowerCase())
-              ) || prev
-            : null
-        );
+
+        setCurrentUser((prev) => {
+          if (!prev) return null;
+          const found = cloudItems.find(
+            (u) =>
+              u.id === prev.id ||
+              (Boolean(u.email) &&
+                Boolean(prev.email) &&
+                (u.email || '').trim().toLowerCase() === (prev.email || '').trim().toLowerCase())
+          );
+          return found || prev;
+        });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'users')
     );
@@ -483,7 +566,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubCustomers = onSnapshot(
       collection(db, 'customers'),
       (snapshot) => {
-        setCustomers(snapshot.docs.map((d) => d.data() as Customer));
+        const cloudItems = snapshot.docs.map((d) => d.data() as Customer);
+        setCustomers((prev) => {
+          const map = new Map<string, Customer>();
+          prev.forEach((c) => map.set(c.id, c));
+          cloudItems.forEach((c) => map.set(c.id, c));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_customers_cache', merged);
+          return merged;
+        });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'customers')
     );
@@ -492,7 +583,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubCategories = onSnapshot(
       collection(db, 'categories'),
       (snapshot) => {
-        setCategories(snapshot.docs.map((d) => d.data() as ServiceCategory));
+        const cloudItems = snapshot.docs.map((d) => d.data() as ServiceCategory);
+        setCategories((prev) => {
+          const map = new Map<string, ServiceCategory>();
+          prev.forEach((c) => map.set(c.id, c));
+          cloudItems.forEach((c) => map.set(c.id, c));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_categories_cache', merged);
+          return merged;
+        });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'categories')
     );
@@ -501,7 +600,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubServices = onSnapshot(
       collection(db, 'services'),
       (snapshot) => {
-        setServices(snapshot.docs.map((d) => d.data() as Service));
+        const cloudItems = snapshot.docs.map((d) => d.data() as Service);
+        setServices((prev) => {
+          const map = new Map<string, Service>();
+          prev.forEach((s) => map.set(s.id, s));
+          cloudItems.forEach((s) => map.set(s.id, s));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_services_cache', merged);
+          return merged;
+        });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'services')
     );
@@ -512,7 +619,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (snapshot) => {
         const loadedJobs = snapshot.docs.map((d) => d.data() as Job);
 
-        // Audio & Voice Notifications for real-time new jobs or staff assignments
         if (!isInitialJobsLoadRef.current) {
           snapshot.docChanges().forEach((change) => {
             if (change.type === 'added') {
@@ -530,7 +636,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           isInitialJobsLoadRef.current = false;
         }
 
-        setJobs(loadedJobs);
+        setJobs((prev) => {
+          const map = new Map<string, Job>();
+          prev.forEach((j) => map.set(j.id, j));
+          loadedJobs.forEach((j) => map.set(j.id, j));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_jobs_cache', merged);
+          return merged;
+        });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'jobs')
     );
@@ -539,7 +652,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubInventory = onSnapshot(
       collection(db, 'inventory'),
       (snapshot) => {
-        setInventory(snapshot.docs.map((d) => d.data() as InventoryItem));
+        const cloudItems = snapshot.docs.map((d) => d.data() as InventoryItem);
+        setInventory((prev) => {
+          const map = new Map<string, InventoryItem>();
+          prev.forEach((i) => map.set(i.id, i));
+          cloudItems.forEach((i) => map.set(i.id, i));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_inventory_cache', merged);
+          return merged;
+        });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'inventory')
     );
@@ -548,7 +669,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubInvTx = onSnapshot(
       collection(db, 'inventoryTransactions'),
       (snapshot) => {
-        setInventoryTransactions(snapshot.docs.map((d) => d.data() as InventoryTransaction));
+        const cloudItems = snapshot.docs.map((d) => d.data() as InventoryTransaction);
+        setInventoryTransactions((prev) => {
+          const map = new Map<string, InventoryTransaction>();
+          prev.forEach((t) => map.set(t.id, t));
+          cloudItems.forEach((t) => map.set(t.id, t));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_inv_tx_cache', merged);
+          return merged;
+        });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'inventoryTransactions')
     );
@@ -557,7 +686,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubQuotations = onSnapshot(
       collection(db, 'quotations'),
       (snapshot) => {
-        setQuotations(snapshot.docs.map((d) => d.data() as Quotation));
+        const cloudItems = snapshot.docs.map((d) => d.data() as Quotation);
+        setQuotations((prev) => {
+          const map = new Map<string, Quotation>();
+          prev.forEach((q) => map.set(q.id, q));
+          cloudItems.forEach((q) => map.set(q.id, q));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_quotations_cache', merged);
+          return merged;
+        });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'quotations')
     );
@@ -566,7 +703,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubInvoices = onSnapshot(
       collection(db, 'invoices'),
       (snapshot) => {
-        setInvoices(snapshot.docs.map((d) => d.data() as Invoice));
+        const cloudItems = snapshot.docs.map((d) => d.data() as Invoice);
+        setInvoices((prev) => {
+          const map = new Map<string, Invoice>();
+          prev.forEach((inv) => map.set(inv.id, inv));
+          cloudItems.forEach((inv) => map.set(inv.id, inv));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_invoices_cache', merged);
+          return merged;
+        });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'invoices')
     );
@@ -575,7 +720,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubPayments = onSnapshot(
       collection(db, 'payments'),
       (snapshot) => {
-        setPayments(snapshot.docs.map((d) => d.data() as Payment));
+        const cloudItems = snapshot.docs.map((d) => d.data() as Payment);
+        setPayments((prev) => {
+          const map = new Map<string, Payment>();
+          prev.forEach((p) => map.set(p.id, p));
+          cloudItems.forEach((p) => map.set(p.id, p));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_payments_cache', merged);
+          return merged;
+        });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'payments')
     );
@@ -584,7 +737,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubContracts = onSnapshot(
       collection(db, 'contracts'),
       (snapshot) => {
-        setContracts(snapshot.docs.map((d) => d.data() as RecurringContract));
+        const cloudItems = snapshot.docs.map((d) => d.data() as RecurringContract);
+        setContracts((prev) => {
+          const map = new Map<string, RecurringContract>();
+          prev.forEach((c) => map.set(c.id, c));
+          cloudItems.forEach((c) => map.set(c.id, c));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_contracts_cache', merged);
+          return merged;
+        });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'contracts')
     );
@@ -593,7 +754,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubExpenses = onSnapshot(
       collection(db, 'expenses'),
       (snapshot) => {
-        setExpenses(snapshot.docs.map((d) => d.data() as Expense));
+        const cloudItems = snapshot.docs.map((d) => d.data() as Expense);
+        setExpenses((prev) => {
+          const map = new Map<string, Expense>();
+          prev.forEach((e) => map.set(e.id, e));
+          cloudItems.forEach((e) => map.set(e.id, e));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_expenses_cache', merged);
+          return merged;
+        });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'expenses')
     );
@@ -602,7 +771,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubNotifications = onSnapshot(
       collection(db, 'notifications'),
       (snapshot) => {
-        setNotifications(snapshot.docs.map((d) => d.data() as Notification));
+        const cloudItems = snapshot.docs.map((d) => d.data() as Notification);
+        setNotifications((prev) => {
+          const map = new Map<string, Notification>();
+          prev.forEach((n) => map.set(n.id, n));
+          cloudItems.forEach((n) => map.set(n.id, n));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_notifications_cache', merged);
+          return merged;
+        });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'notifications')
     );
@@ -611,7 +788,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubActivities = onSnapshot(
       collection(db, 'activities'),
       (snapshot) => {
-        setActivityLogs(snapshot.docs.map((d) => d.data() as ActivityLog));
+        const cloudItems = snapshot.docs.map((d) => d.data() as ActivityLog);
+        setActivityLogs((prev) => {
+          const map = new Map<string, ActivityLog>();
+          prev.forEach((a) => map.set(a.id, a));
+          cloudItems.forEach((a) => map.set(a.id, a));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_activity_logs_cache', merged);
+          return merged;
+        });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'activities')
     );
@@ -620,7 +805,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubSyncLogs = onSnapshot(
       collection(db, 'manualSyncLogs'),
       (snapshot) => {
-        setManualSyncLogs(snapshot.docs.map((d) => d.data() as ManualSyncLog));
+        const cloudItems = snapshot.docs.map((d) => d.data() as ManualSyncLog);
+        setManualSyncLogs((prev) => {
+          const map = new Map<string, ManualSyncLog>();
+          prev.forEach((m) => map.set(m.id, m));
+          cloudItems.forEach((m) => map.set(m.id, m));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_manual_sync_logs_cache', merged);
+          return merged;
+        });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'manualSyncLogs')
     );
@@ -630,10 +823,13 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'roles'),
       (snapshot) => {
         if (!snapshot.empty) {
-          setRoles(snapshot.docs.map((d) => d.data() as Role));
+          const loadedRoles = snapshot.docs.map((d) => d.data() as Role);
+          setRoles(loadedRoles);
+          saveCache('serviflow_roles_cache', loadedRoles);
         } else {
           DEMO_ROLES.forEach((r) => saveToFirestore('roles', r.id, r));
           setRoles(DEMO_ROLES);
+          saveCache('serviflow_roles_cache', DEMO_ROLES);
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'roles')
@@ -645,6 +841,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (snapshot) => {
         const sessions = snapshot.docs.map((d) => d.data() as SupportSession);
         setSupportSessions(sessions);
+        saveCache('serviflow_support_sessions_cache', sessions);
         const active = sessions.find((s) => s.status === 'active' && new Date(s.expiryTime).getTime() > Date.now());
         setActiveSupportSession(active || null);
       },
@@ -656,7 +853,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       doc(db, 'systemSettings', 'global'),
       (docSnap) => {
         if (docSnap.exists()) {
-          setSystemSettings(docSnap.data() as SystemSettings);
+          const loaded = docSnap.data() as SystemSettings;
+          setSystemSettings(loaded);
+          saveCache('serviflow_system_settings_cache', loaded);
         } else {
           saveToFirestore('systemSettings', 'global', DEFAULT_SYSTEM_SETTINGS);
         }
@@ -668,7 +867,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubSecurityLogs = onSnapshot(
       collection(db, 'securityAuditLogs'),
       (snapshot) => {
-        setSecurityAuditLogs(snapshot.docs.map((d) => d.data() as SecurityAuditLog));
+        const logs = snapshot.docs.map((d) => d.data() as SecurityAuditLog);
+        setSecurityAuditLogs(logs);
+        saveCache('serviflow_security_logs_cache', logs);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'securityAuditLogs')
     );
@@ -1438,15 +1639,37 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveToFirestore('categories', defaultCategory.id, defaultCategory);
     saveToFirestore('services', defaultService.id, defaultService);
 
-    setBusinesses((prev) => [...prev.filter((b) => b.id !== newBiz.id), newBiz]);
-    setUsers((prev) => [...prev.filter((u) => u.id !== ownerUser.id), ownerUser]);
-    setCategories((prev) => [...prev.filter((c) => c.id !== defaultCategory.id), defaultCategory]);
-    setServices((prev) => [...prev.filter((s) => s.id !== defaultService.id), defaultService]);
+    setBusinesses((prev) => {
+      const updated = [...prev.filter((b) => b.id !== newBiz.id), newBiz];
+      saveCache('serviflow_businesses_cache', updated);
+      return updated;
+    });
+    setUsers((prev) => {
+      const updated = [...prev.filter((u) => u.id !== ownerUser.id), ownerUser];
+      saveCache('serviflow_users_cache', updated);
+      return updated;
+    });
+    setCategories((prev) => {
+      const updated = [...prev.filter((c) => c.id !== defaultCategory.id), defaultCategory];
+      saveCache('serviflow_categories_cache', updated);
+      return updated;
+    });
+    setServices((prev) => {
+      const updated = [...prev.filter((s) => s.id !== defaultService.id), defaultService];
+      saveCache('serviflow_services_cache', updated);
+      return updated;
+    });
 
     if (!isPending) {
-      setCurrentBusiness(newBiz);
-      setCurrentUser(ownerUser);
-      showToast(`Welcome! Business "${newBiz.name}" onboarded and synced to Firestore.`, 'success');
+      if (currentUser?.role === 'super_admin') {
+        showToast(`Business "${newBiz.name}" created and synced to Firestore.`, 'success');
+      } else {
+        setCurrentBusiness(newBiz);
+        saveCache('serviflow_current_biz_cache', newBiz);
+        setCurrentUser(ownerUser);
+        localStorage.setItem('serviflow_user_session', JSON.stringify(ownerUser));
+        showToast(`Welcome! Business "${newBiz.name}" onboarded and synced to Firestore.`, 'success');
+      }
     }
     return newBiz;
   };
@@ -1953,30 +2176,35 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     newStatus: 'active' | 'pending' | 'rejected' | 'suspended'
   ) => {
     saveToFirestore('businesses', businessId, { status: newStatus });
-    setBusinesses((prev) =>
-      prev.map((b) => (b.id === businessId ? { ...b, status: newStatus } : b))
-    );
+    setBusinesses((prev) => {
+      const updated = prev.map((b) => (b.id === businessId ? { ...b, status: newStatus } : b));
+      saveCache('serviflow_businesses_cache', updated);
+      return updated;
+    });
 
+    const targetStatus: 'active' | 'inactive' = newStatus === 'active' ? 'active' : 'inactive';
     const ownerUsers = users.filter((u) => u.businessId === businessId && u.role === 'business_owner');
     ownerUsers.forEach((owner) => {
       const userUpdates: Partial<User> = {
         approvalStatus: newStatus,
-        status: newStatus === 'active' ? 'active' : 'inactive',
+        status: targetStatus,
       };
       saveToFirestore('users', owner.id, userUpdates);
     });
 
-    setUsers((prev) =>
-      prev.map((u) =>
+    setUsers((prev) => {
+      const updated = prev.map((u) =>
         u.businessId === businessId && u.role === 'business_owner'
           ? {
               ...u,
               approvalStatus: newStatus,
-              status: newStatus === 'active' ? 'active' : 'inactive',
+              status: targetStatus,
             }
           : u
-      )
-    );
+      );
+      saveCache('serviflow_users_cache', updated);
+      return updated;
+    });
 
     const targetBiz = businesses.find((b) => b.id === businessId);
     const bizName = targetBiz?.name || businessId;
@@ -2000,23 +2228,26 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const target = users.find((u) => u.id === userId);
     if (!target) return;
 
+    const targetStatus: 'active' | 'inactive' = newApprovalStatus === 'active' ? 'active' : 'inactive';
     const updates: Partial<User> = {
       approvalStatus: newApprovalStatus,
-      status: newApprovalStatus === 'active' ? 'active' : 'inactive',
+      status: targetStatus,
     };
 
     saveToFirestore('users', userId, updates);
-    setUsers((prev) =>
-      prev.map((u) =>
+    setUsers((prev) => {
+      const updated = prev.map((u) =>
         u.id === userId
           ? {
               ...u,
               approvalStatus: newApprovalStatus,
-              status: newApprovalStatus === 'active' ? 'active' : 'inactive',
+              status: targetStatus,
             }
           : u
-      )
-    );
+      );
+      saveCache('serviflow_users_cache', updated);
+      return updated;
+    });
 
     if (newApprovalStatus === 'active') {
       showToast(`Approved & activated account for ${target.name}`, 'success');
@@ -2141,7 +2372,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           approvalStatus: 'pending',
         };
         saveToFirestore('users', newOwner.id, newOwner);
-        setUsers((prev) => [...prev.filter((u) => u.id !== newOwner.id), newOwner]);
+        setUsers((prev) => {
+          const updated = [...prev.filter((u) => u.id !== newOwner.id), newOwner];
+          saveCache('serviflow_users_cache', updated);
+          return updated;
+        });
       }
 
       const notification: Notification = {
@@ -2155,7 +2390,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         targetRoleId: 'super_admin',
       };
       saveToFirestore('notifications', notification.id, notification);
-      setNotifications((prev) => [notification, ...prev]);
+      setNotifications((prev) => {
+        const updated = [notification, ...prev];
+        saveCache('serviflow_notifications_cache', updated);
+        return updated;
+      });
 
       showToast('Your business registration is pending approval from the platform admin. You will be notified once approved.', 'info');
       return { user: newOwner, isPending: true };
@@ -2176,7 +2415,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       saveToFirestore('users', newStaff.id, newStaff);
-      setUsers((prev) => [...prev.filter((u) => u.id !== newStaff.id), newStaff]);
+      setUsers((prev) => {
+        const updated = [...prev.filter((u) => u.id !== newStaff.id), newStaff];
+        saveCache('serviflow_users_cache', updated);
+        return updated;
+      });
 
       const notification: Notification = {
         id: `notif-${Date.now()}`,
@@ -2189,7 +2432,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         targetRoleId: 'business_owner',
       };
       saveToFirestore('notifications', notification.id, notification);
-      setNotifications((prev) => [notification, ...prev]);
+      setNotifications((prev) => {
+        const updated = [notification, ...prev];
+        saveCache('serviflow_notifications_cache', updated);
+        return updated;
+      });
 
       showToast(`Registration submitted for ${newStaff.name}. Waiting for Owner approval.`, 'info');
       return { user: newStaff, isPending: true };
@@ -2199,6 +2446,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateBusinessSettings = (updates: Partial<Business>) => {
     const updated = { ...currentBusiness, ...updates };
     setCurrentBusiness(updated);
+    saveCache('serviflow_current_biz_cache', updated);
+    setBusinesses((prev) => {
+      const updatedList = prev.map((b) => (b.id === updated.id ? updated : b));
+      saveCache('serviflow_businesses_cache', updatedList);
+      return updatedList;
+    });
     saveToFirestore('businesses', currentBusiness.id, updates);
     showToast('Business profile & settings updated and synced to Firestore', 'success');
   };
