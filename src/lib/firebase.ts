@@ -1,5 +1,11 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+  inMemoryPersistence,
+} from 'firebase/auth';
 import {
   getFirestore,
   doc,
@@ -19,10 +25,20 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
 export const auth = getAuth(app);
 
-// Explicitly set browserLocalPersistence before any login logic runs
-setPersistence(auth, browserLocalPersistence).catch((error) => {
-  console.error('Failed to set browserLocalPersistence:', error);
-});
+// Gracefully configure auth persistence with multi-tier fallback
+(async () => {
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+  } catch (localErr) {
+    console.warn('browserLocalPersistence unavailable, falling back to browserSessionPersistence:', localErr);
+    try {
+      await setPersistence(auth, browserSessionPersistence);
+    } catch (sessionErr) {
+      console.warn('browserSessionPersistence unavailable, falling back to inMemoryPersistence:', sessionErr);
+      await setPersistence(auth, inMemoryPersistence).catch(() => {});
+    }
+  }
+})();
 
 export enum OperationType {
   CREATE = 'create',

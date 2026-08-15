@@ -385,7 +385,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
               >
                 {isSubmitting ? (
                   <span>Signing in...</span>
@@ -396,6 +396,38 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   </>
                 )}
               </button>
+
+              {/* Quick Demo Sign-in Helper */}
+              <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
+                <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 flex items-center justify-between">
+                  <span>Quick Demo Logins:</span>
+                  <span className="text-[10px] text-indigo-500 font-normal">Auto-fills credentials</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginIdentifier('admin@serviflow.io');
+                      setLoginPassword('ServiFlow@123');
+                    }}
+                    className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800/70 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-slate-200 dark:border-slate-700 text-left transition-colors cursor-pointer"
+                  >
+                    <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate">Super Admin</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">admin@serviflow.io</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginIdentifier('owner@apexsecurity.com');
+                      setLoginPassword('ServiFlow@123');
+                    }}
+                    className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800/70 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-slate-200 dark:border-slate-700 text-left transition-colors cursor-pointer"
+                  >
+                    <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate">Business Owner</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">owner@apexsecurity.com</div>
+                  </button>
+                </div>
+              </div>
             </form>
           )}
 

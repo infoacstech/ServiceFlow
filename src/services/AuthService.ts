@@ -187,20 +187,46 @@ export class AuthService {
     }
 
     const authPass = password || 'ServiFlow@123';
-    let authUser: FirebaseUser;
+    let authUser: FirebaseUser | null = null;
 
     try {
       const cred = await signInWithEmailAndPassword(auth, targetEmail, authPass);
       authUser = cred.user;
     } catch (authErr: any) {
-      if (authErr.code === 'auth/user-not-found' || authErr.code === 'auth/invalid-credential') {
-        throw new Error('Invalid email or password. Please check your credentials.');
+      // If user doesn't exist yet in Firebase Authentication (e.g. first-time login, super admin, or pre-seeded user),
+      // auto-provision the Auth credential seamlessly
+      if (
+        authErr.code === 'auth/user-not-found' ||
+        authErr.code === 'auth/invalid-credential' ||
+        authErr.code === 'auth/invalid-email'
+      ) {
+        try {
+          const createCred = await createUserWithEmailAndPassword(auth, targetEmail, authPass);
+          authUser = createCred.user;
+        } catch (createErr: any) {
+          if (createErr.code === 'auth/email-already-in-use') {
+            // Re-attempt sign in if password was different or user was just created
+            try {
+              const retryCred = await signInWithEmailAndPassword(auth, targetEmail, authPass);
+              authUser = retryCred.user;
+            } catch {
+              throw new Error('Invalid email or password. Please check your credentials or reset password.');
+            }
+          } else {
+            throw new Error('Invalid email or password. Please check your credentials.');
+          }
+        }
       } else if (authErr.code === 'auth/wrong-password') {
-        throw new Error('Incorrect password. Please try again.');
+        throw new Error('Incorrect password. Please try again or use Forgot Password.');
       } else if (authErr.code === 'auth/too-many-requests') {
         throw new Error('Too many failed attempts. Please try again later or reset password.');
+      } else {
+        throw authErr;
       }
-      throw authErr;
+    }
+
+    if (!authUser) {
+      throw new Error('Authentication failed. Please check your credentials.');
     }
 
     // 1. Fetch User Record
