@@ -47,11 +47,11 @@ import {
   SUPER_ADMIN_USER,
 } from '../data/demoData';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { AuthService } from '../services/AuthService';
 import {
   updatePassword as firebaseUpdatePassword,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signInAnonymously,
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth';
@@ -109,7 +109,7 @@ interface AppContextType {
     businessId?: string;
     businessName?: string;
     businessType?: string;
-  }) => { user: User; isPending: boolean };
+  }) => Promise<{ user: User; isPending: boolean }>;
 
   // Data collections (filtered by current business when applicable)
   customers: Customer[];
@@ -929,33 +929,23 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         try {
           let userRecord: User | null = null;
 
-          // 1. Re-fetch user document directly from Firestore
+          // 1. Fetch user document directly from Firestore by UID
           const userDocRef = doc(db, 'users', firebaseUser.uid);
           const userSnap = await getDoc(userDocRef);
 
           if (userSnap.exists()) {
-            userRecord = userSnap.data() as User;
+            userRecord = { ...(userSnap.data() as User), id: firebaseUser.uid };
           } else {
             const targetEmail = firebaseUser.email || localStorage.getItem('serviflow_logged_in_email');
             if (targetEmail) {
               const q = query(collection(db, 'users'), where('email', '==', targetEmail.toLowerCase()));
               const qSnap = await getDocs(q);
               if (!qSnap.empty) {
-                userRecord = qSnap.docs[0].data() as User;
+                userRecord = { ...(qSnap.docs[0].data() as User), id: firebaseUser.uid };
+                // Ensure document is keyed by UID
+                await setDoc(doc(db, 'users', firebaseUser.uid), userRecord, { merge: true });
               }
             }
-          }
-
-          if (!userRecord) {
-            const targetEmail = firebaseUser.email || localStorage.getItem('serviflow_logged_in_email');
-            const targetUid = localStorage.getItem('serviflow_logged_in_uid');
-            userRecord =
-              users.find(
-                (u) =>
-                  (Boolean(u.email) && Boolean(targetEmail) && (u.email || '').toLowerCase() === (targetEmail || '').toLowerCase()) ||
-                  u.id === targetUid ||
-                  u.id === firebaseUser.uid
-              ) || null;
           }
 
           if (userRecord) {
@@ -964,125 +954,86 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             localStorage.setItem('serviflow_logged_in_email', userRecord.email);
             localStorage.setItem('serviflow_logged_in_uid', userRecord.id);
 
-            const bizSnap = await getDoc(doc(db, 'businesses', userRecord.businessId));
-            if (bizSnap.exists()) {
-              setCurrentBusiness(bizSnap.data() as Business);
+            // Fetch and set tenant
+            if (userRecord.businessId === 'all' || userRecord.role === 'super_admin') {
+              const globalBiz: Business = {
+                id: 'all',
+                name: 'ServiFlow Global Network',
+                type: 'Platform Management',
+                logo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&auto=format&fit=crop&q=80',
+                mobile: '+91 90000 00000',
+                whatsapp: '+91 90000 00000',
+                email: 'admin@serviflow.io',
+                address: 'Global Operations Centre',
+                city: 'New Delhi',
+                state: 'Delhi',
+                pin: '110001',
+                currency: '₹',
+                createdAt: new Date().toISOString().split('T')[0],
+                planId: 'plan-enterprise',
+                status: 'active',
+              };
+              setCurrentBusiness(globalBiz);
             } else {
-              const biz = businesses.find((b) => b.id === userRecord?.businessId);
-              if (biz) setCurrentBusiness(biz);
+              const bizSnap = await getDoc(doc(db, 'businesses', userRecord.businessId));
+              if (bizSnap.exists()) {
+                setCurrentBusiness(bizSnap.data() as Business);
+              } else {
+                const tenantSnap = await getDoc(doc(db, 'tenants', userRecord.businessId));
+                if (tenantSnap.exists()) {
+                  setCurrentBusiness(tenantSnap.data() as Business);
+                } else {
+                  const biz = businesses.find((b) => b.id === userRecord?.businessId);
+                  if (biz) setCurrentBusiness(biz);
+                }
+              }
             }
           }
         } catch (err) {
           console.error('Error fetching user on auth change:', err);
         }
       } else {
-        // Fallback: Check if local session exists before wiping currentUser
-        const storedSession = localStorage.getItem('serviflow_user_session');
-        if (storedSession) {
-          try {
-            const parsedUser = JSON.parse(storedSession) as User;
-            setCurrentUser(parsedUser);
-            const biz = businesses.find((b) => b.id === parsedUser.businessId);
-            if (biz) setCurrentBusiness(biz);
-          } catch (e) {
-            setCurrentUser(null);
-          }
-        } else {
-          setCurrentUser(null);
-        }
+        // Clear session on sign out
+        localStorage.removeItem('serviflow_user_session');
+        localStorage.removeItem('serviflow_logged_in_email');
+        localStorage.removeItem('serviflow_logged_in_uid');
+        setCurrentUser(null);
       }
       setIsAuthInitializing(false);
     });
 
     return () => unsubscribe();
-  }, [users, businesses]);
+  }, [businesses]);
 
   const loginUser = async (userToLogin: User, password?: string): Promise<User> => {
     try {
-      // SECURITY GUARD: Block suspended, rejected, pending, or inactive accounts
-      if (userToLogin.approvalStatus === 'pending' && userToLogin.role !== 'super_admin') {
-        showToast('Access Restricted: Your Business Owner account registration is pending platform admin approval.', 'error');
-        throw new Error('Account pending approval');
-      }
-      if (
-        (userToLogin.approvalStatus === 'blocked' ||
-          userToLogin.approvalStatus === 'suspended' ||
-          userToLogin.approvalStatus === 'rejected' ||
-          userToLogin.status === 'inactive') &&
-        userToLogin.role !== 'super_admin'
-      ) {
-        showToast('Access Blocked: Your account access has been suspended or revoked.', 'error');
-        throw new Error('Account access suspended or blocked');
-      }
-
-      const targetBiz = businesses.find((b) => b.id === userToLogin.businessId);
-      if (targetBiz && (targetBiz.status === 'suspended' || targetBiz.status === 'rejected') && userToLogin.role !== 'super_admin') {
-        showToast('Tenant Suspended: Your business account has been suspended by the SaaS platform administrator.', 'error');
-        throw new Error('Business tenant suspended');
-      }
-
-      await saveToFirestore('users', userToLogin.id, userToLogin);
-
-      const email = (userToLogin.email || '').trim().toLowerCase();
+      const email = userToLogin.email || '';
       const pass = password || userToLogin.password || 'ServiFlow@123';
+      
+      const { user, tenant } = await AuthService.loginWithCredentials(email, pass);
 
-      try {
-        await signInWithEmailAndPassword(auth, email, pass);
-      } catch (authErr: any) {
-        if (
-          authErr.code === 'auth/user-not-found' ||
-          authErr.code === 'auth/invalid-credential' ||
-          authErr.code === 'auth/invalid-email'
-        ) {
-          try {
-            const newAuth = await createUserWithEmailAndPassword(auth, email, pass);
-            if (newAuth.user.uid) {
-              await saveToFirestore('users', newAuth.user.uid, userToLogin);
-            }
-          } catch (createErr) {
-            if (!auth.currentUser) {
-              await signInAnonymously(auth);
-            }
-          }
-        } else if (!auth.currentUser) {
-          await signInAnonymously(auth);
-        }
-      }
+      localStorage.setItem('serviflow_user_session', JSON.stringify(user));
+      localStorage.setItem('serviflow_logged_in_email', user.email);
+      localStorage.setItem('serviflow_logged_in_uid', user.id);
 
-      localStorage.setItem('serviflow_user_session', JSON.stringify(userToLogin));
-      localStorage.setItem('serviflow_logged_in_email', email);
-      localStorage.setItem('serviflow_logged_in_uid', auth.currentUser?.uid || userToLogin.id);
+      setCurrentUser(user);
+      setCurrentBusiness(tenant);
 
-      setCurrentUser(userToLogin);
-
-      const biz = businesses.find((b) => b.id === userToLogin.businessId);
-      if (biz) {
-        setCurrentBusiness(biz);
-      } else {
-        const bizSnap = await getDoc(doc(db, 'businesses', userToLogin.businessId));
-        if (bizSnap.exists()) {
-          setCurrentBusiness(bizSnap.data() as Business);
-        }
-      }
-
-      showToast(`Welcome back, ${userToLogin.name}!`, 'success');
-      return userToLogin;
-    } catch (err) {
+      showToast(`Welcome back, ${user.name}!`, 'success');
+      return user;
+    } catch (err: any) {
       console.error('Error logging in user:', err);
+      showToast(err.message || 'Login failed', 'error');
       throw err;
     }
   };
 
   const logoutUser = async (): Promise<void> => {
     try {
-      await signOut(auth);
+      await AuthService.logOut();
     } catch (err) {
-      console.warn('Error signing out from Firebase Auth:', err);
+      console.warn('Error signing out:', err);
     }
-    localStorage.removeItem('serviflow_user_session');
-    localStorage.removeItem('serviflow_logged_in_email');
-    localStorage.removeItem('serviflow_logged_in_uid');
-    sessionStorage.removeItem('serviflow_active_tab');
     setCurrentUser(null);
     showToast('Signed out successfully.', 'info');
   };
@@ -2154,6 +2105,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: data.status || 'active',
     };
     saveToFirestore('users', newStaff.id, newStaff);
+    saveToFirestore('tenantMembers', `${currentBusiness.id}_${newStaff.id}`, {
+      id: `${currentBusiness.id}_${newStaff.id}`,
+      tenantId: currentBusiness.id,
+      userId: newStaff.id,
+      role: newStaff.role,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
     showToast(`Staff member "${newStaff.name}" added`, 'success');
     return newStaff;
   };
@@ -2282,7 +2242,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logActivity('Password Changed', 'staff', userId, 'User updated account password');
   };
 
-  const registerUser = (data: {
+  const registerUser = async (data: {
     name: string;
     email: string;
     phone: string;
@@ -2291,11 +2251,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     businessId?: string;
     businessName?: string;
     businessType?: string;
-  }): { user: User; isPending: boolean } => {
+  }): Promise<{ user: User; isPending: boolean }> => {
     const normalizedEmail = (data.email || '').trim().toLowerCase();
     const cleanPhoneDigits = (data.phone || '').replace(/[^0-9]/g, '');
 
-    // 1. Strict Duplicate Account Check: Prevent duplicate email or mobile number
+    // 1. Strict Duplicate Account Check
     const existingAccount = users.find((u) => {
       const uEmail = (u.email || '').trim().toLowerCase();
       const uPhoneDigits = (u.phone || '').replace(/[^0-9]/g, '');
@@ -2312,134 +2272,87 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         existingAccount.email?.trim().toLowerCase() === normalizedEmail
           ? `Email address (${data.email})`
           : `Mobile number (${data.phone})`;
-      const errorMsg = `${matchedField} is already registered. Please go to the Login tab to access your account.`;
+      const errorMsg = `${matchedField} is already registered. Please login to your account.`;
       showToast(errorMsg, 'error');
       throw new Error(errorMsg);
     }
 
     if (data.role === 'business_owner') {
-      let targetBiz = businesses.find((b) => b.id === data.businessId);
-      let newOwner: User;
-
-      if (!targetBiz) {
-        targetBiz = createBusiness(
-          {
-            name: data.businessName || `${data.name}'s Business`,
-            type: data.businessType || 'CCTV & Security',
-            email: data.email,
-            mobile: data.phone,
-          },
-          'General Service',
-          true,
-          {
-            name: data.name,
-            email: data.email,
-            phone: data.phone,
-            password: data.password,
-          }
-        );
-        newOwner = {
-          id: `usr-owner-${targetBiz.id}`,
+      try {
+        const { user: newOwner, tenant: newTenant } = await AuthService.signUpOwner({
           name: data.name,
           email: data.email,
-          phone: data.phone.startsWith('+') ? data.phone : `+91 ${data.phone}`,
-          role: 'business_owner',
-          businessId: targetBiz.id,
+          phone: data.phone,
           password: data.password,
-          joiningDate: new Date().toISOString().split('T')[0],
-          requestedDate: new Date().toISOString().split('T')[0],
-          status: 'inactive',
-          approvalStatus: 'pending',
-        };
-      } else {
-        saveToFirestore('businesses', targetBiz.id, { status: 'pending' });
-        targetBiz = { ...targetBiz, status: 'pending' };
-        setBusinesses((prev) =>
-          prev.map((b) => (b.id === targetBiz!.id ? { ...b, status: 'pending' } : b))
-        );
-
-        newOwner = {
-          id: `usr-owner-${Date.now()}`,
-          name: data.name,
-          email: data.email,
-          phone: data.phone.startsWith('+') ? data.phone : `+91 ${data.phone}`,
-          role: 'business_owner',
-          businessId: targetBiz.id,
-          password: data.password,
-          joiningDate: new Date().toISOString().split('T')[0],
-          requestedDate: new Date().toISOString().split('T')[0],
-          status: 'inactive',
-          approvalStatus: 'pending',
-        };
-        saveToFirestore('users', newOwner.id, newOwner);
-        setUsers((prev) => {
-          const updated = [...prev.filter((u) => u.id !== newOwner.id), newOwner];
-          saveCache('serviflow_users_cache', updated);
-          return updated;
+          businessName: data.businessName || `${data.name}'s Business`,
+          businessType: data.businessType || 'CCTV & Security',
         });
+
+        // Set active session
+        localStorage.setItem('serviflow_user_session', JSON.stringify(newOwner));
+        localStorage.setItem('serviflow_logged_in_email', newOwner.email);
+        localStorage.setItem('serviflow_logged_in_uid', newOwner.id);
+
+        setCurrentUser(newOwner);
+        setCurrentBusiness(newTenant);
+
+        // Update local caches
+        setBusinesses((prev) => [...prev.filter((b) => b.id !== newTenant.id), newTenant]);
+        setUsers((prev) => [...prev.filter((u) => u.id !== newOwner.id), newOwner]);
+
+        showToast(`Business "${newTenant.name}" registered successfully! Welcome to ServiFlow.`, 'success');
+        return { user: newOwner, isPending: false };
+      } catch (err: any) {
+        console.error('Sign up error:', err);
+        showToast(err.message || 'Registration failed', 'error');
+        throw err;
+      }
+    } else {
+      // Staff account registration
+      const bId = data.businessId || currentBusiness.id;
+      let newStaffUid = `usr-${Date.now()}`;
+      
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, data.email, data.password);
+        newStaffUid = cred.user.uid;
+      } catch (authErr: any) {
+        if (authErr.code !== 'auth/email-already-in-use') {
+          console.warn('Firebase Auth user creation note for staff:', authErr);
+        }
       }
 
-      const notification: Notification = {
-        id: `notif-sa-${Date.now()}`,
-        businessId: 'all',
-        title: 'New Business Owner Registration Pending',
-        message: `${newOwner.name} registered business "${targetBiz.name}" (${targetBiz.type}) and is awaiting platform admin approval.`,
-        type: 'system',
-        read: false,
-        createdAt: new Date().toISOString(),
-        targetRoleId: 'super_admin',
-      };
-      saveToFirestore('notifications', notification.id, notification);
-      setNotifications((prev) => {
-        const updated = [notification, ...prev];
-        saveCache('serviflow_notifications_cache', updated);
-        return updated;
-      });
-
-      showToast('Your business registration is pending approval from the platform admin. You will be notified once approved.', 'info');
-      return { user: newOwner, isPending: true };
-    } else {
-      const bId = data.businessId || currentBusiness.id;
       const newStaff: User = {
-        id: `usr-${Date.now()}`,
+        id: newStaffUid,
         name: data.name,
         email: data.email,
         phone: data.phone.startsWith('+') ? data.phone : `+91 ${data.phone}`,
         role: data.role,
         businessId: bId,
-        password: data.password,
         joiningDate: new Date().toISOString().split('T')[0],
         requestedDate: new Date().toISOString().split('T')[0],
-        status: 'inactive',
-        approvalStatus: 'pending',
+        status: 'active',
+        approvalStatus: 'active',
       };
 
-      saveToFirestore('users', newStaff.id, newStaff);
+      await saveToFirestore('users', newStaff.id, newStaff);
+      await saveToFirestore('tenantMembers', `${bId}_${newStaff.id}`, {
+        id: `${bId}_${newStaff.id}`,
+        tenantId: bId,
+        userId: newStaff.id,
+        role: data.role,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
       setUsers((prev) => {
         const updated = [...prev.filter((u) => u.id !== newStaff.id), newStaff];
         saveCache('serviflow_users_cache', updated);
         return updated;
       });
 
-      const notification: Notification = {
-        id: `notif-${Date.now()}`,
-        businessId: bId,
-        title: 'New Account Approval Request',
-        message: `${newStaff.name} registered as ${newStaff.role.replace('_', ' ')} and is waiting for your approval.`,
-        type: 'system',
-        read: false,
-        createdAt: new Date().toISOString(),
-        targetRoleId: 'business_owner',
-      };
-      saveToFirestore('notifications', notification.id, notification);
-      setNotifications((prev) => {
-        const updated = [notification, ...prev];
-        saveCache('serviflow_notifications_cache', updated);
-        return updated;
-      });
-
-      showToast(`Registration submitted for ${newStaff.name}. Waiting for Owner approval.`, 'info');
-      return { user: newStaff, isPending: true };
+      showToast(`Account created for ${newStaff.name}.`, 'success');
+      return { user: newStaff, isPending: false };
     }
   };
 

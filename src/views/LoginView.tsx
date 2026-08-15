@@ -94,7 +94,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   // Handle Direct Sign In
   const handleDirectLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanIdentifier = loginIdentifier.trim().toLowerCase();
+    const cleanIdentifier = loginIdentifier.trim();
 
     if (!cleanIdentifier) {
       showToast('Please enter your email address or mobile phone number', 'error');
@@ -104,109 +104,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setIsSubmitting(true);
 
     try {
-      // Find user locally by email or phone
-      const cleanDigits = cleanIdentifier.replace(/[^0-9]/g, '');
-      const isEmailInput = cleanIdentifier.includes('@');
-      let matchedUser = (users || []).find((u) => {
-        const uEmail = (u.email || '').trim().toLowerCase();
-        const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
-        if (isEmailInput) {
-          return uEmail === cleanIdentifier;
-        }
-        if (cleanDigits.length >= 10) {
-          return uPhone.length >= 10 && uPhone.slice(-10) === cleanDigits.slice(-10);
-        }
-        return uEmail === cleanIdentifier;
-      });
+      // Direct login through AppContext and AuthService
+      const loggedIn = await loginUser(
+        { email: cleanIdentifier, id: '', name: '', phone: '', role: 'business_owner', businessId: '', status: 'active' },
+        loginPassword
+      );
 
-      // Firestore fallback query if not in local memory yet
-      if (!matchedUser) {
-        try {
-          if (isEmailInput) {
-            const qEmail = query(collection(db, 'users'), where('email', '==', cleanIdentifier));
-            const snapEmail = await getDocs(qEmail);
-            if (!snapEmail.empty) {
-              matchedUser = snapEmail.docs[0].data() as User;
-            }
-          } else if (cleanDigits.length >= 10) {
-            const allUsersSnap = await getDocs(collection(db, 'users'));
-            const foundDoc = allUsersSnap.docs.find((d) => {
-              const uData = d.data() as User;
-              const uPhoneDigits = (uData.phone || '').replace(/[^0-9]/g, '');
-              return uPhoneDigits.length >= 10 && uPhoneDigits.slice(-10) === cleanDigits.slice(-10);
-            });
-            if (foundDoc) {
-              matchedUser = foundDoc.data() as User;
-            }
-          }
-        } catch (fsErr) {
-          console.warn('Firestore fallback user query error:', fsErr);
-        }
-      }
-
-      if (!matchedUser) {
-        showToast('No account found with this email or mobile phone. Please check details or register.', 'error');
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Password Check
-      if (matchedUser.password && loginPassword && matchedUser.password !== loginPassword) {
-        showToast('Incorrect password. Please try again.', 'error');
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Business & Status Checks
-      const userBiz = (businesses || []).find((b) => b.id === matchedUser.businessId);
-
-      if (userBiz?.status === 'suspended') {
-        showToast('Your business account access has been suspended by the platform admin.', 'error');
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (matchedUser.role === 'business_owner') {
-        const bizStatus = userBiz?.status || matchedUser.approvalStatus || 'active';
-        if (bizStatus === 'pending' || matchedUser.approvalStatus === 'pending') {
-          showToast('Your business registration is pending approval from the platform admin.', 'error');
-          setIsSubmitting(false);
-          return;
-        }
-        if (bizStatus === 'rejected' || matchedUser.approvalStatus === 'rejected') {
-          showToast('Your registration was rejected by the platform admin.', 'error');
-          setIsSubmitting(false);
-          return;
-        }
-        if (bizStatus === 'suspended' || matchedUser.approvalStatus === 'suspended') {
-          showToast('Your business account access has been suspended.', 'error');
-          setIsSubmitting(false);
-          return;
-        }
-      } else if (matchedUser.role !== 'super_admin') {
-        const staffStatus = matchedUser.approvalStatus || 'active';
-        if (staffStatus === 'pending') {
-          showToast('Waiting for Owner approval. Contact your business owner to activate your account.', 'error');
-          setIsSubmitting(false);
-          return;
-        }
-        if (staffStatus === 'rejected') {
-          showToast('Your registration was rejected by the business owner.', 'error');
-          setIsSubmitting(false);
-          return;
-        }
-        if (staffStatus === 'blocked' || staffStatus === 'suspended') {
-          showToast('Your access has been blocked by the business owner.', 'error');
-          setIsSubmitting(false);
-          return;
-        }
-      }
-
-      // Execute Login & Set Active Tab
-      sessionStorage.setItem('serviflow_active_tab', matchedUser.role === 'super_admin' ? 'super_admin' : 'dashboard');
-      await loginUser(matchedUser, loginPassword);
+      sessionStorage.setItem('serviflow_active_tab', loggedIn.role === 'super_admin' ? 'super_admin' : 'dashboard');
       if (onLoginSuccess) onLoginSuccess();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Sign in error:', err);
     } finally {
       setIsSubmitting(false);
@@ -214,20 +120,22 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   };
 
   // Handle Account Registration
-  const handleDirectRegistration = (e: React.FormEvent) => {
+  const handleDirectRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regName.trim() || !regEmail.trim() || !regPhone.trim() || !regPassword.trim()) {
       showToast('Please complete all required fields including password', 'error');
       return;
     }
 
-    if (regPassword.length < 4) {
-      showToast('Password should be at least 4 characters long', 'error');
+    if (regPassword.length < 6) {
+      showToast('Password must be at least 6 characters long for secure Firebase Authentication', 'error');
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
-      const result = registerUser({
+      const result = await registerUser({
         name: regName.trim(),
         email: regEmail.trim(),
         phone: regPhone.trim(),
@@ -245,10 +153,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         setRegPhone('');
         setRegPassword('');
       } else {
+        sessionStorage.setItem('serviflow_active_tab', 'dashboard');
         if (onLoginSuccess) onLoginSuccess();
       }
-    } catch {
-      // Toast notification is already triggered by registerUser
+    } catch (err: any) {
+      console.error('Registration error:', err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

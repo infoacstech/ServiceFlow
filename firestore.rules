@@ -8,74 +8,181 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Businesses collection - Allow public read and registration create/updates
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'admin@serviflow.io' ||
+        request.auth.uid == 'usr-admin' ||
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin'
+      );
+    }
+
+    function isUserSelf(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isTenantMember(businessId) {
+      return isAuthenticated() && (
+        isSuperAdmin() ||
+        exists(/databases/$(database)/documents/tenantMembers/$(businessId + '_' + request.auth.uid)) ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId
+        )
+      );
+    }
+
+    // Businesses and Tenants collections
     match /businesses/{businessId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated() || true; // Public read for tenant profile loading & discovery
+      allow create: if isAuthenticated() || true; // Self-registration allowed
+      allow update, delete: if isTenantMember(businessId) || isSuperAdmin();
     }
 
-    // Users collection - Allow public read for login matching and self-registration
+    match /tenants/{tenantId} {
+      allow read: if isAuthenticated() || true;
+      allow create: if isAuthenticated() || true;
+      allow update, delete: if isTenantMember(tenantId) || isSuperAdmin();
+    }
+
+    // Tenant Memberships
+    match /tenantMembers/{membershipId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isSuperAdmin() || (
+        isAuthenticated() && resource.data.userId == request.auth.uid
+      );
+    }
+
+    // Users Collection
     match /users/{userId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated() || true; // Public read for lookup during login
+      allow create: if isAuthenticated() || true; // Self-registration
+      allow update: if isUserSelf(userId) || isSuperAdmin();
+      allow delete: if isSuperAdmin();
     }
 
-    // Tenant operational collections
+    // Tenant Operational Collections (Protected by Tenant Membership & Super Admin)
     match /customers/{docId} {
-      allow read, write: if true;
-    }
-    match /categories/{docId} {
-      allow read, write: if true;
-    }
-    match /services/{docId} {
-      allow read, write: if true;
-    }
-    match /jobs/{docId} {
-      allow read, write: if true;
-    }
-    match /inventory/{docId} {
-      allow read, write: if true;
-    }
-    match /inventoryTransactions/{docId} {
-      allow read, write: if true;
-    }
-    match /quotations/{docId} {
-      allow read, write: if true;
-    }
-    match /invoices/{docId} {
-      allow read, write: if true;
-    }
-    match /payments/{docId} {
-      allow read, write: if true;
-    }
-    match /contracts/{docId} {
-      allow read, write: if true;
-    }
-    match /expenses/{docId} {
-      allow read, write: if true;
-    }
-    match /notifications/{docId} {
-      allow read, write: if true;
-    }
-    match /activities/{docId} {
-      allow read, write: if true;
-    }
-    match /manualSyncLogs/{docId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) ||
+        isTenantMember(request.resource.data.businessId) ||
+        isSuperAdmin()
+      );
     }
 
-    // Super Admin System Collections & Security Logs
+    match /jobs/{docId} {
+      allow read, write: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) ||
+        isTenantMember(request.resource.data.businessId) ||
+        isSuperAdmin()
+      );
+    }
+
+    match /invoices/{docId} {
+      allow read, write: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) ||
+        isTenantMember(request.resource.data.businessId) ||
+        isSuperAdmin()
+      );
+    }
+
+    match /quotations/{docId} {
+      allow read, write: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) ||
+        isTenantMember(request.resource.data.businessId) ||
+        isSuperAdmin()
+      );
+    }
+
+    match /payments/{docId} {
+      allow read, write: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) ||
+        isTenantMember(request.resource.data.businessId) ||
+        isSuperAdmin()
+      );
+    }
+
+    match /contracts/{docId} {
+      allow read, write: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) ||
+        isTenantMember(request.resource.data.businessId) ||
+        isSuperAdmin()
+      );
+    }
+
+    match /expenses/{docId} {
+      allow read, write: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) ||
+        isTenantMember(request.resource.data.businessId) ||
+        isSuperAdmin()
+      );
+    }
+
+    match /inventory/{docId} {
+      allow read, write: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) ||
+        isTenantMember(request.resource.data.businessId) ||
+        isSuperAdmin()
+      );
+    }
+
+    match /inventoryTransactions/{docId} {
+      allow read, write: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) ||
+        isTenantMember(request.resource.data.businessId) ||
+        isSuperAdmin()
+      );
+    }
+
+    match /categories/{docId} {
+      allow read, write: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) ||
+        isTenantMember(request.resource.data.businessId) ||
+        isSuperAdmin()
+      );
+    }
+
+    match /services/{docId} {
+      allow read, write: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) ||
+        isTenantMember(request.resource.data.businessId) ||
+        isSuperAdmin()
+      );
+    }
+
+    match /notifications/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /activities/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /manualSyncLogs/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // System Settings & Support Sessions
     match /supportSessions/{sessionId} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
+
     match /systemSettings/{settingId} {
-      allow read, write: if true;
-    }
-    match /securityAuditLogs/{logId} {
       allow read: if true;
-      allow create, update: if true;
-      allow delete: if false; // Immutable audit trail
+      allow write: if isSuperAdmin();
     }
+
+    match /securityAuditLogs/{logId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Immutable audit trail
+    }
+
     match /roles/{roleId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isSuperAdmin();
     }
   }
 }
+

@@ -27,6 +27,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     businesses,
     switchBusiness,
     switchRole,
+    loginUser,
     showToast,
     registerUser,
     updateUserPassword,
@@ -62,92 +63,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  const handleDirectLogin = (e: React.FormEvent) => {
+  const handleDirectLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const clean = loginIdentifier.trim().toLowerCase();
+    const clean = loginIdentifier.trim();
     if (!clean) {
       showToast('Please enter your email or mobile number', 'error');
       return;
     }
 
-    const cleanDigits = clean.replace(/[^0-9]/g, '');
-    const isEmailInput = clean.includes('@');
-    const matchedUser = (users || []).find((u) => {
-      const uEmail = (u.email || '').trim().toLowerCase();
-      const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
-      if (isEmailInput) {
-        return uEmail === clean;
-      }
-      if (cleanDigits.length >= 10) {
-        return uPhone.length >= 10 && uPhone.slice(-10) === cleanDigits.slice(-10);
-      }
-      return uEmail === clean;
-    });
-
-    if (!matchedUser) {
-      showToast('No user account found with this email or mobile number.', 'error');
-      return;
+    try {
+      await loginUser(
+        { email: clean, id: '', name: '', phone: '', role: 'business_owner', businessId: '', status: 'active' },
+        loginPassword
+      );
+      onClose();
+    } catch (err) {
+      console.error('Sign in error in modal:', err);
     }
-
-    if (matchedUser.password && loginPassword && matchedUser.password !== loginPassword) {
-      showToast('Incorrect password. Please try again.', 'error');
-      return;
-    }
-
-    const userBiz = (businesses || []).find((b) => b.id === matchedUser.businessId);
-
-    if (userBiz?.status === 'suspended') {
-      showToast('Your business account access has been suspended by the platform admin.', 'error');
-      return;
-    }
-
-    if (matchedUser.role === 'business_owner') {
-      const bizStatus = userBiz?.status || matchedUser.approvalStatus || 'active';
-      if (bizStatus === 'pending' || matchedUser.approvalStatus === 'pending') {
-        showToast('Your business registration is pending approval from the platform admin.', 'error');
-        return;
-      }
-      if (bizStatus === 'rejected' || matchedUser.approvalStatus === 'rejected') {
-        showToast('Your registration was rejected by the platform admin.', 'error');
-        return;
-      }
-      if (bizStatus === 'suspended' || matchedUser.approvalStatus === 'suspended') {
-        showToast('Your business account access has been suspended.', 'error');
-        return;
-      }
-    } else if (matchedUser.role !== 'super_admin') {
-      const staffStatus = matchedUser.approvalStatus || 'active';
-      if (staffStatus === 'pending') {
-        showToast('Waiting for Owner approval. Contact your business owner to activate your account.', 'error');
-        return;
-      }
-      if (staffStatus === 'rejected') {
-        showToast('Your registration was rejected by the business owner.', 'error');
-        return;
-      }
-      if (staffStatus === 'blocked' || staffStatus === 'suspended') {
-        showToast('Your access has been blocked by the business owner.', 'error');
-        return;
-      }
-    }
-
-    setCurrentUser(matchedUser);
-    if (matchedUser.businessId && matchedUser.businessId !== 'all') {
-      switchBusiness(matchedUser.businessId);
-    }
-    showToast(`Welcome back, ${matchedUser.name}!`, 'success');
-    onClose();
   };
 
-  const handleDirectRegistration = (e: React.FormEvent) => {
+  const handleDirectRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regName.trim() || !regEmail.trim() || !regPhone.trim() || !regPassword.trim()) {
       showToast('Please complete all required fields including password', 'error');
       return;
     }
 
+    if (regPassword.length < 6) {
+      showToast('Password must be at least 6 characters long for secure Firebase Authentication', 'error');
+      return;
+    }
+
     try {
-      const result = registerUser({
+      const result = await registerUser({
         name: regName.trim(),
         email: regEmail.trim(),
         phone: regPhone.trim(),
@@ -167,8 +115,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       } else {
         onClose();
       }
-    } catch {
-      // Toast notification is handled by registerUser
+    } catch (err) {
+      console.error('Registration error in modal:', err);
     }
   };
 
