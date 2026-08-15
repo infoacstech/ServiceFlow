@@ -58,6 +58,7 @@ import {
 import { FirestoreService, firestoreService } from '../services/FirestoreService';
 import {
   playJobVoiceNotification,
+  playJobCompletedVoiceNotification,
   playCustomVoiceNotification,
 } from '../utils/audioNotification';
 import {
@@ -1638,7 +1639,24 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const filteredPayments = isSuperAdminUser ? payments : payments.filter((p) => p.businessId === currBizId);
   const filteredContracts = isSuperAdminUser ? contracts : contracts.filter((c) => c.businessId === currBizId);
   const filteredExpenses = isSuperAdminUser ? expenses : expenses.filter((e) => e.businessId === currBizId);
-  const filteredNotifications = isSuperAdminUser ? notifications : notifications.filter((n) => n.businessId === currBizId);
+  const filteredNotifications = isSuperAdminUser
+    ? notifications
+    : notifications.filter((n) => {
+        if (n.businessId !== currBizId) return false;
+        if (n.targetUserId && currentUser) {
+          return n.targetUserId === currentUser.id || n.targetUserId === currentUser.email;
+        }
+        if (n.targetRoleId && currentUser) {
+          if (n.targetRoleId === 'owner') {
+            return currentUser.role === 'owner' || currentUser.role === 'business_owner';
+          }
+          if (n.targetRoleId === 'technician') {
+            return currentUser.role === 'technician';
+          }
+          return currentUser.role === n.targetRoleId;
+        }
+        return true;
+      });
   const filteredActivityLogs = isSuperAdminUser ? activityLogs : activityLogs.filter((a) => a.businessId === currBizId);
   const filteredStaff = isSuperAdminUser ? users : users.filter((u) => u.businessId === currBizId && u.role !== 'super_admin');
 
@@ -1738,6 +1756,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id,
       businessId: currentBusiness.id,
       jobId,
+      scheduledTime: data.scheduledTime || '09:00 AM - 11:00 AM',
+      scheduledTimeSlot: data.scheduledTimeSlot || data.scheduledTime || '09:00 AM - 11:00 AM',
       createdAt: new Date().toISOString().split('T')[0],
     };
 
@@ -1754,15 +1774,19 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       read: false,
       createdAt: new Date().toISOString(),
       targetRoleId: 'technician',
+      targetUserId: data.assignedStaffId,
     };
     saveToFirestore('notifications', newNotif.id, newNotif);
 
     logActivity('Job Created', 'job', newJob.id, `Created job ${jobId}`);
 
-    // Instant voice notification audio chime & speech
-    playJobVoiceNotification(jobId, data.description || 'New Service Task', data.location, assignedStaff?.name);
+    // Voice notification should only play for the assigned technician (not owner who created it)
+    const isCurrentUserTheTechnician = currentUser?.id === data.assignedStaffId || (currentUser?.role === 'technician' && !currentUser?.role.includes('owner'));
+    if (isCurrentUserTheTechnician) {
+      playJobVoiceNotification(jobId, data.description || 'New Service Task', data.location, assignedStaff?.name);
+    }
 
-    showToast(`Job ${jobId} issued & staff notified with voice alert!`, 'success');
+    showToast(`Job ${jobId} issued & assigned${assignedStaff ? ' to ' + assignedStaff.name : ''}!`, 'success');
     return newJob;
   };
 
@@ -1889,14 +1913,38 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       materialsUsed: data.materialsUsed || [],
     };
 
+    const assignedTech = (users || []).find((u) => u.id === existingJob?.assignedStaffId) || currentUser;
+    const techName = assignedTech?.name || currentUser?.name || 'Staff Member';
+
+    // Create Notification doc in Firestore for Business Owner
+    const completeNotif: Notification = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      businessId: currentBusiness.id,
+      title: `Job Completed: ${existingJob?.jobId || id}`,
+      message: `Staff ${techName} has completed job ${existingJob?.jobId || id} (${existingJob?.description || 'Service'}). Customer rating: ${data.customerRating || 5}★.`,
+      type: 'job',
+      read: false,
+      createdAt: new Date().toISOString(),
+      targetRoleId: 'owner',
+    };
+    saveToFirestore('notifications', completeNotif.id, completeNotif);
+
     if (isActuallyOffline) {
       addToSyncQueue('complete_job', id, data, 'Technician completed job & recorded customer report/signature');
       showToast('Offline Mode: Job report saved locally & queued for sync!', 'success');
     } else {
       firestoreService.saveDocument<Job>('jobs', id, completionData);
-      logActivity('Job Completed', 'job', id, 'Technician completed job work & obtained customer signature');
+      logActivity('Job Completed', 'job', id, `Technician ${techName} completed job work & obtained customer signature`);
       showToast('Job marked as completed & synced to Firestore!', 'success');
     }
+
+    // Trigger multi-language voice alert for Business Owner in their selected language
+    playJobCompletedVoiceNotification(
+      existingJob?.jobId || id,
+      techName,
+      existingJob?.description,
+      data.customerRating || 5
+    );
   };
 
   // Inventory Actions

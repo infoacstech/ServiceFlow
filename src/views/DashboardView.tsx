@@ -348,7 +348,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           )}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {/* Action 1: Add Customer */}
           <button
             onClick={() => setIsAddCustomerOpen(true)}
@@ -373,32 +373,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-[10px] text-slate-400 dark:text-slate-500">Generate estimate</span>
           </button>
 
-          {/* Action 3: Sync Offline Data */}
-          <button
-            onClick={handleSyncData}
-            disabled={isSyncing}
-            className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all group active:scale-95 cursor-pointer ${
-              pendingSyncQueue.length > 0
-                ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-900/50 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200'
-                : 'bg-slate-50/80 hover:bg-blue-50 dark:bg-slate-800/60 dark:hover:bg-blue-950/40 border-slate-200/60 dark:border-slate-700/60 hover:border-blue-300 dark:hover:border-blue-600/50 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-300'
-            }`}
-          >
-            <div
-              className={`p-2 rounded-xl mb-1.5 group-hover:scale-110 transition-transform ${
-                pendingSyncQueue.length > 0
-                  ? 'bg-amber-200 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300'
-                  : 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
-              }`}
-            >
-              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            </div>
-            <span className="text-xs font-bold">Sync Offline Data</span>
-            <span className="text-[10px] text-slate-400 dark:text-slate-500">
-              {pendingSyncQueue.length > 0 ? `${pendingSyncQueue.length} items queued` : 'Cache synced'}
-            </span>
-          </button>
-
-          {/* Action 4: Schedule Job */}
+          {/* Action 3: Schedule Job */}
           <button
             onClick={onOpenNewJob}
             className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/80 hover:bg-purple-50 dark:bg-slate-800/60 dark:hover:bg-purple-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-purple-300 dark:hover:border-purple-600/50 text-slate-700 dark:text-slate-200 hover:text-purple-600 dark:hover:text-purple-300 transition-all group active:scale-95 cursor-pointer"
@@ -410,7 +385,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-[10px] text-slate-400 dark:text-slate-500">Dispatch tech</span>
           </button>
 
-          {/* Action 5: Create Invoice */}
+          {/* Action 4: Create Invoice */}
           <button
             onClick={() => navigate('invoices', { statusFilter: 'all' })}
             className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/80 hover:bg-rose-50 dark:bg-slate-800/60 dark:hover:bg-rose-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-rose-300 dark:hover:border-rose-600/50 text-slate-700 dark:text-slate-200 hover:text-rose-600 dark:hover:text-rose-300 transition-all group active:scale-95 cursor-pointer"

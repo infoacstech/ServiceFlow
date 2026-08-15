@@ -25,6 +25,27 @@ export const SUPPORTED_VOICE_LANGUAGES: VoiceLanguageOption[] = [
 // Global Audio Context singleton
 let audioCtx: AudioContext | null = null;
 
+/**
+ * Gets currently set voice volume (0.0 to 1.0)
+ */
+export function getVoiceVolume(): number {
+  if (typeof localStorage === 'undefined') return 0.85;
+  const saved = localStorage.getItem('serviflow_voice_volume');
+  if (saved === null) return 0.85;
+  const parsed = parseFloat(saved);
+  return isNaN(parsed) ? 0.85 : Math.max(0, Math.min(1, parsed));
+}
+
+/**
+ * Sets voice volume (0.0 to 1.0)
+ */
+export function setVoiceVolume(volume: number): void {
+  if (typeof localStorage !== 'undefined') {
+    const clamped = Math.max(0, Math.min(1, volume));
+    localStorage.setItem('serviflow_voice_volume', clamped.toString());
+  }
+}
+
 function getAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null;
   if (!audioCtx) {
@@ -47,6 +68,9 @@ export function playNotificationChime(): void {
     const ctx = getAudioContext();
     if (!ctx) return;
 
+    const volume = getVoiceVolume();
+    if (volume <= 0.01) return; // Muted
+
     const now = ctx.currentTime;
 
     // Harmonic Tone 1 (D5 - 587.33 Hz)
@@ -54,7 +78,7 @@ export function playNotificationChime(): void {
     const gain1 = ctx.createGain();
     osc1.type = 'sine';
     osc1.frequency.setValueAtTime(587.33, now);
-    gain1.gain.setValueAtTime(0.28, now);
+    gain1.gain.setValueAtTime(0.28 * volume, now);
     gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
     osc1.connect(gain1);
     gain1.connect(ctx.destination);
@@ -66,7 +90,7 @@ export function playNotificationChime(): void {
     const gain2 = ctx.createGain();
     osc2.type = 'sine';
     osc2.frequency.setValueAtTime(880, now + 0.12);
-    gain2.gain.setValueAtTime(0.32, now + 0.12);
+    gain2.gain.setValueAtTime(0.32 * volume, now + 0.12);
     gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
     osc2.connect(gain2);
     gain2.connect(ctx.destination);
@@ -125,10 +149,14 @@ export function speakText(text: string, options?: { rate?: number; pitch?: numbe
   try {
     window.speechSynthesis.cancel();
 
+    const volume = getVoiceVolume();
+    if (volume <= 0.01) return; // Muted
+
     const targetLang = options?.lang || getSelectedVoiceLanguage();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = options?.rate || 0.95;
     utterance.pitch = options?.pitch || 1.0;
+    utterance.volume = volume;
     utterance.lang = targetLang;
 
     // Pick best matching natural voice
@@ -192,6 +220,63 @@ export function playJobVoiceNotification(
 
   setTimeout(() => {
     speakText(speechMessage, { rate: 0.95, pitch: 1.05, lang });
+  }, 350);
+}
+
+/**
+ * Triggers instant chime + multi-language voice alert for Job Completion (Notifies Business Owner)
+ */
+export function playJobCompletedVoiceNotification(
+  jobId: string,
+  technicianName?: string,
+  serviceDescription?: string,
+  rating?: number
+): void {
+  if (!isVoiceNotificationEnabled()) return;
+
+  playNotificationChime();
+
+  const lang = getSelectedVoiceLanguage();
+  const tech = technicianName || 'स्टाफ सदस्य';
+  const desc = (serviceDescription || 'सेवा कार्य').replace(/[^\w\s]/gi, ' ');
+  let speechMessage = '';
+
+  if (lang.startsWith('hi')) {
+    // Hindi
+    speechMessage = `काम पूरा हुआ! फील्ड तकनीशियन ${tech} ने जॉब ${jobId} का काम सफलता पूर्वक पूरा कर दिया है.${
+      rating ? ` कस्टमर ने ${rating} स्टार रेटिंग दी है.` : ''
+    }`;
+  } else if (lang.startsWith('mr')) {
+    // Marathi
+    speechMessage = `काम पूर्ण झाले! तंत्रज्ञ ${tech} यांनी जॉब नंबर ${jobId} चे काम यशस्वीरित्या पूर्ण केले आहे.${
+      rating ? ` ग्राहकाने ${rating} स्टार रेटिंग दिली आहे.` : ''
+    }`;
+  } else if (lang.startsWith('gu')) {
+    // Gujarati
+    speechMessage = `કામ પૂર્ણ થયું! ટેકનિશિયન ${tech} એ જોબ ${jobId} નું કામ સફળતાપૂર્વક પૂરું કર્યું છે.${
+      rating ? ` ગ્રાહકે ${rating} સ્ટાર રેટિંગ આપ્યું છે.` : ''
+    }`;
+  } else if (lang.startsWith('bn')) {
+    // Bengali
+    speechMessage = `কাজ সম্পন্ন হয়েছে! টেকনিশিয়ান ${tech} জব ${jobId} সফলভাবে সম্পন্ন করেছেন.`;
+  } else if (lang.startsWith('ta')) {
+    // Tamil
+    speechMessage = `வேலை முடிந்தது! தொழில்நுட்ப வல்லுநர் ${tech} வேலை ${jobId} ஐ வெற்றிகரமாக முடித்துள்ளார்.`;
+  } else if (lang.startsWith('te')) {
+    // Telugu
+    speechMessage = `పని పూర్తయింది! టెక్నీషియన్ ${tech} జాబ్ ${jobId} పనిని విజయవంతంగా పూర్తి చేశారు.`;
+  } else if (lang.startsWith('kn')) {
+    // Kannada
+    speechMessage = `ಕೆಲಸ ಪೂರ್ಣಗೊಂಡಿದೆ! ತಂತ್ರಜ್ಞ ${tech} ಜಾಬ್ ${jobId} ಕೆಲಸವನ್ನು ಯಶಸ್ವಿಯಾಗಿ ಮುಗಿಸಿದ್ದಾರೆ.`;
+  } else {
+    // English
+    speechMessage = `Job Completed! Field technician ${technicianName || 'staff'} has successfully completed job ${jobId}.${
+      rating ? ` Customer gave ${rating} star rating.` : ''
+    }`;
+  }
+
+  setTimeout(() => {
+    speakText(speechMessage, { rate: 0.95, pitch: 1.0, lang });
   }, 350);
 }
 

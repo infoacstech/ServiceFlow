@@ -33,6 +33,13 @@ import {
   setVoiceNotificationEnabled,
   playCustomVoiceNotification,
   speakText,
+  getVoiceVolume,
+  setVoiceVolume,
+  getSelectedVoiceLanguage,
+  setSelectedVoiceLanguage,
+  SUPPORTED_VOICE_LANGUAGES,
+  VoiceLanguageCode,
+  playNotificationChime,
 } from '../utils/audioNotification';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -72,12 +79,25 @@ export const Navbar: React.FC<NavbarProps> = ({
     logoutUser,
   } = useApp();
 
-  type ActiveMenu = 'tenant' | 'role' | 'notif' | 'profile' | null;
+  type ActiveMenu = 'tenant' | 'role' | 'notif' | 'profile' | 'voice' | null;
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
   const [isRefreshingPage, setIsRefreshingPage] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
+
+  const [voiceVolume, setVoiceVolumeState] = useState<number>(() => getVoiceVolume());
+  const [selectedVoiceLang, setSelectedVoiceLangState] = useState<VoiceLanguageCode>(() => getSelectedVoiceLanguage());
+
+  const handleVolumeChange = (newVol: number) => {
+    setVoiceVolumeState(newVol);
+    setVoiceVolume(newVol);
+  };
+
+  const handleLanguageChange = (newLang: VoiceLanguageCode) => {
+    setSelectedVoiceLangState(newLang);
+    setSelectedVoiceLanguage(newLang);
+  };
 
   useEffect(() => {
     // Check if running in Standalone app mode
@@ -300,24 +320,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="hidden xs:inline">{currentRoleObj.label}</span>
           </div>
 
-          {/* AI Assistant Quick Tab */}
+          {/* Activity Log Audit Trail Trigger */}
           <button
             onClick={() => {
-              setActiveTab('ai_assistant');
+              setIsActivityLogOpen(true);
               closeAllMenus();
             }}
-            className={`hidden sm:flex p-1.5 sm:p-2 rounded-xl border transition-all items-center gap-1.5 text-xs font-medium ${
-              activeTab === 'ai_assistant'
-                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                : 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 border-indigo-200/60 dark:border-indigo-800/60 hover:bg-indigo-100'
-            }`}
-            title="AI Business Assistant"
+            className="hidden sm:flex p-1.5 sm:p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+            title="Activity Log & Audit Trail"
+            aria-label="Activity Log"
           >
-            <Sparkles className="w-4 h-4 shrink-0" />
-            <span className="hidden lg:inline">AI Insights</span>
+            <History className="w-4 h-4" />
           </button>
 
-          {/* Quick Action: Sync Offline Data for ALL Roles */}
+          {/* Unified Sync & Refresh Data Button */}
           <button
             onClick={() => {
               setIsRefreshingPage(true);
@@ -338,8 +354,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 ? 'bg-amber-500 hover:bg-amber-600 text-stone-900 border-amber-600 shadow-xs animate-pulse'
                 : 'bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-blue-950/40 text-slate-700 dark:text-slate-200 border-slate-200/80 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600'
             }`}
-            title="Sync Offline Data & Upload Queued Changes (Available for all roles)"
-            aria-label="Sync Offline Data"
+            title="Sync Data & Cloud Sync (Upload offline changes and fetch latest records)"
+            aria-label="Sync Data"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingPage ? 'animate-spin text-indigo-600 dark:text-indigo-400' : ''}`} />
             <span className="hidden sm:inline">Sync Data</span>
@@ -350,50 +366,109 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </button>
 
-          {/* Activity Log Audit Trail Trigger */}
-          <button
-            onClick={() => {
-              setIsActivityLogOpen(true);
-              closeAllMenus();
-            }}
-            className="hidden sm:flex p-1.5 sm:p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
-            title="Activity Log & Audit Trail"
-            aria-label="Activity Log"
-          >
-            <History className="w-4 h-4" />
-          </button>
-
-          {/* Refresh App Button */}
-          <button
-            onClick={handleHeaderRefresh}
-            disabled={isRefreshingPage}
-            className="p-1.5 sm:p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors active:scale-95"
-            title="Refresh site & sync data"
-            aria-label="Refresh Site"
-          >
-            <RefreshCw className={`w-4 h-4 ${isRefreshingPage ? 'animate-spin text-indigo-600' : ''}`} />
-          </button>
-
           {/* Dark / Light Theme Toggle */}
           <ThemeToggle />
 
-          {/* Voice Notification Toggle / Test Button */}
-          <button
-            onClick={handleToggleVoice}
-            className={`p-1.5 sm:p-2 rounded-xl transition-all border ${
-              voiceEnabled
-                ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800'
-                : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 border-transparent'
-            }`}
-            title={voiceEnabled ? 'Voice Alerts Active (Click to Mute or Test)' : 'Voice Alerts Muted (Click to Enable)'}
-            aria-label="Voice Alerts"
-          >
-            {voiceEnabled ? (
-              <Volume2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 animate-pulse" />
-            ) : (
-              <VolumeX className="w-4 h-4" />
+          {/* Voice Notification & Volume Settings Popover */}
+          <div className="relative">
+            <button
+              onClick={() => toggleMenu('voice')}
+              className={`p-1.5 sm:p-2 rounded-xl transition-all border ${
+                voiceEnabled
+                  ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800'
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 border-transparent'
+              }`}
+              title="Voice Notification & Volume Settings"
+              aria-label="Voice Alerts & Volume"
+            >
+              {voiceEnabled ? (
+                <Volume2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              ) : (
+                <VolumeX className="w-4 h-4" />
+              )}
+            </button>
+
+            {activeMenu === 'voice' && (
+              <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-4 z-50 animate-in fade-in zoom-in-95 space-y-3.5">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                    <Volume2 className="w-4 h-4 text-indigo-600" /> Voice Alert Settings
+                  </span>
+                  <button
+                    onClick={handleToggleVoice}
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-all ${
+                      voiceEnabled
+                        ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                    }`}
+                  >
+                    {voiceEnabled ? 'ACTIVE' : 'MUTED'}
+                  </button>
+                </div>
+
+                {/* Volume Slider Control */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <span>Voice Volume</span>
+                    <span className="text-indigo-600 font-mono font-bold">{Math.round(voiceVolume * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={voiceVolume}
+                    onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                    className="w-full accent-indigo-600 cursor-pointer h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span>Mute (0%)</span>
+                    <span>50%</span>
+                    <span>100% (Max)</span>
+                  </div>
+                </div>
+
+                {/* Language Mode Selector */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                    Announcement Language
+                  </label>
+                  <select
+                    value={selectedVoiceLang}
+                    onChange={(e) => handleLanguageChange(e.target.value as VoiceLanguageCode)}
+                    className="w-full p-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium"
+                  >
+                    {SUPPORTED_VOICE_LANGUAGES.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.name} ({lang.nativeName})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Test Voice Button */}
+                <button
+                  onClick={() => {
+                    playNotificationChime();
+                    const testPhrases: Record<string, string> = {
+                      'hi-IN': 'यह एक टेस्ट वॉयस नोटिफिकेशन है. सर्वफ्लो अलर्ट सिस्टम पूरी तरह चालू है.',
+                      'mr-IN': 'ही एक टेस्ट व्हॉईस सूचना आहे. सर्वफ्लो अलर्ट सिस्टीम व्यवस्थित काम करत आहे.',
+                      'gu-IN': 'આ એક ટેસ્ટ વોઈસ નોટિફિકેશન છે. સર્વિફ્લો એલર્ટ સિસ્ટમ કાર્યરત છે.',
+                      'en-IN': 'This is a test voice notification. ServiFlow alert system is fully operational.',
+                      'en-US': 'This is a test voice notification. ServiFlow alert system is operational.',
+                    };
+                    const phrase = testPhrases[selectedVoiceLang] || testPhrases['en-IN'];
+                    setTimeout(() => {
+                      speakText(phrase, { lang: selectedVoiceLang });
+                    }, 300);
+                  }}
+                  className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/80 text-indigo-600 dark:text-indigo-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-indigo-200 dark:border-indigo-800 transition-all cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" /> Test Voice Alert ({Math.round(voiceVolume * 100)}%)
+                </button>
+              </div>
             )}
-          </button>
+          </div>
 
           {/* Notifications Bell */}
           <div className="relative">

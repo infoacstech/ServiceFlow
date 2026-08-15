@@ -145,6 +145,7 @@ export interface Job {
   assignedStaffId?: string;
   scheduledDate: string;
   scheduledTime: string;
+  scheduledTimeSlot?: string;
   location: string;
   estimatedAmount: number;
   status: JobStatus;
@@ -301,6 +302,7 @@ export interface Notification {
   read: boolean;
   createdAt: string;
   targetRoleId?: UserRole;
+  targetUserId?: string;
 }
 
 export interface ActivityLog {
