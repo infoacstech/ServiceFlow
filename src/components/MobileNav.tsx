@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   LayoutDashboard,
@@ -20,7 +20,15 @@ import {
   Settings,
   ShieldCheck,
   KeyRound,
+  Download,
+  Smartphone,
 } from 'lucide-react';
+import { InstallAppModal } from './InstallAppModal';
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
 
 interface MobileNavProps {
   activeTab: string;
@@ -31,6 +39,20 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
   const { currentUser, getRolePermissions } = useApp();
   const permissions = getRolePermissions(currentUser?.role);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    };
+  }, []);
 
   const isTech = currentUser?.role === 'technician';
   const isSuperAdmin = currentUser?.role === 'super_admin';
@@ -141,9 +163,38 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
                   );
                 })}
             </div>
+
+            {/* Install Standalone App Prompt inside drawer */}
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                onClick={() => {
+                  setIsMoreMenuOpen(false);
+                  setIsInstallModalOpen(true);
+                }}
+                className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-bold text-xs shadow-lg shadow-indigo-600/20 active:scale-98 transition-all"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+                    <Smartphone className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="text-left">
+                    <div>Install ServiFlow App</div>
+                    <div className="text-[10px] text-indigo-200 font-normal">Dedicated fullscreen mobile app</div>
+                  </div>
+                </div>
+                <Download className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Standalone Installation Modal */}
+      <InstallAppModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        deferredPrompt={deferredPrompt}
+      />
     </>
   );
 };

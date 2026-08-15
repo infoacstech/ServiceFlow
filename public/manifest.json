@@ -1,7 +1,13 @@
 {
   "short_name": "ServiFlow",
-  "name": "ServiFlow FSM - Field Service Management",
+  "name": "ServiFlow - Field Operations & Service Management",
   "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "48x48 72x72 96x96 128x128 192x192 256x256 512x512",
+      "purpose": "any maskable"
+    },
     {
       "src": "/icon-192.svg",
       "type": "image/svg+xml",
@@ -19,16 +25,53 @@
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "type": "image/png",
+      "sizes": "180x180",
+      "purpose": "any"
     }
   ],
   "start_url": "/",
-  "id": "/",
+  "id": "serviflow-standalone-app",
   "background_color": "#0f172a",
   "theme_color": "#4f46e5",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui", "browser"],
-  "orientation": "portrait-primary",
+  "display_override": ["standalone", "window-controls-overlay", "minimal-ui"],
+  "orientation": "any",
   "scope": "/",
-  "description": "ServiFlow Field Service SaaS - Manage jobs, technicians, dispatches, invoices, and contracts offline & online.",
-  "categories": ["business", "productivity", "utilities"]
+  "description": "ServiFlow Field Service SaaS - Manage field technicians, jobs, dispatches, GPS tracking, invoices, and quotations in real-time across PC & mobile devices.",
+  "categories": ["business", "productivity", "utilities"],
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Field Jobs & Dispatches",
+      "short_name": "Jobs",
+      "description": "View and manage active technician jobs",
+      "url": "/?tab=jobs",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Customer Directory",
+      "short_name": "Customers",
+      "description": "Access customer CRM and service history",
+      "url": "/?tab=customers",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Billing & Invoices",
+      "short_name": "Invoices",
+      "description": "Create and manage GST invoices",
+      "url": "/?tab=invoices",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "AI Assistant",
+      "short_name": "AI Insights",
+      "description": "Instant AI business summary & voice alerts",
+      "url": "/?tab=ai_assistant",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
 }

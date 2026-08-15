@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   Building2,
@@ -20,15 +20,25 @@ import {
   Smartphone,
   Volume2,
   VolumeX,
+  Download,
+  Laptop,
+  CheckCircle2,
+  Radio,
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { ThemeToggle } from './ThemeToggle';
+import { InstallAppModal } from './InstallAppModal';
 import {
   isVoiceNotificationEnabled,
   setVoiceNotificationEnabled,
   playCustomVoiceNotification,
   speakText,
 } from '../utils/audioNotification';
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
 
 interface NavbarProps {
   onOpenOnboarding: () => void;
@@ -64,6 +74,29 @@ export const Navbar: React.FC<NavbarProps> = ({
   type ActiveMenu = 'tenant' | 'role' | 'notif' | 'profile' | null;
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
   const [isRefreshingPage, setIsRefreshingPage] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    // Check if running in Standalone app mode
+    const isStandaloneMode =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true ||
+      document.referrer.includes('android-app://');
+
+    setIsStandalone(isStandaloneMode);
+
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    };
+  }, []);
 
   const ownerUser = (users || []).find(
     (u) => u.businessId === currentBusiness?.id && u.role === 'business_owner'
@@ -240,8 +273,28 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right Controls */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          {/* Standalone Status or Install Standalone App Button */}
+          {isStandalone ? (
+            <div
+              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+              title="Running in Standalone Native Application Mode with Realtime Cloud Sync"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              <span>Live App Mode</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsInstallModalOpen(true)}
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all active:scale-95 animate-pulse"
+              title="Install ServiFlow as a native Desktop / Mobile App"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Install App</span>
+            </button>
+          )}
+
           {/* User Role Badge */}
-          <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1 rounded-full text-xs font-medium border shadow-xs transition-all ${currentRoleObj.badgeColor}">
+          <div className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1 rounded-full text-xs font-medium border shadow-xs transition-all ${currentRoleObj.badgeColor}`}>
             <UserCheck className="w-3.5 h-3.5 shrink-0" />
             <span className="hidden xs:inline">{currentRoleObj.label}</span>
           </div>
@@ -412,6 +465,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                 <button
                   onClick={() => {
+                    setIsInstallModalOpen(true);
+                    closeAllMenus();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                >
+                  <Download className="w-3.5 h-3.5" /> Install Standalone App
+                </button>
+
+                <button
+                  onClick={() => {
                     setActiveTab('settings');
                     closeAllMenus();
                   }}
@@ -434,6 +497,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Standalone Installation Modal */}
+      <InstallAppModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        deferredPrompt={deferredPrompt}
+        onInstalled={() => {
+          setIsStandalone(true);
+        }}
+      />
     </header>
   );
 };
