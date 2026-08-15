@@ -247,9 +247,11 @@ export const StaffCalendarTimeline: React.FC = () => {
 
             {/* Body: Each Staff Member Row */}
             <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
-              {staff.map((tech) => {
+              {(staff || []).map((tech) => {
                 // Get all jobs for this technician across the week
-                const techWeekJobs = jobs.filter((j) => j.assignedStaffId === tech.id);
+                const techWeekJobs = (jobs || []).filter((j) => j.assignedStaffId === tech.id);
+                const techName = tech?.name || tech?.email || 'Technician';
+                const techInitials = (tech?.name || tech?.email || 'TC').substring(0, 2).toUpperCase();
 
                 return (
                   <tr key={tech.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
@@ -257,19 +259,19 @@ export const StaffCalendarTimeline: React.FC = () => {
                     <td className="p-3.5 sticky left-0 bg-white dark:bg-slate-900 z-10 border-r border-slate-200 dark:border-slate-800 space-y-1">
                       <div className="flex items-center gap-2.5">
                         <div className="w-9 h-9 rounded-xl bg-slate-200 dark:bg-slate-800 overflow-hidden ring-2 ring-indigo-500/20 shrink-0 font-bold flex items-center justify-center text-xs text-slate-700 dark:text-slate-300">
-                          {tech.avatar ? (
-                            <img src={tech.avatar} alt={tech.name} className="w-full h-full object-cover" />
+                          {tech?.avatar ? (
+                            <img src={tech.avatar} alt={techName} className="w-full h-full object-cover" />
                           ) : (
-                            tech.name.substring(0, 2)
+                            techInitials
                           )}
                         </div>
                         <div className="min-w-0">
                           <h4 className="font-extrabold text-xs text-slate-900 dark:text-slate-100 truncate">
-                            {tech.name}
+                            {techName}
                           </h4>
                           <div className="flex items-center gap-1">
                             <span className="text-[9px] px-1.5 py-0.2 rounded-md font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 truncate">
-                              {tech.role.replace('_', ' ')}
+                              {(tech?.role || 'staff').replace('_', ' ')}
                             </span>
                           </div>
                         </div>
@@ -421,9 +423,9 @@ export const StaffCalendarTimeline: React.FC = () => {
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-slate-100 focus:outline-none"
                 >
                   <option value="">-- Unassigned --</option>
-                  {staff.map((s) => (
+                  {(staff || []).map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.name} ({s.role.replace('_', ' ')})
+                      {s?.name || s?.email || 'Staff'} ({(s?.role || 'staff').replace('_', ' ')})
                     </option>
                   ))}
                 </select>
