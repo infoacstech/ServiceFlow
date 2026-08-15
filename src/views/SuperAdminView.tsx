@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { SystemSettings } from '../types';
+import { FirestoreService } from '../services/FirestoreService';
 import {
   ShieldCheck,
   Building2,
@@ -315,14 +316,16 @@ export const SuperAdminView: React.FC = () => {
 
     setIsDeletingAllTenants(true);
     try {
-      for (const b of businesses) {
-        await deleteBusinessTenant(b.id);
-      }
+      const res = await FirestoreService.wipeAllExceptSuperAdmin();
       setIsDeleteAllTenantsModalOpen(false);
       setDeleteAllConfirmText('');
-      showToast('All business tenant accounts and dummy data successfully purged.', 'success');
+      showToast(`100% Clean Slate: Purged ${res.totalDocsDeleted} documents. Only Super Admin preserved.`, 'success');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (err) {
-      console.error('Failed to delete all tenants:', err);
+      console.error('Failed to wipe all tenants:', err);
+      showToast('Purge error: ' + String(err), 'error');
     } finally {
       setIsDeletingAllTenants(false);
     }
@@ -570,14 +573,6 @@ export const SuperAdminView: React.FC = () => {
               <div className="flex items-center justify-center gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={handleSimulateTestRegistration}
-                  className="px-4 py-2 rounded-xl bg-amber-100 dark:bg-amber-950/80 hover:bg-amber-200 dark:hover:bg-amber-900 text-amber-900 dark:text-amber-200 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
-                >
-                  <Sparkles className="w-4 h-4 text-amber-600" />
-                  <span>Create Test Registration Request</span>
-                </button>
-                <button
-                  type="button"
                   onClick={() => {
                     setNewTenantForm({
                       businessName: '',
@@ -585,7 +580,7 @@ export const SuperAdminView: React.FC = () => {
                       ownerName: '',
                       ownerEmail: '',
                       ownerPhone: '',
-                      ownerPassword: '1234',
+                      ownerPassword: '',
                       initialStatus: 'active',
                     });
                     setIsAddTenantModalOpen(true);

@@ -130,6 +130,89 @@ export class FirestoreService {
   }
 
   /**
+   * Performs a 100% complete database wipe, deleting all dummy businesses, tenant associations,
+   * all dummy staff/owners/customers/records, and preserving ONLY the Super Admin account.
+   */
+  static async wipeAllExceptSuperAdmin(): Promise<{ totalDocsDeleted: number }> {
+    let totalDocsDeleted = 0;
+
+    // 1. Purge all transactional and operational collections
+    const collectionsToWipe = [
+      'customers',
+      'jobs',
+      'services',
+      'categories',
+      'inventory',
+      'inventoryTransactions',
+      'quotations',
+      'invoices',
+      'payments',
+      'contracts',
+      'expenses',
+      'notifications',
+      'activities',
+      'manualSyncLogs',
+      'tenantMembers',
+      'tenants',
+      'businesses',
+    ];
+
+    for (const colName of collectionsToWipe) {
+      try {
+        const snap = await getDocs(collection(db, colName));
+        if (!snap.empty) {
+          const batch = writeBatch(db);
+          snap.docs.forEach((d) => {
+            // Keep 'all' platform business if present, wipe everything else
+            if (colName === 'businesses' && d.id === 'all') return;
+            batch.delete(d.ref);
+            totalDocsDeleted++;
+          });
+          await batch.commit();
+        }
+      } catch (err) {
+        console.error(`Error wiping collection ${colName}:`, err);
+      }
+    }
+
+    // 2. Wipe all non-SuperAdmin users
+    try {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      if (!usersSnap.empty) {
+        const batch = writeBatch(db);
+        usersSnap.docs.forEach((d) => {
+          const u = d.data() as User;
+          if (u.role !== 'super_admin' && u.email !== 'admin@serviflow.io' && d.id !== 'usr-admin') {
+            batch.delete(d.ref);
+            totalDocsDeleted++;
+          }
+        });
+        await batch.commit();
+      }
+    } catch (err) {
+      console.error('Error wiping users:', err);
+    }
+
+    // 3. Clear all browser local cached state
+    try {
+      localStorage.removeItem('serviflow_businesses_cache');
+      localStorage.removeItem('serviflow_users_cache');
+      localStorage.removeItem('serviflow_customers_cache');
+      localStorage.removeItem('serviflow_jobs_cache');
+      localStorage.removeItem('serviflow_invoices_cache');
+      localStorage.removeItem('serviflow_inventory_cache');
+      localStorage.removeItem('serviflow_quotations_cache');
+      localStorage.removeItem('serviflow_payments_cache');
+      localStorage.removeItem('serviflow_contracts_cache');
+      localStorage.removeItem('serviflow_expenses_cache');
+    } catch (e) {
+      console.warn('Cache clear error:', e);
+    }
+
+    return { totalDocsDeleted };
+  }
+
+  /**
    * Tenant-isolated data purge: clears transactional records belonging only to the specified business ID.
    */
   static async purgeTenantTransactionalData(businessId: string): Promise<{ clearedCollections: string[]; totalDocsDeleted: number }> {
