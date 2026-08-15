@@ -112,6 +112,7 @@ export const SettingsView: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [logFilter, setLogFilter] = useState<'ALL' | 'SUCCESS' | 'NO_CHANGES' | 'OFFLINE_QUEUED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [syncLogLimit, setSyncLogLimit] = useState<number | 'all'>(10);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -129,7 +130,7 @@ export const SettingsView: React.FC = () => {
     }, 600);
   };
 
-  const filteredLogs = (manualSyncLogs || []).filter((log) => {
+  const allFilteredLogs = (manualSyncLogs || []).filter((log) => {
     const matchesFilter = logFilter === 'ALL' || log.status === logFilter;
     const q = (searchQuery || '').trim().toLowerCase();
     const matchesQuery =
@@ -147,6 +148,8 @@ export const SettingsView: React.FC = () => {
 
     return matchesFilter && matchesQuery;
   });
+
+  const filteredLogs = syncLogLimit === 'all' ? allFilteredLogs : allFilteredLogs.slice(0, syncLogLimit);
 
   const lastSyncLog = manualSyncLogs[0];
 
@@ -479,6 +482,25 @@ export const SettingsView: React.FC = () => {
                 }`}
               >
                 {st === 'ALL' ? 'All Logs' : st === 'OFFLINE_QUEUED' ? 'Queued' : st}
+              </button>
+            ))}
+          </div>
+
+          {/* Limit Selector: Default 10 */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+            <span className="text-[10px] font-bold text-slate-400 pl-1">Limit:</span>
+            {([10, 25, 50, 'all'] as const).map((lim) => (
+              <button
+                key={String(lim)}
+                type="button"
+                onClick={() => setSyncLogLimit(lim)}
+                className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                  syncLogLimit === lim
+                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                {lim === 'all' ? 'All' : lim}
               </button>
             ))}
           </div>

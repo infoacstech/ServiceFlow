@@ -67,6 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     toggleTheme,
     setIsActivityLogOpen,
     syncOfflineQueue,
+    pendingSyncQueue,
     showToast,
     logoutUser,
   } = useApp();
@@ -314,6 +315,39 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Sparkles className="w-4 h-4 shrink-0" />
             <span className="hidden lg:inline">AI Insights</span>
+          </button>
+
+          {/* Quick Action: Sync Offline Data for ALL Roles */}
+          <button
+            onClick={() => {
+              setIsRefreshingPage(true);
+              syncOfflineQueue();
+              setTimeout(() => {
+                setIsRefreshingPage(false);
+                showToast(
+                  pendingSyncQueue.length > 0
+                    ? `Synchronized ${pendingSyncQueue.length} offline updates with cloud database!`
+                    : 'Cloud sync complete. All local and field data is up to date.',
+                  'success'
+                );
+              }, 600);
+            }}
+            disabled={isRefreshingPage}
+            className={`flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer ${
+              pendingSyncQueue.length > 0
+                ? 'bg-amber-500 hover:bg-amber-600 text-stone-900 border-amber-600 shadow-xs animate-pulse'
+                : 'bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-blue-950/40 text-slate-700 dark:text-slate-200 border-slate-200/80 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600'
+            }`}
+            title="Sync Offline Data & Upload Queued Changes (Available for all roles)"
+            aria-label="Sync Offline Data"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingPage ? 'animate-spin text-indigo-600 dark:text-indigo-400' : ''}`} />
+            <span className="hidden sm:inline">Sync Data</span>
+            {pendingSyncQueue.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-stone-900 text-amber-400 text-[10px] font-mono font-black">
+                {pendingSyncQueue.length}
+              </span>
+            )}
           </button>
 
           {/* Activity Log Audit Trail Trigger */}

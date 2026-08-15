@@ -73,6 +73,7 @@ export const SuperAdminView: React.FC = () => {
   const [activeTabSection, setActiveTabSection] = useState<
     'approvals' | 'tenants' | 'cleanup' | 'support' | 'settings' | 'audit' | 'sessions'
   >('approvals');
+  const [auditLogsLimit, setAuditLogsLimit] = useState<number | 'all'>(10);
 
   // Add / Onboard Tenant Modal State
   const [isAddTenantModalOpen, setIsAddTenantModalOpen] = useState(false);
@@ -1487,7 +1488,7 @@ export const SuperAdminView: React.FC = () => {
       {/* SECTION 5: Security Audit Logs */}
       {activeTabSection === 'audit' && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm">
-          <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
                 Security Audit Logs & Compliance Trail
@@ -1496,7 +1497,34 @@ export const SuperAdminView: React.FC = () => {
                 Real-time immutable security logs for all platform admin events, support access requests, and user status changes.
               </p>
             </div>
-            <span className="text-xs font-bold text-slate-500">{securityAuditLogs.length} Events</span>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <span className="text-xs font-bold text-slate-500">
+                Showing{' '}
+                <strong>
+                  {auditLogsLimit === 'all'
+                    ? securityAuditLogs.length
+                    : Math.min(auditLogsLimit, securityAuditLogs.length)}
+                </strong>{' '}
+                of {securityAuditLogs.length} Events
+              </span>
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span className="text-[10px] text-slate-400 pl-1 font-bold">Limit:</span>
+                {([10, 25, 50, 'all'] as const).map((lim) => (
+                  <button
+                    key={String(lim)}
+                    type="button"
+                    onClick={() => setAuditLogsLimit(lim)}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                      auditLogsLimit === lim
+                        ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {lim === 'all' ? 'All' : lim}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -1512,7 +1540,10 @@ export const SuperAdminView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {securityAuditLogs.map((log, idx) => (
+                {(auditLogsLimit === 'all'
+                  ? securityAuditLogs
+                  : securityAuditLogs.slice(0, auditLogsLimit)
+                ).map((log, idx) => (
                   <tr key={log.id || `audit-log-${idx}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                     <td className="p-4 font-mono text-[11px] text-slate-500">
                       {new Date(log.timestamp).toLocaleString()}

@@ -69,9 +69,23 @@ export class AuthService {
     const phone = params.phone.trim();
     const name = params.name.trim();
 
-    // 1. Create Firebase Auth user
-    const authCredential = await createUserWithEmailAndPassword(auth, email, params.password);
-    const uid = authCredential.user.uid;
+    // 1. Create or sync Firebase Auth user
+    let uid: string;
+    try {
+      const authCredential = await createUserWithEmailAndPassword(auth, email, params.password);
+      uid = authCredential.user.uid;
+    } catch (authErr: any) {
+      if (authErr.code === 'auth/email-already-in-use') {
+        try {
+          const signInCred = await signInWithEmailAndPassword(auth, email, params.password);
+          uid = signInCred.user.uid;
+        } catch {
+          throw new Error(`Email address (${email}) is already registered in Firebase Authentication. Please login to your account.`);
+        }
+      } else {
+        throw authErr;
+      }
+    }
 
     const tenantId = `tenant-${Date.now()}`;
     const nowIso = new Date().toISOString();
@@ -172,17 +186,52 @@ export class AuthService {
     // If login identifier is a mobile number, lookup email first
     if (!cleanId.includes('@')) {
       const cleanDigits = cleanId.replace(/[^0-9]/g, '');
-      const usersSnap = await getDocs(collection(db, 'users'));
-      const foundDoc = usersSnap.docs.find((d) => {
-        const u = d.data() as User;
-        const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
-        return uPhone.length >= 10 && uPhone.slice(-10) === cleanDigits.slice(-10);
-      });
+      let foundEmail: string | null = null;
 
-      if (foundDoc) {
-        targetEmail = (foundDoc.data() as User).email.toLowerCase();
+      try {
+        const usersSnap = await getDocs(collection(db, 'users'));
+        const foundDoc = usersSnap.docs.find((d) => {
+          const u = d.data() as User;
+          const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
+          return (
+            (uPhone.length >= 10 && cleanDigits.length >= 10 && uPhone.slice(-10) === cleanDigits.slice(-10)) ||
+            (uPhone.length >= 6 && cleanDigits.length >= 6 && uPhone.endsWith(cleanDigits.slice(-10)))
+          );
+        });
+
+        if (foundDoc) {
+          foundEmail = (foundDoc.data() as User).email.toLowerCase();
+        }
+      } catch (err) {
+        console.warn('Firestore user fetch note:', err);
+      }
+
+      // Check localStorage cached users as fast fallback
+      if (!foundEmail) {
+        try {
+          const rawCached = localStorage.getItem('serviflow_users_cache');
+          if (rawCached) {
+            const cachedUsers = JSON.parse(rawCached) as User[];
+            const foundCached = cachedUsers.find((u) => {
+              const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
+              return (
+                (uPhone.length >= 10 && cleanDigits.length >= 10 && uPhone.slice(-10) === cleanDigits.slice(-10)) ||
+                (uPhone.length >= 6 && cleanDigits.length >= 6 && uPhone.endsWith(cleanDigits.slice(-10)))
+              );
+            });
+            if (foundCached && foundCached.email) {
+              foundEmail = foundCached.email.toLowerCase();
+            }
+          }
+        } catch (e) {
+          console.warn('Cache fallback parse error:', e);
+        }
+      }
+
+      if (foundEmail) {
+        targetEmail = foundEmail;
       } else {
-        throw new Error('No user account found with this phone number.');
+        throw new Error(`No user account found with phone number (${identifier}). Please check your number or create an account.`);
       }
     }
 

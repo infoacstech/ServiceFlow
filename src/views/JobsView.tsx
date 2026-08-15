@@ -29,6 +29,15 @@ export interface JobInitialFilter {
   priorityFilter?: string;
 }
 
+export const TIME_SLOT_PRESETS = [
+  '09:00 AM - 11:00 AM (Morning 1)',
+  '11:00 AM - 01:00 PM (Morning 2)',
+  '01:00 PM - 03:00 PM (Afternoon 1)',
+  '03:00 PM - 05:00 PM (Afternoon 2)',
+  '05:00 PM - 07:00 PM (Evening)',
+  '07:00 PM - 09:00 PM (Night / Emergency)',
+];
+
 interface JobsViewProps {
   isCreateModalOpen: boolean;
   setIsCreateModalOpen: (v: boolean) => void;
@@ -46,8 +55,11 @@ export const JobsView: React.FC<JobsViewProps> = ({
     services,
     staff,
     addJob,
+    addCustomer,
+    addService,
     updateJobStatus,
     currentBusiness,
+    showToast,
   } = useApp();
 
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
@@ -82,15 +94,57 @@ export const JobsView: React.FC<JobsViewProps> = ({
   const [newJobData, setNewJobData] = useState({
     customerId: customers?.[0]?.id || '',
     serviceId: services?.[0]?.id || '',
-    description: '',
+    description: services?.[0]?.name || '',
     priority: 'medium' as JobPriority,
     assignedStaffId: (staff || []).find((s) => s.role === 'technician')?.id || '',
     scheduledDate: new Date().toISOString().split('T')[0],
-    scheduledTime: '10:00 AM',
-    location: customers?.[0]?.address || 'Site Location',
-    estimatedAmount: 1500,
+    scheduledTime: '09:00 AM - 11:00 AM (Morning 1)',
+    location: customers?.[0]?.address ? `${customers[0].address}, ${customers[0].city}` : '',
+    estimatedAmount: services?.[0]?.price || 1500,
     status: 'assigned' as JobStatus,
   });
+
+  // Quick Customer Creation Mode within Job Wizard
+  const [isQuickAddCustomer, setIsQuickAddCustomer] = useState(false);
+  const [quickCustomer, setQuickCustomer] = useState({
+    name: '',
+    mobile: '',
+    address: '',
+    city: currentBusiness.city || 'Mumbai',
+    companyName: '',
+  });
+
+  // Keep newJobData synchronized when modal opens or lists load
+  useEffect(() => {
+    if (isCreateModalOpen) {
+      if (!newJobData.customerId && customers.length > 0) {
+        const firstCust = customers[0];
+        setNewJobData((prev) => ({
+          ...prev,
+          customerId: firstCust.id,
+          location: prev.location || `${firstCust.address || ''}, ${firstCust.city || ''}`,
+        }));
+      }
+      if (!newJobData.serviceId && services.length > 0) {
+        const firstSrv = services[0];
+        setNewJobData((prev) => ({
+          ...prev,
+          serviceId: firstSrv.id,
+          description: prev.description || firstSrv.name,
+          estimatedAmount: prev.estimatedAmount || firstSrv.price,
+        }));
+      }
+      if (!newJobData.assignedStaffId && staff.length > 0) {
+        const firstTech = staff.find((s) => s.role === 'technician') || staff[0];
+        if (firstTech) {
+          setNewJobData((prev) => ({
+            ...prev,
+            assignedStaffId: firstTech.id,
+          }));
+        }
+      }
+    }
+  }, [isCreateModalOpen, customers, services, staff]);
 
   const statuses: JobStatus[] = [
     'new',
@@ -137,10 +191,65 @@ export const JobsView: React.FC<JobsViewProps> = ({
 
   const handleCreateJob = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newJobData.customerId || !newJobData.serviceId) return;
 
-    addJob(newJobData);
+    let targetCustomerId = newJobData.customerId;
+    let targetLocation = newJobData.location;
+
+    // If Quick Add Customer mode is active
+    if (isQuickAddCustomer) {
+      if (!quickCustomer.name.trim() || !quickCustomer.mobile.trim()) {
+        showToast('Please enter customer name and mobile number', 'error');
+        return;
+      }
+
+      const createdCustomer = addCustomer({
+        name: quickCustomer.name.trim(),
+        mobile: quickCustomer.mobile.trim(),
+        address: quickCustomer.address.trim() || 'Site Address',
+        city: quickCustomer.city.trim() || currentBusiness.city || 'Mumbai',
+        state: currentBusiness.state || 'Maharashtra',
+        pin: currentBusiness.pin || '400001',
+        companyName: quickCustomer.companyName.trim() || undefined,
+        customerType: quickCustomer.companyName.trim() ? 'commercial' : 'individual',
+      });
+
+      if (createdCustomer && createdCustomer.id) {
+        targetCustomerId = createdCustomer.id;
+        targetLocation = `${quickCustomer.address || ''}, ${quickCustomer.city || ''}`.trim() || 'Site Address';
+      }
+    }
+
+    if (!targetCustomerId) {
+      showToast('Please select an existing customer or create a new customer', 'error');
+      return;
+    }
+
+    if (!newJobData.serviceId && !newJobData.description.trim()) {
+      showToast('Please select a service or enter job instructions', 'error');
+      return;
+    }
+
+    if (!newJobData.description.trim()) {
+      showToast('Please describe the work / instructions for the technician', 'error');
+      return;
+    }
+
+    addJob({
+      ...newJobData,
+      customerId: targetCustomerId,
+      location: targetLocation || newJobData.location || 'Site Location',
+    });
+
+    showToast('Job scheduled and assigned successfully!', 'success');
     setIsCreateModalOpen(false);
+    setIsQuickAddCustomer(false);
+    setQuickCustomer({
+      name: '',
+      mobile: '',
+      address: '',
+      city: currentBusiness.city || 'Mumbai',
+      companyName: '',
+    });
   };
 
   return (
@@ -557,135 +666,382 @@ export const JobsView: React.FC<JobsViewProps> = ({
 
       {/* Create Job Wizard Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <form
             onSubmit={handleCreateJob}
-            className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 border shadow-2xl space-y-4"
+            className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 my-8 max-h-[90vh] overflow-y-auto"
           >
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-base text-slate-900 dark:text-slate-100">Schedule & Dispatch New Job</h3>
-              <button type="button" onClick={() => setIsCreateModalOpen(false)} className="text-slate-400">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Briefcase className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                  Schedule & Dispatch New Job
+                </h3>
+                <p className="text-xs text-slate-500">Fill in job specifics, site location, and assign a technician</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="col-span-2">
-                <label className="font-semibold block mb-1">Select Customer *</label>
-                <select
-                  value={newJobData.customerId}
-                  onChange={(e) => {
-                    const c = (customers || []).find((cust) => cust.id === e.target.value);
-                    setNewJobData({
-                      ...newJobData,
-                      customerId: e.target.value,
-                      location: c ? `${c.address}, ${c.city}` : newJobData.location,
-                    });
-                  }}
-                  className="w-full px-3 py-2 rounded-xl border bg-slate-50"
-                >
-                  {(customers || []).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.companyName || c.mobile})
-                    </option>
-                  ))}
-                </select>
+            {/* Form Fields Grid */}
+            <div className="space-y-4 text-xs">
+              {/* SECTION: Customer Selection or Quick Add */}
+              <div className="p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <UserCheck className="w-4 h-4 text-indigo-600" />
+                    Customer Details *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsQuickAddCustomer(!isQuickAddCustomer)}
+                    className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    {isQuickAddCustomer ? '← Choose Existing Customer' : '+ New Customer'}
+                  </button>
+                </div>
+
+                {!isQuickAddCustomer ? (
+                  <div>
+                    {customers.length === 0 ? (
+                      <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-amber-800 dark:text-amber-300 text-xs">
+                        No registered customers found. Click <strong>"+ New Customer"</strong> to add one directly.
+                      </div>
+                    ) : (
+                      <select
+                        value={newJobData.customerId}
+                        onChange={(e) => {
+                          const c = (customers || []).find((cust) => cust.id === e.target.value);
+                          setNewJobData({
+                            ...newJobData,
+                            customerId: e.target.value,
+                            location: c ? `${c.address || ''}, ${c.city || ''}`.trim() : newJobData.location,
+                          });
+                        }}
+                        className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="" disabled>-- Select a Customer ({customers.length} available) --</option>
+                        {customers.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} {c.companyName ? `(${c.companyName})` : ''} - {c.mobile}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
+                        Customer / Client Name *
+                      </label>
+                      <input
+                        type="text"
+                        required={isQuickAddCustomer}
+                        placeholder="e.g. Rajesh Sharma"
+                        value={quickCustomer.name}
+                        onChange={(e) => setQuickCustomer({ ...quickCustomer, name: e.target.value })}
+                        className="w-full px-3 py-1.5 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
+                        Mobile Phone Number *
+                      </label>
+                      <input
+                        type="tel"
+                        required={isQuickAddCustomer}
+                        placeholder="e.g. 9876543210"
+                        value={quickCustomer.mobile}
+                        onChange={(e) => setQuickCustomer({ ...quickCustomer, mobile: e.target.value })}
+                        className="w-full px-3 py-1.5 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
+                        Company / Business Name (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Apex Towers Soc."
+                        value={quickCustomer.companyName}
+                        onChange={(e) => setQuickCustomer({ ...quickCustomer, companyName: e.target.value })}
+                        className="w-full px-3 py-1.5 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
+                        City / Area
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Mumbai"
+                        value={quickCustomer.city}
+                        onChange={(e) => setQuickCustomer({ ...quickCustomer, city: e.target.value })}
+                        className="w-full px-3 py-1.5 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
+                        Premises / Site Address
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Flat 402, Building A, Main Road"
+                        value={quickCustomer.address}
+                        onChange={(e) => setQuickCustomer({ ...quickCustomer, address: e.target.value })}
+                        className="w-full px-3 py-1.5 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="col-span-2">
-                <label className="font-semibold block mb-1">Select Service *</label>
-                <select
-                  value={newJobData.serviceId}
-                  onChange={(e) => {
-                    const s = (services || []).find((srv) => srv.id === e.target.value);
-                    setNewJobData({
-                      ...newJobData,
-                      serviceId: e.target.value,
-                      description: s ? s.name : newJobData.description,
-                      estimatedAmount: s ? s.price : newJobData.estimatedAmount,
-                    });
-                  }}
-                  className="w-full px-3 py-2 rounded-xl border bg-slate-50"
-                >
-                  {services.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} - {currentBusiness.currency}{s.price}
-                    </option>
-                  ))}
-                </select>
+              {/* SECTION: Service Type & Description */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="font-semibold block mb-1 text-slate-800 dark:text-slate-200">
+                    Select Service Category *
+                  </label>
+                  <select
+                    value={newJobData.serviceId}
+                    onChange={(e) => {
+                      const s = (services || []).find((srv) => srv.id === e.target.value);
+                      setNewJobData({
+                        ...newJobData,
+                        serviceId: e.target.value,
+                        description: s ? s.name : newJobData.description,
+                        estimatedAmount: s ? s.price : newJobData.estimatedAmount,
+                      });
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="" disabled>-- Select a Service --</option>
+                    {services.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} - {currentBusiness.currency}{s.price}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="font-semibold block mb-1 text-slate-800 dark:text-slate-200">
+                    Job Instructions / Site Work Description *
+                  </label>
+                  <textarea
+                    required
+                    rows={2}
+                    value={newJobData.description}
+                    onChange={(e) => setNewJobData({ ...newJobData, description: e.target.value })}
+                    placeholder="Type detailed instructions for the field technician (e.g. CCTV Camera 3 repair & wire reconnection)..."
+                    className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
               </div>
 
-              <div className="col-span-2">
-                <label className="font-semibold block mb-1">Job Instructions / Site Work Description *</label>
-                <textarea
-                  required
-                  value={newJobData.description}
-                  onChange={(e) => setNewJobData({ ...newJobData, description: e.target.value })}
-                  placeholder="Describe specific work requested..."
-                  className="w-full px-3 py-2 rounded-xl border bg-slate-50 h-20"
-                />
+              {/* SECTION: Site Location & Estimated Amount */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold block mb-1 text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                    Site Location / Address *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newJobData.location}
+                    onChange={(e) => setNewJobData({ ...newJobData, location: e.target.value })}
+                    placeholder="Enter site address or landmark..."
+                    className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold block mb-1 text-slate-800 dark:text-slate-200">
+                    Estimated Amount ({currentBusiness.currency}) *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="50"
+                    value={newJobData.estimatedAmount}
+                    onChange={(e) =>
+                      setNewJobData({ ...newJobData, estimatedAmount: parseFloat(e.target.value) || 0 })
+                    }
+                    placeholder="1500"
+                    className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="font-semibold block mb-1">Assign Technician</label>
-                <select
-                  value={newJobData.assignedStaffId}
-                  onChange={(e) => setNewJobData({ ...newJobData, assignedStaffId: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border bg-slate-50"
-                >
-                  {staff.map((st) => (
-                    <option key={st.id} value={st.id}>
-                      {st.name} ({st.role})
-                    </option>
-                  ))}
-                </select>
+              {/* SECTION: Assignment & Priority */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold block mb-1 text-slate-800 dark:text-slate-200">
+                    Assign Technician
+                  </label>
+                  <select
+                    value={newJobData.assignedStaffId}
+                    onChange={(e) => setNewJobData({ ...newJobData, assignedStaffId: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">-- Unassigned (Pool) --</option>
+                    {staff.map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.name} ({st.role})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-semibold block mb-1 text-slate-800 dark:text-slate-200">
+                    Job Priority
+                  </label>
+                  <select
+                    value={newJobData.priority}
+                    onChange={(e) => setNewJobData({ ...newJobData, priority: e.target.value as JobPriority })}
+                    className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="low">🟢 Low Priority</option>
+                    <option value="medium">🟡 Medium Priority</option>
+                    <option value="high">🟠 High Priority</option>
+                    <option value="urgent">🔴 Urgent / Emergency</option>
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="font-semibold block mb-1">Priority</label>
-                <select
-                  value={newJobData.priority}
-                  onChange={(e) => setNewJobData({ ...newJobData, priority: e.target.value as JobPriority })}
-                  className="w-full px-3 py-2 rounded-xl border bg-slate-50"
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </div>
+              {/* SECTION: Scheduled Date & Time Slot Selection */}
+              <div className="p-3.5 rounded-2xl bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                        Scheduled Date *
+                      </label>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setNewJobData({
+                              ...newJobData,
+                              scheduledDate: new Date().toISOString().split('T')[0],
+                            })
+                          }
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 cursor-pointer"
+                        >
+                          Today
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const tom = new Date();
+                            tom.setDate(tom.getDate() + 1);
+                            setNewJobData({
+                              ...newJobData,
+                              scheduledDate: tom.toISOString().split('T')[0],
+                            });
+                          }}
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 cursor-pointer"
+                        >
+                          Tomorrow
+                        </button>
+                      </div>
+                    </div>
+                    <input
+                      type="date"
+                      required
+                      value={newJobData.scheduledDate}
+                      onChange={(e) => setNewJobData({ ...newJobData, scheduledDate: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                    />
+                  </div>
 
-              <div>
-                <label className="font-semibold block mb-1">Date</label>
-                <input
-                  type="date"
-                  value={newJobData.scheduledDate}
-                  onChange={(e) => setNewJobData({ ...newJobData, scheduledDate: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl border bg-slate-50"
-                />
-              </div>
+                  <div>
+                    <label className="font-bold block mb-1 text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                      Select Time Slot *
+                    </label>
+                    <select
+                      value={newJobData.scheduledTime}
+                      onChange={(e) => setNewJobData({ ...newJobData, scheduledTime: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {TIME_SLOT_PRESETS.map((slot) => (
+                        <option key={slot} value={slot}>
+                          {slot}
+                        </option>
+                      ))}
+                      <option value="CUSTOM">Custom Time Slot...</option>
+                    </select>
+                  </div>
+                </div>
 
-              <div>
-                <label className="font-semibold block mb-1">Time Slot</label>
-                <input
-                  type="text"
-                  value={newJobData.scheduledTime}
-                  onChange={(e) => setNewJobData({ ...newJobData, scheduledTime: e.target.value })}
-                  placeholder="10:00 AM"
-                  className="w-full px-3 py-2 rounded-xl border bg-slate-50"
-                />
+                {/* Quick Time Slot Chips */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Quick Time Slot Presets:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TIME_SLOT_PRESETS.map((preset) => {
+                      const isSelected = newJobData.scheduledTime === preset;
+                      const shortLabel = preset.split(' ')[0] + ' ' + preset.split(' ')[1] + ' - ' + preset.split(' ')[3] + ' ' + preset.split(' ')[4];
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setNewJobData({ ...newJobData, scheduledTime: preset })}
+                          className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer border ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                          }`}
+                        >
+                          {shortLabel}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Custom Time Slot Text Override Input */}
+                <div className="pt-1">
+                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
+                    Custom / Specific Time Note:
+                  </label>
+                  <input
+                    type="text"
+                    value={newJobData.scheduledTime}
+                    onChange={(e) => setNewJobData({ ...newJobData, scheduledTime: e.target.value })}
+                    placeholder="e.g. 10:30 AM or Exact 02:00 PM"
+                    className="w-full px-3 py-1.5 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t">
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
               <button
                 type="button"
                 onClick={() => setIsCreateModalOpen(false)}
-                className="px-4 py-2 rounded-xl border text-xs font-semibold"
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold cursor-pointer transition-colors"
               >
                 Cancel
               </button>
-              <button type="submit" className="px-5 py-2 rounded-xl bg-indigo-600 text-white font-semibold text-xs shadow-md">
+              <button
+                type="submit"
+                className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="w-4 h-4" />
                 Dispatch & Schedule Job
               </button>
             </div>

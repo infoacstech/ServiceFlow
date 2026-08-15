@@ -19,6 +19,7 @@ import {
   RefreshCw,
   X,
   Phone,
+  AlertCircle,
 } from 'lucide-react';
 
 interface LoginViewProps {
@@ -70,6 +71,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
   // Registration Success Alert State
   const [pendingRegistrationSuccess, setPendingRegistrationSuccess] = useState<User | null>(null);
+  // Duplicate Account Alert State
+  const [duplicateAccountNotice, setDuplicateAccountNotice] = useState<{
+    message: string;
+    identifier: string;
+    password?: string;
+  } | null>(null);
 
   // Auto-detect business based on email/phone matching or selection
   const cleanId = loginIdentifier.trim().toLowerCase();
@@ -148,6 +155,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
       if (result.isPending) {
         setPendingRegistrationSuccess(result.user);
+        setDuplicateAccountNotice(null);
         setRegName('');
         setRegEmail('');
         setRegPhone('');
@@ -158,6 +166,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       }
     } catch (err: any) {
       console.error('Registration error:', err);
+      const errMsg = err?.message || 'Registration failed';
+      if (errMsg.toLowerCase().includes('already registered')) {
+        setDuplicateAccountNotice({
+          message: errMsg,
+          identifier: regPhone.trim() || regEmail.trim(),
+          password: regPassword,
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -430,6 +446,49 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 </div>
               ) : (
                 <form onSubmit={handleDirectRegistration} className="space-y-3.5">
+                  {duplicateAccountNotice && (
+                    <div className="p-3.5 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 rounded-2xl space-y-2.5 animate-in fade-in">
+                      <div className="flex items-start gap-2.5">
+                        <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <div className="text-xs text-amber-900 dark:text-amber-100">
+                          <div className="font-bold">{duplicateAccountNotice.message}</div>
+                          <div className="text-slate-600 dark:text-slate-400 mt-0.5">
+                            An account with this mobile number or email already exists. You can sign in immediately.
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuthTab('login');
+                            setLoginIdentifier(duplicateAccountNotice.identifier);
+                            if (duplicateAccountNotice.password) {
+                              setLoginPassword(duplicateAccountNotice.password);
+                            }
+                            setDuplicateAccountNotice(null);
+                          }}
+                          className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all"
+                        >
+                          <span>Sign In Now</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setForgotIdentifier(duplicateAccountNotice.identifier);
+                            setIsForgotPasswordOpen(true);
+                            setForgotStep('identifier');
+                            setDuplicateAccountNotice(null);
+                          }}
+                          className="py-2 px-3 rounded-xl bg-amber-100 dark:bg-amber-900/60 hover:bg-amber-200 dark:hover:bg-amber-800 text-amber-900 dark:text-amber-200 font-bold text-xs transition-all cursor-pointer text-center"
+                        >
+                          Reset Password (OTP)
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                       Account Type *

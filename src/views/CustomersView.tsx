@@ -52,6 +52,7 @@ export const CustomersView: React.FC = () => {
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
+  const [timelineLimit, setTimelineLimit] = useState<number | 'all'>(10);
 
   const customerCsvFields: CsvColumnMapping[] = [
     { fieldKey: 'name', fieldLabel: 'Customer / Contact Name', required: true },
@@ -408,14 +409,45 @@ export const CustomersView: React.FC = () => {
               )}
 
               {activeProfileTab === 'timeline' && (
-                <div className="space-y-3 pl-2 border-l-2 border-indigo-500 text-xs">
-                  {activityLogs.map((log) => (
-                    <div key={log.id} className="pl-3 relative">
-                      <div className="font-bold text-slate-900 dark:text-slate-100">{log.action}</div>
-                      <div className="text-slate-500 text-[11px]">{log.description}</div>
-                      <div className="text-[10px] text-slate-400">{new Date(log.timestamp).toLocaleString()}</div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b text-[11px] text-slate-500">
+                    <span>
+                      Showing{' '}
+                      <strong>
+                        {timelineLimit === 'all'
+                          ? activityLogs.length
+                          : Math.min(timelineLimit, activityLogs.length)}
+                      </strong>{' '}
+                      of {activityLogs.length} events
+                    </span>
+                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg">
+                      <span className="text-[10px] text-slate-400 pl-1 font-bold">Limit:</span>
+                      {([10, 25, 'all'] as const).map((lim) => (
+                        <button
+                          key={String(lim)}
+                          type="button"
+                          onClick={() => setTimelineLimit(lim)}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                            timelineLimit === lim
+                              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                          }`}
+                        >
+                          {lim === 'all' ? 'All' : lim}
+                        </button>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+
+                  <div className="space-y-3 pl-2 border-l-2 border-indigo-500 text-xs">
+                    {(timelineLimit === 'all' ? activityLogs : activityLogs.slice(0, timelineLimit)).map((log) => (
+                      <div key={log.id} className="pl-3 relative">
+                        <div className="font-bold text-slate-900 dark:text-slate-100">{log.action}</div>
+                        <div className="text-slate-500 text-[11px]">{log.description}</div>
+                        <div className="text-[10px] text-slate-400">{new Date(log.timestamp).toLocaleString()}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
