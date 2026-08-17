@@ -43,7 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
     plans[0];
 
   const mainNavItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: permissions.canManageJobs || permissions.canViewFinancials },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: !isTech && (permissions.canManageJobs || permissions.canViewFinancials) },
     { id: 'jobs', label: isTech ? 'My Assigned Jobs' : 'Job Management', icon: Briefcase, visible: permissions.canManageJobs },
     { id: 'customers', label: 'Customers CRM', icon: Users, visible: permissions.canManageJobs || permissions.canManageStaff },
     { id: 'services', label: 'Service Catalog', icon: Wrench, visible: permissions.canManageServices },

@@ -53,7 +53,15 @@ const MainContent: React.FC = () => {
       const isSuperUser = currentUser.role === 'super_admin';
       const savedTab = sessionStorage.getItem('serviflow_active_tab');
 
-      if (!savedTab || savedTab === 'login') {
+      if (isTechUser) {
+        // Technicians & staff must default to 'jobs' (My Jobs) and are restricted from dashboard
+        if (!savedTab || savedTab === 'login' || savedTab === 'dashboard') {
+          setActiveTab('jobs');
+          sessionStorage.setItem('serviflow_active_tab', 'jobs');
+        } else {
+          setActiveTab(savedTab);
+        }
+      } else if (!savedTab || savedTab === 'login') {
         const defaultTab = isSuperUser ? 'super_admin' : 'dashboard';
         setActiveTab(defaultTab);
         sessionStorage.setItem('serviflow_active_tab', defaultTab);
@@ -66,9 +74,13 @@ const MainContent: React.FC = () => {
   }, [currentUser, isAuthInitializing]);
 
   const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
+    let targetTab = tab;
+    if (currentUser?.role === 'technician' && tab === 'dashboard') {
+      targetTab = 'jobs';
+    }
+    setActiveTab(targetTab);
     if (currentUser) {
-      sessionStorage.setItem('serviflow_active_tab', tab);
+      sessionStorage.setItem('serviflow_active_tab', targetTab);
     }
   };
 
@@ -112,7 +124,10 @@ const MainContent: React.FC = () => {
   const getTabAccess = (tab: string) => {
     switch (tab) {
       case 'dashboard':
-        return { allowed: permissions.canManageJobs || permissions.canViewFinancials, label: 'Admin or Manager' };
+        return {
+          allowed: currentUser?.role !== 'technician' && (permissions.canManageJobs || permissions.canViewFinancials),
+          label: 'Admin or Manager'
+        };
       case 'jobs':
         return { allowed: permissions.canManageJobs, label: 'Technician, Manager, or Admin' };
       case 'customers':

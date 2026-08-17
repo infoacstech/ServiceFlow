@@ -1047,7 +1047,7 @@ export const SettingsView: React.FC = () => {
 
                       <div className="text-right">
                         <div className="text-xs font-black text-emerald-600 dark:text-emerald-400">
-                          +₹{record.bonusAmount.toLocaleString('en-IN')} Bonus
+                          +₹{(record.bonusEarned || record.bonusAmount || 0).toLocaleString('en-IN')} Bonus
                         </div>
                         <span className="inline-block px-1.5 py-0.2 text-[9px] font-extrabold rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 uppercase">
                           {record.status}

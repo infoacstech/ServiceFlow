@@ -848,15 +848,54 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               if (seenNotifIdsRef.current.has(notif.id)) return;
               seenNotifIdsRef.current.add(notif.id);
 
-              // Check if notification is targeted to the current active user
-              const isTargetedToMe =
-                !notif.targetUserId ||
-                (currentUser && (notif.targetUserId === currentUser.id || notif.targetUserId === currentUser.email));
-              const isTargetedToMyRole =
-                !notif.targetRoleId ||
-                (currentUser && currentUser.role === notif.targetRoleId);
+              if (!currentUser) return;
+              if (notif.businessId !== currentBusiness?.id && currentUser.role !== 'super_admin') return;
 
-              if (isTargetedToMe && isTargetedToMyRole && notif.businessId === currentBusiness?.id) {
+              // Check if notification is targeted to the current active user
+              let isTargetedToMe = false;
+
+              if (currentUser.role === 'super_admin') {
+                isTargetedToMe = true;
+              } else if (notif.actionType === 'assigned') {
+                // IMPORTANT: Owner should NOT be notified when assigning jobs to others
+                if (currentUser.role === 'business_owner') {
+                  isTargetedToMe = false;
+                } else {
+                  // Check if this technician matches targetUserId
+                  if (notif.targetUserId) {
+                    if (notif.targetUserId === currentUser.id || notif.targetUserId === currentUser.email) {
+                      isTargetedToMe = true;
+                    } else {
+                      const matchedUser = (users || []).find((u) => u.id === notif.targetUserId);
+                      if (matchedUser) {
+                        if (currentUser.email && matchedUser.email && currentUser.email.toLowerCase() === matchedUser.email.toLowerCase()) {
+                          isTargetedToMe = true;
+                        } else if (currentUser.name && matchedUser.name && currentUser.name.toLowerCase() === matchedUser.name.toLowerCase()) {
+                          isTargetedToMe = true;
+                        }
+                      }
+                    }
+                  } else if (currentUser.role === 'technician') {
+                    isTargetedToMe = true;
+                  }
+                }
+              } else if (notif.actionType === 'accepted' || notif.actionType === 'started' || notif.actionType === 'completed') {
+                // Owner receives updates when technician accepts, starts, or finishes jobs
+                if (currentUser.role === 'business_owner' || currentUser.role === 'manager') {
+                  isTargetedToMe = true;
+                }
+              } else {
+                // General notifications
+                if (notif.targetUserId) {
+                  isTargetedToMe = notif.targetUserId === currentUser.id || notif.targetUserId === currentUser.email;
+                } else if (notif.targetRoleId) {
+                  isTargetedToMe = notif.targetRoleId === currentUser.role;
+                } else {
+                  isTargetedToMe = true;
+                }
+              }
+
+              if (isTargetedToMe) {
                 // Show in-app banner popup card with full details
                 setActiveJobPopup(notif);
 
@@ -1801,16 +1840,34 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ? notifications
     : notifications.filter((n) => {
         if (n.businessId !== currBizId) return false;
-        if (n.targetUserId && currentUser) {
+        if (!currentUser) return true;
+
+        if (currentUser.role === 'business_owner') {
+          // Business owner does not need to see technician assignment notifications
+          if (n.actionType === 'assigned') return false;
+          return true;
+        }
+
+        if (currentUser.role === 'technician') {
+          if (n.targetUserId) {
+            if (n.targetUserId === currentUser.id || n.targetUserId === currentUser.email) return true;
+            const matchedStaff = (users || []).find((u) => u.id === n.targetUserId);
+            if (matchedStaff) {
+              if (currentUser.email && matchedStaff.email && matchedStaff.email.toLowerCase() === currentUser.email.toLowerCase()) return true;
+              if (currentUser.name && matchedStaff.name && matchedStaff.name.toLowerCase() === currentUser.name.toLowerCase()) return true;
+            }
+            return false;
+          }
+          if (n.targetRoleId) {
+            return n.targetRoleId === 'technician';
+          }
+          return true;
+        }
+
+        if (n.targetUserId) {
           return n.targetUserId === currentUser.id || n.targetUserId === currentUser.email;
         }
-        if (n.targetRoleId && currentUser) {
-          if (n.targetRoleId === 'business_owner') {
-            return currentUser.role === 'business_owner';
-          }
-          if (n.targetRoleId === 'technician') {
-            return currentUser.role === 'technician';
-          }
+        if (n.targetRoleId) {
           return currentUser.role === n.targetRoleId;
         }
         return true;
@@ -1982,16 +2039,32 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
       firestoreService.updateJob(id, updates);
 
-      // If technician was updated or status changed, notify & speak
+      // If technician was updated or reassigned, create targeted notification for the new assignee
       const existingJ = jobs.find((j) => j.id === id);
       if (existingJ && updates.assignedStaffId && updates.assignedStaffId !== existingJ.assignedStaffId) {
         const assignedStaff = (users || []).find((u) => u.id === updates.assignedStaffId);
-        playJobVoiceNotification(
-          existingJ.jobId,
-          `Reassigned: ${existingJ.description}`,
-          existingJ.location,
-          assignedStaff?.name
-        );
+        const customer = (customers || []).find((c) => c.id === (updates.customerId || existingJ.customerId));
+        const reassignNotif: Notification = {
+          id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+          businessId: currentBusiness.id,
+          title: `Job Reassigned: ${existingJ.jobId}`,
+          message: `Job ${existingJ.jobId} (${updates.description || existingJ.description}) has been assigned to you. Scheduled for ${updates.scheduledDate || existingJ.scheduledDate} (${updates.scheduledTimeSlot || updates.scheduledTime || existingJ.scheduledTime || '09:00 AM'}).`,
+          type: 'job',
+          read: false,
+          createdAt: new Date().toISOString(),
+          targetRoleId: 'technician',
+          targetUserId: updates.assignedStaffId,
+          jobId: existingJ.jobId,
+          jobTitle: updates.description || existingJ.description,
+          jobLocation: updates.location || existingJ.location || customer?.address,
+          customerName: customer?.name,
+          customerPhone: customer?.mobile,
+          scheduledDate: updates.scheduledDate || existingJ.scheduledDate,
+          scheduledTime: updates.scheduledTimeSlot || updates.scheduledTime || existingJ.scheduledTime,
+          priority: updates.priority || existingJ.priority,
+          actionType: 'assigned',
+        };
+        saveToFirestore('notifications', reassignNotif.id, reassignNotif);
       }
 
       logActivity('Job Updated', 'job', id, 'Updated job assignment and schedule');
@@ -2561,6 +2634,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     businessId?: string;
     businessName?: string;
     businessType?: string;
+    referralCode?: string;
   }): Promise<{ user: User; isPending: boolean }> => {
     const normalizedEmail = (data.email || '').trim().toLowerCase();
     const cleanPhoneDigits = (data.phone || '').replace(/[^0-9]/g, '');
@@ -2810,7 +2884,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       businessId: currentBusiness.id,
       businessName: currentBusiness.name,
       ownerName: currentUser?.name || currentBusiness.name,
-      ownerPhone: currentUser?.phone || currentBusiness.mobile || currentBusiness.phone,
+      ownerPhone: currentUser?.phone || currentBusiness.mobile || '',
       amount: params.amount,
       payoutMethod: params.payoutMethod,
       upiId: params.upiId,

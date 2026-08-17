@@ -3,19 +3,18 @@ import { useApp } from '../context/AppContext';
 import { Job } from '../types';
 import {
   Mic,
-  MicOff,
   Square,
-  Sparkles,
   Save,
   Trash2,
   Volume2,
-  Clock,
   CheckCircle2,
   AlertCircle,
   Tag,
-  Copy,
-  Plus,
+  Languages,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
+import { getSelectedVoiceLanguage, SUPPORTED_VOICE_LANGUAGES, VoiceLanguageCode } from '../utils/audioNotification';
 
 interface VoiceNotesRecorderProps {
   job: Job;
@@ -34,15 +33,23 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
 
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [interimText, setInterimText] = useState('');
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [appendMode, setAppendMode] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedLang, setSelectedLang] = useState<VoiceLanguageCode>(() => {
+    const saved = getSelectedVoiceLanguage();
+    return saved || 'en-IN';
+  });
   const [speechSupported, setSpeechSupported] = useState(true);
+  const [micPermissionState, setMicPermissionState] = useState<'idle' | 'granted' | 'denied'>('idle');
 
   const recognitionRef = useRef<any>(null);
+  const isManuallyRecordingRef = useRef(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const baseTranscriptRef = useRef('');
 
-  // Initialize Speech Recognition if available
+  // Check speech recognition support on mount
   useEffect(() => {
     const SpeechRecognitionAPI =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -52,7 +59,7 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
     }
   }, []);
 
-  // Timer effect during recording
+  // Timer counter when recording
   useEffect(() => {
     if (isRecording) {
       timerRef.current = setInterval(() => {
@@ -68,58 +75,129 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
     };
   }, [isRecording]);
 
-  const startRecording = () => {
+  // Clean up recognition on unmount
+  useEffect(() => {
+    return () => {
+      isManuallyRecordingRef.current = false;
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {}
+      }
+    };
+  }, []);
+
+  const startRecording = async () => {
     const SpeechRecognitionAPI =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-    if (SpeechRecognitionAPI) {
-      try {
-        const recognition = new SpeechRecognitionAPI();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        recognition.onresult = (event: any) => {
-          let currentTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            currentTranscript += event.results[i][0].transcript;
-          }
-          if (currentTranscript) {
-            setTranscript((prev) => {
-              // Avoid duplicate append if continuous
-              if (prev && !prev.endsWith(' ')) {
-                return prev + ' ' + currentTranscript;
-              }
-              return currentTranscript;
-            });
-          }
-        };
-
-        recognition.onerror = (event: any) => {
-          console.warn('Speech recognition error:', event.error);
-          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-            showToast('Microphone access blocked. Using manual voice notes mode.', 'info');
-          }
-        };
-
-        recognition.onend = () => {
-          setIsRecording(false);
-        };
-
-        recognition.start();
-        recognitionRef.current = recognition;
-        setIsRecording(true);
-        showToast('Listening... Speak your on-site job notes clearly.', 'info');
-      } catch (err) {
-        console.error('Failed to start speech recognition:', err);
-        fallbackSimulatedDictation();
+    // Request microphone access permissions explicitly
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setMicPermissionState('granted');
+        // Stop stream tracks so SpeechRecognition can take over the mic cleanly
+        stream.getTracks().forEach((track) => track.stop());
       }
-    } else {
-      fallbackSimulatedDictation();
+    } catch (permErr) {
+      console.warn('Microphone permission request failed or denied:', permErr);
+      setMicPermissionState('denied');
+      showToast('Please enable microphone access in your browser to dictate notes.', 'error');
+    }
+
+    if (!SpeechRecognitionAPI) {
+      setSpeechSupported(false);
+      showToast('Speech Recognition API not supported in this browser. Please type or use quick chips.', 'info');
+      return;
+    }
+
+    try {
+      // Abort any existing instance
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {}
+      }
+
+      const recognition = new SpeechRecognitionAPI();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+      recognition.lang = selectedLang;
+
+      baseTranscriptRef.current = transcript.trim();
+      isManuallyRecordingRef.current = true;
+
+      recognition.onstart = () => {
+        setIsRecording(true);
+        setInterimText('');
+        showToast('Listening... Speak clearly into your microphone.', 'info');
+      };
+
+      recognition.onresult = (event: any) => {
+        let finalChunk = '';
+        let interimChunk = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const item = event.results[i];
+          if (item.isFinal) {
+            finalChunk += item[0].transcript + ' ';
+          } else {
+            interimChunk += item[0].transcript;
+          }
+        }
+
+        if (finalChunk) {
+          setTranscript((prev) => {
+            const trimmed = prev.trim();
+            return trimmed ? `${trimmed} ${finalChunk.trim()}` : finalChunk.trim();
+          });
+        }
+
+        setInterimText(interimChunk);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition event error:', event.error);
+        if (event.error === 'not-allowed') {
+          setMicPermissionState('denied');
+          showToast('Microphone access denied. Please allow microphone permission.', 'error');
+          setIsRecording(false);
+          isManuallyRecordingRef.current = false;
+        } else if (event.error === 'no-speech') {
+          // Normal pause in speaking, do not stop
+        } else if (event.error === 'network') {
+          showToast('Network issue with speech recognizer. Retrying...', 'info');
+        }
+      };
+
+      recognition.onend = () => {
+        setInterimText('');
+        // If user has not clicked stop, auto-restart to keep continuous dictation alive
+        if (isManuallyRecordingRef.current) {
+          try {
+            recognition.start();
+          } catch (e) {
+            // Already started or restarting
+          }
+        } else {
+          setIsRecording(false);
+        }
+      };
+
+      recognition.start();
+      recognitionRef.current = recognition;
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Failed to initialize speech recognition:', err);
+      setIsRecording(false);
+      isManuallyRecordingRef.current = false;
+      showToast('Could not start speech recognition. Please check your mic settings.', 'error');
     }
   };
 
   const stopRecording = () => {
+    isManuallyRecordingRef.current = false;
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -128,32 +206,8 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
       }
     }
     setIsRecording(false);
-    showToast('Voice recording stopped. Transcribed notes ready.', 'success');
-  };
-
-  // Fallback demo speech dictation if SpeechRecognition browser API is blocked or missing
-  const fallbackSimulatedDictation = () => {
-    setIsRecording(true);
-    showToast('Voice dictation active. Simulating audio input...', 'info');
-
-    const samplePhrases = [
-      'Inspected the site control panel.',
-      'All voltage readings are stable at 240V.',
-      'Replaced 2 faulty BNC connectors and re-crimped coaxial cable line.',
-      'Tested CCTV video feed output on primary NVR monitor.',
-      'Customer verified and approved the installation.',
-    ];
-
-    let phraseIdx = 0;
-    const interval = setInterval(() => {
-      if (phraseIdx < samplePhrases.length) {
-        setTranscript((prev) => (prev ? `${prev} ${samplePhrases[phraseIdx]}` : samplePhrases[phraseIdx]));
-        phraseIdx++;
-      } else {
-        clearInterval(interval);
-        setIsRecording(false);
-      }
-    }, 2000);
+    setInterimText('');
+    showToast('Voice dictation captured successfully!', 'success');
   };
 
   // Format recording time MM:SS
@@ -165,14 +219,15 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
 
   // Save voice notes to Job in AppContext
   const handleSaveNotes = () => {
-    if (!transcript.trim()) {
-      showToast('No notes to save. Record or type notes first.', 'info');
+    const fullText = (transcript + (interimText ? ' ' + interimText : '')).trim();
+    if (!fullText) {
+      showToast('No notes to save. Please speak or enter text first.', 'info');
       return;
     }
 
     setIsSaving(true);
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const formattedEntry = `🎤 [Voice Note - ${timeStr}]: ${transcript.trim()}`;
+    const formattedEntry = `🎤 [Voice Note - ${timeStr}]: ${fullText}`;
 
     const existingContent = (job as any)[targetField] || '';
     let finalNotes = '';
@@ -183,59 +238,85 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
       finalNotes = formattedEntry;
     }
 
-    // Call updateJob
     updateJob(job.id, { [targetField]: finalNotes });
 
     setTimeout(() => {
       setIsSaving(false);
       if (onNotesSaved) onNotesSaved(finalNotes);
-      showToast('Voice note transcribed & saved to job record!', 'success');
-      setTranscript(''); // Reset input box after saving
+      showToast('Voice notes saved to job record & synced!', 'success');
+      setTranscript('');
+      setInterimText('');
     }, 300);
   };
 
-  // Quick preset tags to insert into notes
+  // Quick preset tags / phrases to insert into notes
   const addQuickTag = (tagText: string) => {
-    setTranscript((prev) => (prev ? `${prev} [${tagText}]` : `[${tagText}]`));
+    setTranscript((prev) => {
+      const trimmed = prev.trim();
+      return trimmed ? `${trimmed} ${tagText}` : tagText;
+    });
   };
 
   return (
     <div
       className={`rounded-2xl border transition-all ${
         isRecording
-          ? 'bg-rose-50/80 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800 shadow-md ring-2 ring-rose-500/20'
-          : 'bg-slate-50/80 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700'
+          ? 'bg-rose-50/90 dark:bg-rose-950/40 border-rose-400 dark:border-rose-700 shadow-lg ring-2 ring-rose-500/30'
+          : 'bg-slate-50/90 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700'
       } ${compact ? 'p-3' : 'p-4'}`}
+      id={`voice-recorder-job-${job.id}`}
     >
       {/* Header Bar */}
-      <div className="flex items-center justify-between mb-2.5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
         <div className="flex items-center gap-2">
           <div
-            className={`p-1.5 rounded-xl ${
+            className={`p-2 rounded-xl transition-all ${
               isRecording
-                ? 'bg-rose-600 text-white animate-pulse'
+                ? 'bg-rose-600 text-white shadow-md shadow-rose-600/40 animate-pulse'
                 : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
             }`}
           >
             <Mic className="w-4 h-4" />
           </div>
           <div>
-            <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-              <span>On-Site Voice Notes Dictation</span>
-              {isRecording && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-900/50 px-2 py-0.5 rounded-full animate-pulse">
+            <h4 className="text-xs font-black text-slate-900 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
+              <span>On-Site Voice Dictation & Notes</span>
+              {isRecording ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-900/60 px-2.5 py-0.5 rounded-full border border-rose-300 dark:border-rose-700 animate-pulse">
                   <span className="w-2 h-2 rounded-full bg-rose-600 animate-ping" />
-                  Recording {formatTime(recordingSeconds)}
+                  Recording: {formatTime(recordingSeconds)}
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold text-slate-400 bg-slate-200/60 dark:bg-slate-700/60 px-2 py-0.5 rounded-md">
+                  Hands-Free Field Input
                 </span>
               )}
             </h4>
             <p className="text-[10px] text-slate-500 dark:text-slate-400">
-              Dictate notes hands-free. Transcriptions are saved directly to job record.
+              Speak in Hindi, English, Marathi, or Gujarati to record on-site job updates.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Language & Append Mode Controls */}
+        <div className="flex items-center gap-1.5 self-end sm:self-auto flex-wrap">
+          {/* Language Selector */}
+          <div className="flex items-center gap-1 bg-white dark:bg-slate-900 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+            <Languages className="w-3 h-3 text-slate-400" />
+            <select
+              value={selectedLang}
+              onChange={(e) => setSelectedLang(e.target.value as VoiceLanguageCode)}
+              disabled={isRecording}
+              className="text-[11px] font-bold bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
+            >
+              {SUPPORTED_VOICE_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+                  {l.flag} {l.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Append Mode Toggle */}
           <button
             type="button"
@@ -247,68 +328,102 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
             }`}
             title="When active, new voice notes are appended to existing job notes instead of replacing them."
           >
-            {appendMode ? 'Mode: Append' : 'Mode: Overwrite'}
+            {appendMode ? 'Append Mode' : 'Overwrite Mode'}
           </button>
         </div>
       </div>
 
-      {/* Live Audio Visualizer Animation when recording */}
+      {/* Live Audio Speech Waveform Indicator */}
       {isRecording && (
-        <div className="flex items-center justify-center gap-1 py-2 px-3 bg-rose-100/60 dark:bg-rose-900/40 rounded-xl mb-3 border border-rose-200/60 dark:border-rose-800/60">
-          <Volume2 className="w-4 h-4 text-rose-600 animate-bounce mr-2" />
-          <div className="flex items-center gap-1 h-5">
-            <span className="w-1 bg-rose-500 rounded-full h-2 animate-[ping_0.8s_infinite_100ms]" />
-            <span className="w-1 bg-rose-600 rounded-full h-4 animate-[ping_0.8s_infinite_200ms]" />
-            <span className="w-1 bg-rose-500 rounded-full h-5 animate-[ping_0.8s_infinite_300ms]" />
-            <span className="w-1 bg-rose-600 rounded-full h-3 animate-[ping_0.8s_infinite_150ms]" />
-            <span className="w-1 bg-rose-500 rounded-full h-4 animate-[ping_0.8s_infinite_250ms]" />
+        <div className="flex items-center justify-between p-2.5 bg-rose-100/70 dark:bg-rose-900/50 rounded-xl mb-2.5 border border-rose-300/80 dark:border-rose-800">
+          <div className="flex items-center gap-2">
+            <Volume2 className="w-4 h-4 text-rose-600 animate-bounce" />
+            <div className="flex items-center gap-1 h-5">
+              <span className="w-1 bg-rose-500 rounded-full h-2 animate-[ping_0.7s_infinite_100ms]" />
+              <span className="w-1 bg-rose-600 rounded-full h-4 animate-[ping_0.7s_infinite_200ms]" />
+              <span className="w-1 bg-rose-500 rounded-full h-5 animate-[ping_0.7s_infinite_300ms]" />
+              <span className="w-1 bg-rose-600 rounded-full h-3 animate-[ping_0.7s_infinite_150ms]" />
+              <span className="w-1 bg-rose-500 rounded-full h-4 animate-[ping_0.7s_infinite_250ms]" />
+            </div>
+            <span className="text-[11px] font-bold text-rose-800 dark:text-rose-200 ml-2">
+              Listening live... Speak your notes now.
+            </span>
           </div>
-          <span className="text-[11px] font-bold text-rose-700 dark:text-rose-300 ml-3">
-            Transcribing speech in real-time...
-          </span>
+
+          <button
+            type="button"
+            onClick={stopRecording}
+            className="py-1 px-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer"
+          >
+            <Square className="w-3 h-3 fill-white" /> Done Speaking
+          </button>
         </div>
       )}
 
-      {/* Transcription Editor Field */}
+      {/* Dictation Box */}
       <div className="space-y-2">
-        <textarea
-          value={transcript}
-          onChange={(e) => setTranscript(e.target.value)}
-          placeholder={
-            isRecording
-              ? 'Listening to your speech... Speak now...'
-              : 'Click "Start Voice Recording" to dictate notes or type directly here...'
-          }
-          className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 min-h-[75px]"
-        />
-
-        {/* Quick Tags Bar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-          <span className="text-[10px] font-bold text-slate-400 shrink-0 flex items-center gap-1">
-            <Tag className="w-3 h-3" /> Quick Tags:
-          </span>
-          {['Parts Needed', 'Follow-up Required', 'Client Approved', 'Safety Check OK', 'High Priority'].map(
-            (tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => addQuickTag(tag)}
-                className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-slate-600 dark:text-slate-300 hover:text-indigo-600 text-[10px] font-semibold border border-slate-200 dark:border-slate-700 transition-colors shrink-0 cursor-pointer"
-              >
-                + {tag}
-              </button>
-            )
+        <div className="relative">
+          <textarea
+            value={transcript + (interimText ? (transcript ? ' ' : '') + interimText : '')}
+            onChange={(e) => {
+              setTranscript(e.target.value);
+              setInterimText('');
+            }}
+            placeholder={
+              isRecording
+                ? 'Listening to speech in real-time... (Speak now)'
+                : 'Click "Start Voice Recording" to speak, or tap quick phrases below, or type manually...'
+            }
+            className={`w-full p-3 rounded-xl border text-xs font-medium text-slate-900 dark:text-slate-100 transition-all min-h-[85px] focus:ring-2 focus:ring-indigo-500 ${
+              isRecording
+                ? 'bg-white dark:bg-slate-900 border-rose-400 dark:border-rose-700 shadow-inner'
+                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+            }`}
+          />
+          {interimText && (
+            <span className="absolute bottom-2.5 right-3 text-[10px] font-semibold text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/80 px-2 py-0.5 rounded-full animate-pulse border border-rose-200 dark:border-rose-900">
+              transcribing speech...
+            </span>
           )}
         </div>
 
-        {/* Control Buttons Bar */}
-        <div className="flex items-center justify-between gap-2 pt-1">
+        {/* Quick Dictation Preset Phrases */}
+        <div className="space-y-1">
+          <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+            <Sparkles className="w-3 h-3 text-amber-500" />
+            <span>Quick Service Phrases & Tags:</span>
+          </div>
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            {[
+              'Diagnostic test completed successfully.',
+              'Faulty connector replaced and re-crimped.',
+              'Voltage and power supply calibrated.',
+              'Cleaned lens & checked camera signal feed.',
+              'Client verified and signed off on site.',
+              '[Parts Needed]',
+              '[Follow-up Required]',
+              '[Priority Fix]',
+            ].map((phrase) => (
+              <button
+                key={phrase}
+                type="button"
+                onClick={() => addQuickTag(phrase)}
+                className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/90 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 text-slate-700 dark:text-slate-300 hover:text-indigo-600 text-[10px] font-semibold border border-slate-200 dark:border-slate-700 transition-colors shrink-0 cursor-pointer"
+              >
+                + {phrase}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Action Controls Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
           <div className="flex items-center gap-2">
             {!isRecording ? (
               <button
                 type="button"
                 onClick={startRecording}
-                className="py-2 px-3.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                className="py-2 px-3.5 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Mic className="w-3.5 h-3.5" />
                 <span>Start Voice Recording</span>
@@ -317,10 +432,10 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
               <button
                 type="button"
                 onClick={stopRecording}
-                className="py-2 px-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                className="py-2 px-3.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Square className="w-3.5 h-3.5 text-rose-400 fill-rose-400" />
-                <span>Stop & Transcribe</span>
+                <span>Stop Recording</span>
               </button>
             )}
 
@@ -333,6 +448,7 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
                     if (SpeechSynthesisAPI) {
                       window.speechSynthesis.cancel();
                       const u = new SpeechSynthesisUtterance(transcript);
+                      u.lang = selectedLang;
                       u.rate = 0.95;
                       window.speechSynthesis.speak(u);
                     }
@@ -346,7 +462,10 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setTranscript('')}
+                  onClick={() => {
+                    setTranscript('');
+                    setInterimText('');
+                  }}
                   className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950 transition-colors cursor-pointer"
                   title="Clear transcript"
                 >
@@ -359,8 +478,8 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
           <button
             type="button"
             onClick={handleSaveNotes}
-            disabled={!transcript.trim() || isSaving}
-            className="py-2 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-40"
+            disabled={(!transcript.trim() && !interimText.trim()) || isSaving}
+            className="py-2 px-4 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40"
           >
             <Save className="w-3.5 h-3.5" />
             <span>Save to Job Record</span>
@@ -377,7 +496,7 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
               <CheckCircle2 className="w-3 h-3" /> Synced to Database
             </span>
           </div>
-          <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap max-h-32 overflow-y-auto leading-relaxed">
+          <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap max-h-36 overflow-y-auto leading-relaxed">
             {(job as any)[targetField]}
           </div>
         </div>
