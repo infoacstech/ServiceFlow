@@ -153,7 +153,7 @@ const MainContent: React.FC = () => {
       case 'super_admin':
         return { allowed: permissions.canAccessSuperAdmin, label: 'Super Admin' };
       case 'settings':
-        return { allowed: permissions.canAccessSettings, label: 'Admin / Business Owner' };
+        return { allowed: true, label: '' };
       case 'notifications':
       case 'login':
       default:

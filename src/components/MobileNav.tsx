@@ -86,8 +86,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
     { id: 'reports', label: 'Reports & Analytics', icon: BarChart3, visible: permissions.canViewFinancials },
     { id: 'notifications', label: 'Notifications', icon: Bell, visible: true },
     { id: 'ai_assistant', label: 'AI Business Assistant', icon: Sparkles, visible: permissions.canManageJobs || permissions.canViewFinancials },
-    { id: 'settings', label: 'Settings', icon: Settings, visible: permissions.canAccessSettings },
-    { id: 'login', label: 'Login Panel & Switch', icon: KeyRound, visible: true },
+    { id: 'settings', label: isTech ? 'Profile & Settings' : 'Profile Settings', icon: Settings, visible: true },
   ];
 
   if (isSuperAdmin || permissions.canAccessSuperAdmin) {

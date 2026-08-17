@@ -58,8 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
     { id: 'notifications', label: 'Notifications', icon: Bell, visible: true },
     { id: 'ai_assistant', label: 'AI Business Assistant', icon: Sparkles, visible: permissions.canManageJobs || permissions.canViewFinancials },
     { id: 'customer_portal', label: 'Customer Portal', icon: Globe, visible: permissions.canAccessCustomerPortal },
-    { id: 'settings', label: 'Business Settings', icon: Settings, visible: permissions.canAccessSettings },
-    { id: 'login', label: 'Login Panel & Switch', icon: KeyRound, visible: true },
+    { id: 'settings', label: isTech ? 'Profile & Settings' : 'Profile Settings', icon: Settings, visible: true },
   ];
 
   if (isSuperAdmin || permissions.canAccessSuperAdmin) {

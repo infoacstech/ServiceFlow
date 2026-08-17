@@ -564,12 +564,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                 <button
                   onClick={() => {
-                    setActiveTab('login');
+                    setActiveTab('settings');
                     closeAllMenus();
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 my-1"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 dark:hover:text-indigo-400 my-1 transition-colors"
                 >
-                  <Smartphone className="w-3.5 h-3.5" /> Login Panel & Switch User
+                  <Sliders className="w-3.5 h-3.5" /> Profile Settings
                 </button>
 
                 <button
@@ -580,16 +580,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                 >
                   <Download className="w-3.5 h-3.5" /> Install Standalone App
-                </button>
-
-                <button
-                  onClick={() => {
-                    setActiveTab('settings');
-                    closeAllMenus();
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  <Sliders className="w-3.5 h-3.5" /> Business Settings
                 </button>
 
                 <button

@@ -109,6 +109,7 @@ interface AppContextType {
   updateUserStatus: (userId: string, status: 'active' | 'pending' | 'rejected' | 'blocked' | 'suspended') => void;
   updateBusinessAndOwnerStatus: (businessId: string, newStatus: 'active' | 'pending' | 'rejected' | 'suspended') => void;
   updateUserPassword: (userId: string, newPass: string) => Promise<void>;
+  updateUserProfile: (userId: string, updates: Partial<User>) => Promise<void>;
   registerUser: (data: {
     name: string;
     email: string;
@@ -2625,6 +2626,24 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logActivity('Password Changed', 'staff', userId, 'User updated account password');
   };
 
+  const updateUserProfile = async (userId: string, updates: Partial<User>) => {
+    await saveToFirestore('users', userId, updates);
+    setUsers((prev) => {
+      const updated = prev.map((u) => (u.id === userId ? { ...u, ...updates } : u));
+      saveCache('serviflow_users_cache', updated);
+      return updated;
+    });
+
+    if (currentUser?.id === userId) {
+      const updatedUser = { ...currentUser, ...updates };
+      setCurrentUser(updatedUser);
+      localStorage.setItem('serviflow_user_session', JSON.stringify(updatedUser));
+    }
+
+    logActivity('Profile Updated', 'staff', userId, `Updated user profile details for ${updates.name || currentUser?.name}`);
+    showToast('Profile information updated successfully!', 'success');
+  };
+
   const registerUser = async (data: {
     name: string;
     email: string;
@@ -3056,6 +3075,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateUserStatus,
         updateBusinessAndOwnerStatus,
         updateUserPassword,
+        updateUserProfile,
         registerUser,
 
         customers: filteredCustomers,

@@ -43,9 +43,30 @@ import {
   Share2,
   Users,
   Award,
+  User,
+  UserCheck,
+  Volume2,
+  VolumeX,
+  Plus,
+  X,
+  Radio,
+  Camera,
+  Wrench,
+  Sliders,
 } from 'lucide-react';
 import { Plan } from '../types';
-import { playCustomVoiceNotification, playNotificationChime } from '../utils/audioNotification';
+import {
+  isVoiceNotificationEnabled,
+  setVoiceNotificationEnabled,
+  getVoiceVolume,
+  setVoiceVolume,
+  getSelectedVoiceLanguage,
+  setSelectedVoiceLanguage,
+  SUPPORTED_VOICE_LANGUAGES,
+  speakText,
+  playCustomVoiceNotification,
+  playNotificationChime,
+} from '../utils/audioNotification';
 
 export const SettingsView: React.FC = () => {
   const {
@@ -63,6 +84,7 @@ export const SettingsView: React.FC = () => {
     toggleSimulateOffline,
     currentUser,
     updateUserPassword,
+    updateUserProfile,
     purgeTenantTransactionalData,
     showToast,
     referralRecords,
@@ -70,9 +92,49 @@ export const SettingsView: React.FC = () => {
     requestReferralPayout,
   } = useApp();
 
+  const isOwnerOrAdmin = currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin';
+  const isTech = currentUser?.role === 'technician';
+
   const [activeSettingsTab, setActiveSettingsTab] = useState<
-    'profile' | 'subscription' | 'referrals' | 'sync' | 'security' | 'appearance' | 'reset'
-  >('profile');
+    'my_profile' | 'profile' | 'subscription' | 'referrals' | 'sync' | 'security' | 'appearance' | 'reset'
+  >(isOwnerOrAdmin ? 'profile' : 'my_profile');
+
+  // User Profile Form State
+  const [userProfileData, setUserProfileData] = useState({
+    name: currentUser?.name || '',
+    phone: currentUser?.phone || '',
+    email: currentUser?.email || '',
+    avatar: currentUser?.avatar || '',
+    skills: currentUser?.skills || ['General Maintenance', 'Field Diagnostics'],
+    status: (currentUser?.status || 'active') as 'active' | 'inactive' | 'on_leave',
+  });
+  const [newSkillInput, setNewSkillInput] = useState('');
+  const [isSavingUser, setIsSavingUser] = useState(false);
+  const [userSavedSuccess, setUserSavedSuccess] = useState(false);
+
+  // Voice & Audio Preference States
+  const [voiceEnabled, setVoiceEnabled] = useState(isVoiceNotificationEnabled());
+  const [voiceVolume, setVoiceVol] = useState(getVoiceVolume());
+  const [voiceLang, setVoiceLang] = useState(getSelectedVoiceLanguage());
+
+  const handleUserProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser?.id) return;
+    if (!userProfileData.name.trim()) {
+      showToast('Please enter your full name', 'error');
+      return;
+    }
+    setIsSavingUser(true);
+    try {
+      await updateUserProfile(currentUser.id, userProfileData);
+      setUserSavedSuccess(true);
+      setTimeout(() => setUserSavedSuccess(false), 3000);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update profile', 'error');
+    } finally {
+      setIsSavingUser(false);
+    }
+  };
 
   // Referral Payout Request State
   const [payoutAmount, setPayoutAmount] = useState<number>(0);
@@ -310,44 +372,68 @@ export const SettingsView: React.FC = () => {
     );
   };
 
+  const tabs = isOwnerOrAdmin
+    ? [
+        { id: 'profile', label: 'Company Profile & Logo', icon: Building2 },
+        { id: 'my_profile', label: 'Owner Profile', icon: UserCheck },
+        { id: 'subscription', label: 'Subscription & Pricing Plans', icon: CreditCard, highlight: true },
+        { id: 'referrals', label: 'Refer & Earn (10% Bonus)', icon: Gift, highlight: true, isReferral: true },
+        { id: 'sync', label: 'Offline Sync & Logs', icon: RefreshCw },
+        { id: 'security', label: 'Password & Security', icon: KeyRound },
+        { id: 'appearance', label: 'Theme & Audio Preferences', icon: Sun },
+        { id: 'reset', label: 'Danger Zone / Reset', icon: Trash2 },
+      ]
+    : [
+        { id: 'my_profile', label: isTech ? 'My Profile & Skills' : 'My Profile', icon: UserCheck },
+        { id: 'security', label: 'Password & Security', icon: KeyRound },
+        { id: 'appearance', label: 'Audio & App Preferences', icon: Sun },
+        { id: 'sync', label: 'Offline Sync Status', icon: RefreshCw },
+      ];
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-16 animate-in fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
         <div>
           <h1 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Settings className="w-5 h-5 text-indigo-600" /> Business Settings & Workspace
+            <Sliders className="w-5 h-5 text-indigo-600" />
+            {isTech ? 'Technician Profile & Settings' : isOwnerOrAdmin ? 'Profile & Business Settings' : 'Staff Profile & Settings'}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Manage company profile, SaaS subscription & pricing plans, offline sync logs, and security
+            {isTech
+              ? 'Manage your personal profile, technical skills, voice language preferences, and security'
+              : isOwnerOrAdmin
+              ? 'Manage company profile, SaaS subscription & pricing plans, offline sync logs, and security'
+              : 'Manage your staff profile details, audio preferences, and security'}
           </p>
         </div>
 
-        {/* Current Plan Pill */}
+        {/* Current Plan or Role Pill */}
         <div className="flex items-center gap-2">
-          <div className="px-3.5 py-1.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-            <div className="text-xs">
-              <span className="font-extrabold text-indigo-900 dark:text-indigo-200">{currentPlan?.name} Plan</span>
-              <span className="text-[10px] ml-1.5 px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold uppercase">
-                Active
-              </span>
+          {isOwnerOrAdmin ? (
+            <div className="px-3.5 py-1.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <div className="text-xs">
+                <span className="font-extrabold text-indigo-900 dark:text-indigo-200">{currentPlan?.name} Plan</span>
+                <span className="text-[10px] ml-1.5 px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold uppercase">
+                  Active
+                </span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="px-3.5 py-1.5 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center gap-2">
+              <UserCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <div className="text-xs font-bold text-slate-800 dark:text-slate-200 capitalize">
+                {(currentUser?.role || 'Staff').replace('_', ' ')}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Navigation Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-slate-200/80 dark:border-slate-800">
-        {[
-          { id: 'profile', label: 'Company Profile & Logo', icon: Building2 },
-          { id: 'subscription', label: 'Subscription & Pricing Plans', icon: CreditCard, highlight: true },
-          { id: 'referrals', label: 'Refer & Earn (10% Bonus)', icon: Gift, highlight: true, isReferral: true },
-          { id: 'sync', label: 'Offline Sync & Logs', icon: RefreshCw },
-          { id: 'security', label: 'Password & Security', icon: KeyRound },
-          { id: 'appearance', label: 'Theme & Appearance', icon: Sun },
-          { id: 'reset', label: 'Danger Zone / Reset', icon: Trash2 },
-        ].map((tab) => {
+        {tabs.map((tab: any) => {
           const Icon = tab.icon;
           const isActive = activeSettingsTab === tab.id;
           return (
@@ -376,6 +462,271 @@ export const SettingsView: React.FC = () => {
           );
         })}
       </div>
+
+      {/* TAB 0: USER PERSONAL PROFILE (ROLE AWARE) */}
+      {activeSettingsTab === 'my_profile' && (
+        <form onSubmit={handleUserProfileSubmit} className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-6 text-xs animate-in fade-in">
+          {userSavedSuccess && (
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 rounded-2xl font-bold flex items-center gap-2 border border-emerald-200 dark:border-emerald-800">
+              <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Personal Profile Updated Successfully!
+            </div>
+          )}
+
+          {/* User Badge & Avatar Card */}
+          <div className="p-5 bg-gradient-to-r from-slate-50 to-indigo-50/40 dark:from-slate-800/80 dark:to-indigo-950/30 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="relative group">
+                <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white font-black text-xl flex items-center justify-center shadow-md overflow-hidden ring-2 ring-indigo-500/30">
+                  {userProfileData.avatar ? (
+                    <img src={userProfileData.avatar} alt={userProfileData.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{(userProfileData.name || 'US').substring(0, 2).toUpperCase()}</span>
+                  )}
+                </div>
+                <label className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-white dark:bg-slate-800 shadow-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:text-indigo-600 cursor-pointer transition-colors" title="Change Avatar">
+                  <Camera className="w-3.5 h-3.5" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        if (file.size > 2 * 1024 * 1024) {
+                          showToast('Avatar image must be under 2MB', 'error');
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                          if (ev.target?.result) {
+                            setUserProfileData((prev) => ({ ...prev, avatar: ev.target!.result as string }));
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                    {userProfileData.name || currentUser?.name || 'User Profile'}
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] uppercase">
+                    {(currentUser?.role || 'Staff').replace('_', ' ')}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Business Tenant: <span className="font-semibold text-slate-700 dark:text-slate-300">{currentBusiness?.name}</span>
+                </p>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                    userProfileData.status === 'active'
+                      ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                      : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${userProfileData.status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                    {userProfileData.status === 'active' ? 'On Duty / Available' : 'On Leave / Unavailable'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Duty Toggle */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setUserProfileData((prev) => ({
+                  ...prev,
+                  status: prev.status === 'active' ? 'on_leave' : 'active'
+                }))}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-colors cursor-pointer border ${
+                  userProfileData.status === 'active'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100'
+                    : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 hover:bg-amber-100'
+                }`}
+              >
+                {userProfileData.status === 'active' ? 'Switch to On Leave' : 'Set as Available (On Duty)'}
+              </button>
+            </div>
+          </div>
+
+          {/* Form Fields */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="font-semibold block mb-1 text-slate-700 dark:text-slate-300">
+                Full Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={userProfileData.name}
+                onChange={(e) => setUserProfileData({ ...userProfileData, name: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 dark:border-slate-700 font-bold text-slate-900 dark:text-white"
+                placeholder="e.g. Rahul Sharma"
+              />
+            </div>
+
+            <div>
+              <label className="font-semibold block mb-1 text-slate-700 dark:text-slate-300">
+                Mobile / WhatsApp Number * (For Job Dispatch)
+              </label>
+              <input
+                type="tel"
+                required
+                value={userProfileData.phone}
+                onChange={(e) => setUserProfileData({ ...userProfileData, phone: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 dark:border-slate-700 text-slate-900 dark:text-white font-mono"
+                placeholder="+91 98765 43210"
+              />
+            </div>
+
+            <div>
+              <label className="font-semibold block mb-1 text-slate-700 dark:text-slate-300">
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={userProfileData.email}
+                onChange={(e) => setUserProfileData({ ...userProfileData, email: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 dark:border-slate-700 text-slate-900 dark:text-white"
+                placeholder="name@business.com"
+              />
+            </div>
+
+            <div>
+              <label className="font-semibold block mb-1 text-slate-700 dark:text-slate-300">
+                Assigned Role in Business
+              </label>
+              <div className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/60 font-semibold text-slate-600 dark:text-slate-400 capitalize">
+                {(currentUser?.role || 'staff').replace('_', ' ')}
+              </div>
+            </div>
+          </div>
+
+          {/* Specializations & Skills (especially useful for Technicians and Managers) */}
+          <div className="p-4 bg-slate-50/80 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">
+            <div>
+              <label className="font-bold text-slate-900 dark:text-white block mb-0.5">
+                Technical Skills & Specializations
+              </label>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Specify services and equipments you specialize in for smart job routing and assignments.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(userProfileData.skills || []).map((skill, idx) => (
+                <span
+                  key={idx}
+                  className="px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 font-semibold text-xs flex items-center gap-1.5"
+                >
+                  <Wrench className="w-3 h-3 text-indigo-500" />
+                  <span>{skill}</span>
+                  <button
+                    type="button"
+                    onClick={() => setUserProfileData((prev) => ({
+                      ...prev,
+                      skills: prev.skills?.filter((_, i) => i !== idx) || []
+                    }))}
+                    className="p-0.5 rounded-full hover:bg-indigo-200 dark:hover:bg-indigo-900 text-indigo-500 hover:text-indigo-800 dark:hover:text-indigo-200 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+
+              {/* Add Skill Input */}
+              <div className="flex items-center gap-1.5 mt-1 sm:mt-0">
+                <input
+                  type="text"
+                  value={newSkillInput}
+                  onChange={(e) => setNewSkillInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (newSkillInput.trim()) {
+                        setUserProfileData((prev) => ({
+                          ...prev,
+                          skills: [...(prev.skills || []), newSkillInput.trim()]
+                        }));
+                        setNewSkillInput('');
+                      }
+                    }
+                  }}
+                  placeholder="+ Add skill..."
+                  className="px-2.5 py-1 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newSkillInput.trim()) {
+                      setUserProfileData((prev) => ({
+                        ...prev,
+                        skills: [...(prev.skills || []), newSkillInput.trim()]
+                      }));
+                      setNewSkillInput('');
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 cursor-pointer"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+
+            {/* Common Skill Suggestions */}
+            <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                Quick Add Suggestions:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  'CCTV Installation',
+                  'IP Camera Config',
+                  'AC Repair & Gas Refill',
+                  'Inverter & Solar Servicing',
+                  'Electrical Wiring',
+                  'Plumbing & Drainage',
+                  'Fire Alarm & Sensors',
+                  'Access Control & Biometrics',
+                  'PC & Network Hardware',
+                ]
+                  .filter((s) => !(userProfileData.skills || []).includes(s))
+                  .slice(0, 6)
+                  .map((suggested) => (
+                    <button
+                      key={suggested}
+                      type="button"
+                      onClick={() =>
+                        setUserProfileData((prev) => ({
+                          ...prev,
+                          skills: [...(prev.skills || []), suggested],
+                        }))
+                      }
+                      className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950 dark:hover:text-indigo-300 text-[11px] font-medium transition-colors cursor-pointer"
+                    >
+                      + {suggested}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t dark:border-slate-800 flex justify-end">
+            <button
+              type="submit"
+              disabled={isSavingUser}
+              className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+            >
+              {isSavingUser ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>{isSavingUser ? 'Saving Profile...' : 'Save Profile Changes'}</span>
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* TAB 1: COMPANY PROFILE */}
       {activeSettingsTab === 'profile' && (
@@ -1637,9 +1988,9 @@ export const SettingsView: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 5: THEME & APPEARANCE */}
+      {/* TAB 5: THEME & APPEARANCE / AUDIO PREFERENCES */}
       {activeSettingsTab === 'appearance' && (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-6 animate-in fade-in">
           <div>
             <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               {theme === 'dark' ? <Moon className="w-4 h-4 text-amber-400" /> : <Sun className="w-4 h-4 text-amber-600" />} Appearance & Theme Mode
@@ -1693,6 +2044,125 @@ export const SettingsView: React.FC = () => {
               </div>
               {theme === 'dark' && <Check className="w-4 h-4 text-amber-400" />}
             </button>
+          </div>
+
+          {/* Voice Notification Audio Alerts Section */}
+          <div className="pt-6 border-t border-slate-200/80 dark:border-slate-800 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Volume2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Voice & Audio Notification Center
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Receive spoken announcements in Hindi, Marathi, Gujarati, English, etc. when jobs are assigned or updated.
+                </p>
+              </div>
+
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={voiceEnabled}
+                  onChange={(e) => {
+                    const val = e.target.checked;
+                    setVoiceEnabled(val);
+                    setVoiceNotificationEnabled(val);
+                    if (val) {
+                      playNotificationChime();
+                      playCustomVoiceNotification('Voice notifications are now activated.');
+                    }
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            {voiceEnabled && (
+              <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/60 space-y-4">
+                {/* Language Selector */}
+                <div>
+                  <label className="font-bold text-slate-800 dark:text-slate-200 block mb-1.5">
+                    Voice Announcement Language
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {SUPPORTED_VOICE_LANGUAGES.map((lang) => {
+                      const isSelected = voiceLang === lang.code;
+                      return (
+                        <button
+                          key={lang.code}
+                          type="button"
+                          onClick={() => {
+                            setVoiceLang(lang.code);
+                            setSelectedVoiceLanguage(lang.code);
+                            playNotificationChime();
+                            if (lang.code === 'hi-IN') {
+                              speakText('सर्विसफ्लो वॉयस नोटिफिकेशन सक्रिय है।', { lang: 'hi-IN' });
+                            } else if (lang.code === 'mr-IN') {
+                              speakText('सर्व्हिसफ्लो व्हॉईस सूचना सुरू झाली आहे.', { lang: 'mr-IN' });
+                            } else if (lang.code === 'gu-IN') {
+                              speakText('સર્વિસફ્લો વૉઇસ નોટિફિકેશન સક્રિય છે.', { lang: 'gu-IN' });
+                            } else {
+                              speakText(`ServiFlow voice notification set to ${lang.name}.`, { lang: lang.code });
+                            }
+                          }}
+                          className={`p-2.5 rounded-xl border text-left flex items-center justify-between cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-white dark:bg-slate-900 border-indigo-600 text-indigo-900 dark:text-indigo-200 font-bold shadow-xs'
+                              : 'bg-white/60 dark:bg-slate-900/40 border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{lang.flag}</span>
+                            <div>
+                              <div className="text-xs font-semibold leading-tight">{lang.name}</div>
+                              <div className="text-[10px] text-slate-400">{lang.nativeName}</div>
+                            </div>
+                          </div>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Volume Slider */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
+                    <span className="flex items-center gap-1.5">
+                      <Volume2 className="w-4 h-4 text-indigo-600" /> Announcement Volume
+                    </span>
+                    <span>{Math.round(voiceVolume * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="1"
+                    step="0.05"
+                    value={voiceVolume}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value);
+                      setVoiceVol(v);
+                      setVoiceVolume(v);
+                    }}
+                    className="w-full accent-indigo-600"
+                  />
+                </div>
+
+                {/* Test Voice Button */}
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playNotificationChime();
+                      playCustomVoiceNotification('New job assigned: CCTV Camera Installation at Bandra West.');
+                    }}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" /> Test Voice Notification
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
