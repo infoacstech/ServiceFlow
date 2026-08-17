@@ -13,7 +13,11 @@ import {
   X,
   CreditCard,
   Filter,
+  MessageSquare,
+  Send,
+  Sparkles,
 } from 'lucide-react';
+import { sendInvoiceWhatsAppReminder } from '../utils/whatsappHelper';
 
 export interface InvoiceInitialFilter {
   statusFilter?: string;
@@ -207,12 +211,22 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
                         {inv.status}
                       </span>
                     </td>
-                    <td className="p-3.5 text-right space-x-2">
+                    <td className="p-3.5 text-right space-x-1.5">
+                      <button
+                        onClick={() => {
+                          const cust = (customers || []).find((c) => c.id === inv.customerId);
+                          sendInvoiceWhatsAppReminder(inv, cust, currentBusiness);
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 text-[11px] inline-flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                        title="Send invoice & UPI link on WhatsApp"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
+                      </button>
                       <button
                         onClick={() => setSelectedInvoice(inv)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-100 font-bold text-slate-700 hover:bg-slate-200"
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 font-bold text-slate-700 hover:bg-slate-200 text-[11px]"
                       >
-                        View Invoice
+                        View
                       </button>
                       {inv.balanceAmount > 0 && (
                         <button
@@ -221,9 +235,9 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
                             setPayAmount(inv.balanceAmount);
                             setIsPaymentModalOpen(true);
                           }}
-                          className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-xs"
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-xs text-[11px]"
                         >
-                          Record Payment
+                          Record Pay
                         </button>
                       )}
                     </td>
@@ -368,8 +382,18 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t">
-              <button onClick={() => setSelectedInvoice(null)} className="px-5 py-2 rounded-xl bg-slate-200 text-slate-800 font-semibold text-xs">
+            <div className="flex items-center justify-between gap-2 pt-3 border-t">
+              <button
+                type="button"
+                onClick={() => {
+                  const cust = (customers || []).find((c) => c.id === selectedInvoice.customerId);
+                  sendInvoiceWhatsAppReminder(selectedInvoice, cust, currentBusiness);
+                }}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4" /> Share on WhatsApp
+              </button>
+              <button onClick={() => setSelectedInvoice(null)} className="px-5 py-2 rounded-xl bg-slate-200 text-slate-800 font-semibold text-xs cursor-pointer">
                 Close
               </button>
             </div>

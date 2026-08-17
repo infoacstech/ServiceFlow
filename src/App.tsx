@@ -14,6 +14,7 @@ import { AccessDeniedView } from './components/AccessDeniedView';
 import { PullToRefresh } from './components/PullToRefresh';
 import { PwaInstallPrompt } from './components/PwaInstallPrompt';
 import { JobNotificationPopup } from './components/JobNotificationPopup';
+import { QuickActionFab } from './components/QuickActionFab';
 
 import { DashboardView } from './views/DashboardView';
 import { CustomersView } from './views/CustomersView';
@@ -286,6 +287,10 @@ const MainContent: React.FC = () => {
           onOpenJob={(jobId) => {
             handleNavigateWithFilter('jobs', { query: jobId });
           }}
+        />
+        <QuickActionFab
+          onOpenNewJob={handleOpenNewJob}
+          onNavigate={handleTabChange}
         />
         <PwaInstallPrompt />
         <ToastContainer />

@@ -19,7 +19,16 @@ import {
   Calendar,
   X,
   Mic,
+  MessageSquare,
+  Share2,
+  Send,
+  Sparkles,
 } from 'lucide-react';
+import {
+  sendTechnicianOnTheWayAlert,
+  sendJobCompletionSummaryToCustomer,
+  sendGoogleReviewRequest,
+} from '../utils/whatsappHelper';
 
 export const TechnicianView: React.FC = () => {
   const {
@@ -470,23 +479,47 @@ export const TechnicianView: React.FC = () => {
                   </div>
 
                   {/* Site Address with Map Navigation Trigger */}
-                  <div className="flex items-start justify-between gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                    <div className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300">
+                  <div className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                    <div className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300 min-w-0 flex-1">
                       <MapPin className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                      <div>
-                        <span className="font-bold text-slate-900 dark:text-slate-100 block">Site Location:</span>
-                        <span>{job.location || customer?.address || 'On-site address provided'}</span>
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-900 dark:text-slate-100 block text-[11px]">Site Address:</span>
+                        <span className="truncate block">{job.location || customer?.address || 'On-site address provided'}</span>
                       </div>
                     </div>
-                    {job.location && (
+                    {(job.location || customer?.address) && (
                       <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.location)}`}
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.location || customer?.address || '')}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-700 rounded-lg text-xs font-bold inline-flex items-center gap-1 shrink-0"
-                        title="Open in Google Maps"
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shrink-0 shadow-2xs transition-all active:scale-95"
+                        title="Start GPS Turn-by-Turn Navigation"
                       >
-                        <Navigation className="w-3.5 h-3.5" /> Maps
+                        <Navigation className="w-3.5 h-3.5" /> Start GPS Route
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Smart WhatsApp Actions for Field Tech */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sendTechnicianOnTheWayAlert(job, customer, currentUser, currentBusiness);
+                      }}
+                      className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                      WhatsApp: I'm On The Way
+                    </button>
+
+                    {customer?.mobile && (
+                      <a
+                        href={`tel:${customer.mobile}`}
+                        className="py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-bold text-[11px] flex items-center justify-center gap-1.5 shrink-0"
+                      >
+                        <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                        Call
                       </a>
                     )}
                   </div>
@@ -553,19 +586,43 @@ export const TechnicianView: React.FC = () => {
 
                     {/* Status 5: Completed */}
                     {isCompleted && (
-                      <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-2xl flex items-center justify-between text-xs text-emerald-900 dark:text-emerald-200">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          <span className="font-bold">Job Completed & Signed Off</span>
-                          {job.customerRating && (
-                            <span>• ⭐ {job.customerRating}/5</span>
+                      <div className="space-y-2">
+                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-2xl flex items-center justify-between text-xs text-emerald-900 dark:text-emerald-200">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            <span className="font-bold">Job Completed & Signed Off</span>
+                            {job.customerRating && (
+                              <span>• ⭐ {job.customerRating}/5</span>
+                            )}
+                          </div>
+                          {job.solutionProvided && (
+                            <span className="text-[11px] text-emerald-700 dark:text-emerald-300 max-w-[200px] truncate">
+                              {job.solutionProvided}
+                            </span>
                           )}
                         </div>
-                        {job.solutionProvided && (
-                          <span className="text-[11px] text-emerald-700 dark:text-emerald-300 max-w-[200px] truncate">
-                            {job.solutionProvided}
-                          </span>
-                        )}
+
+                        {/* Customer 5-Star Review & Summary Booster */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sendGoogleReviewRequest(customer, currentBusiness);
+                            }}
+                            className="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[11px] flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 fill-current" /> Request 5⭐ Google Review on WhatsApp
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sendJobCompletionSummaryToCustomer(job, customer, currentUser, currentBusiness);
+                            }}
+                            className="py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 dark:text-slate-200 font-bold text-[11px] flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-all active:scale-95 cursor-pointer"
+                          >
+                            <Share2 className="w-3.5 h-3.5 text-emerald-600" /> Share Report
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
