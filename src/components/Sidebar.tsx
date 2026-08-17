@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   LayoutDashboard,
@@ -20,7 +20,9 @@ import {
   Globe,
   KeyRound,
   LogOut,
+  Zap,
 } from 'lucide-react';
+import { PricingModal } from './PricingModal';
 
 interface SidebarProps {
   activeTab: string;
@@ -28,11 +30,17 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
-  const { currentUser, getRolePermissions } = useApp();
+  const { currentUser, getRolePermissions, currentBusiness, plans } = useApp();
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
   const permissions = getRolePermissions(currentUser?.role);
 
   const isTech = currentUser?.role === 'technician';
   const isSuperAdmin = currentUser?.role === 'super_admin';
+
+  const currentPlan =
+    plans.find((p) => p.id === currentBusiness?.planId) ||
+    plans.find((p) => p.id === 'plan-starter') ||
+    plans[0];
 
   const mainNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: permissions.canManageJobs || permissions.canViewFinancials },
@@ -97,14 +105,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
 
       {/* Plan Status Banner */}
       <div className="mt-auto pt-3 border-t border-slate-800/80">
-        <div className="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/50 text-xs">
+        <div
+          onClick={() => setIsPricingModalOpen(true)}
+          className="p-3 rounded-2xl bg-gradient-to-br from-slate-800/80 to-indigo-950/40 border border-slate-700/60 text-xs hover:border-indigo-500/50 transition-all cursor-pointer group"
+        >
           <div className="flex items-center justify-between font-semibold text-slate-200 mb-1">
-            <span>Professional Plan</span>
-            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-md font-bold uppercase">Active</span>
+            <span className="font-extrabold text-white group-hover:text-indigo-300 transition-colors flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              {currentPlan?.name} Plan
+            </span>
+            <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-md font-extrabold uppercase">
+              ₹{currentPlan?.price}/mo
+            </span>
           </div>
-          <div className="text-[11px] text-slate-400">Multi-tenant FSM ready</div>
+          <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
+            <span>{currentPlan?.maxStaff >= 999 ? 'Unlimited' : `Up to ${currentPlan?.maxStaff}`} Staff</span>
+            <span className="text-indigo-400 font-bold group-hover:underline">Upgrade →</span>
+          </div>
         </div>
       </div>
+
+      <PricingModal
+        isOpen={isPricingModalOpen}
+        onClose={() => setIsPricingModalOpen(false)}
+      />
     </aside>
   );
 };

@@ -27,6 +27,8 @@ import type {
   SupportSession,
   SystemSettings,
   SecurityAuditLog,
+  ReferralRecord,
+  ReferralPayoutRequest,
 } from '../types';
 import {
   DEMO_BUSINESSES,
@@ -46,6 +48,8 @@ import {
   DEMO_PLANS,
   DEMO_ROLES,
   SUPER_ADMIN_USER,
+  DEMO_REFERRALS,
+  DEMO_REFERRAL_PAYOUTS,
 } from '../data/demoData';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { AuthService } from '../services/AuthService';
@@ -114,7 +118,36 @@ interface AppContextType {
     businessId?: string;
     businessName?: string;
     businessType?: string;
+    referralCode?: string;
   }) => Promise<{ user: User; isPending: boolean }>;
+
+  // Referral Bonus System
+  referralRecords: ReferralRecord[];
+  referralPayoutRequests: ReferralPayoutRequest[];
+  validateReferralCode: (code: string) => {
+    isValid: boolean;
+    referrerBusiness?: Business;
+    referrerUser?: User;
+    discountPercent: number;
+    bonusPercent: number;
+    message: string;
+  };
+  requestReferralPayout: (params: {
+    amount: number;
+    payoutMethod: 'upi' | 'bank_transfer' | 'subscription_credit';
+    upiId?: string;
+    bankAccount?: {
+      accountNumber: string;
+      ifsc: string;
+      holderName: string;
+    };
+    notes?: string;
+  }) => Promise<ReferralPayoutRequest>;
+  processReferralPayout: (
+    requestId: string,
+    newStatus: 'approved' | 'rejected' | 'completed',
+    notes?: string
+  ) => void;
 
   // Data collections (filtered by current business when applicable)
   customers: Customer[];
@@ -472,6 +505,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
   const [roles, setRoles] = useState<Role[]>(() =>
     loadCache('serviflow_roles_cache', DEMO_ROLES)
+  );
+
+  // Referral Bonus States
+  const [referralRecords, setReferralRecords] = useState<ReferralRecord[]>(() =>
+    loadCache('serviflow_referrals_cache', DEMO_REFERRALS)
+  );
+  const [referralPayoutRequests, setReferralPayoutRequests] = useState<ReferralPayoutRequest[]>(() =>
+    loadCache('serviflow_ref_payouts_cache', DEMO_REFERRAL_PAYOUTS)
   );
 
   // Super Admin Support Access & Security States
@@ -956,6 +997,40 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (error) => handleFirestoreError(error, OperationType.GET, 'securityAuditLogs')
     );
 
+    // 21. Referral Records
+    const unsubReferrals = onSnapshot(
+      collection(db, 'referrals'),
+      (snapshot) => {
+        const cloudItems = snapshot.docs.map((d) => d.data() as ReferralRecord);
+        setReferralRecords((prev) => {
+          const map = new Map<string, ReferralRecord>();
+          prev.forEach((r) => map.set(r.id, r));
+          cloudItems.forEach((r) => map.set(r.id, r));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_referrals_cache', merged);
+          return merged;
+        });
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'referrals')
+    );
+
+    // 22. Referral Payout Requests
+    const unsubReferralPayouts = onSnapshot(
+      collection(db, 'referralPayouts'),
+      (snapshot) => {
+        const cloudItems = snapshot.docs.map((d) => d.data() as ReferralPayoutRequest);
+        setReferralPayoutRequests((prev) => {
+          const map = new Map<string, ReferralPayoutRequest>();
+          prev.forEach((p) => map.set(p.id, p));
+          cloudItems.forEach((p) => map.set(p.id, p));
+          const merged = Array.from(map.values());
+          saveCache('serviflow_ref_payouts_cache', merged);
+          return merged;
+        });
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'referralPayouts')
+    );
+
     return () => {
       unsubBiz();
       unsubUsers();
@@ -977,6 +1052,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubSupportSessions();
       unsubSystemSettings();
       unsubSecurityLogs();
+      unsubReferrals();
+      unsubReferralPayouts();
     };
   }, []);
 
@@ -1740,6 +1817,16 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
   const filteredActivityLogs = isSuperAdminUser ? activityLogs : activityLogs.filter((a) => a.businessId === currBizId);
   const filteredStaff = isSuperAdminUser ? users : users.filter((u) => u.businessId === currBizId && u.role !== 'super_admin');
+  const filteredReferralRecords = isSuperAdminUser
+    ? referralRecords
+    : referralRecords.filter(
+        (r) =>
+          r.referrerBusinessId === currBizId ||
+          r.referredBusinessId === currBizId
+      );
+  const filteredReferralPayouts = isSuperAdminUser
+    ? referralPayoutRequests
+    : referralPayoutRequests.filter((p) => p.businessId === currBizId);
 
   // Customer Actions
   const addCustomer = (data: Omit<Customer, 'id' | 'businessId' | 'createdAt'>) => {
@@ -2502,6 +2589,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (data.role === 'business_owner') {
       try {
+        const cleanRefCode = (data.referralCode || '').trim().toUpperCase();
+
         const { user: newOwner, tenant: newTenant } = await AuthService.signUpOwner({
           name: data.name,
           email: data.email,
@@ -2509,7 +2598,80 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           password: data.password,
           businessName: data.businessName || `${data.name}'s Business`,
           businessType: data.businessType || 'CCTV & Security',
+          referredBy: cleanRefCode || undefined,
         });
+
+        // If registered with referral code, find referrer and process 10% discount & 10% bonus
+        if (cleanRefCode) {
+          const referrerBiz = businesses.find(
+            (b) => (b.referralCode || '').trim().toUpperCase() === cleanRefCode
+          );
+          const referrerUser = users.find(
+            (u) => (u.referralCode || '').trim().toUpperCase() === cleanRefCode
+          );
+          const matchedBiz = referrerBiz || (referrerUser?.businessId ? businesses.find((b) => b.id === referrerUser?.businessId) : undefined);
+
+          if (matchedBiz) {
+            // Plan default value calculation: Standard Pro plan (₹1,299/mo)
+            const planPrice = 1299;
+            const discountPercent = 10;
+            const discountAmount = Math.round((planPrice * discountPercent) / 100); // ₹130
+            const bonusPercent = 10;
+            const bonusEarned = Math.round((planPrice * bonusPercent) / 100); // ₹130
+
+            const newReferralRecord: ReferralRecord = {
+              id: `ref-tx-${Date.now()}`,
+              referrerBusinessId: matchedBiz.id,
+              referrerUserId: referrerUser?.id,
+              referrerCode: matchedBiz.referralCode || cleanRefCode,
+              referrerBusinessName: matchedBiz.name,
+              referredBusinessId: newTenant.id,
+              referredBusinessName: newTenant.name,
+              referredOwnerName: newOwner.name,
+              referredOwnerPhone: newOwner.phone,
+              planId: newTenant.planId || 'plan-pro',
+              planName: 'Professional Plan (10% Referral Discount)',
+              planPrice,
+              discountPercent,
+              discountAmount,
+              bonusPercent,
+              bonusEarned,
+              status: 'credited',
+              createdAt: new Date().toISOString(),
+              notes: `10% discount (-₹${discountAmount}) applied for ${newTenant.name}. 10% referral bonus (+₹${bonusEarned}) credited to ${matchedBiz.name}.`,
+            };
+
+            await saveToFirestore('referrals', newReferralRecord.id, newReferralRecord);
+            setReferralRecords((prev) => [newReferralRecord, ...prev.filter((r) => r.id !== newReferralRecord.id)]);
+
+            // Update referrer business balance & earnings
+            const updatedEarnings = (matchedBiz.referralEarnings || 0) + bonusEarned;
+            const updatedBalance = (matchedBiz.referralBalance || 0) + bonusEarned;
+            await saveToFirestore('businesses', matchedBiz.id, {
+              referralEarnings: updatedEarnings,
+              referralBalance: updatedBalance,
+            });
+
+            // Send Realtime In-App Notification to Referrer
+            const bonusNotification: Notification = {
+              id: `notif-ref-${Date.now()}`,
+              businessId: matchedBiz.id,
+              title: `🎉 10% Referral Bonus Credited: +₹${bonusEarned}!`,
+              message: `${newOwner.name} ("${newTenant.name}") registered using your referral code "${cleanRefCode}". ₹${bonusEarned} bonus has been credited to your referral wallet!`,
+              type: 'payment',
+              read: false,
+              createdAt: new Date().toISOString(),
+            };
+            await saveToFirestore('notifications', bonusNotification.id, bonusNotification);
+
+            logActivity(
+              'Referral Bonus Credited',
+              'financials',
+              newReferralRecord.id,
+              `Referrer "${matchedBiz.name}" earned ₹${bonusEarned} (10%) from signup of "${newTenant.name}"`
+            );
+          }
+        }
 
         // Set active session
         localStorage.setItem('serviflow_user_session', JSON.stringify(newOwner));
@@ -2523,7 +2685,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setBusinesses((prev) => [...prev.filter((b) => b.id !== newTenant.id), newTenant]);
         setUsers((prev) => [...prev.filter((u) => u.id !== newOwner.id), newOwner]);
 
-        showToast(`Business "${newTenant.name}" registered successfully! Welcome to ServiFlow.`, 'success');
+        if (cleanRefCode) {
+          showToast(`Welcome to ServiFlow! 10% Referral Discount applied to your account.`, 'success');
+        } else {
+          showToast(`Business "${newTenant.name}" registered successfully! Welcome to ServiFlow.`, 'success');
+        }
         return { user: newOwner, isPending: false };
       } catch (err: any) {
         console.error('Sign up error:', err);
@@ -2577,6 +2743,140 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast(`Account created for ${newStaff.name}.`, 'success');
       return { user: newStaff, isPending: false };
     }
+  };
+
+  // Referral System Actions
+  const validateReferralCode = (code: string) => {
+    const clean = (code || '').trim().toUpperCase();
+    if (!clean) {
+      return {
+        isValid: false,
+        discountPercent: 0,
+        bonusPercent: 0,
+        message: 'Please enter a referral code.',
+      };
+    }
+
+    const matchedBiz = businesses.find(
+      (b) => (b.referralCode || '').trim().toUpperCase() === clean
+    );
+    const matchedUser = users.find(
+      (u) => (u.referralCode || '').trim().toUpperCase() === clean
+    );
+
+    if (matchedBiz || matchedUser) {
+      const bizName = matchedBiz?.name || matchedUser?.name || 'Verified Partner';
+      return {
+        isValid: true,
+        referrerBusiness: matchedBiz,
+        referrerUser: matchedUser,
+        discountPercent: 10,
+        bonusPercent: 10,
+        message: `Valid code from ${bizName}! 10% Discount will be applied at signup & subscription.`,
+      };
+    }
+
+    return {
+      isValid: false,
+      discountPercent: 0,
+      bonusPercent: 0,
+      message: 'Invalid referral code. Please check and try again.',
+    };
+  };
+
+  const requestReferralPayout = async (params: {
+    amount: number;
+    payoutMethod: 'upi' | 'bank_transfer' | 'subscription_credit';
+    upiId?: string;
+    bankAccount?: {
+      accountNumber: string;
+      ifsc: string;
+      holderName: string;
+    };
+    notes?: string;
+  }): Promise<ReferralPayoutRequest> => {
+    if (!currentBusiness) throw new Error('No active business tenant found.');
+    const currentBal = currentBusiness.referralBalance || 0;
+
+    if (params.amount > currentBal) {
+      throw new Error(`Insufficient referral wallet balance. Available: ₹${currentBal}`);
+    }
+    if (params.amount <= 0) {
+      throw new Error('Please enter a valid payout amount greater than 0.');
+    }
+
+    const newPayoutReq: ReferralPayoutRequest = {
+      id: `payout-${Date.now()}`,
+      businessId: currentBusiness.id,
+      businessName: currentBusiness.name,
+      ownerName: currentUser?.name || currentBusiness.name,
+      ownerPhone: currentUser?.phone || currentBusiness.mobile || currentBusiness.phone,
+      amount: params.amount,
+      payoutMethod: params.payoutMethod,
+      upiId: params.upiId,
+      bankAccount: params.bankAccount,
+      status: params.payoutMethod === 'subscription_credit' ? 'completed' : 'pending',
+      requestedAt: new Date().toISOString(),
+      processedAt: params.payoutMethod === 'subscription_credit' ? new Date().toISOString() : undefined,
+      notes: params.notes,
+    };
+
+    // Deduct balance from business
+    const newBal = currentBal - params.amount;
+    await saveToFirestore('businesses', currentBusiness.id, { referralBalance: newBal });
+    setCurrentBusiness((prev) => (prev ? { ...prev, referralBalance: newBal } : null));
+
+    await saveToFirestore('referralPayouts', newPayoutReq.id, newPayoutReq);
+    setReferralPayoutRequests((prev) => [newPayoutReq, ...prev.filter((p) => p.id !== newPayoutReq.id)]);
+
+    if (params.payoutMethod === 'subscription_credit') {
+      showToast(`₹${params.amount} credited directly towards your upcoming subscription bill!`, 'success');
+    } else {
+      showToast(`Payout request for ₹${params.amount} submitted successfully! Admin will process via ${params.payoutMethod.toUpperCase()}.`, 'success');
+    }
+
+    logActivity(
+      'Referral Payout Requested',
+      'financials',
+      newPayoutReq.id,
+      `Requested ₹${params.amount} via ${params.payoutMethod}`
+    );
+
+    return newPayoutReq;
+  };
+
+  const processReferralPayout = (
+    requestId: string,
+    newStatus: 'approved' | 'rejected' | 'completed',
+    notes?: string
+  ) => {
+    const req = referralPayoutRequests.find((p) => p.id === requestId);
+    if (!req) return;
+
+    const updates: Partial<ReferralPayoutRequest> = {
+      status: newStatus,
+      processedAt: new Date().toISOString(),
+      notes: notes || req.notes,
+    };
+
+    // If rejected, refund balance back to business
+    if (newStatus === 'rejected' && req.status === 'pending') {
+      const biz = businesses.find((b) => b.id === req.businessId);
+      if (biz) {
+        const restoredBal = (biz.referralBalance || 0) + req.amount;
+        saveToFirestore('businesses', biz.id, { referralBalance: restoredBal });
+        if (currentBusiness?.id === biz.id) {
+          setCurrentBusiness((prev) => (prev ? { ...prev, referralBalance: restoredBal } : null));
+        }
+      }
+    }
+
+    saveToFirestore('referralPayouts', requestId, updates);
+    setReferralPayoutRequests((prev) =>
+      prev.map((p) => (p.id === requestId ? { ...p, ...updates } : p))
+    );
+    showToast(`Payout request ${requestId} updated to ${newStatus}.`, 'success');
+    logActivity('Referral Payout Processed', 'financials', requestId, `Status updated to ${newStatus}`);
   };
 
   const updateBusinessSettings = (updates: Partial<Business>) => {
@@ -2783,6 +3083,13 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Tenant and User Deletion
         deleteBusinessTenant,
         deleteUserAccount,
+
+        // Referral Bonus System
+        referralRecords: filteredReferralRecords,
+        referralPayoutRequests: filteredReferralPayouts,
+        validateReferralCode,
+        requestReferralPayout,
+        processReferralPayout,
       }}
     >
       {children}

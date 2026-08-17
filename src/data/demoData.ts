@@ -15,6 +15,8 @@ import {
   Expense,
   Notification,
   ActivityLog,
+  ReferralRecord,
+  ReferralPayoutRequest,
 } from '../types';
 
 export const DEMO_ROLES: Role[] = [
@@ -96,32 +98,65 @@ export const DEMO_PLANS: Plan[] = [
   {
     id: 'plan-starter',
     name: 'Starter',
-    price: 999,
+    price: 499,
+    yearlyPrice: 4999,
     billingCycle: 'monthly',
-    maxJobs: 50,
+    maxJobs: 100,
     maxStaff: 2,
-    maxCustomers: 100,
-    features: ['Basic Customer CRM', 'Job Management', 'Direct WhatsApp Billing', 'Mobile Technician App'],
+    maxCustomers: 250,
+    targetAudience: 'Small Agencies / Freelancers (1 Owner + 2 Field Techs)',
+    badge: 'CHHOTE BUSINESS',
+    features: [
+      'Up to 2 Field Staff / Technicians',
+      'Job Scheduling & Real-time Dispatch',
+      'GST Invoicing & Quotations with PDF',
+      'In-App Audio Voice Announcements',
+      'Basic Inventory (Up to 50 items/parts)',
+      'Customer Digital Signature & Rating',
+    ],
   },
   {
     id: 'plan-pro',
     name: 'Professional',
-    price: 2499,
+    price: 1299,
+    yearlyPrice: 12499,
     billingCycle: 'monthly',
-    maxJobs: 300,
-    maxStaff: 10,
-    maxCustomers: 1000,
-    features: ['Everything in Starter', 'Inventory Tracking', 'Quotations & Invoices', 'Payment Collections', 'Staff Tracking & Analytics'],
+    maxJobs: 1000,
+    maxStaff: 7,
+    maxCustomers: 2000,
+    popular: true,
+    badge: 'MOST POPULAR',
+    targetAudience: 'Mid-size Service Agencies (CCTV, AC, RO, Electrical, 5-10 Staff)',
+    features: [
+      'Up to 7 Field Staff / Technicians',
+      'Unlimited Jobs, Invoices & Quotations',
+      'Multi-Language Voice Alerts (Hindi, Marathi, Gujarati, English)',
+      'Background Push & OS Notifications (Service Worker)',
+      'Advanced Inventory & Auto-Parts Usage Deduction',
+      'AMC & Recurring Service Maintenance Contracts',
+      'Automated WhatsApp / SMS Customer Alerts',
+      'Staff Performance Tracking & Financial P&L Reports',
+    ],
   },
   {
     id: 'plan-biz',
     name: 'Business',
-    price: 4999,
+    price: 2999,
+    yearlyPrice: 28999,
     billingCycle: 'monthly',
-    maxJobs: 9999,
-    maxStaff: 50,
-    maxCustomers: 9999,
-    features: ['Everything in Professional', 'Recurring Contracts / AMC', 'AI Assistant Insights', 'Customer Portal', 'Custom Branding'],
+    maxJobs: 99999,
+    maxStaff: 999,
+    maxCustomers: 99999,
+    badge: 'ENTERPRISE ELITE',
+    targetAudience: 'Multi-Branch Service Companies & Security Enterprises',
+    features: [
+      'Unlimited Technicians & Office Staff',
+      'Custom Business Branding & Logo on Invoices & Portals',
+      'Complete Security Audit Logs & Multi-Tenant Management',
+      'Multi-Branch & Location Dispatch Tracking',
+      'Priority 24/7 Dedicated Support & Training',
+      'Automated Cloud Backup & Single-Click Data Purge / Export',
+    ],
   },
 ];
 
@@ -151,3 +186,5 @@ export const DEMO_CONTRACTS: RecurringContract[] = [];
 export const DEMO_EXPENSES: Expense[] = [];
 export const DEMO_NOTIFICATIONS: Notification[] = [];
 export const DEMO_ACTIVITIES: ActivityLog[] = [];
+export const DEMO_REFERRALS: ReferralRecord[] = [];
+export const DEMO_REFERRAL_PAYOUTS: ReferralPayoutRequest[] = [];

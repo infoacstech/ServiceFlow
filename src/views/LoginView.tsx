@@ -19,7 +19,11 @@ import {
   X,
   Phone,
   AlertCircle,
+  CreditCard,
+  Gift,
+  Tag,
 } from 'lucide-react';
+import { PricingModal } from '../components/PricingModal';
 
 interface LoginViewProps {
   onLoginSuccess?: () => void;
@@ -35,14 +39,58 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     showToast,
     registerUser,
     updateUserPassword,
+    validateReferralCode,
   } = useApp();
 
   const [authTab, setAuthTab] = useState<'login' | 'register' | 'super_admin'>('login');
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
 
   // Sign In Form State
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Referral Code Input & Validation State
+  const [regReferralCode, setRegReferralCode] = useState('');
+  const [referralValidation, setReferralValidation] = useState<{
+    isValid: boolean;
+    message: string;
+    discountPercent: number;
+  } | null>(null);
+
+  // Auto-detect referral code from URL parameter (e.g. ?ref=SF-APEX10)
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const refParam = urlParams.get('ref') || urlParams.get('referral');
+      if (refParam) {
+        const cleanRef = refParam.trim().toUpperCase();
+        setRegReferralCode(cleanRef);
+        setAuthTab('register');
+        const validation = validateReferralCode(cleanRef);
+        setReferralValidation({
+          isValid: validation.isValid,
+          message: validation.message,
+          discountPercent: validation.discountPercent,
+        });
+      }
+    }
+  }, [businesses]);
+
+  const handleReferralCodeInput = (code: string) => {
+    const clean = code.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+    setRegReferralCode(clean);
+    if (!clean.trim()) {
+      setReferralValidation(null);
+      return;
+    }
+    const val = validateReferralCode(clean);
+    setReferralValidation({
+      isValid: val.isValid,
+      message: val.message,
+      discountPercent: val.discountPercent,
+    });
+  };
 
   // Forgot Password State
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
@@ -145,6 +193,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         businessId: registerRole !== 'business_owner' ? regBusinessId : undefined,
         businessName: registerRole === 'business_owner' ? regBusinessName || `${regName.trim()}'s Services` : undefined,
         businessType: registerRole === 'business_owner' ? regBusinessType : undefined,
+        referralCode: registerRole === 'business_owner' && regReferralCode.trim() ? regReferralCode.trim().toUpperCase() : undefined,
       });
 
       if (result.isPending) {
@@ -563,6 +612,43 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                           <option value="Computer & IT Repair">Computer & IT Repair</option>
                         </select>
                       </div>
+
+                      {/* Optional Referral Code for Business Owners with Instant 10% Discount Badge */}
+                      <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/60 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
+                            <Gift className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                            <span>Referral Code (Optional)</span>
+                          </label>
+                          <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full font-extrabold flex items-center gap-1 border border-emerald-300 dark:border-emerald-800">
+                            <Tag className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                            Instant 10% Discount
+                          </span>
+                        </div>
+                        <input
+                          type="text"
+                          value={regReferralCode}
+                          onChange={(e) => handleReferralCodeInput(e.target.value)}
+                          placeholder="e.g. SF-APEX10 (or leave blank)"
+                          className="w-full px-3 py-2 rounded-lg border border-amber-200 dark:border-amber-800/80 bg-white dark:bg-slate-900 text-xs font-mono font-bold tracking-wider text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-amber-500 outline-hidden uppercase placeholder:normal-case placeholder:font-normal placeholder:tracking-normal"
+                        />
+                        {referralValidation && (
+                          <div
+                            className={`text-[11px] font-semibold flex items-center gap-1.5 ${
+                              referralValidation.isValid
+                                ? 'text-emerald-700 dark:text-emerald-400'
+                                : 'text-rose-600 dark:text-rose-400'
+                            }`}
+                          >
+                            {referralValidation.isValid ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-600 dark:text-rose-400" />
+                            )}
+                            <span>{referralValidation.message}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div>
@@ -634,26 +720,43 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           )}
         </div>
 
-        {/* Bottom Footer Link */}
-        <div className="text-center pt-1">
-          {authTab !== 'super_admin' ? (
-            <button
-              onClick={() => setAuthTab('super_admin')}
-              className="text-xs text-slate-400 hover:text-purple-600 font-semibold transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-purple-500" />
-              <span>Platform Super Admin Access</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => setAuthTab('login')}
-              className="text-xs text-slate-400 hover:text-indigo-600 font-semibold transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer"
-            >
-              <span>← Back to Business Sign In</span>
-            </button>
-          )}
+        {/* Bottom Footer Links */}
+        <div className="text-center pt-1 space-y-2">
+          <button
+            type="button"
+            onClick={() => setIsPricingModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800/80 text-indigo-700 dark:text-indigo-300 font-bold text-xs shadow-xs transition-all cursor-pointer mx-auto"
+          >
+            <CreditCard className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            <span>View SaaS Pricing & Plans (Starter ₹499 • Pro ₹1,299 • Business ₹2,999)</span>
+          </button>
+
+          <div>
+            {authTab !== 'super_admin' ? (
+              <button
+                onClick={() => setAuthTab('super_admin')}
+                className="text-xs text-slate-400 hover:text-purple-600 font-semibold transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-purple-500" />
+                <span>Platform Super Admin Access</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setAuthTab('login')}
+                className="text-xs text-slate-400 hover:text-indigo-600 font-semibold transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer"
+              >
+                <span>← Back to Business Sign In</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* PRICING MODAL */}
+      <PricingModal
+        isOpen={isPricingModalOpen}
+        onClose={() => setIsPricingModalOpen(false)}
+      />
 
       {/* FORGOT PASSWORD MODAL */}
       {isForgotPasswordOpen && (

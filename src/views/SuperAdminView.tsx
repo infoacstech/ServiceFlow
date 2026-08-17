@@ -30,6 +30,11 @@ import {
   Check,
   Plus,
   UserPlus,
+  Gift,
+  Tag,
+  Wallet,
+  Banknote,
+  Copy,
 } from 'lucide-react';
 
 export const SuperAdminView: React.FC = () => {
@@ -68,11 +73,21 @@ export const SuperAdminView: React.FC = () => {
     deleteBusinessTenant,
     deleteUserAccount,
     showToast,
+    referralRecords,
+    referralPayoutRequests,
+    processReferralPayout,
   } = useApp();
 
   const [activeTabSection, setActiveTabSection] = useState<
-    'approvals' | 'tenants' | 'cleanup' | 'support' | 'settings' | 'audit' | 'sessions'
+    'approvals' | 'tenants' | 'referrals' | 'cleanup' | 'support' | 'settings' | 'audit' | 'sessions'
   >('approvals');
+
+  // Payout Process Modal State
+  const [selectedPayoutForAction, setSelectedPayoutForAction] = useState<any>(null);
+  const [payoutActionType, setPayoutActionType] = useState<'completed' | 'approved' | 'rejected'>('completed');
+  const [payoutTxnRef, setPayoutTxnRef] = useState('');
+  const [payoutAdminNote, setPayoutAdminNote] = useState('');
+  const [isProcessingPayoutAction, setIsProcessingPayoutAction] = useState(false);
   const [auditLogsLimit, setAuditLogsLimit] = useState<number | 'all'>(10);
 
   // Add / Onboard Tenant Modal State
@@ -393,6 +408,18 @@ export const SuperAdminView: React.FC = () => {
         >
           <Building2 className="w-4 h-4" />
           <span>Tenant Businesses ({businesses.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTabSection('referrals')}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTabSection === 'referrals'
+              ? 'bg-amber-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Gift className="w-4 h-4" />
+          <span>Referrals & Payouts ({referralPayoutRequests.filter(p => p.status === 'pending').length} Pending)</span>
         </button>
 
         <button

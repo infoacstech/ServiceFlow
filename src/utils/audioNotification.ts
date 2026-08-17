@@ -462,12 +462,12 @@ export function playTransactionVoiceNotification(
 /**
  * Triggers custom voice notification
  */
-export function playCustomVoiceNotification(heading: string, detail: string): void {
+export function playCustomVoiceNotification(heading: string, detail?: string): void {
   if (!isVoiceNotificationEnabled()) return;
 
   playNotificationChime();
 
-  const speechMessage = `${heading}. ${detail}`;
+  const speechMessage = detail ? `${heading}. ${detail}` : heading;
   setTimeout(() => {
     speakText(speechMessage, { rate: 0.98, pitch: 1.0 });
   }, 300);

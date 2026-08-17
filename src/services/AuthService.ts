@@ -40,6 +40,7 @@ export interface SignUpOwnerParams {
   city?: string;
   state?: string;
   currency?: string;
+  referredBy?: string;
 }
 
 export interface SignUpStaffParams {
@@ -91,6 +92,14 @@ export class AuthService {
     const nowIso = new Date().toISOString();
     const today = nowIso.split('T')[0];
 
+    // Generate unique, clean referral code for this new business owner (e.g. SF-APEX10)
+    const cleanBizPrefix = (params.businessName || name)
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .slice(0, 5)
+      .toUpperCase();
+    const uniqueReferralSuffix = Math.floor(100 + Math.random() * 900);
+    const newReferralCode = `SF-${cleanBizPrefix || 'BIZ'}${uniqueReferralSuffix}`;
+
     // 2. Create Tenant (Business) Record
     const tenant: Business = {
       id: tenantId,
@@ -108,6 +117,11 @@ export class AuthService {
       createdAt: today,
       planId: 'plan-pro',
       status: 'active',
+      referralCode: newReferralCode,
+      referredBy: params.referredBy ? params.referredBy.trim().toUpperCase() : undefined,
+      referralDiscountApplied: Boolean(params.referredBy),
+      referralEarnings: 0,
+      referralBalance: 0,
     };
 
     // 3. Create User Record (Keyed strictly by Firebase UID)
@@ -123,6 +137,7 @@ export class AuthService {
       joiningDate: today,
       requestedDate: today,
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+      referralCode: newReferralCode,
     };
 
     // 4. Create Tenant Membership Record
