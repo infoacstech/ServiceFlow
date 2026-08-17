@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { Job } from '../types';
 import {
@@ -13,6 +13,9 @@ import {
   Languages,
   Sparkles,
   RefreshCw,
+  Wand2,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { getSelectedVoiceLanguage, SUPPORTED_VOICE_LANGUAGES, VoiceLanguageCode } from '../utils/audioNotification';
 
@@ -21,6 +24,75 @@ interface VoiceNotesRecorderProps {
   onNotesSaved?: (updatedNotes: string) => void;
   targetField?: 'notes' | 'problemFound' | 'solutionProvided';
   compact?: boolean;
+}
+
+/**
+ * Cleans accidental consecutive duplicate words and repeated phrases (supports Indian scripts & English)
+ */
+export function cleanRepeatedWordsAndPhrases(input: string): string {
+  if (!input || !input.trim()) return '';
+
+  let text = input.trim();
+
+  // Normalize multiple spaces into single space
+  text = text.replace(/\s+/g, ' ');
+
+  // Split into words
+  const words = text.split(' ').filter(Boolean);
+  if (words.length <= 1) return text;
+
+  // 1. Remove consecutive identical words (e.g. "हॅलो हॅलो हॅलो" -> "हॅलो", "हेलो हेलो" -> "हेलो", "test test" -> "test")
+  const deduplicatedWords: string[] = [];
+  for (let i = 0; i < words.length; i++) {
+    const current = words[i];
+    const prev = deduplicatedWords[deduplicatedWords.length - 1];
+
+    // Compare case-insensitively / trimmed
+    if (prev && prev.toLowerCase() === current.toLowerCase()) {
+      continue; // Skip duplicate word
+    }
+    deduplicatedWords.push(current);
+  }
+
+  // 2. Remove consecutive repeated 2-word and 3-word phrases (e.g., "माझं काम माझं काम" -> "माझं काम")
+  let resultWords = deduplicatedWords;
+
+  // Check 2-word repetitions
+  let changed = true;
+  while (changed && resultWords.length >= 4) {
+    changed = false;
+    for (let i = 0; i <= resultWords.length - 4; i++) {
+      const phrase1 = `${resultWords[i]} ${resultWords[i + 1]}`.toLowerCase();
+      const phrase2 = `${resultWords[i + 2]} ${resultWords[i + 3]}`.toLowerCase();
+      if (phrase1 === phrase2) {
+        resultWords.splice(i + 2, 2);
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  // Check 3-word repetitions
+  changed = true;
+  while (changed && resultWords.length >= 6) {
+    changed = false;
+    for (let i = 0; i <= resultWords.length - 6; i++) {
+      const phrase1 = `${resultWords[i]} ${resultWords[i + 1]} ${resultWords[i + 2]}`.toLowerCase();
+      const phrase2 = `${resultWords[i + 3]} ${resultWords[i + 4]} ${resultWords[i + 5]}`.toLowerCase();
+      if (phrase1 === phrase2) {
+        resultWords.splice(i + 3, 3);
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  let cleaned = resultWords.join(' ').trim();
+
+  // Normalize punctuation spacing
+  cleaned = cleaned.replace(/\s+([.,!?।])/g, '$1');
+
+  return cleaned;
 }
 
 export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
@@ -37,17 +109,21 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [appendMode, setAppendMode] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [selectedLang, setSelectedLang] = useState<VoiceLanguageCode>(() => {
     const saved = getSelectedVoiceLanguage();
-    return saved || 'en-IN';
+    return saved || 'mr-IN';
   });
   const [speechSupported, setSpeechSupported] = useState(true);
-  const [micPermissionState, setMicPermissionState] = useState<'idle' | 'granted' | 'denied'>('idle');
 
   const recognitionRef = useRef<any>(null);
   const isManuallyRecordingRef = useRef(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const baseTranscriptRef = useRef('');
+
+  // Stores text that was already in the box before the current recognition session started
+  const priorTextRef = useRef('');
+  // Stores final transcript accumulated in the current recognition session
+  const currentSessionFinalRef = useRef('');
 
   // Check speech recognition support on mount
   useEffect(() => {
@@ -87,28 +163,33 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
     };
   }, []);
 
+  const combineText = (base: string, addition: string) => {
+    const b = (base || '').trim();
+    const a = (addition || '').trim();
+    if (!b) return a;
+    if (!a) return b;
+    return `${b} ${a}`;
+  };
+
   const startRecording = async () => {
     const SpeechRecognitionAPI =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-    // Request microphone access permissions explicitly
+    if (!SpeechRecognitionAPI) {
+      setSpeechSupported(false);
+      showToast('Speech Recognition is not supported on this browser. Please type or use quick chips.', 'info');
+      return;
+    }
+
+    // Request microphone permissions cleanly
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        setMicPermissionState('granted');
-        // Stop stream tracks so SpeechRecognition can take over the mic cleanly
         stream.getTracks().forEach((track) => track.stop());
       }
     } catch (permErr) {
-      console.warn('Microphone permission request failed or denied:', permErr);
-      setMicPermissionState('denied');
-      showToast('Please enable microphone access in your browser to dictate notes.', 'error');
-    }
-
-    if (!SpeechRecognitionAPI) {
-      setSpeechSupported(false);
-      showToast('Speech Recognition API not supported in this browser. Please type or use quick chips.', 'info');
-      return;
+      console.warn('Microphone permission request warning:', permErr);
+      showToast('Please allow microphone permissions to dictate speech.', 'error');
     }
 
     try {
@@ -125,60 +206,69 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
       recognition.maxAlternatives = 1;
       recognition.lang = selectedLang;
 
-      baseTranscriptRef.current = transcript.trim();
+      // Lock in prior text so incoming speech adds cleanly on top without duplicating
+      priorTextRef.current = transcript.trim();
+      currentSessionFinalRef.current = '';
       isManuallyRecordingRef.current = true;
 
       recognition.onstart = () => {
         setIsRecording(true);
         setInterimText('');
-        showToast('Listening... Speak clearly into your microphone.', 'info');
+        showToast('Listening... Speak clearly into your mic.', 'info');
       };
 
       recognition.onresult = (event: any) => {
-        let finalChunk = '';
-        let interimChunk = '';
+        let sessionFinal = '';
+        let sessionInterim = '';
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const item = event.results[i];
-          if (item.isFinal) {
-            finalChunk += item[0].transcript + ' ';
+        // Iterate through all results in the current continuous recognition session
+        for (let i = 0; i < event.results.length; ++i) {
+          const res = event.results[i];
+          if (res.isFinal) {
+            sessionFinal += res[0].transcript + ' ';
           } else {
-            interimChunk += item[0].transcript;
+            sessionInterim += res[0].transcript;
           }
         }
 
-        if (finalChunk) {
-          setTranscript((prev) => {
-            const trimmed = prev.trim();
-            return trimmed ? `${trimmed} ${finalChunk.trim()}` : finalChunk.trim();
-          });
-        }
+        currentSessionFinalRef.current = sessionFinal.trim();
 
-        setInterimText(interimChunk);
+        // Calculate combined finalized text
+        const rawFinal = combineText(priorTextRef.current, currentSessionFinalRef.current);
+        const cleanedFinal = cleanRepeatedWordsAndPhrases(rawFinal);
+
+        setTranscript(cleanedFinal);
+        setInterimText(sessionInterim.trim());
       };
 
       recognition.onerror = (event: any) => {
-        console.warn('Speech recognition event error:', event.error);
+        console.warn('Speech recognition error:', event.error);
         if (event.error === 'not-allowed') {
-          setMicPermissionState('denied');
           showToast('Microphone access denied. Please allow microphone permission.', 'error');
           setIsRecording(false);
           isManuallyRecordingRef.current = false;
         } else if (event.error === 'no-speech') {
-          // Normal pause in speaking, do not stop
+          // Normal pause in speech, keep listening
         } else if (event.error === 'network') {
-          showToast('Network issue with speech recognizer. Retrying...', 'info');
+          // Temporary network glitch with recognizer
         }
       };
 
       recognition.onend = () => {
         setInterimText('');
-        // If user has not clicked stop, auto-restart to keep continuous dictation alive
+
+        // If recognizer pauses automatically but user hasn't clicked stop:
         if (isManuallyRecordingRef.current) {
+          // Commit current session final transcript into priorTextRef so new session doesn't overwrite or duplicate
+          priorTextRef.current = cleanRepeatedWordsAndPhrases(
+            combineText(priorTextRef.current, currentSessionFinalRef.current)
+          );
+          currentSessionFinalRef.current = '';
+
           try {
             recognition.start();
           } catch (e) {
-            // Already started or restarting
+            // Restarted or busy
           }
         } else {
           setIsRecording(false);
@@ -207,7 +297,10 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
     }
     setIsRecording(false);
     setInterimText('');
-    showToast('Voice dictation captured successfully!', 'success');
+
+    // Perform final refinement & de-duplication pass
+    setTranscript((prev) => cleanRepeatedWordsAndPhrases(prev));
+    showToast('Voice dictation captured accurately!', 'success');
   };
 
   // Format recording time MM:SS
@@ -217,9 +310,28 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
     return `${mins < 10 ? '0' : ''}${mins}:${remainingSecs < 10 ? '0' : ''}${remainingSecs}`;
   };
 
+  // Manual one-click text refiner & repeat cleaner
+  const handleCleanAndRefine = () => {
+    const cleaned = cleanRepeatedWordsAndPhrases(transcript);
+    setTranscript(cleaned);
+    showToast('Sentence refined & duplicate words removed!', 'success');
+  };
+
+  // Copy text to clipboard
+  const handleCopyText = () => {
+    const fullText = (transcript + (interimText ? ' ' + interimText : '')).trim();
+    if (!fullText) return;
+    navigator.clipboard?.writeText(fullText);
+    setCopied(true);
+    showToast('Copied to clipboard!', 'info');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   // Save voice notes to Job in AppContext
   const handleSaveNotes = () => {
-    const fullText = (transcript + (interimText ? ' ' + interimText : '')).trim();
+    const fullText = cleanRepeatedWordsAndPhrases(
+      (transcript + (interimText ? ' ' + interimText : '')).trim()
+    );
     if (!fullText) {
       showToast('No notes to save. Please speak or enter text first.', 'info');
       return;
@@ -246,14 +358,17 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
       showToast('Voice notes saved to job record & synced!', 'success');
       setTranscript('');
       setInterimText('');
-    }, 300);
+      priorTextRef.current = '';
+      currentSessionFinalRef.current = '';
+    }, 250);
   };
 
   // Quick preset tags / phrases to insert into notes
   const addQuickTag = (tagText: string) => {
     setTranscript((prev) => {
       const trimmed = prev.trim();
-      return trimmed ? `${trimmed} ${tagText}` : tagText;
+      const combined = trimmed ? `${trimmed} ${tagText}` : tagText;
+      return cleanRepeatedWordsAndPhrases(combined);
     });
   };
 
@@ -288,12 +403,12 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
                 </span>
               ) : (
                 <span className="text-[10px] font-bold text-slate-400 bg-slate-200/60 dark:bg-slate-700/60 px-2 py-0.5 rounded-md">
-                  Hands-Free Field Input
+                  Clean Speech AI Filter Active
                 </span>
               )}
             </h4>
             <p className="text-[10px] text-slate-500 dark:text-slate-400">
-              Speak in Hindi, English, Marathi, or Gujarati to record on-site job updates.
+              Speak in Marathi, Hindi, English, or Gujarati to record clear on-site job updates.
             </p>
           </div>
         </div>
@@ -305,7 +420,13 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
             <Languages className="w-3 h-3 text-slate-400" />
             <select
               value={selectedLang}
-              onChange={(e) => setSelectedLang(e.target.value as VoiceLanguageCode)}
+              onChange={(e) => {
+                const newLang = e.target.value as VoiceLanguageCode;
+                setSelectedLang(newLang);
+                if (typeof localStorage !== 'undefined') {
+                  localStorage.setItem('serviflow_voice_language', newLang);
+                }
+              }}
               disabled={isRecording}
               className="text-[11px] font-bold bg-transparent text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
             >
@@ -346,7 +467,7 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
               <span className="w-1 bg-rose-500 rounded-full h-4 animate-[ping_0.7s_infinite_250ms]" />
             </div>
             <span className="text-[11px] font-bold text-rose-800 dark:text-rose-200 ml-2">
-              Listening live... Speak your notes now.
+              Listening live... Speak clearly at normal pace.
             </span>
           </div>
 
@@ -364,10 +485,9 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
       <div className="space-y-2">
         <div className="relative">
           <textarea
-            value={transcript + (interimText ? (transcript ? ' ' : '') + interimText : '')}
+            value={transcript}
             onChange={(e) => {
               setTranscript(e.target.value);
-              setInterimText('');
             }}
             placeholder={
               isRecording
@@ -380,10 +500,14 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
                 : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
             }`}
           />
+
+          {/* Real-time Interim Live Preview Strip */}
           {interimText && (
-            <span className="absolute bottom-2.5 right-3 text-[10px] font-semibold text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/80 px-2 py-0.5 rounded-full animate-pulse border border-rose-200 dark:border-rose-900">
-              transcribing speech...
-            </span>
+            <div className="mt-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-[11px] text-amber-800 dark:text-amber-300 flex items-center gap-1.5 animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+              <span className="font-semibold shrink-0">Hearing:</span>
+              <span className="italic truncate">{interimText}</span>
+            </div>
           )}
         </div>
 
@@ -418,7 +542,7 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
 
         {/* Action Controls Bar */}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {!isRecording ? (
               <button
                 type="button"
@@ -443,6 +567,25 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
               <>
                 <button
                   type="button"
+                  onClick={handleCleanAndRefine}
+                  className="py-1.5 px-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/70 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                  title="Remove repeat words & polish sentence"
+                >
+                  <Wand2 className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Refine Text</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCopyText}
+                  className="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer flex items-center gap-1 font-semibold text-xs"
+                  title="Copy text"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => {
                     const SpeechSynthesisAPI = window.speechSynthesis;
                     if (SpeechSynthesisAPI) {
@@ -457,7 +600,6 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
                   title="Listen to dictated transcript out loud"
                 >
                   <Volume2 className="w-4 h-4" />
-                  <span className="hidden sm:inline">Listen</span>
                 </button>
 
                 <button
@@ -465,6 +607,8 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
                   onClick={() => {
                     setTranscript('');
                     setInterimText('');
+                    priorTextRef.current = '';
+                    currentSessionFinalRef.current = '';
                   }}
                   className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950 transition-colors cursor-pointer"
                   title="Clear transcript"
