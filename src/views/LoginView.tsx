@@ -8,7 +8,6 @@ import {
   Lock,
   ArrowRight,
   ShieldCheck,
-  Building2,
   UserPlus,
   Clock,
   KeyRound,
@@ -66,9 +65,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [regBusinessName, setRegBusinessName] = useState('');
   const [regBusinessType, setRegBusinessType] = useState('CCTV & Security');
 
-  // Selected Organization state for custom logo preview on sign-in
-  const [selectedOrgId, setSelectedOrgId] = useState<string>('');
-
   // Registration Success Alert State
   const [pendingRegistrationSuccess, setPendingRegistrationSuccess] = useState<User | null>(null);
   // Duplicate Account Alert State
@@ -92,8 +88,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     activeBusiness = businesses.find((b) => b.id === regBusinessId) || null;
   } else if (matchedUser) {
     activeBusiness = businesses.find((b) => b.id === matchedUser.businessId) || null;
-  } else if (selectedOrgId) {
-    activeBusiness = businesses.find((b) => b.id === selectedOrgId) || null;
   } else if (businesses.length > 0 && businesses[0]?.logo) {
     activeBusiness = businesses[0];
   }
@@ -321,33 +315,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           {/* SIGN IN TAB */}
           {authTab === 'login' && (
             <form onSubmit={handleDirectLogin} className="space-y-4">
-              {businesses.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                      Company Organization (Optional)
-                    </label>
-                    {activeBusiness?.logo && (
-                      <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md flex items-center gap-1">
-                        <Building2 className="w-3 h-3" /> Custom Logo
-                      </span>
-                    )}
-                  </div>
-                  <select
-                    value={selectedOrgId || activeBusiness?.id || ''}
-                    onChange={(e) => setSelectedOrgId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                  >
-                    <option key="auto-detect-org" value="">Auto-Detect from Email/Mobile</option>
-                    {businesses.map((b, idx) => (
-                      <option key={b.id ? `org-${b.id}-${idx}` : `biz-opt-${idx}`} value={b.id}>
-                        {b.name} ({b.type})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                   Email Address or Mobile Phone

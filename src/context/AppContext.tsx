@@ -1647,8 +1647,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return n.targetUserId === currentUser.id || n.targetUserId === currentUser.email;
         }
         if (n.targetRoleId && currentUser) {
-          if (n.targetRoleId === 'owner') {
-            return currentUser.role === 'owner' || currentUser.role === 'business_owner';
+          if (n.targetRoleId === 'business_owner') {
+            return currentUser.role === 'business_owner';
           }
           if (n.targetRoleId === 'technician') {
             return currentUser.role === 'technician';
@@ -1925,7 +1925,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       type: 'job',
       read: false,
       createdAt: new Date().toISOString(),
-      targetRoleId: 'owner',
+      targetRoleId: 'business_owner',
     };
     saveToFirestore('notifications', completeNotif.id, completeNotif);
 

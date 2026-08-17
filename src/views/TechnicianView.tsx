@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Job, JobStatus, JobPriority } from '../types';
 import { DigitalSignatureCanvas } from '../components/DigitalSignatureCanvas';
@@ -10,24 +10,14 @@ import {
   Clock,
   Phone,
   MapPin,
-  Camera,
-  Package,
   Star,
   FileCheck2,
-  AlertTriangle,
   Play,
   Check,
-  Sparkles,
-  ExternalLink,
   Search,
-  Filter,
-  RefreshCw,
   UserCheck,
   Calendar,
   X,
-  ChevronRight,
-  ShieldCheck,
-  Mic,
 } from 'lucide-react';
 
 export const TechnicianView: React.FC = () => {
@@ -40,9 +30,6 @@ export const TechnicianView: React.FC = () => {
     updateJobStatus,
     completeJob,
     currentBusiness,
-    isOffline,
-    pendingSyncQueue,
-    syncOfflineQueue,
     showToast,
   } = useApp();
 
@@ -50,7 +37,7 @@ export const TechnicianView: React.FC = () => {
   const techJobs = useMemo(() => {
     return (jobs || []).filter((j) => {
       // If previewing as admin / owner / manager, show all business jobs
-      if (currentUser?.role && currentUser.role !== 'technician' && currentUser.role !== 'staff') {
+      if (currentUser?.role && currentUser.role !== 'technician') {
         return true;
       }
       if (!currentUser) return true;
@@ -263,7 +250,7 @@ export const TechnicianView: React.FC = () => {
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
           <button
             onClick={() => setFilterTab('active')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
               filterTab === 'active'
                 ? 'bg-indigo-600 text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -275,7 +262,7 @@ export const TechnicianView: React.FC = () => {
 
           <button
             onClick={() => setFilterTab('in_progress')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
               filterTab === 'in_progress'
                 ? 'bg-indigo-600 text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -287,7 +274,7 @@ export const TechnicianView: React.FC = () => {
 
           <button
             onClick={() => setFilterTab('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
               filterTab === 'all'
                 ? 'bg-indigo-600 text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -299,7 +286,7 @@ export const TechnicianView: React.FC = () => {
 
           <button
             onClick={() => setFilterTab('completed')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
               filterTab === 'completed'
                 ? 'bg-indigo-600 text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -465,7 +452,7 @@ export const TechnicianView: React.FC = () => {
                   {/* Audio Notes Recorder for this job */}
                   <VoiceNotesRecorder
                     job={job}
-                    onNotesSaved={(updatedNotes) => {
+                    onNotesSaved={() => {
                       showToast('Field audio notes saved for job ' + job.jobId, 'success');
                     }}
                   />
@@ -565,7 +552,7 @@ export const TechnicianView: React.FC = () => {
             <div className="grid grid-cols-4 text-center border-b border-slate-100 dark:border-slate-800 text-[11px] font-bold text-slate-500 bg-slate-50/50 dark:bg-slate-900/50">
               <button
                 onClick={() => setCompletionStep(1)}
-                className={`py-2.5 border-b-2 transition-all ${
+                className={`py-2.5 border-b-2 transition-all cursor-pointer ${
                   completionStep === 1 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/30' : 'border-transparent'
                 }`}
               >
@@ -573,7 +560,7 @@ export const TechnicianView: React.FC = () => {
               </button>
               <button
                 onClick={() => setCompletionStep(2)}
-                className={`py-2.5 border-b-2 transition-all ${
+                className={`py-2.5 border-b-2 transition-all cursor-pointer ${
                   completionStep === 2 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/30' : 'border-transparent'
                 }`}
               >
@@ -581,7 +568,7 @@ export const TechnicianView: React.FC = () => {
               </button>
               <button
                 onClick={() => setCompletionStep(3)}
-                className={`py-2.5 border-b-2 transition-all ${
+                className={`py-2.5 border-b-2 transition-all cursor-pointer ${
                   completionStep === 3 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/30' : 'border-transparent'
                 }`}
               >
@@ -589,7 +576,7 @@ export const TechnicianView: React.FC = () => {
               </button>
               <button
                 onClick={() => setCompletionStep(4)}
-                className={`py-2.5 border-b-2 transition-all ${
+                className={`py-2.5 border-b-2 transition-all cursor-pointer ${
                   completionStep === 4 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/30' : 'border-transparent'
                 }`}
               >
@@ -683,7 +670,7 @@ export const TechnicianView: React.FC = () => {
                               <span className="font-mono font-bold">x{m.quantity} {invItem?.unit}</span>
                               <button
                                 onClick={() => removeMaterialItem(m.inventoryId)}
-                                className="text-rose-500 hover:text-rose-700 text-xs font-bold"
+                                className="text-rose-500 hover:text-rose-700 text-xs font-bold cursor-pointer"
                               >
                                 ✕
                               </button>
