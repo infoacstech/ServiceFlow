@@ -13,6 +13,7 @@ import { AuthModal } from './components/AuthModal';
 import { AccessDeniedView } from './components/AccessDeniedView';
 import { PullToRefresh } from './components/PullToRefresh';
 import { PwaInstallPrompt } from './components/PwaInstallPrompt';
+import { JobNotificationPopup } from './components/JobNotificationPopup';
 
 import { DashboardView } from './views/DashboardView';
 import { CustomersView } from './views/CustomersView';
@@ -266,6 +267,11 @@ const MainContent: React.FC = () => {
         />
         <GlobalSearchModal onSelectTab={(tab) => handleTabChange(tab)} />
         <ActivityLogDrawer />
+        <JobNotificationPopup
+          onOpenJob={(jobId) => {
+            handleNavigateWithFilter('jobs', { query: jobId });
+          }}
+        />
         <PwaInstallPrompt />
         <ToastContainer />
       </div>

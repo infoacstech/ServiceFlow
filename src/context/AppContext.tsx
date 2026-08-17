@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
+import type {
   Business,
   User,
   UserRole,
@@ -10,6 +10,7 @@ import {
   Service,
   Job,
   JobStatus,
+  JobPriority,
   InventoryItem,
   InventoryTransaction,
   Quotation,
@@ -59,7 +60,10 @@ import { FirestoreService, firestoreService } from '../services/FirestoreService
 import {
   playJobVoiceNotification,
   playJobCompletedVoiceNotification,
+  playJobStatusVoiceNotification,
   playCustomVoiceNotification,
+  sendBackgroundSystemNotification,
+  requestBrowserNotificationPermission,
 } from '../utils/audioNotification';
 import {
   collection,
@@ -200,6 +204,9 @@ interface AppContextType {
   updateBusinessProfile: (updates: Partial<Business>) => void;
 
   markNotificationRead: (id: string) => void;
+  activeJobPopup: Notification | null;
+  dismissJobPopup: () => void;
+  triggerJobPopupAlert: (notification: Notification) => void;
 
   // Offline Sync Capabilities
   isOffline: boolean;
@@ -493,8 +500,26 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [activeJobPopup, setActiveJobPopup] = useState<Notification | null>(null);
+
+  const dismissJobPopup = () => {
+    setActiveJobPopup(null);
+  };
+
+  const triggerJobPopupAlert = (notification: Notification) => {
+    setActiveJobPopup(notification);
+  };
 
   const isInitialJobsLoadRef = React.useRef(true);
+  const isInitialNotifsLoadRef = React.useRef(true);
+  const seenNotifIdsRef = React.useRef<Set<string>>(new Set());
+
+  // Auto request browser notification permission on mount/user interaction
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      requestBrowserNotificationPermission().catch(() => {});
+    }
+  }, []);
 
   // -------------------------------------------------------------
   // REAL-TIME FIRESTORE SUBSCRIPTIONS (WITH PERSISTENT LOCAL CACHE)
@@ -773,6 +798,62 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'notifications'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Notification);
+
+        // Process newly added notifications for real-time alert dispatch
+        if (!isInitialNotifsLoadRef.current) {
+          snapshot.docChanges().forEach((change) => {
+            if (change.type === 'added') {
+              const notif = change.doc.data() as Notification;
+              if (seenNotifIdsRef.current.has(notif.id)) return;
+              seenNotifIdsRef.current.add(notif.id);
+
+              // Check if notification is targeted to the current active user
+              const isTargetedToMe =
+                !notif.targetUserId ||
+                (currentUser && (notif.targetUserId === currentUser.id || notif.targetUserId === currentUser.email));
+              const isTargetedToMyRole =
+                !notif.targetRoleId ||
+                (currentUser && currentUser.role === notif.targetRoleId);
+
+              if (isTargetedToMe && isTargetedToMyRole && notif.businessId === currentBusiness?.id) {
+                // Show in-app banner popup card with full details
+                setActiveJobPopup(notif);
+
+                // Trigger Background OS System Notification (works when window is minimized/tab in background/PWA)
+                sendBackgroundSystemNotification(notif.title, {
+                  body: notif.message,
+                  data: { jobId: notif.jobId, url: '/' },
+                });
+
+                // Trigger Voice Audio Alert
+                if (notif.actionType === 'assigned') {
+                  playJobVoiceNotification(
+                    notif.jobId || 'NEW',
+                    notif.jobTitle || notif.title,
+                    notif.jobLocation
+                  );
+                } else if (notif.actionType === 'completed') {
+                  playJobCompletedVoiceNotification(
+                    notif.jobId || 'DONE',
+                    notif.targetUserId || undefined,
+                    notif.jobTitle
+                  );
+                } else if (notif.actionType === 'accepted' || notif.actionType === 'started') {
+                  playJobStatusVoiceNotification(
+                    notif.actionType,
+                    notif.jobId || '',
+                    currentUser?.name,
+                    notif.jobTitle
+                  );
+                }
+              }
+            }
+          });
+        } else {
+          isInitialNotifsLoadRef.current = false;
+          cloudItems.forEach((n) => seenNotifIdsRef.current.add(n.id));
+        }
+
         setNotifications((prev) => {
           const map = new Map<string, Notification>();
           prev.forEach((n) => map.set(n.id, n));
@@ -1765,16 +1846,26 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Broadcast instant Notification doc in Firestore for staff members
     const assignedStaff = (users || []).find((u) => u.id === data.assignedStaffId);
+    const customer = (customers || []).find((c) => c.id === data.customerId);
     const newNotif: Notification = {
       id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
       businessId: currentBusiness.id,
-      title: `New Job Issued: ${jobId}`,
-      message: `New service job ${jobId} (${data.description}) assigned${assignedStaff ? ' to ' + assignedStaff.name : ''}. Scheduled for ${data.scheduledDate}`,
+      title: `New Job Assigned: ${jobId}`,
+      message: `New service task ${jobId} (${data.description}) assigned${assignedStaff ? ' to ' + assignedStaff.name : ''}. Scheduled for ${data.scheduledDate} (${data.scheduledTime || data.scheduledTimeSlot || '09:00 AM'})`,
       type: 'job',
       read: false,
       createdAt: new Date().toISOString(),
       targetRoleId: 'technician',
       targetUserId: data.assignedStaffId,
+      jobId: jobId,
+      jobTitle: data.description,
+      jobLocation: data.location || customer?.address,
+      customerName: customer?.name,
+      customerPhone: customer?.mobile,
+      scheduledDate: data.scheduledDate,
+      scheduledTime: data.scheduledTimeSlot || data.scheduledTime,
+      priority: data.priority,
+      actionType: 'assigned',
     };
     saveToFirestore('notifications', newNotif.id, newNotif);
 
@@ -1784,6 +1875,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const isCurrentUserTheTechnician = currentUser?.id === data.assignedStaffId || (currentUser?.role === 'technician' && !currentUser?.role.includes('owner'));
     if (isCurrentUserTheTechnician) {
       playJobVoiceNotification(jobId, data.description || 'New Service Task', data.location, assignedStaff?.name);
+      setActiveJobPopup(newNotif);
     }
 
     showToast(`Job ${jobId} issued & assigned${assignedStaff ? ' to ' + assignedStaff.name : ''}!`, 'success');
@@ -1827,11 +1919,54 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast('Unauthorized: Cannot update job belonging to another tenant business.', 'error');
       return;
     }
+
+    const techUser = (users || []).find((u) => u.id === target?.assignedStaffId) || currentUser;
+    const techName = techUser?.name || 'Staff Technician';
+
     if (isActuallyOffline) {
       addToSyncQueue('update_job_status', id, { status }, `Job status changed to ${status.replace('_', ' ')}`);
       showToast(`Offline Mode: Status updated to ${status.replace('_', ' ')} (queued)`, 'info');
     } else {
       firestoreService.updateJob(id, { status });
+
+      // If status changed to accepted, on_the_way, or started, notify Business Owner
+      if (status === 'accepted' || status === 'on_the_way' || status === 'started') {
+        const customer = (customers || []).find((c) => c.id === target?.customerId);
+        const statusLabel =
+          status === 'accepted'
+            ? 'Accepted'
+            : status === 'on_the_way'
+            ? 'On The Way'
+            : 'Started Work';
+
+        const statusNotif: Notification = {
+          id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+          businessId: currentBusiness.id,
+          title: `Job ${statusLabel}: ${target?.jobId || id}`,
+          message: `Technician ${techName} has marked job ${target?.jobId || id} as "${statusLabel.toUpperCase()}". Client: ${customer?.name || 'Customer'}.`,
+          type: 'job',
+          read: false,
+          createdAt: new Date().toISOString(),
+          targetRoleId: 'business_owner',
+          jobId: target?.jobId || id,
+          jobTitle: target?.description,
+          jobLocation: target?.location || customer?.address,
+          customerName: customer?.name,
+          customerPhone: customer?.mobile,
+          scheduledDate: target?.scheduledDate,
+          scheduledTime: target?.scheduledTimeSlot || target?.scheduledTime,
+          priority: target?.priority,
+          actionType: status === 'accepted' ? 'accepted' : status === 'started' ? 'started' : 'general',
+        };
+        saveToFirestore('notifications', statusNotif.id, statusNotif);
+
+        // If current user is Business Owner, speak alert
+        if (currentUser?.role === 'business_owner' || isSuperAdminUser) {
+          playJobStatusVoiceNotification(status, target?.jobId || id, techName, target?.description);
+          setActiveJobPopup(statusNotif);
+        }
+      }
+
       logActivity('Job Status Updated', 'job', id, `Changed job status to ${status.replace('_', ' ').toUpperCase()}`);
       showToast(`Job status updated to ${status.replace('_', ' ')}`, 'info');
     }
@@ -1863,11 +1998,38 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       notes: notes ? `${existingJob?.notes || ''}\nStart Notes: ${notes}` : (existingJob?.notes || ''),
     };
 
+    const techUser = (users || []).find((u) => u.id === existingJob?.assignedStaffId) || currentUser;
+    const techName = techUser?.name || 'Staff Technician';
+    const customer = (customers || []).find((c) => c.id === existingJob?.customerId);
+
     if (isActuallyOffline) {
       addToSyncQueue('start_job', id, { beforePhotos, notes }, 'Technician started job work on site');
       showToast('Offline Mode: Job start logged locally & queued for sync.', 'info');
     } else {
       firestoreService.saveDocument<Job>('jobs', id, startUpdates);
+
+      // Notify Business Owner that job execution has begun
+      const startNotif: Notification = {
+        id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+        businessId: currentBusiness.id,
+        title: `Job Work Started: ${existingJob?.jobId || id}`,
+        message: `Technician ${techName} has arrived at site and started work on ${existingJob?.jobId || id}.`,
+        type: 'job',
+        read: false,
+        createdAt: new Date().toISOString(),
+        targetRoleId: 'business_owner',
+        jobId: existingJob?.jobId || id,
+        jobTitle: existingJob?.description,
+        jobLocation: existingJob?.location || customer?.address,
+        customerName: customer?.name,
+        customerPhone: customer?.mobile,
+        scheduledDate: existingJob?.scheduledDate,
+        scheduledTime: existingJob?.scheduledTimeSlot || existingJob?.scheduledTime,
+        priority: existingJob?.priority,
+        actionType: 'started',
+      };
+      saveToFirestore('notifications', startNotif.id, startNotif);
+
       logActivity('Job Work Started', 'job', id, 'Technician initiated work on site');
       showToast('Job work started & synced!', 'success');
     }
@@ -1915,6 +2077,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const assignedTech = (users || []).find((u) => u.id === existingJob?.assignedStaffId) || currentUser;
     const techName = assignedTech?.name || currentUser?.name || 'Staff Member';
+    const customer = (customers || []).find((c) => c.id === existingJob?.customerId);
 
     // Create Notification doc in Firestore for Business Owner
     const completeNotif: Notification = {
@@ -1926,6 +2089,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       read: false,
       createdAt: new Date().toISOString(),
       targetRoleId: 'business_owner',
+      jobId: existingJob?.jobId || id,
+      jobTitle: existingJob?.description,
+      jobLocation: existingJob?.location || customer?.address,
+      customerName: customer?.name,
+      customerPhone: customer?.mobile,
+      scheduledDate: existingJob?.scheduledDate,
+      scheduledTime: existingJob?.scheduledTimeSlot || existingJob?.scheduledTime,
+      priority: existingJob?.priority,
+      actionType: 'completed',
     };
     saveToFirestore('notifications', completeNotif.id, completeNotif);
 
@@ -1938,13 +2110,16 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast('Job marked as completed & synced to Firestore!', 'success');
     }
 
-    // Trigger multi-language voice alert for Business Owner in their selected language
-    playJobCompletedVoiceNotification(
-      existingJob?.jobId || id,
-      techName,
-      existingJob?.description,
-      data.customerRating || 5
-    );
+    // Trigger multi-language voice alert and popup for Business Owner
+    if (currentUser?.role === 'business_owner' || isSuperAdminUser) {
+      playJobCompletedVoiceNotification(
+        existingJob?.jobId || id,
+        techName,
+        existingJob?.description,
+        data.customerRating || 5
+      );
+      setActiveJobPopup(completeNotif);
+    }
   };
 
   // Inventory Actions
@@ -2576,6 +2751,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateBusinessSettings,
         updateBusinessProfile: updateBusinessSettings,
         markNotificationRead,
+        activeJobPopup,
+        dismissJobPopup,
+        triggerJobPopupAlert,
 
         isOffline: isActuallyOffline,
         isSimulatedOffline,

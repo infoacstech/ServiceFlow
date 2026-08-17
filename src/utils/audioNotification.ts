@@ -138,6 +138,83 @@ export function setSelectedVoiceLanguage(lang: VoiceLanguageCode): void {
 }
 
 /**
+ * Requests browser push notification permission
+ */
+export async function requestBrowserNotificationPermission(): Promise<NotificationPermission> {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return 'denied';
+  }
+  if (Notification.permission === 'granted') {
+    return 'granted';
+  }
+  try {
+    const permission = await Notification.requestPermission();
+    return permission;
+  } catch (err) {
+    console.warn('Error requesting notification permission:', err);
+    return 'denied';
+  }
+}
+
+/**
+ * Triggers background OS / System notification (works even when tab is backgrounded / minimized or in PWA mode)
+ */
+export function sendBackgroundSystemNotification(
+  title: string,
+  options?: {
+    body?: string;
+    icon?: string;
+    tag?: string;
+    data?: any;
+  }
+): void {
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+
+  if (Notification.permission === 'granted') {
+    try {
+      // 1. Try via Service Worker registration for persistent background OS alerts
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.showNotification(title, {
+            body: options?.body || 'ServiFlow Alert',
+            icon: options?.icon || '/favicon.svg',
+            badge: '/favicon.svg',
+            tag: options?.tag || `serviflow-${Date.now()}`,
+            vibrate: [200, 100, 200],
+            data: options?.data || { url: '/' },
+          } as any);
+        }).catch(() => {
+          // Fallback to standard Notification constructor
+          new Notification(title, {
+            body: options?.body || 'ServiFlow Alert',
+            icon: options?.icon || '/favicon.svg',
+            tag: options?.tag,
+            data: options?.data,
+          });
+        });
+      } else {
+        new Notification(title, {
+          body: options?.body || 'ServiFlow Alert',
+          icon: options?.icon || '/favicon.svg',
+          tag: options?.tag,
+          data: options?.data,
+        });
+      }
+
+      // Haptic vibration feedback if device supports it
+      if ('navigator' in window && 'vibrate' in navigator) {
+        navigator.vibrate([200, 100, 200, 100, 300]);
+      }
+    } catch (err) {
+      console.warn('Could not display system notification:', err);
+    }
+  } else if (Notification.permission === 'default') {
+    // Request permission silently
+    Notification.requestPermission().catch(() => {});
+  }
+}
+
+/**
  * High-quality Speech Synthesis using native browser Speech API with language fallback
  */
 export function speakText(text: string, options?: { rate?: number; pitch?: number; lang?: VoiceLanguageCode }): void {
@@ -273,6 +350,63 @@ export function playJobCompletedVoiceNotification(
     speechMessage = `Job Completed! Field technician ${technicianName || 'staff'} has successfully completed job ${jobId}.${
       rating ? ` Customer gave ${rating} star rating.` : ''
     }`;
+  }
+
+  setTimeout(() => {
+    speakText(speechMessage, { rate: 0.95, pitch: 1.0, lang });
+  }, 350);
+}
+
+/**
+ * Triggers instant chime + multi-language voice alert for Job Status Updates (e.g. Technician Accepted, On the way, Started work)
+ */
+export function playJobStatusVoiceNotification(
+  status: 'accepted' | 'on_the_way' | 'started' | 'completed' | string,
+  jobId: string,
+  technicianName?: string,
+  serviceDescription?: string
+): void {
+  if (!isVoiceNotificationEnabled()) return;
+
+  playNotificationChime();
+
+  const lang = getSelectedVoiceLanguage();
+  const tech = technicianName || 'स्टाफ सदस्य';
+  const desc = (serviceDescription || 'काम').replace(/[^\w\s]/gi, ' ');
+  let speechMessage = '';
+
+  if (status === 'accepted') {
+    if (lang.startsWith('hi')) {
+      speechMessage = `काम स्वीकार हुआ! तकनीशियन ${tech} ने जॉब ${jobId} का काम स्वीकार (Accept) कर लिया है.`;
+    } else if (lang.startsWith('mr')) {
+      speechMessage = `काम स्वीकारले! तंत्रज्ञ ${tech} यांनी जॉब ${jobId} चे काम स्वीकारले आहे.`;
+    } else if (lang.startsWith('gu')) {
+      speechMessage = `કામ સ્વીકારાયું! ટેકનિશિયન ${tech} એ જોબ ${jobId} સ્વીકારી લીધું છે.`;
+    } else {
+      speechMessage = `Job Accepted! Technician ${tech} accepted job ${jobId}.`;
+    }
+  } else if (status === 'on_the_way') {
+    if (lang.startsWith('hi')) {
+      speechMessage = `तकनीशियन रास्ते में है! ${tech} जॉब ${jobId} के लिए रवाना हो चुके हैं.`;
+    } else if (lang.startsWith('mr')) {
+      speechMessage = `तंत्रज्ञ वाटेवर आहेत! ${tech} जॉब ${jobId} साठी निघाले आहेत.`;
+    } else if (lang.startsWith('gu')) {
+      speechMessage = `ટેકનિશિયન રસ્તામાં છે! ${tech} જોબ ${jobId} માટે નીકળી ગયા છે.`;
+    } else {
+      speechMessage = `Technician on the way! ${tech} is on the way to site for job ${jobId}.`;
+    }
+  } else if (status === 'started') {
+    if (lang.startsWith('hi')) {
+      speechMessage = `काम शुरू हुआ! तकनीशियन ${tech} ने जॉब ${jobId} पर काम शुरू कर दिया है.`;
+    } else if (lang.startsWith('mr')) {
+      speechMessage = `काम सुरू झाले! तंत्रज्ञ ${tech} यांनी जॉब ${jobId} चे काम सुरू केले आहे.`;
+    } else if (lang.startsWith('gu')) {
+      speechMessage = `કામ શરૂ થયું! ટેકનિશિયન ${tech} એ જોબ ${jobId} નું કામ શરૂ કરી દીધું છે.`;
+    } else {
+      speechMessage = `Work Started! Technician ${tech} started work on job ${jobId}.`;
+    }
+  } else {
+    speechMessage = `Job ${jobId} status updated to ${status.replace('_', ' ')} by ${tech}.`;
   }
 
   setTimeout(() => {

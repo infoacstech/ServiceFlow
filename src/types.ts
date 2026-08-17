@@ -303,6 +303,15 @@ export interface Notification {
   createdAt: string;
   targetRoleId?: UserRole;
   targetUserId?: string;
+  jobId?: string;
+  jobTitle?: string;
+  jobLocation?: string;
+  customerName?: string;
+  customerPhone?: string;
+  scheduledDate?: string;
+  scheduledTime?: string;
+  priority?: JobPriority;
+  actionType?: 'assigned' | 'accepted' | 'started' | 'completed' | 'general';
 }
 
 export interface ActivityLog {
