@@ -29,6 +29,11 @@ import {
   sendJobCompletionSummaryToCustomer,
   sendGoogleReviewRequest,
 } from '../utils/whatsappHelper';
+import {
+  VoiceAudioMonitor,
+  removeOverlappingBoundary,
+  formatCompleteSentence,
+} from '../utils/audioVoiceProcessor';
 
 export const TechnicianView: React.FC = () => {
   const {
@@ -122,7 +127,7 @@ export const TechnicianView: React.FC = () => {
   // Dictation states for completion modal
   const [activeDictationField, setActiveDictationField] = useState<'problem' | 'solution' | null>(null);
 
-  const startModalDictation = (field: 'problem' | 'solution') => {
+  const startModalDictation = async (field: 'problem' | 'solution') => {
     const SpeechRecognitionAPI =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -132,13 +137,21 @@ export const TechnicianView: React.FC = () => {
     }
 
     try {
+      // Request audio stream with hardware noise suppression & echo cancellation
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        });
+        stream.getTracks().forEach((track) => track.stop());
+      }
+
       const rec = new SpeechRecognitionAPI();
       rec.continuous = false;
       rec.interimResults = true;
       rec.lang = 'en-IN';
 
       setActiveDictationField(field);
-      showToast(`Listening for ${field === 'problem' ? 'problem diagnosis' : 'work solution'}... Speak now.`, 'info');
+      showToast(`Listening with Noise Suppression for ${field === 'problem' ? 'problem diagnosis' : 'work solution'}... Speak now.`, 'info');
 
       rec.onresult = (event: any) => {
         let resultText = '';
@@ -147,9 +160,15 @@ export const TechnicianView: React.FC = () => {
         }
         if (resultText) {
           if (field === 'problem') {
-            setProblemFound((prev) => (prev ? `${prev} ${resultText}` : resultText));
+            setProblemFound((prev) => {
+              const combined = removeOverlappingBoundary(prev, resultText);
+              return formatCompleteSentence(combined, 'en-IN');
+            });
           } else {
-            setSolutionProvided((prev) => (prev ? `${prev} ${resultText}` : resultText));
+            setSolutionProvided((prev) => {
+              const combined = removeOverlappingBoundary(prev, resultText);
+              return formatCompleteSentence(combined, 'en-IN');
+            });
           }
         }
       };

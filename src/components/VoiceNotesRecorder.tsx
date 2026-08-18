@@ -16,8 +16,18 @@ import {
   Wand2,
   Copy,
   Check,
+  ShieldCheck,
+  Activity,
+  Sliders,
 } from 'lucide-react';
 import { getSelectedVoiceLanguage, SUPPORTED_VOICE_LANGUAGES, VoiceLanguageCode } from '../utils/audioNotification';
+import {
+  VoiceAudioMonitor,
+  sanitizeVoiceTranscript,
+  removeOverlappingBoundary,
+  formatCompleteSentence,
+  DEFAULT_NOISE_GATE_CONFIG,
+} from '../utils/audioVoiceProcessor';
 
 interface VoiceNotesRecorderProps {
   job: Job;
@@ -30,69 +40,7 @@ interface VoiceNotesRecorderProps {
  * Cleans accidental consecutive duplicate words and repeated phrases (supports Indian scripts & English)
  */
 export function cleanRepeatedWordsAndPhrases(input: string): string {
-  if (!input || !input.trim()) return '';
-
-  let text = input.trim();
-
-  // Normalize multiple spaces into single space
-  text = text.replace(/\s+/g, ' ');
-
-  // Split into words
-  const words = text.split(' ').filter(Boolean);
-  if (words.length <= 1) return text;
-
-  // 1. Remove consecutive identical words (e.g. "हॅलो हॅलो हॅलो" -> "हॅलो", "हेलो हेलो" -> "हेलो", "test test" -> "test")
-  const deduplicatedWords: string[] = [];
-  for (let i = 0; i < words.length; i++) {
-    const current = words[i];
-    const prev = deduplicatedWords[deduplicatedWords.length - 1];
-
-    // Compare case-insensitively / trimmed
-    if (prev && prev.toLowerCase() === current.toLowerCase()) {
-      continue; // Skip duplicate word
-    }
-    deduplicatedWords.push(current);
-  }
-
-  // 2. Remove consecutive repeated 2-word and 3-word phrases (e.g., "माझं काम माझं काम" -> "माझं काम")
-  let resultWords = deduplicatedWords;
-
-  // Check 2-word repetitions
-  let changed = true;
-  while (changed && resultWords.length >= 4) {
-    changed = false;
-    for (let i = 0; i <= resultWords.length - 4; i++) {
-      const phrase1 = `${resultWords[i]} ${resultWords[i + 1]}`.toLowerCase();
-      const phrase2 = `${resultWords[i + 2]} ${resultWords[i + 3]}`.toLowerCase();
-      if (phrase1 === phrase2) {
-        resultWords.splice(i + 2, 2);
-        changed = true;
-        break;
-      }
-    }
-  }
-
-  // Check 3-word repetitions
-  changed = true;
-  while (changed && resultWords.length >= 6) {
-    changed = false;
-    for (let i = 0; i <= resultWords.length - 6; i++) {
-      const phrase1 = `${resultWords[i]} ${resultWords[i + 1]} ${resultWords[i + 2]}`.toLowerCase();
-      const phrase2 = `${resultWords[i + 3]} ${resultWords[i + 4]} ${resultWords[i + 5]}`.toLowerCase();
-      if (phrase1 === phrase2) {
-        resultWords.splice(i + 3, 3);
-        changed = true;
-        break;
-      }
-    }
-  }
-
-  let cleaned = resultWords.join(' ').trim();
-
-  // Normalize punctuation spacing
-  cleaned = cleaned.replace(/\s+([.,!?।])/g, '$1');
-
-  return cleaned;
+  return sanitizeVoiceTranscript(input);
 }
 
 export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
@@ -116,7 +64,15 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
   });
   const [speechSupported, setSpeechSupported] = useState(true);
 
+  // Real-time Audio & Noise Gate States
+  const [audioLevel, setAudioLevel] = useState<number>(0);
+  const [audioDb, setAudioDb] = useState<number>(-60);
+  const [isVoiceActive, setIsVoiceActive] = useState<boolean>(false);
+  const [noiseEnvironment, setNoiseEnvironment] = useState<'standard' | 'high_noise' | 'quiet'>('standard');
+  const [showAudioSettings, setShowAudioSettings] = useState(false);
+
   const recognitionRef = useRef<any>(null);
+  const audioMonitorRef = useRef<VoiceAudioMonitor | null>(null);
   const isManuallyRecordingRef = useRef(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -124,6 +80,8 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
   const priorTextRef = useRef('');
   // Stores final transcript accumulated in the current recognition session
   const currentSessionFinalRef = useRef('');
+  // Buffer of last finalized chunk to prevent interim collisions
+  const lastFinalizedChunkRef = useRef('');
 
   // Check speech recognition support on mount
   useEffect(() => {
@@ -151,7 +109,7 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
     };
   }, [isRecording]);
 
-  // Clean up recognition on unmount
+  // Clean up recognition & audio monitor on unmount
   useEffect(() => {
     return () => {
       isManuallyRecordingRef.current = false;
@@ -160,15 +118,30 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
           recognitionRef.current.abort();
         } catch (e) {}
       }
+      if (audioMonitorRef.current) {
+        audioMonitorRef.current.stop();
+      }
     };
   }, []);
 
+  // Update noise environment profile
+  useEffect(() => {
+    if (audioMonitorRef.current) {
+      if (noiseEnvironment === 'high_noise') {
+        audioMonitorRef.current.setNoiseFloorDb(-35); // Strict noise gate for noisy job sites
+        audioMonitorRef.current.setSilenceTimeout(1.2);
+      } else if (noiseEnvironment === 'quiet') {
+        audioMonitorRef.current.setNoiseFloorDb(-48); // Highly sensitive for quiet offices
+        audioMonitorRef.current.setSilenceTimeout(2.0);
+      } else {
+        audioMonitorRef.current.setNoiseFloorDb(DEFAULT_NOISE_GATE_CONFIG.noiseFloorDb); // Standard -42 dB
+        audioMonitorRef.current.setSilenceTimeout(DEFAULT_NOISE_GATE_CONFIG.silenceThresholdSeconds);
+      }
+    }
+  }, [noiseEnvironment]);
+
   const combineText = (base: string, addition: string) => {
-    const b = (base || '').trim();
-    const a = (addition || '').trim();
-    if (!b) return a;
-    if (!a) return b;
-    return `${b} ${a}`;
+    return removeOverlappingBoundary(base, addition);
   };
 
   const startRecording = async () => {
@@ -181,17 +154,6 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
       return;
     }
 
-    // Request microphone permissions cleanly
-    try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach((track) => track.stop());
-      }
-    } catch (permErr) {
-      console.warn('Microphone permission request warning:', permErr);
-      showToast('Please allow microphone permissions to dictate speech.', 'error');
-    }
-
     try {
       // Abort any existing instance
       if (recognitionRef.current) {
@@ -199,6 +161,32 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
           recognitionRef.current.abort();
         } catch (e) {}
       }
+
+      // Initialize Web Audio Noise Gate & Silence Detection Monitor
+      const monitor = new VoiceAudioMonitor({
+        noiseFloorDb:
+          noiseEnvironment === 'high_noise' ? -35 : noiseEnvironment === 'quiet' ? -48 : -42,
+        silenceThresholdSeconds:
+          noiseEnvironment === 'high_noise' ? 1.2 : noiseEnvironment === 'quiet' ? 2.0 : 1.6,
+      });
+
+      monitor.onVolumeUpdate = (volPercent, db, voiceActive) => {
+        setAudioLevel(volPercent);
+        setAudioDb(db);
+        setIsVoiceActive(voiceActive);
+      };
+
+      monitor.onSilenceDetected = () => {
+        // Natural pause / silence detected: finalize and seal the current sentence buffer
+        if (currentSessionFinalRef.current || interimText) {
+          const raw = combineText(priorTextRef.current, currentSessionFinalRef.current);
+          const sanitized = formatCompleteSentence(raw, selectedLang);
+          setTranscript(sanitized);
+        }
+      };
+
+      const stream = await monitor.start();
+      audioMonitorRef.current = monitor;
 
       const recognition = new SpeechRecognitionAPI();
       recognition.continuous = true;
@@ -209,12 +197,13 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
       // Lock in prior text so incoming speech adds cleanly on top without duplicating
       priorTextRef.current = transcript.trim();
       currentSessionFinalRef.current = '';
+      lastFinalizedChunkRef.current = '';
       isManuallyRecordingRef.current = true;
 
       recognition.onstart = () => {
         setIsRecording(true);
         setInterimText('');
-        showToast('Listening... Speak clearly into your mic.', 'info');
+        showToast('Active Noise-Cancellation Listening... Speak clearly.', 'info');
       };
 
       recognition.onresult = (event: any) => {
@@ -231,24 +220,29 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
           }
         }
 
-        currentSessionFinalRef.current = sessionFinal.trim();
+        const trimmedFinal = sessionFinal.trim();
+        currentSessionFinalRef.current = trimmedFinal;
 
-        // Calculate combined finalized text
+        // Calculate combined finalized text with smart overlap & repetition elimination
         const rawFinal = combineText(priorTextRef.current, currentSessionFinalRef.current);
-        const cleanedFinal = cleanRepeatedWordsAndPhrases(rawFinal);
+        const cleanedFinal = formatCompleteSentence(rawFinal, selectedLang);
 
         setTranscript(cleanedFinal);
-        setInterimText(sessionInterim.trim());
+
+        // Sanitize interim text to prevent echo chatter in preview
+        const cleanedInterim = sanitizeVoiceTranscript(sessionInterim.trim());
+        setInterimText(cleanedInterim);
       };
 
       recognition.onerror = (event: any) => {
-        console.warn('Speech recognition error:', event.error);
+        console.warn('Speech recognition event:', event.error);
         if (event.error === 'not-allowed') {
           showToast('Microphone access denied. Please allow microphone permission.', 'error');
           setIsRecording(false);
           isManuallyRecordingRef.current = false;
+          if (audioMonitorRef.current) audioMonitorRef.current.stop();
         } else if (event.error === 'no-speech') {
-          // Normal pause in speech, keep listening
+          // Normal pause in speech, keep listening without dropping session
         } else if (event.error === 'network') {
           // Temporary network glitch with recognizer
         }
@@ -259,19 +253,23 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
 
         // If recognizer pauses automatically but user hasn't clicked stop:
         if (isManuallyRecordingRef.current) {
-          // Commit current session final transcript into priorTextRef so new session doesn't overwrite or duplicate
-          priorTextRef.current = cleanRepeatedWordsAndPhrases(
-            combineText(priorTextRef.current, currentSessionFinalRef.current)
+          // Commit current session final transcript into priorTextRef
+          priorTextRef.current = formatCompleteSentence(
+            combineText(priorTextRef.current, currentSessionFinalRef.current),
+            selectedLang
           );
           currentSessionFinalRef.current = '';
 
           try {
             recognition.start();
           } catch (e) {
-            // Restarted or busy
+            // Already started or busy
           }
         } else {
           setIsRecording(false);
+          if (audioMonitorRef.current) {
+            audioMonitorRef.current.stop();
+          }
         }
       };
 
@@ -282,7 +280,10 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
       console.error('Failed to initialize speech recognition:', err);
       setIsRecording(false);
       isManuallyRecordingRef.current = false;
-      showToast('Could not start speech recognition. Please check your mic settings.', 'error');
+      if (audioMonitorRef.current) {
+        audioMonitorRef.current.stop();
+      }
+      showToast('Could not start speech recognition. Please check your mic permissions.', 'error');
     }
   };
 
@@ -295,11 +296,17 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
         console.error(err);
       }
     }
+    if (audioMonitorRef.current) {
+      audioMonitorRef.current.stop();
+      audioMonitorRef.current = null;
+    }
     setIsRecording(false);
     setInterimText('');
+    setAudioLevel(0);
+    setIsVoiceActive(false);
 
     // Perform final refinement & de-duplication pass
-    setTranscript((prev) => cleanRepeatedWordsAndPhrases(prev));
+    setTranscript((prev) => formatCompleteSentence(prev, selectedLang));
     showToast('Voice dictation captured accurately!', 'success');
   };
 
@@ -312,7 +319,7 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
 
   // Manual one-click text refiner & repeat cleaner
   const handleCleanAndRefine = () => {
-    const cleaned = cleanRepeatedWordsAndPhrases(transcript);
+    const cleaned = formatCompleteSentence(transcript, selectedLang);
     setTranscript(cleaned);
     showToast('Sentence refined & duplicate words removed!', 'success');
   };
@@ -329,8 +336,9 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
 
   // Save voice notes to Job in AppContext
   const handleSaveNotes = () => {
-    const fullText = cleanRepeatedWordsAndPhrases(
-      (transcript + (interimText ? ' ' + interimText : '')).trim()
+    const fullText = formatCompleteSentence(
+      (transcript + (interimText ? ' ' + interimText : '')).trim(),
+      selectedLang
     );
     if (!fullText) {
       showToast('No notes to save. Please speak or enter text first.', 'info');
@@ -368,7 +376,7 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
     setTranscript((prev) => {
       const trimmed = prev.trim();
       const combined = trimmed ? `${trimmed} ${tagText}` : tagText;
-      return cleanRepeatedWordsAndPhrases(combined);
+      return formatCompleteSentence(combined, selectedLang);
     });
   };
 
@@ -454,30 +462,116 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
         </div>
       </div>
 
-      {/* Live Audio Speech Waveform Indicator */}
+      {/* Live Audio Speech & Noise Gate VU Meter Bar */}
       {isRecording && (
-        <div className="flex items-center justify-between p-2.5 bg-rose-100/70 dark:bg-rose-900/50 rounded-xl mb-2.5 border border-rose-300/80 dark:border-rose-800">
-          <div className="flex items-center gap-2">
-            <Volume2 className="w-4 h-4 text-rose-600 animate-bounce" />
-            <div className="flex items-center gap-1 h-5">
-              <span className="w-1 bg-rose-500 rounded-full h-2 animate-[ping_0.7s_infinite_100ms]" />
-              <span className="w-1 bg-rose-600 rounded-full h-4 animate-[ping_0.7s_infinite_200ms]" />
-              <span className="w-1 bg-rose-500 rounded-full h-5 animate-[ping_0.7s_infinite_300ms]" />
-              <span className="w-1 bg-rose-600 rounded-full h-3 animate-[ping_0.7s_infinite_150ms]" />
-              <span className="w-1 bg-rose-500 rounded-full h-4 animate-[ping_0.7s_infinite_250ms]" />
+        <div className="p-3 bg-gradient-to-r from-rose-100/90 via-amber-50/80 to-rose-100/90 dark:from-rose-950/70 dark:via-slate-900 dark:to-rose-950/70 rounded-2xl mb-2.5 border border-rose-300 dark:border-rose-800 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div
+                className={`p-1.5 rounded-lg transition-all ${
+                  isVoiceActive
+                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/40 animate-pulse'
+                    : 'bg-slate-300 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+              </div>
+
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-black text-slate-900 dark:text-white">
+                    {isVoiceActive ? 'Voice Detected (Speaking)' : 'Noise Gate: Ambient Filtered'}
+                  </span>
+                  <span
+                    className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-md ${
+                      isVoiceActive
+                        ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300/60'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                    }`}
+                  >
+                    {audioDb} dB
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                  Echo Cancellation & Anti-Repetition Layer Active
+                </p>
+              </div>
             </div>
-            <span className="text-[11px] font-bold text-rose-800 dark:text-rose-200 ml-2">
-              Listening live... Speak clearly at normal pace.
-            </span>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setShowAudioSettings(!showAudioSettings)}
+                className="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-indigo-600 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                title="Noise sensitivity settings"
+              >
+                <Sliders className="w-3 h-3" />
+                <span className="text-[10px] capitalize hidden sm:inline">{noiseEnvironment.replace('_', ' ')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={stopRecording}
+                className="py-1 px-3 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold text-[11px] rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer shrink-0"
+              >
+                <Square className="w-3 h-3 fill-white" /> Done
+              </button>
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={stopRecording}
-            className="py-1 px-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] rounded-lg shadow-sm transition-all flex items-center gap-1 cursor-pointer"
-          >
-            <Square className="w-3 h-3 fill-white" /> Done Speaking
-          </button>
+          {/* Real-time VU Sound Level Bar */}
+          <div className="space-y-1">
+            <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden p-0.5 flex gap-0.5">
+              <div
+                className={`h-full rounded-full transition-all duration-75 ${
+                  audioLevel > 60
+                    ? 'bg-gradient-to-r from-emerald-500 via-amber-500 to-rose-500'
+                    : audioLevel > 25
+                    ? 'bg-emerald-500'
+                    : 'bg-slate-400 dark:bg-slate-600'
+                }`}
+                style={{ width: `${Math.min(100, Math.max(4, audioLevel))}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[9px] text-slate-400 font-mono">
+              <span>Silence (-60dB)</span>
+              <span>Noise Floor Gate</span>
+              <span>Active Speech (0dB)</span>
+            </div>
+          </div>
+
+          {/* Expandable Noise Environment Settings */}
+          {showAudioSettings && (
+            <div className="pt-2 border-t border-rose-200 dark:border-rose-900/60 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Noise Profile:</span>
+              </span>
+
+              <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                {(
+                  [
+                    { id: 'standard', label: 'Standard', desc: 'Balanced Site' },
+                    { id: 'high_noise', label: 'High Noise', desc: 'Strict Filter' },
+                    { id: 'quiet', label: 'Quiet Room', desc: 'Sensitive' },
+                  ] as const
+                ).map((env) => (
+                  <button
+                    key={env.id}
+                    type="button"
+                    onClick={() => setNoiseEnvironment(env.id)}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                      noiseEnvironment === env.id
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {env.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

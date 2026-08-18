@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { SystemSettings } from '../types';
+import { SystemSettings, Business } from '../types';
 import { FirestoreService } from '../services/FirestoreService';
 import {
   ShieldCheck,
@@ -225,7 +225,7 @@ export const SuperAdminView: React.FC = () => {
     // Update referrer balance & earnings in Firestore
     const updatedEarnings = (referrerBiz.referralEarnings || 0) + bonusEarned;
     const updatedBalance = (referrerBiz.referralBalance || 0) + bonusEarned;
-    await FirestoreService.saveDocument('businesses', referrerBiz.id, {
+    await FirestoreService.saveDocument<Business>('businesses', referrerBiz.id, {
       referralCode: cleanRefCode,
       referralEarnings: updatedEarnings,
       referralBalance: updatedBalance,
