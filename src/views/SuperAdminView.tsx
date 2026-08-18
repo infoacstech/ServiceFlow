@@ -35,7 +35,17 @@ import {
   Wallet,
   Banknote,
   Copy,
+  Search,
+  ArrowUpRight,
+  CheckCheck,
+  CreditCard,
+  TrendingUp,
+  Coins,
+  Award,
+  ExternalLink,
+  QrCode,
 } from 'lucide-react';
+import { ReferralRecord, ReferralPayoutRequest } from '../types';
 
 export const SuperAdminView: React.FC = () => {
   const {
@@ -83,12 +93,17 @@ export const SuperAdminView: React.FC = () => {
   >('approvals');
 
   // Payout Process Modal State
-  const [selectedPayoutForAction, setSelectedPayoutForAction] = useState<any>(null);
+  const [selectedPayoutForAction, setSelectedPayoutForAction] = useState<ReferralPayoutRequest | null>(null);
   const [payoutActionType, setPayoutActionType] = useState<'completed' | 'approved' | 'rejected'>('completed');
   const [payoutTxnRef, setPayoutTxnRef] = useState('');
   const [payoutAdminNote, setPayoutAdminNote] = useState('');
   const [isProcessingPayoutAction, setIsProcessingPayoutAction] = useState(false);
   const [auditLogsLimit, setAuditLogsLimit] = useState<number | 'all'>(10);
+
+  // Referral System Sub-tab & Filters
+  const [referralSubTab, setReferralSubTab] = useState<'conversions' | 'payouts' | 'leaderboard'>('conversions');
+  const [referralSearchTerm, setReferralSearchTerm] = useState('');
+  const [payoutStatusFilter, setPayoutStatusFilter] = useState<'all' | 'pending' | 'approved' | 'completed' | 'rejected'>('all');
 
   // Add / Onboard Tenant Modal State
   const [isAddTenantModalOpen, setIsAddTenantModalOpen] = useState(false);
@@ -146,6 +161,101 @@ export const SuperAdminView: React.FC = () => {
       }
     );
     showToast(`Test registration for "${testBiz.name}" created and pending approval!`, 'success');
+  };
+
+  // Execute Payout Decision (Mark as Paid, Approve, or Reject & Refund)
+  const handleExecutePayoutAction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPayoutForAction) return;
+
+    setIsProcessingPayoutAction(true);
+    try {
+      const noteDetails = payoutTxnRef.trim()
+        ? `Txn Ref / UTR: ${payoutTxnRef.trim()}${payoutAdminNote.trim() ? ` | Note: ${payoutAdminNote.trim()}` : ''}`
+        : payoutAdminNote.trim() || undefined;
+
+      processReferralPayout(selectedPayoutForAction.id, payoutActionType, noteDetails);
+      setSelectedPayoutForAction(null);
+      setPayoutTxnRef('');
+      setPayoutAdminNote('');
+    } catch (err) {
+      console.error('Failed to process referral payout action:', err);
+    } finally {
+      setIsProcessingPayoutAction(false);
+    }
+  };
+
+  // Quick Simulation of a Referral Signup for Testing
+  const handleSimulateTestReferral = async () => {
+    if (businesses.length === 0) {
+      showToast('Please onboard at least 1 business tenant first.', 'error');
+      return;
+    }
+
+    const referrerBiz = businesses[0];
+    const cleanRefCode = referrerBiz.referralCode || `SF-${referrerBiz.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase()}10`;
+    const timestamp = Date.now().toString().slice(-4);
+    const planPrice = 1299;
+    const discountAmount = 130;
+    const bonusEarned = 130;
+
+    const testRecord: ReferralRecord = {
+      id: `ref-tx-${Date.now()}`,
+      referrerBusinessId: referrerBiz.id,
+      referrerCode: cleanRefCode,
+      referrerBusinessName: referrerBiz.name,
+      referredBusinessId: `biz-ref-${timestamp}`,
+      referredBusinessName: `Smart Solar Power ${timestamp}`,
+      referredOwnerName: `Ajay Deshmukh ${timestamp}`,
+      referredOwnerPhone: `+91 98450${timestamp}`,
+      planId: 'plan-pro',
+      planName: 'Professional Plan (10% Referral Discount)',
+      planPrice,
+      discountPercent: 10,
+      discountAmount,
+      bonusPercent: 10,
+      bonusEarned,
+      status: 'credited',
+      createdAt: new Date().toISOString(),
+      notes: `10% discount (-₹${discountAmount}) applied. 10% referral bonus (+₹${bonusEarned}) credited to ${referrerBiz.name}.`,
+    };
+
+    await FirestoreService.saveDocument('referrals', testRecord.id, testRecord);
+
+    // Update referrer balance & earnings in Firestore
+    const updatedEarnings = (referrerBiz.referralEarnings || 0) + bonusEarned;
+    const updatedBalance = (referrerBiz.referralBalance || 0) + bonusEarned;
+    await FirestoreService.saveDocument('businesses', referrerBiz.id, {
+      referralCode: cleanRefCode,
+      referralEarnings: updatedEarnings,
+      referralBalance: updatedBalance,
+    });
+
+    showToast(`Test Referral Simulated: "${referrerBiz.name}" referred "Smart Solar Power ${timestamp}" and earned +₹${bonusEarned} bonus!`, 'success');
+  };
+
+  // Quick Simulation of a Payout Request for Testing
+  const handleSimulatePayoutRequest = async () => {
+    if (businesses.length === 0) {
+      showToast('Please onboard at least 1 business tenant first.', 'error');
+      return;
+    }
+    const biz = businesses[0];
+    const testReq: ReferralPayoutRequest = {
+      id: `payout-${Date.now()}`,
+      businessId: biz.id,
+      businessName: biz.name,
+      ownerName: 'Ramesh Sharma',
+      ownerPhone: '+91 9876543210',
+      amount: 260,
+      payoutMethod: 'upi',
+      upiId: 'ramesh.sharma@okaxis',
+      status: 'pending',
+      requestedAt: new Date().toISOString(),
+      notes: 'Sample bonus payout request via UPI for testing',
+    };
+    await FirestoreService.saveDocument('referralPayouts', testReq.id, testReq);
+    showToast(`Sample payout request of ₹260 submitted for ${biz.name}!`, 'success');
   };
 
   const handleOnboardTenantSubmit = (e: React.FormEvent) => {
@@ -909,6 +1019,720 @@ export const SuperAdminView: React.FC = () => {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* SECTION: Referral & Bonus Payout Management Console */}
+      {activeTabSection === 'referrals' && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* Top Info & Action Banner */}
+          <div className="bg-gradient-to-r from-amber-900 via-yellow-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 border border-amber-500/30 shadow-lg relative overflow-hidden">
+            <div className="relative z-10 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="inline-flex items-center gap-2 bg-amber-500/20 text-amber-300 px-3.5 py-1.5 rounded-full border border-amber-500/30 text-xs font-bold">
+                  <Gift className="w-4 h-4 text-amber-300" />
+                  <span>SaaS Referral & Bonus Governance</span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={handleSimulateTestReferral}
+                    className="px-3.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                    title="Simulate a new business signing up via referral"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Simulate Referral Signup</span>
+                  </button>
+
+                  <button
+                    onClick={handleSimulatePayoutRequest}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                    title="Simulate a business requesting payout of their bonus"
+                  >
+                    <Banknote className="w-3.5 h-3.5 text-emerald-300" />
+                    <span>Simulate Payout Demand</span>
+                  </button>
+                </div>
+              </div>
+
+              <h2 className="text-xl sm:text-2xl font-black text-white">
+                Tenant Referral Program & Bonus Settlement
+              </h2>
+              <p className="text-xs sm:text-sm text-amber-200/80 max-w-3xl leading-relaxed">
+                Super Admin can oversee which business referred whom, track the 10% subscription discounts given to new joiners, monitor the 10% bonus cash credited to referring businesses, and disburse UPI/Bank payouts with audit transaction proofs.
+              </p>
+            </div>
+          </div>
+
+          {/* Key Metric Overview Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1: Total Referrals */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Referrals</span>
+                <div className="p-2 bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 rounded-xl">
+                  <Gift className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900 dark:text-white">
+                  {referralRecords.length}
+                </span>
+                <span className="text-xs font-medium text-slate-500">conversions</span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                New businesses joined via affiliate codes
+              </p>
+            </div>
+
+            {/* Card 2: Total Bonus Generated */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Bonus Generated</span>
+                <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-xl">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                  ₹{referralRecords.reduce((acc, r) => acc + (r.bonusEarned || 0), 0).toLocaleString()}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                10% reward value credited to referring partners
+              </p>
+            </div>
+
+            {/* Card 3: Pending Payout Requests */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pending Payouts</span>
+                <div className="p-2 bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 rounded-xl">
+                  <Clock className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-rose-600 dark:text-rose-400">
+                  ₹
+                  {referralPayoutRequests
+                    .filter((p) => p.status === 'pending')
+                    .reduce((acc, p) => acc + (p.amount || 0), 0)
+                    .toLocaleString()}
+                </span>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300">
+                  {referralPayoutRequests.filter((p) => p.status === 'pending').length} pending
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Awaiting Super Admin disbursement approval
+              </p>
+            </div>
+
+            {/* Card 4: Settled / Disbursed Payouts */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Settled Payouts</span>
+                <div className="p-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-xl">
+                  <CheckCheck className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                  ₹
+                  {referralPayoutRequests
+                    .filter((p) => p.status === 'completed')
+                    .reduce((acc, p) => acc + (p.amount || 0), 0)
+                    .toLocaleString()}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Paid out via UPI / Bank Transfer / Bill Credits
+              </p>
+            </div>
+          </div>
+
+          {/* Sub-Navigation Switcher */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-2 shadow-sm flex flex-wrap gap-2 items-center justify-between">
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setReferralSubTab('conversions')}
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 cursor-pointer transition-all ${
+                  referralSubTab === 'conversions'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Gift className="w-3.5 h-3.5" />
+                <span>Referral Conversions ({referralRecords.length})</span>
+              </button>
+
+              <button
+                onClick={() => setReferralSubTab('payouts')}
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 cursor-pointer transition-all ${
+                  referralSubTab === 'payouts'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Banknote className="w-3.5 h-3.5" />
+                <span>
+                  Payout Requests (
+                  {referralPayoutRequests.filter((p) => p.status === 'pending').length} Pending)
+                </span>
+              </button>
+
+              <button
+                onClick={() => setReferralSubTab('leaderboard')}
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 cursor-pointer transition-all ${
+                  referralSubTab === 'leaderboard'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Award className="w-3.5 h-3.5" />
+                <span>Business Wallets & Codes ({businesses.length})</span>
+              </button>
+            </div>
+
+            {/* Quick Search */}
+            <div className="relative min-w-[240px] flex-1 sm:flex-initial">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search business, code, phone..."
+                value={referralSearchTerm}
+                onChange={(e) => setReferralSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-900 dark:text-white"
+              />
+            </div>
+          </div>
+
+          {/* SUB-VIEW 1: All Referral Conversions (Who Referred Whom) */}
+          {referralSubTab === 'conversions' && (
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden space-y-4 p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-slate-800">
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                    <Gift className="w-4 h-4 text-amber-500" />
+                    <span>Referral Conversions Log (किसने किसे Refer किया)</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Live audit record of each business joining via a referral code, discounts applied, and bonus credited to the referrer.
+                  </p>
+                </div>
+              </div>
+
+              {referralRecords.length === 0 ? (
+                <div className="py-12 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+                    <Gift className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                    No Referral Signups Yet
+                  </h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    When any tenant registers with another business's referral code, their signup details, discount applied, and the 10% referrer bonus will appear here automatically.
+                  </p>
+                  <button
+                    onClick={handleSimulateTestReferral}
+                    className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs inline-flex items-center gap-2 cursor-pointer transition-all shadow-sm"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Simulate Test Referral Conversion</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 uppercase tracking-wider font-extrabold text-[11px]">
+                        <th className="py-3 px-4">Referrer Business (किसने भेजा)</th>
+                        <th className="py-3 px-4">Referred New Business (किसने Join किया)</th>
+                        <th className="py-3 px-4">Subscription Plan & Value</th>
+                        <th className="py-3 px-4">Referral Bonus (किसे Bonus गया)</th>
+                        <th className="py-3 px-4">Date & Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                      {referralRecords
+                        .filter((r) => {
+                          if (!referralSearchTerm) return true;
+                          const term = referralSearchTerm.toLowerCase();
+                          return (
+                            (r.referrerBusinessName || '').toLowerCase().includes(term) ||
+                            (r.referrerCode || '').toLowerCase().includes(term) ||
+                            (r.referredBusinessName || '').toLowerCase().includes(term) ||
+                            (r.referredOwnerName || '').toLowerCase().includes(term) ||
+                            (r.referredOwnerPhone || '').toLowerCase().includes(term)
+                          );
+                        })
+                        .map((record) => {
+                          const referrerBiz = businesses.find((b) => b.id === record.referrerBusinessId);
+
+                          return (
+                            <tr
+                              key={record.id}
+                              className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                            >
+                              {/* Referrer Column */}
+                              <td className="py-3.5 px-4 align-top">
+                                <div className="space-y-1">
+                                  <div className="font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                    <Building2 className="w-3.5 h-3.5 text-amber-500" />
+                                    <span>{record.referrerBusinessName || referrerBiz?.name || 'Partner Business'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 font-bold border border-amber-300/40">
+                                      {record.referrerCode}
+                                    </span>
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(record.referrerCode);
+                                        showToast(`Copied code ${record.referrerCode}`, 'success');
+                                      }}
+                                      className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                                      title="Copy referral code"
+                                    >
+                                      <Copy className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Referred Business Column */}
+                              <td className="py-3.5 px-4 align-top">
+                                <div className="space-y-1">
+                                  <div className="font-extrabold text-slate-900 dark:text-white">
+                                    {record.referredBusinessName}
+                                  </div>
+                                  <div className="text-[11px] text-slate-500 flex flex-wrap gap-2">
+                                    <span>Owner: {record.referredOwnerName || 'Owner'}</span>
+                                    {record.referredOwnerPhone && (
+                                      <span className="font-mono text-slate-400">({record.referredOwnerPhone})</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Subscription Plan & Value Column */}
+                              <td className="py-3.5 px-4 align-top">
+                                <div className="space-y-1">
+                                  <div className="font-bold text-slate-800 dark:text-slate-200">
+                                    {record.planName || 'Standard Pro Plan'}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-[11px]">
+                                    <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                                      ₹{record.planPrice || 1299}/mo
+                                    </span>
+                                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-300/40">
+                                      -{record.discountPercent || 10}% Joiner Discount (-₹{record.discountAmount || 130})
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Referrer Bonus Earned */}
+                              <td className="py-3.5 px-4 align-top">
+                                <div className="space-y-1">
+                                  <div className="font-black text-amber-600 dark:text-amber-400 text-sm flex items-center gap-1">
+                                    <Coins className="w-4 h-4" />
+                                    <span>+₹{record.bonusEarned || 130}</span>
+                                    <span className="text-[10px] text-slate-400 font-normal">({record.bonusPercent || 10}%)</span>
+                                  </div>
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>Credited to Wallet</span>
+                                  </span>
+                                </div>
+                              </td>
+
+                              {/* Date & Audit Info */}
+                              <td className="py-3.5 px-4 align-top">
+                                <div className="space-y-1">
+                                  <div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">
+                                    {new Date(record.createdAt).toLocaleDateString('en-IN', {
+                                      day: 'numeric',
+                                      month: 'short',
+                                      year: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </div>
+                                  {record.notes && (
+                                    <p className="text-[10px] text-slate-400 italic max-w-xs truncate">
+                                      {record.notes}
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SUB-VIEW 2: Payout Requests & Settlement Queue */}
+          {referralSubTab === 'payouts' && (
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden space-y-4 p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                    <Banknote className="w-4 h-4 text-emerald-500" />
+                    <span>Payout Requests & Bonus Disbursements (किसे Bonus देना है)</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Process tenant bonus withdrawal requests via UPI ID, Direct Bank Transfer (NEFT/IMPS), or bill credit.
+                  </p>
+                </div>
+
+                {/* Filter chips */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(['all', 'pending', 'approved', 'completed', 'rejected'] as const).map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => setPayoutStatusFilter(status)}
+                      className={`px-3 py-1 rounded-xl text-xs font-bold capitalize transition-all cursor-pointer ${
+                        payoutStatusFilter === status
+                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {referralPayoutRequests.length === 0 ? (
+                <div className="py-12 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                    <Banknote className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                    No Payout Requests Submitted Yet
+                  </h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    When businesses request to withdraw their referral bonus to UPI or Bank Account, they will appear here for Super Admin approval and UTR proof entry.
+                  </p>
+                  <button
+                    onClick={handleSimulatePayoutRequest}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs inline-flex items-center gap-2 cursor-pointer transition-all shadow-sm"
+                  >
+                    <Banknote className="w-3.5 h-3.5" />
+                    <span>Simulate Sample Payout Request</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {referralPayoutRequests
+                    .filter((p) => {
+                      if (payoutStatusFilter !== 'all' && p.status !== payoutStatusFilter) return false;
+                      if (!referralSearchTerm) return true;
+                      const term = referralSearchTerm.toLowerCase();
+                      return (
+                        (p.businessName || '').toLowerCase().includes(term) ||
+                        (p.ownerName || '').toLowerCase().includes(term) ||
+                        (p.upiId || '').toLowerCase().includes(term) ||
+                        (p.bankAccount?.accountNumber || '').includes(term) ||
+                        (p.notes || '').toLowerCase().includes(term)
+                      );
+                    })
+                    .map((payout) => {
+                      const isPending = payout.status === 'pending';
+                      const isApproved = payout.status === 'approved';
+                      const isCompleted = payout.status === 'completed';
+                      const isRejected = payout.status === 'rejected';
+
+                      return (
+                        <div
+                          key={payout.id}
+                          className="bg-slate-50 dark:bg-slate-950/60 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all hover:border-slate-300 dark:hover:border-slate-700"
+                        >
+                          {/* Left: Business Details & Method */}
+                          <div className="space-y-2 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-extrabold text-sm text-slate-900 dark:text-white">
+                                {payout.businessName}
+                              </span>
+                              <span className="text-xs text-slate-500">
+                                ({payout.ownerName} • {payout.ownerPhone})
+                              </span>
+
+                              {/* Status Badge */}
+                              <span
+                                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full capitalize ${
+                                  isPending
+                                    ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300/40'
+                                    : isApproved
+                                    ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 border border-indigo-300/40'
+                                    : isCompleted
+                                    ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300/40'
+                                    : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-300/40'
+                                }`}
+                              >
+                                {payout.status}
+                              </span>
+                            </div>
+
+                            {/* Destination Account Info */}
+                            <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200/80 dark:border-slate-800 text-xs space-y-1.5 max-w-xl">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                                  {payout.payoutMethod === 'upi' && <QrCode className="w-3.5 h-3.5 text-indigo-500" />}
+                                  {payout.payoutMethod === 'bank_transfer' && <CreditCard className="w-3.5 h-3.5 text-emerald-500" />}
+                                  {payout.payoutMethod === 'subscription_credit' && <Tag className="w-3.5 h-3.5 text-amber-500" />}
+                                  <span className="uppercase font-extrabold">{payout.payoutMethod.replace('_', ' ')}</span>
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                  Requested: {new Date(payout.requestedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+
+                              {payout.payoutMethod === 'upi' && payout.upiId && (
+                                <div className="flex items-center justify-between font-mono bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-indigo-600 dark:text-indigo-400 font-bold">
+                                  <span>UPI ID: {payout.upiId}</span>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(payout.upiId || '');
+                                      showToast(`Copied UPI ID: ${payout.upiId}`, 'success');
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-indigo-600 transition-colors"
+                                    title="Copy UPI ID"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
+
+                              {payout.payoutMethod === 'bank_transfer' && payout.bankAccount && (
+                                <div className="space-y-1 font-mono text-[11px] bg-slate-50 dark:bg-slate-950 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                                  <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
+                                    <span>A/C: {payout.bankAccount.accountNumber}</span>
+                                    <span>IFSC: {payout.bankAccount.ifsc}</span>
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(`${payout.bankAccount?.accountNumber} | IFSC: ${payout.bankAccount?.ifsc} | Name: ${payout.bankAccount?.holderName}`);
+                                        showToast('Copied Bank Details to Clipboard', 'success');
+                                      }}
+                                      className="p-1 text-slate-400 hover:text-emerald-600"
+                                      title="Copy full bank details"
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 font-sans">
+                                    Holder: {payout.bankAccount.holderName}
+                                  </div>
+                                </div>
+                              )}
+
+                              {payout.notes && (
+                                <div className="text-[11px] text-slate-600 dark:text-slate-400 italic">
+                                  Note: {payout.notes}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right: Amount & Super Admin Action Buttons */}
+                          <div className="flex sm:flex-col items-end justify-between sm:justify-center gap-3 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-200 dark:border-slate-800">
+                            <div className="text-right">
+                              <span className="text-[10px] uppercase tracking-wider text-slate-500 font-extrabold block">
+                                Payout Amount
+                              </span>
+                              <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                                ₹{payout.amount.toLocaleString()}
+                              </span>
+                            </div>
+
+                            {/* Action Buttons for Super Admin */}
+                            <div className="flex items-center gap-2">
+                              {(isPending || isApproved) && (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedPayoutForAction(payout);
+                                      setPayoutActionType('completed');
+                                      setPayoutTxnRef('');
+                                      setPayoutAdminNote('');
+                                    }}
+                                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-sm cursor-pointer transition-all"
+                                  >
+                                    <CheckCheck className="w-3.5 h-3.5" />
+                                    <span>Mark as Paid</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                      setSelectedPayoutForAction(payout);
+                                      setPayoutActionType('rejected');
+                                      setPayoutTxnRef('');
+                                      setPayoutAdminNote('');
+                                    }}
+                                    className="px-3 py-1.5 rounded-xl border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950 font-bold text-xs flex items-center gap-1 cursor-pointer transition-all"
+                                  >
+                                    <XCircle className="w-3.5 h-3.5" />
+                                    <span>Reject & Refund</span>
+                                  </button>
+                                </>
+                              )}
+
+                              {isCompleted && (
+                                <span className="inline-flex items-center gap-1 text-xs font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-3 py-1.5 rounded-xl border border-emerald-300/40">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  <span>Settled & Paid</span>
+                                </span>
+                              )}
+
+                              {isRejected && (
+                                <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950 px-3 py-1.5 rounded-xl border border-rose-300/40">
+                                  <XCircle className="w-4 h-4" />
+                                  <span>Rejected & Refunded</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SUB-VIEW 3: Business Wallets & Referral Code Directory */}
+          {referralSubTab === 'leaderboard' && (
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden space-y-4 p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-slate-800">
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                    <Award className="w-4 h-4 text-amber-500" />
+                    <span>Business Referral Directory & Wallet Balances</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Overview of each tenant business's unique referral link code, successful conversions count, and currently available wallet balance.
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 uppercase tracking-wider font-extrabold text-[11px]">
+                      <th className="py-3 px-4">Business Name & Industry</th>
+                      <th className="py-3 px-4">Unique Referral Code</th>
+                      <th className="py-3 px-4">Successful Referrals</th>
+                      <th className="py-3 px-4">Total Bonus Earned</th>
+                      <th className="py-3 px-4">Available Wallet Balance</th>
+                      <th className="py-3 px-4">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {businesses
+                      .filter((b) => {
+                        if (!referralSearchTerm) return true;
+                        const term = referralSearchTerm.toLowerCase();
+                        return (
+                          b.name.toLowerCase().includes(term) ||
+                          (b.referralCode || '').toLowerCase().includes(term) ||
+                          b.type.toLowerCase().includes(term)
+                        );
+                      })
+                      .map((biz) => {
+                        const code = biz.referralCode || `SF-${biz.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase()}10`;
+                        const referralsCount = referralRecords.filter((r) => r.referrerBusinessId === biz.id).length;
+                        const earnings = biz.referralEarnings || (referralsCount * 130);
+                        const balance = biz.referralBalance !== undefined ? biz.referralBalance : earnings;
+
+                        return (
+                          <tr
+                            key={biz.id}
+                            className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                          >
+                            {/* Business Info */}
+                            <td className="py-3.5 px-4">
+                              <div className="space-y-0.5">
+                                <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                  <Building2 className="w-3.5 h-3.5 text-indigo-500" />
+                                  <span>{biz.name}</span>
+                                </div>
+                                <div className="text-[11px] text-slate-500">
+                                  {biz.type} • {biz.city || 'India'}
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Referral Code */}
+                            <td className="py-3.5 px-4">
+                              <div className="inline-flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/60 px-2.5 py-1 rounded-lg border border-amber-300/40">
+                                <Tag className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                                <span className="font-mono font-extrabold text-amber-800 dark:text-amber-300">
+                                  {code}
+                                </span>
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(code);
+                                    showToast(`Copied ${biz.name}'s referral code: ${code}`, 'success');
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-amber-600 cursor-pointer"
+                                  title="Copy referral code"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </td>
+
+                            {/* Conversions Count */}
+                            <td className="py-3.5 px-4">
+                              <span className="font-black text-slate-800 dark:text-slate-200 text-sm">
+                                {referralsCount}
+                              </span>
+                              <span className="text-[11px] text-slate-400 ml-1">tenants</span>
+                            </td>
+
+                            {/* Total Lifetime Earned */}
+                            <td className="py-3.5 px-4">
+                              <span className="font-extrabold text-slate-900 dark:text-white">
+                                ₹{earnings.toLocaleString()}
+                              </span>
+                            </td>
+
+                            {/* Available Balance in Wallet */}
+                            <td className="py-3.5 px-4">
+                              <div className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-950 px-2.5 py-1 rounded-lg border border-emerald-300/40">
+                                <Wallet className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                                <span className="font-black text-emerald-700 dark:text-emerald-300">
+                                  ₹{balance.toLocaleString()}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Status */}
+                            <td className="py-3.5 px-4">
+                              <span
+                                className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase ${
+                                  biz.status === 'active'
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                                    : biz.status === 'pending'
+                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                    : 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                                }`}
+                              >
+                                {biz.status}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2218,6 +3042,191 @@ export const SuperAdminView: React.FC = () => {
                     <>
                       <Check className="w-4 h-4" />
                       <span>Create & Onboard Tenant</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Payout Processing Decision Modal */}
+      {selectedPayoutForAction && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-xl">
+                  <Banknote className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                    Process Referral Bonus Payout
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Settle or reject withdrawal demand for {selectedPayoutForAction.businessName}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedPayoutForAction(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Recipient Details Summary */}
+            <div className="bg-slate-50 dark:bg-slate-950/70 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Business / Owner:</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">
+                  {selectedPayoutForAction.businessName} ({selectedPayoutForAction.ownerName})
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Bonus Payout Amount:</span>
+                <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm">
+                  ₹{selectedPayoutForAction.amount.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Destination Method:</span>
+                <span className="font-bold uppercase text-slate-700 dark:text-slate-300">
+                  {selectedPayoutForAction.payoutMethod.replace('_', ' ')}
+                </span>
+              </div>
+              {selectedPayoutForAction.upiId && (
+                <div className="flex justify-between items-center font-mono">
+                  <span className="text-slate-500">UPI ID:</span>
+                  <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                    {selectedPayoutForAction.upiId}
+                  </span>
+                </div>
+              )}
+              {selectedPayoutForAction.bankAccount && (
+                <div className="space-y-1 font-mono pt-1 border-t border-slate-200 dark:border-slate-800 text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 font-sans">Bank A/C:</span>
+                    <span className="font-bold">{selectedPayoutForAction.bankAccount.accountNumber}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 font-sans">IFSC Code:</span>
+                    <span className="font-bold">{selectedPayoutForAction.bankAccount.ifsc}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 font-sans">Holder:</span>
+                    <span className="font-bold font-sans">{selectedPayoutForAction.bankAccount.holderName}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleExecutePayoutAction} className="space-y-3.5 text-xs">
+              {/* Action Decision Selector */}
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Payout Status Decision *
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPayoutActionType('completed')}
+                    className={`py-2 px-3 rounded-xl border text-center font-bold cursor-pointer transition-all ${
+                      payoutActionType === 'completed'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    Mark as Paid
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPayoutActionType('approved')}
+                    className={`py-2 px-3 rounded-xl border text-center font-bold cursor-pointer transition-all ${
+                      payoutActionType === 'approved'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    Approve Request
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPayoutActionType('rejected')}
+                    className={`py-2 px-3 rounded-xl border text-center font-bold cursor-pointer transition-all ${
+                      payoutActionType === 'rejected'
+                        ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    Reject & Refund
+                  </button>
+                </div>
+              </div>
+
+              {payoutActionType === 'completed' && (
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                    Bank UTR / Transaction Reference Number
+                  </label>
+                  <input
+                    type="text"
+                    value={payoutTxnRef}
+                    onChange={(e) => setPayoutTxnRef(e.target.value)}
+                    placeholder="e.g. UPI/41239841289 or NEFT-AXIS908123"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono text-xs"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
+                  Admin Audit Note
+                </label>
+                <textarea
+                  rows={2}
+                  value={payoutAdminNote}
+                  onChange={(e) => setPayoutAdminNote(e.target.value)}
+                  placeholder={
+                    payoutActionType === 'rejected'
+                      ? 'State reason for rejection (balance will be refunded to business wallet automatically)...'
+                      : 'Optional confirmation note for the tenant...'
+                  }
+                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPayoutForAction(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isProcessingPayoutAction}
+                  className={`px-5 py-2 rounded-xl font-extrabold text-white flex items-center gap-2 shadow-md cursor-pointer transition-all ${
+                    payoutActionType === 'rejected'
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : 'bg-emerald-600 hover:bg-emerald-700'
+                  }`}
+                >
+                  {isProcessingPayoutAction ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Confirm & Apply Decision</span>
                     </>
                   )}
                 </button>
