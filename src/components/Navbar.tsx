@@ -13,8 +13,6 @@ import {
   Sliders,
   ChevronDown,
   Sparkles,
-  Sun,
-  Moon,
   History,
   LogOut,
   Smartphone,
@@ -26,8 +24,8 @@ import {
   Radio,
 } from 'lucide-react';
 import { UserRole } from '../types';
-import { ThemeToggle } from './ThemeToggle';
 import { InstallAppModal } from './InstallAppModal';
+import { UserProfileDrawer } from './UserProfileDrawer';
 import {
   isVoiceNotificationEnabled,
   setVoiceNotificationEnabled,
@@ -79,25 +77,13 @@ export const Navbar: React.FC<NavbarProps> = ({
     logoutUser,
   } = useApp();
 
-  type ActiveMenu = 'tenant' | 'role' | 'notif' | 'profile' | 'voice' | null;
+  type ActiveMenu = 'tenant' | 'notif' | null;
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
   const [isRefreshingPage, setIsRefreshingPage] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
-
-  const [voiceVolume, setVoiceVolumeState] = useState<number>(() => getVoiceVolume());
-  const [selectedVoiceLang, setSelectedVoiceLangState] = useState<VoiceLanguageCode>(() => getSelectedVoiceLanguage());
-
-  const handleVolumeChange = (newVol: number) => {
-    setVoiceVolumeState(newVol);
-    setVoiceVolume(newVol);
-  };
-
-  const handleLanguageChange = (newLang: VoiceLanguageCode) => {
-    setSelectedVoiceLangState(newLang);
-    setSelectedVoiceLanguage(newLang);
-  };
 
   useEffect(() => {
     // Check if running in Standalone app mode
@@ -123,36 +109,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     (u) => u.businessId === currentBusiness?.id && u.role === 'business_owner'
   );
 
-  const [voiceEnabled, setVoiceEnabled] = useState(isVoiceNotificationEnabled());
-
-  const handleToggleVoice = () => {
-    const nextVal = !voiceEnabled;
-    setVoiceEnabled(nextVal);
-    setVoiceNotificationEnabled(nextVal);
-    if (nextVal) {
-      showToast('Voice Alert Notifications Active!', 'success');
-      playCustomVoiceNotification(
-        'Voice Notification Active',
-        'Instant voice alerts enabled for job issues and assignments.'
-      );
-    } else {
-      showToast('Voice Notifications Muted.', 'info');
-    }
-  };
-
-  const handleHeaderRefresh = () => {
-    setIsRefreshingPage(true);
-    syncOfflineQueue();
-    showToast('Refreshing application & syncing latest data...', 'info');
-    setTimeout(() => {
-      setIsRefreshingPage(false);
-      showToast('App refreshed successfully!', 'success');
-      if (navigator.onLine) {
-        window.location.reload();
-      }
-    }, 600);
-  };
-
   const toggleMenu = (menu: ActiveMenu) => {
     setActiveMenu((prev) => (prev === menu ? null : menu));
   };
@@ -164,16 +120,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   const unreadNotifs = notifications.filter((n) => !n.read);
 
   const rolesList: { id: UserRole; label: string; badgeColor: string }[] = [
-    { id: 'business_owner', label: 'Business Owner', badgeColor: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800' },
+    { id: 'business_owner', label: 'Owner', badgeColor: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800' },
     { id: 'manager', label: 'Manager', badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' },
-    { id: 'technician', label: 'Field Technician', badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800' },
+    { id: 'technician', label: 'Tech', badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800' },
     { id: 'super_admin', label: 'Super Admin', badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800' },
   ];
 
   const currentRoleObj = rolesList.find((r) => r.id === currentUser?.role) || rolesList[0];
 
   return (
-    <header className="sticky top-0 z-30 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-2 sm:px-4 py-2 sm:py-2.5 transition-all">
+    <header className="sticky top-0 z-30 w-full max-w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-2 sm:px-4 py-2 sm:py-2.5 transition-all overflow-x-hidden">
       {/* Click-outside backdrop overlay to close open menus */}
       {activeMenu !== null && (
         <div
@@ -182,26 +138,26 @@ export const Navbar: React.FC<NavbarProps> = ({
         />
       )}
 
-      <div className="flex items-center justify-between gap-1.5 sm:gap-3 max-w-7xl mx-auto relative z-50">
+      <div className="flex items-center justify-between gap-1.5 sm:gap-3 max-w-7xl mx-auto w-full relative z-50">
         {/* Left: Brand / Tenant Display */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink min-w-0 max-w-[140px] xs:max-w-[180px] sm:max-w-xs">
           {currentUser?.role === 'super_admin' ? (
             /* Tenant Switcher Dropdown (Super Admin Only) */
-            <div className="relative">
+            <div className="relative min-w-0">
               <button
                 onClick={() => toggleMenu('tenant')}
-                className="flex items-center gap-1.5 sm:gap-2 p-1 sm:p-1.5 sm:pr-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors border border-slate-200/60 dark:border-slate-700/60 text-left"
+                className="flex items-center gap-1.5 sm:gap-2 p-1 sm:p-1.5 sm:pr-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors border border-slate-200/60 dark:border-slate-700/60 text-left min-w-0"
                 title="Switch business"
               >
-                <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs overflow-hidden shrink-0">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs overflow-hidden shrink-0">
                   {currentBusiness?.logo ? (
                     <img src={currentBusiness.logo} alt={currentBusiness.name} className="w-full h-full object-cover" />
                   ) : (
                     (currentBusiness?.name || 'SF').substring(0, 2).toUpperCase()
                   )}
                 </div>
-                <div className="text-left max-w-[100px] xs:max-w-[130px] sm:max-w-[160px]">
-                  <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate flex items-center gap-1">
+                <div className="text-left min-w-0 overflow-hidden">
+                  <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate flex items-center gap-0.5">
                     <span className="truncate">{currentBusiness?.name || 'ServiFlow'}</span>
                     <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
                   </div>
@@ -260,19 +216,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           ) : (
             /* Static Display for Business Owners / Staff / Technicians */
-            <div className="flex items-center gap-2 p-1.5 px-3 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60 text-left">
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs overflow-hidden shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 p-1 sm:p-1.5 px-2 sm:px-3 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60 text-left min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-xs overflow-hidden shrink-0">
                 {currentBusiness?.logo ? (
                   <img src={currentBusiness.logo} alt={currentBusiness.name} className="w-full h-full object-cover" />
                 ) : (
                   (currentBusiness?.name || 'SF').substring(0, 2).toUpperCase()
                 )}
               </div>
-              <div className="text-left max-w-[130px] xs:max-w-[170px] sm:max-w-[210px]">
+              <div className="text-left min-w-0 overflow-hidden">
                 <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
                   {currentBusiness?.name || 'ServiFlow'}
                 </div>
-                <div className="text-[10px] text-slate-500 font-semibold truncate">
+                <div className="text-[10px] text-slate-500 font-semibold truncate hidden xs:block">
                   {ownerUser?.name ? `Owner: ${ownerUser.name}` : (currentBusiness?.type || 'Field Services')}
                 </div>
               </div>
@@ -280,10 +236,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
 
-        {/* Center: Search Trigger */}
+        {/* Center: Search Trigger (Desktop) */}
         <button
           onClick={() => setIsSearchOpen(true)}
-          className="hidden md:flex items-center gap-2 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200/70 dark:hover:bg-slate-800 px-3.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-slate-500 text-xs w-64 lg:w-72 transition-all group shrink-0"
+          className="hidden md:flex items-center gap-2 bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200/70 dark:hover:bg-slate-800 px-3.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 text-slate-500 text-xs w-60 lg:w-72 transition-all group shrink-0"
         >
           <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
           <span className="flex-1 text-left truncate">Search customers, jobs, invoices...</span>
@@ -298,7 +254,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {isStandalone ? (
             <div
               className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-              title="Running in Standalone Native Application Mode with Realtime Cloud Sync"
+              title="Running in Standalone Native Application Mode"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
               <span>Live App Mode</span>
@@ -306,18 +262,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           ) : (
             <button
               onClick={() => setIsInstallModalOpen(true)}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all active:scale-95 animate-pulse"
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all active:scale-95"
               title="Install ServiFlow as a native Desktop / Mobile App"
             >
               <Download className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Install App</span>
+              <span>Install App</span>
             </button>
           )}
 
-          {/* User Role Badge */}
-          <div className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1 rounded-full text-xs font-medium border shadow-xs transition-all ${currentRoleObj.badgeColor}`}>
+          {/* User Role Badge (Hidden on very small mobile to prevent overflow) */}
+          <div className={`hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border shadow-xs ${currentRoleObj.badgeColor}`}>
             <UserCheck className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden xs:inline">{currentRoleObj.label}</span>
+            <span>{currentRoleObj.label}</span>
           </div>
 
           {/* Activity Log Audit Trail Trigger */}
@@ -349,126 +305,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               }, 600);
             }}
             disabled={isRefreshingPage}
-            className={`flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer ${
+            className={`flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer ${
               pendingSyncQueue.length > 0
                 ? 'bg-amber-500 hover:bg-amber-600 text-stone-900 border-amber-600 shadow-xs animate-pulse'
                 : 'bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-blue-950/40 text-slate-700 dark:text-slate-200 border-slate-200/80 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600'
             }`}
-            title="Sync Data & Cloud Sync (Upload offline changes and fetch latest records)"
+            title="Sync Data & Cloud Sync"
             aria-label="Sync Data"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingPage ? 'animate-spin text-indigo-600 dark:text-indigo-400' : ''}`} />
-            <span className="hidden sm:inline">Sync Data</span>
+            <span className="hidden md:inline">Sync</span>
             {pendingSyncQueue.length > 0 && (
               <span className="px-1.5 py-0.2 rounded-full bg-stone-900 text-amber-400 text-[10px] font-mono font-black">
                 {pendingSyncQueue.length}
               </span>
             )}
           </button>
-
-          {/* Dark / Light Theme Toggle */}
-          <ThemeToggle />
-
-          {/* Voice Notification & Volume Settings Popover */}
-          <div className="relative">
-            <button
-              onClick={() => toggleMenu('voice')}
-              className={`p-1.5 sm:p-2 rounded-xl transition-all border ${
-                voiceEnabled
-                  ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800'
-                  : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 border-transparent'
-              }`}
-              title="Voice Notification & Volume Settings"
-              aria-label="Voice Alerts & Volume"
-            >
-              {voiceEnabled ? (
-                <Volume2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              ) : (
-                <VolumeX className="w-4 h-4" />
-              )}
-            </button>
-
-            {activeMenu === 'voice' && (
-              <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-4 z-50 animate-in fade-in zoom-in-95 space-y-3.5">
-                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                    <Volume2 className="w-4 h-4 text-indigo-600" /> Voice Alert Settings
-                  </span>
-                  <button
-                    onClick={handleToggleVoice}
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-all ${
-                      voiceEnabled
-                        ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                    }`}
-                  >
-                    {voiceEnabled ? 'ACTIVE' : 'MUTED'}
-                  </button>
-                </div>
-
-                {/* Volume Slider Control */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    <span>Voice Volume</span>
-                    <span className="text-indigo-600 font-mono font-bold">{Math.round(voiceVolume * 100)}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={voiceVolume}
-                    onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                    className="w-full accent-indigo-600 cursor-pointer h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-400">
-                    <span>Mute (0%)</span>
-                    <span>50%</span>
-                    <span>100% (Max)</span>
-                  </div>
-                </div>
-
-                {/* Language Mode Selector */}
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
-                    Announcement Language
-                  </label>
-                  <select
-                    value={selectedVoiceLang}
-                    onChange={(e) => handleLanguageChange(e.target.value as VoiceLanguageCode)}
-                    className="w-full p-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium"
-                  >
-                    {SUPPORTED_VOICE_LANGUAGES.map((lang) => (
-                      <option key={lang.code} value={lang.code}>
-                        {lang.name} ({lang.nativeName})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Test Voice Button */}
-                <button
-                  onClick={() => {
-                    playNotificationChime();
-                    const testPhrases: Record<string, string> = {
-                      'hi-IN': 'यह एक टेस्ट वॉयस नोटिफिकेशन है. सर्वफ्लो अलर्ट सिस्टम पूरी तरह चालू है.',
-                      'mr-IN': 'ही एक टेस्ट व्हॉईस सूचना आहे. सर्वफ्लो अलर्ट सिस्टीम व्यवस्थित काम करत आहे.',
-                      'gu-IN': 'આ એક ટેસ્ટ વોઈસ નોટિફિકેશન છે. સર્વિફ્લો એલર્ટ સિસ્ટમ કાર્યરત છે.',
-                      'en-IN': 'This is a test voice notification. ServiFlow alert system is fully operational.',
-                      'en-US': 'This is a test voice notification. ServiFlow alert system is operational.',
-                    };
-                    const phrase = testPhrases[selectedVoiceLang] || testPhrases['en-IN'];
-                    setTimeout(() => {
-                      speakText(phrase, { lang: selectedVoiceLang });
-                    }, 300);
-                  }}
-                  className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/80 text-indigo-600 dark:text-indigo-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-indigo-200 dark:border-indigo-800 transition-all cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5" /> Test Voice Alert ({Math.round(voiceVolume * 100)}%)
-                </button>
-              </div>
-            )}
-          </div>
 
           {/* Notifications Bell */}
           <div className="relative">
@@ -539,63 +391,35 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          {/* User Profile / Settings menu */}
-          <div className="relative">
-            <button
-              onClick={() => toggleMenu('profile')}
-              className="w-8 h-8 rounded-xl bg-slate-200 dark:bg-slate-800 overflow-hidden ring-2 ring-slate-200 dark:ring-slate-700 hover:ring-indigo-500 transition-all shrink-0"
-              title="User Profile & Settings"
-            >
-              {currentUser?.avatar ? (
-                <img src={currentUser.avatar} alt={currentUser?.name || 'User'} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center font-bold text-xs text-slate-700 dark:text-slate-200">
-                  {(currentUser?.name || currentUser?.email || 'US').substring(0, 2).toUpperCase()}
-                </div>
-              )}
-            </button>
-
-            {activeMenu === 'profile' && (
-              <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 animate-in fade-in zoom-in-95">
-                <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 mb-1">
-                  <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{currentUser?.name || 'Guest User'}</div>
-                  <div className="text-[10px] text-slate-400 truncate">{currentUser?.email || ''}</div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    setActiveTab('settings');
-                    closeAllMenus();
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 dark:hover:text-indigo-400 my-1 transition-colors"
-                >
-                  <Sliders className="w-3.5 h-3.5" /> Profile Settings
-                </button>
-
-                <button
-                  onClick={() => {
-                    setIsInstallModalOpen(true);
-                    closeAllMenus();
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                >
-                  <Download className="w-3.5 h-3.5" /> Install Standalone App
-                </button>
-
-                <button
-                  onClick={() => {
-                    logoutUser();
-                    closeAllMenus();
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                >
-                  <LogOut className="w-3.5 h-3.5" /> Sign Out
-                </button>
-              </div>
+          {/* User Profile Trigger Button (Rightmost icon - opens comprehensive Profile Drawer) */}
+          <button
+            onClick={() => setIsProfileDrawerOpen(true)}
+            className="w-8 h-8 rounded-xl bg-indigo-600 text-white overflow-hidden ring-2 ring-indigo-500/30 hover:ring-indigo-500 transition-all shrink-0 flex items-center justify-center font-bold text-xs shadow-xs cursor-pointer active:scale-95"
+            title="User Profile, Themes & Account Management"
+            aria-label="User Profile & Settings"
+          >
+            {currentUser?.avatar ? (
+              <img src={currentUser.avatar} alt={currentUser?.name || 'User'} className="w-full h-full object-cover" />
+            ) : (
+              <span>{(currentUser?.name || currentUser?.email || 'US').substring(0, 2).toUpperCase()}</span>
             )}
-          </div>
+          </button>
         </div>
       </div>
+
+      {/* Comprehensive User Profile & Account Drawer */}
+      <UserProfileDrawer
+        isOpen={isProfileDrawerOpen}
+        onClose={() => setIsProfileDrawerOpen(false)}
+        onNavigateToSettings={() => {
+          setActiveTab('settings');
+          setIsProfileDrawerOpen(false);
+        }}
+        onOpenInstallModal={() => {
+          setIsInstallModalOpen(true);
+          setIsProfileDrawerOpen(false);
+        }}
+      />
 
       {/* Standalone Installation Modal */}
       <InstallAppModal
@@ -609,3 +433,4 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
+

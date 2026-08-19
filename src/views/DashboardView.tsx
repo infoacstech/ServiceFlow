@@ -292,17 +292,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   ];
 
   return (
-    <div className="space-y-6 pb-12 animate-in fade-in">
+    <div className="space-y-6 pb-12 animate-in fade-in max-w-full overflow-x-hidden">
       {/* Top Banner Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 rounded-3xl shadow-xl">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs bg-indigo-500/20 text-indigo-300 font-bold px-2.5 py-0.5 rounded-full border border-indigo-500/30">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 sm:p-6 rounded-3xl shadow-xl w-full max-w-full overflow-hidden">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <span className="text-xs bg-indigo-500/20 text-indigo-300 font-bold px-2.5 py-0.5 rounded-full border border-indigo-500/30 truncate max-w-full">
               {currentBusiness.type}
             </span>
             <span className="text-xs text-slate-400">Live Operations Dashboard</span>
           </div>
-          <h1 className="text-2xl font-black tracking-tight">{currentBusiness.name}</h1>
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight break-words">{currentBusiness.name}</h1>
           <p className="text-xs text-slate-300 mt-0.5">
             Overview of jobs, dispatches, technician tracking, & financial metrics for today.
           </p>

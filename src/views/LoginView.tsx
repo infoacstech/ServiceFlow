@@ -19,11 +19,9 @@ import {
   X,
   Phone,
   AlertCircle,
-  CreditCard,
   Gift,
   Tag,
 } from 'lucide-react';
-import { PricingModal } from '../components/PricingModal';
 
 interface LoginViewProps {
   onLoginSuccess?: () => void;
@@ -43,7 +41,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   } = useApp();
 
   const [authTab, setAuthTab] = useState<'login' | 'register' | 'super_admin'>('login');
-  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
 
   // Sign In Form State
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -721,16 +718,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </div>
 
         {/* Bottom Footer Links */}
-        <div className="text-center pt-1 space-y-2">
-          <button
-            type="button"
-            onClick={() => setIsPricingModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800/80 text-indigo-700 dark:text-indigo-300 font-bold text-xs shadow-xs transition-all cursor-pointer mx-auto"
-          >
-            <CreditCard className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-            <span>View SaaS Pricing & Plans (Starter ₹499 • Pro ₹1,299 • Business ₹2,999)</span>
-          </button>
-
+        <div className="text-center pt-1">
           <div>
             {authTab !== 'super_admin' ? (
               <button
@@ -751,12 +739,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           </div>
         </div>
       </div>
-
-      {/* PRICING MODAL */}
-      <PricingModal
-        isOpen={isPricingModalOpen}
-        onClose={() => setIsPricingModalOpen(false)}
-      />
 
       {/* FORGOT PASSWORD MODAL */}
       {isForgotPasswordOpen && (

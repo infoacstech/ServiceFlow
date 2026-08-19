@@ -182,7 +182,7 @@ const MainContent: React.FC = () => {
 
   return (
     <PullToRefresh>
-      <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
+      <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white w-full max-w-full overflow-x-hidden">
         {/* Super Admin Support Access Active Banner */}
         <SupportSessionBanner />
 

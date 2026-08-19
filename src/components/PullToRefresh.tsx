@@ -84,7 +84,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ children }) => {
   }, [pullDistance, isRefreshing, syncOfflineQueue, showToast]);
 
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen w-full max-w-full overflow-x-hidden">
       {/* Pull-To-Refresh Indicator Banner */}
       {(pullDistance > 0 || isRefreshing) && (
         <div
