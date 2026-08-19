@@ -15,7 +15,9 @@ import {
   ExternalLink,
   Laptop,
   Check,
+  Copy,
   Layers,
+  Maximize,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -41,6 +43,9 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
   const [selectedPlatform, setSelectedPlatform] = useState<'pc' | 'android' | 'ios' | 'mac'>('pc');
   const [isStandalone, setIsStandalone] = useState(false);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
 
   useEffect(() => {
     // Detect Standalone execution
@@ -76,21 +81,59 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
           if (onInstalled) onInstalled();
           onClose();
         } else {
-          showToast('Installation cancelled by user', 'info');
+          showToast('Installation prompt closed', 'info');
         }
       } catch (err) {
         console.error('PWA install error:', err);
-        showToast('Please use your browser menu to install the app', 'info');
+        handleOpenInNewTab();
       }
+    } else if (isInIframe) {
+      handleOpenInNewTab();
     } else {
-      // Fallback instruction toast based on current platform
+      // Fallback guidance based on current platform
       if (selectedPlatform === 'ios') {
-        showToast('On iOS Safari: Tap Share button ⎋ and choose "Add to Home Screen"', 'info');
+        showToast('On iOS Safari: Tap Share button (⎋) at bottom, then choose "Add to Home Screen"', 'info');
+      } else if (selectedPlatform === 'android') {
+        showToast('On Android Chrome: Tap 3 dots (⋮) menu at top right -> "Install App" or "Add to Home screen"', 'info');
       } else if (selectedPlatform === 'pc') {
         showToast('Look for the "Install" (⊕) icon on the right side of your browser address bar', 'info');
       } else {
-        showToast('Tap browser menu (⋮) -> "Install App" or "Add to Home screen"', 'info');
+        showToast('On Mac Safari/Chrome: Click "Install" icon in address bar or File -> Add to Dock', 'info');
       }
+    }
+  };
+
+  const handleOpenInNewTab = () => {
+    try {
+      const url = window.location.href;
+      window.open(url, '_blank');
+      showToast('Opening app in full browser window for 1-click installation...', 'info');
+    } catch {
+      showToast('Please open the app in a dedicated browser tab to install.', 'info');
+    }
+  };
+
+  const handleCopyLink = () => {
+    try {
+      navigator.clipboard.writeText(window.location.href);
+      setCopiedLink(true);
+      showToast('App link copied to clipboard! Paste it into Chrome or Safari.', 'success');
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch {
+      showToast('Failed to copy link', 'error');
+    }
+  };
+
+  const handleFullscreen = () => {
+    try {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen?.();
+        showToast('Entered Fullscreen App Mode!', 'success');
+      } else {
+        document.exitFullscreen?.();
+      }
+    } catch {
+      showToast('Fullscreen mode toggled', 'info');
     }
   };
 
@@ -139,44 +182,60 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
             title="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Standalone Status Alert */}
+        {/* Standalone Status Alert or In-Iframe Alert */}
         {isStandalone ? (
-          <div className="bg-emerald-500/10 dark:bg-emerald-500/20 border-b border-emerald-500/20 px-6 py-2.5 flex items-center justify-between">
+          <div className="bg-emerald-500/10 dark:bg-emerald-500/20 border-b border-emerald-500/20 px-4 sm:px-6 py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>Running in Native Standalone App Mode (Browser Bar Removed)</span>
             </div>
             <button
               onClick={handleCheckUpdate}
               disabled={isCheckingUpdate}
-              className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:underline flex items-center gap-1"
+              className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:underline flex items-center gap-1 cursor-pointer"
             >
               <RefreshCw className={`w-3 h-3 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
               <span>Check Update</span>
             </button>
           </div>
-        ) : (
-          <div className="bg-amber-500/10 dark:bg-amber-500/20 border-b border-amber-500/20 px-6 py-2.5 flex items-center justify-between text-xs text-amber-800 dark:text-amber-300 font-medium">
+        ) : isInIframe ? (
+          <div className="bg-indigo-50 dark:bg-indigo-950/60 border-b border-indigo-200 dark:border-indigo-800 px-4 sm:px-6 py-2.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-indigo-950 dark:text-indigo-200">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-600" />
-              <span>Currently opened in browser tab. Install to get a 100% full-screen app experience!</span>
+              <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span className="font-medium">
+                To install natively on your device, open the app in a full browser tab:
+              </span>
+            </div>
+            <button
+              onClick={handleOpenInNewTab}
+              className="px-3 py-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Open in Full Tab ↗</span>
+            </button>
+          </div>
+        ) : (
+          <div className="bg-amber-500/10 dark:bg-amber-500/20 border-b border-amber-500/20 px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs text-amber-800 dark:text-amber-300 font-medium">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Install to home screen or taskbar for 1-click fullscreen app launch!</span>
             </div>
           </div>
         )}
 
         {/* Body Content */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
           {/* Key Advantages Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
+              <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 shrink-0">
                 <Monitor className="w-4 h-4" />
               </div>
               <div>
@@ -188,11 +247,11 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
             </div>
 
             <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
+              <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 shrink-0">
                 <Zap className="w-4 h-4" />
               </div>
               <div>
-                <div className="text-xs font-bold text-slate-900 dark:text-slate-100">Always In Real-Time</div>
+                <div className="text-xs font-bold text-slate-900 dark:text-slate-100">Fast & Real-time</div>
                 <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                   Instant live cloud sync for jobs, dispatches, invoices, and payments across all devices.
                 </div>
@@ -200,7 +259,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
             </div>
 
             <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
+              <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 shrink-0">
                 <RefreshCw className="w-4 h-4" />
               </div>
               <div>
@@ -220,7 +279,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 onClick={() => setSelectedPlatform('pc')}
-                className={`flex items-center justify-center gap-2 p-2.5 rounded-2xl font-bold text-xs border transition-all ${
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-2xl font-bold text-xs border transition-all cursor-pointer ${
                   selectedPlatform === 'pc'
                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
                     : 'bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
@@ -232,7 +291,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
 
               <button
                 onClick={() => setSelectedPlatform('android')}
-                className={`flex items-center justify-center gap-2 p-2.5 rounded-2xl font-bold text-xs border transition-all ${
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-2xl font-bold text-xs border transition-all cursor-pointer ${
                   selectedPlatform === 'android'
                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
                     : 'bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
@@ -244,7 +303,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
 
               <button
                 onClick={() => setSelectedPlatform('ios')}
-                className={`flex items-center justify-center gap-2 p-2.5 rounded-2xl font-bold text-xs border transition-all ${
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-2xl font-bold text-xs border transition-all cursor-pointer ${
                   selectedPlatform === 'ios'
                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
                     : 'bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
@@ -256,7 +315,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
 
               <button
                 onClick={() => setSelectedPlatform('mac')}
-                className={`flex items-center justify-center gap-2 p-2.5 rounded-2xl font-bold text-xs border transition-all ${
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-2xl font-bold text-xs border transition-all cursor-pointer ${
                   selectedPlatform === 'mac'
                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
                     : 'bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
@@ -282,7 +341,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                       1
                     </div>
                     <div>
-                      Click the <strong className="text-indigo-600">"Install ServiFlow Desktop App"</strong> button below or look for the <strong className="text-indigo-600">Install icon (⊕)</strong> on the right of the browser address bar.
+                      Click the <strong className="text-indigo-600">"Install Now"</strong> button below or look for the <strong className="text-indigo-600">Install icon (⊕)</strong> on the right side of the browser address bar.
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -290,7 +349,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                       2
                     </div>
                     <div>
-                      Click <strong>"Install"</strong> in the browser prompt.
+                      Click <strong>"Install"</strong> in the browser prompt window.
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -298,7 +357,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                       3
                     </div>
                     <div>
-                      ServiFlow will open in its own clean window. Pin it to your <strong>Windows Taskbar</strong> or <strong>Start Menu</strong> for 1-click launch anytime!
+                      ServiFlow will launch as an independent window with its own icon on your <strong>Windows Taskbar</strong> and <strong>Start Menu</strong>!
                     </div>
                   </div>
                 </div>
@@ -317,7 +376,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                       1
                     </div>
                     <div>
-                      Tap the <strong>"Install App"</strong> button below or tap the <strong>three dots (⋮)</strong> menu in Chrome.
+                      Tap the <strong>"Install Now"</strong> button below or tap the <strong>three dots (⋮)</strong> menu in Chrome.
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -333,7 +392,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                       3
                     </div>
                     <div>
-                      The official ServiFlow company icon is placed on your home screen. When launched, it runs in pure fullscreen mode like any Google Play Store app!
+                      The official ServiFlow app icon will be added to your home screen with pure fullscreen performance!
                     </div>
                   </div>
                 </div>
@@ -368,7 +427,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                       3
                     </div>
                     <div>
-                      Tap <strong>Add</strong> on the top right. Launch ServiFlow from your iOS Home Screen — it will run in standalone app view with full device performance!
+                      Tap <strong>Add</strong> on the top right. Launch ServiFlow from your iOS Home Screen for a dedicated app experience!
                     </div>
                   </div>
                 </div>
@@ -403,11 +462,40 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                       3
                     </div>
                     <div>
-                      ServiFlow is added to your Mac Dock & Launchpad as a native macOS application with company icon!
+                      ServiFlow is added to your Mac Dock & Launchpad as a native macOS application!
                     </div>
                   </div>
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Quick Tools: Copy Link & Fullscreen */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleCopyLink}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copiedLink ? 'Link Copied!' : 'Copy App Link'}</span>
+            </button>
+
+            <button
+              onClick={handleFullscreen}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Maximize className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Toggle Fullscreen Mode</span>
+            </button>
+
+            {isInIframe && (
+              <button
+                onClick={handleOpenInNewTab}
+                className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open in Real Browser Tab ↗</span>
+              </button>
             )}
           </div>
         </div>
@@ -422,7 +510,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
           <div className="flex items-center gap-2.5 w-full sm:w-auto">
             <button
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex-1 sm:flex-none text-center"
+              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex-1 sm:flex-none text-center cursor-pointer"
             >
               Close
             </button>
@@ -430,15 +518,23 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
             {deferredPrompt ? (
               <button
                 onClick={handleInstallClick}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition-all active:scale-95 flex items-center justify-center gap-2 flex-1 sm:flex-none"
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition-all active:scale-95 flex items-center justify-center gap-2 flex-1 sm:flex-none cursor-pointer"
               >
                 <Download className="w-4 h-4" />
                 <span>1-Click Install Now</span>
               </button>
+            ) : isInIframe ? (
+              <button
+                onClick={handleOpenInNewTab}
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition-all active:scale-95 flex items-center justify-center gap-2 flex-1 sm:flex-none cursor-pointer"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>Open in Tab to Install ↗</span>
+              </button>
             ) : selectedPlatform === 'ios' ? (
               <button
                 onClick={() => showToast('In Safari, tap Share ⎋ -> "Add to Home Screen"', 'info')}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 flex-1 sm:flex-none"
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 flex-1 sm:flex-none cursor-pointer"
               >
                 <Share className="w-4 h-4" />
                 <span>Use Safari Share Menu</span>
@@ -446,7 +542,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
             ) : (
               <button
                 onClick={handleInstallClick}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 flex-1 sm:flex-none"
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 flex-1 sm:flex-none cursor-pointer"
               >
                 <Download className="w-4 h-4" />
                 <span>Install Standalone App</span>

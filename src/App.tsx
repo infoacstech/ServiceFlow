@@ -109,14 +109,14 @@ const MainContent: React.FC = () => {
   // 2. Unauthenticated State (Logged Out or No Active Session)
   if (!currentUser) {
     return (
-      <PullToRefresh>
-        <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased">
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+      <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased">
+        <main className="flex-1 max-w-7xl mx-auto w-full overflow-hidden">
+          <PullToRefresh className="p-4 sm:p-6 lg:p-8">
             <LoginView onLoginSuccess={() => {}} />
-          </main>
-          <ToastContainer />
-        </div>
-      </PullToRefresh>
+          </PullToRefresh>
+        </main>
+        <ToastContainer />
+      </div>
     );
   }
 
@@ -181,28 +181,28 @@ const MainContent: React.FC = () => {
   const isTech = currentUser?.role === 'technician';
 
   return (
-    <PullToRefresh>
-      <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white w-full max-w-full overflow-x-hidden">
-        {/* Super Admin Support Access Active Banner */}
-        <SupportSessionBanner />
+    <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white w-full max-w-full overflow-x-hidden">
+      {/* Super Admin Support Access Active Banner */}
+      <SupportSessionBanner />
 
-        {/* Offline Sync Banner for Technicians */}
-        <OfflineSyncBanner />
+      {/* Offline Sync Banner for Technicians */}
+      <OfflineSyncBanner />
 
-        {/* Top Navbar Header */}
-        <Navbar
-          onOpenOnboarding={() => setIsOnboardingOpen(true)}
-          activeTab={activeTab}
-          setActiveTab={handleTabChange}
-        />
+      {/* Top Navbar Header */}
+      <Navbar
+        onOpenOnboarding={() => setIsOnboardingOpen(true)}
+        activeTab={activeTab}
+        setActiveTab={handleTabChange}
+      />
 
-        {/* Main Workspace Layout */}
-        <div className="flex-1 flex max-w-7xl w-full mx-auto overflow-hidden">
-          {/* Desktop Sidebar */}
-          <Sidebar activeTab={activeTab} setActiveTab={handleTabChange} />
+      {/* Main Workspace Layout */}
+      <div className="flex-1 flex max-w-7xl w-full mx-auto overflow-hidden">
+        {/* Desktop Sidebar */}
+        <Sidebar activeTab={activeTab} setActiveTab={handleTabChange} />
 
-          {/* View Content Area */}
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-28 sm:pb-8 overflow-y-auto min-h-0">
+        {/* View Content Area with Targeted Pull-To-Refresh */}
+        <main className="flex-1 overflow-hidden min-h-0 flex flex-col">
+          <PullToRefresh className="p-4 sm:p-6 lg:p-8 pb-28 sm:pb-8">
             <div key={activeTab} className="animate-in fade-in duration-200">
               {!currentTabAccess.allowed ? (
                 <AccessDeniedView
@@ -266,36 +266,36 @@ const MainContent: React.FC = () => {
                 </>
               )}
             </div>
-          </main>
-        </div>
-
-        {/* Mobile Bottom Navigation */}
-        <MobileNav activeTab={activeTab} setActiveTab={handleTabChange} />
-
-        {/* Global Modals & Toasts */}
-        <AuthModal
-          isOpen={isAuthModalOpen}
-          onClose={() => setIsAuthModalOpen(false)}
-        />
-        <OnboardingModal
-          isOpen={isOnboardingOpen}
-          onClose={() => setIsOnboardingOpen(false)}
-        />
-        <GlobalSearchModal onSelectTab={(tab) => handleTabChange(tab)} />
-        <ActivityLogDrawer />
-        <JobNotificationPopup
-          onOpenJob={(jobId) => {
-            handleNavigateWithFilter('jobs', { query: jobId });
-          }}
-        />
-        <QuickActionFab
-          onOpenNewJob={handleOpenNewJob}
-          onNavigate={handleTabChange}
-        />
-        <PwaInstallPrompt />
-        <ToastContainer />
+          </PullToRefresh>
+        </main>
       </div>
-    </PullToRefresh>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileNav activeTab={activeTab} setActiveTab={handleTabChange} />
+
+      {/* Global Modals & Toasts */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
+      <OnboardingModal
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+      />
+      <GlobalSearchModal onSelectTab={(tab) => handleTabChange(tab)} />
+      <ActivityLogDrawer />
+      <JobNotificationPopup
+        onOpenJob={(jobId) => {
+          handleNavigateWithFilter('jobs', { query: jobId });
+        }}
+      />
+      <QuickActionFab
+        onOpenNewJob={handleOpenNewJob}
+        onNavigate={handleTabChange}
+      />
+      <PwaInstallPrompt />
+      <ToastContainer />
+    </div>
   );
 };
 

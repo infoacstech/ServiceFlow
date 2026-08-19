@@ -279,19 +279,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right Action Controls & User Profile */}
         <div className="flex items-center gap-1 sm:gap-2">
-          {/* Quick Install Mobile/Desktop App Icon */}
-          {!isStandalone && (
-            <button
-              onClick={() => setIsInstallModalOpen(true)}
-              className="flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer active:scale-95"
-              title="Install Mobile or Desktop App"
-              aria-label="Install App"
-            >
-              <Download className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 animate-bounce" />
-              <span className="hidden lg:inline">Install App</span>
-            </button>
-          )}
-
           {/* User Role Badge */}
           <div className={`hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border shadow-xs ${currentRoleObj.badgeColor}`}>
             <UserCheck className="w-3.5 h-3.5 shrink-0" />
