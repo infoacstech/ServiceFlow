@@ -810,13 +810,16 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               // Check if notification is targeted to the current active user
               let isTargetedToMe = false;
 
-              if (currentUser.role === 'super_admin') {
-                isTargetedToMe = true;
-              } else if (notif.actionType === 'assigned') {
-                // IMPORTANT: Owner and Manager should NOT receive audio alert when scheduling or assigning jobs to others
-                if (currentUser.role === 'business_owner' || currentUser.role === 'manager') {
+              const isJobAssignment =
+                notif.actionType === 'assigned' ||
+                notif.title?.toLowerCase().includes('assigned') ||
+                notif.title?.toLowerCase().includes('job issued');
+
+              if (isJobAssignment) {
+                // Business Owner, Manager & Super Admin NEVER receive audio alerts or popups when assigning jobs
+                if (currentUser.role !== 'technician') {
                   isTargetedToMe = false;
-                } else if (currentUser.role === 'technician') {
+                } else {
                   // Only the specifically assigned technician receives the voice alert and popup
                   if (notif.targetUserId) {
                     if (notif.targetUserId === currentUser.id || notif.targetUserId === currentUser.email) {
@@ -834,8 +837,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   }
                 }
               } else if (notif.actionType === 'accepted' || notif.actionType === 'started' || notif.actionType === 'completed') {
-                // Owner receives updates when technician accepts, starts, or finishes jobs
-                if (currentUser.role === 'business_owner' || currentUser.role === 'manager') {
+                // Owner & Manager receive updates when technician accepts, starts, or finishes jobs
+                if (currentUser.role === 'business_owner' || currentUser.role === 'manager' || currentUser.role === 'super_admin') {
                   isTargetedToMe = true;
                 }
               } else {
@@ -845,7 +848,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 } else if (notif.targetRoleId) {
                   isTargetedToMe = notif.targetRoleId === currentUser.role;
                 } else {
-                  isTargetedToMe = true;
+                  isTargetedToMe = currentUser.role === 'business_owner' || currentUser.role === 'manager';
                 }
               }
 
@@ -1830,9 +1833,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (n.businessId !== currBizId) return false;
         if (!currentUser) return true;
 
-        if (currentUser.role === 'business_owner' || currentUser.role === 'manager') {
-          // Business owner and manager do not need to see technician assignment notifications
-          if (n.actionType === 'assigned') return false;
+        const isJobAssignment =
+          n.actionType === 'assigned' ||
+          n.title?.toLowerCase().includes('assigned') ||
+          n.title?.toLowerCase().includes('job issued');
+
+        if (currentUser.role === 'business_owner' || currentUser.role === 'manager' || currentUser.role === 'super_admin') {
+          // Business owner, manager & super admin do not need to see technician assignment notifications
+          if (isJobAssignment) return false;
           return true;
         }
 
@@ -2002,10 +2010,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       actionType: 'assigned',
     };
     saveToFirestore('notifications', newNotif.id, newNotif);
+    seenNotifIdsRef.current.add(newNotif.id);
 
     logActivity('Job Created', 'job', newJob.id, `Created job ${jobId}`);
 
-    // Voice notification should only play for the assigned technician (never for the business owner who created it)
+    // Voice notification and popup should ONLY trigger on the assigned technician's device (never for the business owner who created it)
     const isCurrentUserTheAssignedTechnician =
       currentUser?.role === 'technician' &&
       (currentUser?.id === data.assignedStaffId ||
@@ -2061,6 +2070,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           actionType: 'assigned',
         };
         saveToFirestore('notifications', reassignNotif.id, reassignNotif);
+        seenNotifIdsRef.current.add(reassignNotif.id);
       }
 
       logActivity('Job Updated', 'job', id, 'Updated job assignment and schedule');

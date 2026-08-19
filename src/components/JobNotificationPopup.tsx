@@ -27,6 +27,12 @@ export const JobNotificationPopup: React.FC<JobNotificationPopupProps> = ({ onOp
 
   const notif = activeJobPopup;
   const isAssign = notif.actionType === 'assigned' || notif.title.toLowerCase().includes('job issued') || notif.title.toLowerCase().includes('assigned');
+  
+  // Job assignment popup is strictly for the assigned technician, never the owner/manager who created it
+  if (isAssign && currentUser?.role !== 'technician') {
+    return null;
+  }
+
   const isCompleted = notif.actionType === 'completed' || notif.title.toLowerCase().includes('completed');
   const isAccepted = notif.actionType === 'accepted';
   const isStarted = notif.actionType === 'started';
