@@ -153,11 +153,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 w-full max-w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-2 sm:px-4 py-2 sm:py-2.5 transition-all overflow-x-hidden">
+    <header className="sticky top-0 z-40 w-full max-w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-2 sm:px-4 py-2 sm:py-2.5 transition-all">
       {/* Click-outside backdrop overlay to close open menus */}
       {activeMenu !== null && (
         <div
-          className="fixed inset-0 z-40 bg-black/10 dark:bg-black/30 backdrop-blur-[1px]"
+          className="fixed inset-0 z-40 bg-black/20 dark:bg-black/40"
           onClick={closeAllMenus}
         />
       )}
@@ -345,7 +345,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {activeMenu === 'notif' && (
-              <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-3 z-50 animate-in fade-in zoom-in-95">
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-3 z-[100] animate-in fade-in zoom-in-95 ring-1 ring-black/5">
                 <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 mb-2">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold text-slate-900 dark:text-slate-100">Notifications</span>
@@ -354,7 +354,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         e.stopPropagation();
                         playCustomVoiceNotification('Notification Summary', `You have ${unreadNotifs.length} unread notifications.`);
                       }}
-                      className="p-1 text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-600 hover:bg-indigo-100 rounded-lg font-medium flex items-center gap-1"
+                      className="p-1 text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-600 hover:bg-indigo-100 rounded-lg font-medium flex items-center gap-1 cursor-pointer"
                       title="Speak Summary"
                     >
                       <Volume2 className="w-3 h-3" /> Read All
@@ -371,7 +371,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                     notifications.map((n, idx) => (
                       <div
                         key={n.id || `nav-notif-${idx}`}
-                        onClick={() => markNotificationRead(n.id)}
+                        onClick={() => {
+                          markNotificationRead(n.id);
+                        }}
                         className={`p-2.5 rounded-xl border text-xs transition-colors cursor-pointer relative group ${
                           n.read
                             ? 'bg-slate-50/50 dark:bg-slate-950/50 border-slate-100 dark:border-slate-800 text-slate-500'
@@ -395,6 +397,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </div>
                     ))
                   )}
+                </div>
+                <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 text-center">
+                  <button
+                    onClick={() => {
+                      setActiveTab('notifications');
+                      closeAllMenus();
+                    }}
+                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 hover:underline cursor-pointer"
+                  >
+                    Open Full Notifications Center →
+                  </button>
                 </div>
               </div>
             )}

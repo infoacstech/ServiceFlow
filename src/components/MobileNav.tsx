@@ -39,14 +39,13 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
         { id: 'jobs', label: 'My Jobs', icon: Briefcase },
         { id: 'customers', label: 'Customers', icon: Users },
         { id: 'notifications', label: 'Notifications', icon: Bell },
-        { id: 'settings', label: 'Settings', icon: Settings },
         { id: 'more', label: 'More', icon: Grid },
       ]
     : [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'jobs', label: 'Jobs', icon: Briefcase },
         { id: 'customers', label: 'Customers', icon: Users },
-        { id: 'settings', label: 'Settings', icon: Settings },
+        { id: 'invoices', label: 'Invoices', icon: Receipt },
         { id: 'more', label: 'Modules', icon: Grid },
       ];
 
@@ -65,7 +64,6 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
     { id: 'analytics', label: 'Reports & Analytics', icon: BarChart3, visible: permissions.canViewFinancials },
     { id: 'notifications', label: 'Notifications', icon: Bell, visible: true },
     { id: 'ai_assistant', label: 'AI Assistant', icon: Sparkles, visible: permissions.canManageJobs || permissions.canViewFinancials },
-    { id: 'settings', label: 'Settings', icon: Settings, visible: true },
   ];
 
   if (isSuperAdmin || permissions.canAccessSuperAdmin) {
