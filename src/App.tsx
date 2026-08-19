@@ -12,7 +12,6 @@ import { SupportSessionBanner } from './components/SupportSessionBanner';
 import { AuthModal } from './components/AuthModal';
 import { AccessDeniedView } from './components/AccessDeniedView';
 import { PullToRefresh } from './components/PullToRefresh';
-import { PwaInstallPrompt } from './components/PwaInstallPrompt';
 import { JobNotificationPopup } from './components/JobNotificationPopup';
 import { QuickActionFab } from './components/QuickActionFab';
 
@@ -196,12 +195,12 @@ const MainContent: React.FC = () => {
       />
 
       {/* Main Workspace Layout */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto overflow-hidden">
+      <div className="flex-1 flex max-w-7xl w-full mx-auto">
         {/* Desktop Sidebar */}
         <Sidebar activeTab={activeTab} setActiveTab={handleTabChange} />
 
-        {/* View Content Area with Targeted Pull-To-Refresh */}
-        <main className="flex-1 overflow-hidden min-h-0 flex flex-col">
+        {/* View Content Area with Natural Scroll & Pull-To-Refresh */}
+        <main className="flex-1 min-w-0 flex flex-col">
           <PullToRefresh className="p-4 sm:p-6 lg:p-8 pb-28 sm:pb-8">
             <div key={activeTab} className="animate-in fade-in duration-200">
               {!currentTabAccess.allowed ? (
@@ -293,7 +292,6 @@ const MainContent: React.FC = () => {
         onOpenNewJob={handleOpenNewJob}
         onNavigate={handleTabChange}
       />
-      <PwaInstallPrompt />
       <ToastContainer />
     </div>
   );

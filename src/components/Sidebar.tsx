@@ -102,8 +102,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
         })}
       </nav>
 
-      {/* Plan Status Banner & Sign Out */}
-      <div className="mt-auto pt-3 border-t border-slate-800/80 space-y-2">
+      {/* Plan Status Banner */}
+      <div className="mt-auto pt-3 border-t border-slate-800/80">
         <div
           onClick={() => setIsPricingModalOpen(true)}
           className="p-3 rounded-2xl bg-gradient-to-br from-slate-800/80 to-indigo-950/40 border border-slate-700/60 text-xs hover:border-indigo-500/50 transition-all cursor-pointer group"
@@ -122,20 +122,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
             <span className="text-indigo-400 font-bold group-hover:underline">Upgrade →</span>
           </div>
         </div>
-
-        {/* Sidebar Log Out Button */}
-        <button
-          onClick={async () => {
-            await logoutUser();
-            setActiveTab('login');
-            showToast('Logged out successfully.', 'info');
-          }}
-          className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl bg-slate-800/80 hover:bg-rose-600/90 text-slate-300 hover:text-white text-xs font-bold transition-all border border-slate-700/80 hover:border-rose-500 cursor-pointer group"
-          title="Sign Out from account"
-        >
-          <LogOut className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
-          <span>Log Out (लॉग आउट)</span>
-        </button>
       </div>
 
       <PricingModal

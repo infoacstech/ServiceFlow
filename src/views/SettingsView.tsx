@@ -54,7 +54,10 @@ import {
   Wrench,
   Sliders,
   LogOut,
+  Smartphone,
+  Download,
 } from 'lucide-react';
+import { InstallAppModal } from '../components/InstallAppModal';
 import { Plan } from '../types';
 import {
   isVoiceNotificationEnabled,
@@ -118,6 +121,7 @@ export const SettingsView: React.FC = () => {
   const [voiceEnabled, setVoiceEnabled] = useState(isVoiceNotificationEnabled());
   const [voiceVolume, setVoiceVol] = useState(getVoiceVolume());
   const [voiceLang, setVoiceLang] = useState(getSelectedVoiceLanguage());
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
   const handleUserProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -410,7 +414,7 @@ export const SettingsView: React.FC = () => {
           </p>
         </div>
 
-        {/* Current Plan or Role Pill & Log Out Button */}
+        {/* Current Plan or Role Pill */}
         <div className="flex items-center gap-2 flex-wrap">
           {isOwnerOrAdmin ? (
             <div className="px-3.5 py-1.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center gap-2">
@@ -430,19 +434,6 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
           )}
-
-          {/* Dedicated Clear Log Out Button */}
-          <button
-            onClick={async () => {
-              await logoutUser();
-              showToast('Logged out successfully.', 'info');
-            }}
-            className="px-3.5 py-2 rounded-2xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-rose-600/25 cursor-pointer shrink-0"
-            title="Log Out from Account"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Log Out (लॉग आउट)</span>
-          </button>
         </div>
       </div>
 
@@ -2179,6 +2170,32 @@ export const SettingsView: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Standalone App Installation Section */}
+          <div className="pt-6 border-t border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20 shrink-0">
+                <Smartphone className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                  Install App on Mobile & Desktop (ऐप इंस्टॉल करें)
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Download fullscreen standalone application for Android, iPhone / iPad (iOS Safari), and Windows/Mac Chrome.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsInstallModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-600/20 shrink-0 cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              <span>Install Instructions</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -2300,6 +2317,11 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Standalone Installation Modal */}
+      <InstallAppModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+      />
     </div>
   );
 };

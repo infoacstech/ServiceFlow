@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   LayoutDashboard,
@@ -19,17 +19,7 @@ import {
   Sparkles,
   Settings,
   ShieldCheck,
-  KeyRound,
-  Download,
-  Smartphone,
-  LogOut,
 } from 'lucide-react';
-import { InstallAppModal } from './InstallAppModal';
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
 
 interface MobileNavProps {
   activeTab: string;
@@ -37,23 +27,9 @@ interface MobileNavProps {
 }
 
 export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab }) => {
-  const { currentUser, getRolePermissions, logoutUser, showToast } = useApp();
+  const { currentUser, getRolePermissions } = useApp();
   const permissions = getRolePermissions(currentUser?.role);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
-  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-
-  useEffect(() => {
-    const handleBeforeInstall = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
-    };
-  }, []);
 
   const isTech = currentUser?.role === 'technician';
   const isSuperAdmin = currentUser?.role === 'super_admin';
@@ -63,7 +39,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
         { id: 'jobs', label: 'My Jobs', icon: Briefcase },
         { id: 'customers', label: 'Customers', icon: Users },
         { id: 'notifications', label: 'Notifications', icon: Bell },
-        { id: 'settings', label: 'Profile/Settings', icon: Settings },
+        { id: 'settings', label: 'Settings', icon: Settings },
         { id: 'more', label: 'More', icon: Grid },
       ]
     : [
@@ -81,15 +57,15 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
     { id: 'services', label: 'Service Catalog', icon: Wrench, visible: permissions.canManageServices },
     { id: 'staff', label: 'Staff & Techs', icon: UserCheck, visible: permissions.canManageStaff },
     { id: 'inventory', label: 'Inventory & Parts', icon: Package, visible: permissions.canManageInventory },
-    { id: 'quotations', label: 'Quotations', icon: FileText, visible: permissions.canViewFinancials },
+    { id: 'quotes', label: 'Quotations', icon: FileText, visible: permissions.canViewFinancials },
     { id: 'invoices', label: 'Invoices', icon: Receipt, visible: permissions.canViewFinancials },
     { id: 'payments', label: 'Payment Ledger', icon: CreditCard, visible: permissions.canViewFinancials },
     { id: 'contracts', label: 'Recurring Contracts', icon: Repeat, visible: permissions.canManageContracts },
     { id: 'expenses', label: 'Expenses', icon: DollarSign, visible: permissions.canViewFinancials },
-    { id: 'reports', label: 'Reports & Analytics', icon: BarChart3, visible: permissions.canViewFinancials },
+    { id: 'analytics', label: 'Reports & Analytics', icon: BarChart3, visible: permissions.canViewFinancials },
     { id: 'notifications', label: 'Notifications', icon: Bell, visible: true },
-    { id: 'ai_assistant', label: 'AI Business Assistant', icon: Sparkles, visible: permissions.canManageJobs || permissions.canViewFinancials },
-    { id: 'settings', label: isTech ? 'Profile & Settings' : 'Profile Settings', icon: Settings, visible: true },
+    { id: 'ai_assistant', label: 'AI Assistant', icon: Sparkles, visible: permissions.canManageJobs || permissions.canViewFinancials },
+    { id: 'settings', label: 'Settings', icon: Settings, visible: true },
   ];
 
   if (isSuperAdmin || permissions.canAccessSuperAdmin) {
@@ -103,13 +79,6 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
       setActiveTab(id);
       setIsMoreMenuOpen(false);
     }
-  };
-
-  const handleLogout = async () => {
-    setIsMoreMenuOpen(false);
-    await logoutUser();
-    setActiveTab('login');
-    showToast('Logged out successfully.', 'info');
   };
 
   return (
@@ -146,7 +115,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
           <div className="relative z-10 bg-white dark:bg-slate-900 rounded-t-3xl p-5 max-h-[85vh] overflow-y-auto border-t border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-base">All Business Modules</h3>
+                <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-base">All Modules</h3>
                 <p className="text-xs text-slate-500">Tap any module to open</p>
               </div>
               <button
@@ -179,47 +148,9 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
                   );
                 })}
             </div>
-
-            {/* Install Standalone App Prompt inside drawer */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
-              <button
-                onClick={() => {
-                  setIsMoreMenuOpen(false);
-                  setIsInstallModalOpen(true);
-                }}
-                className="w-full flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 active:scale-98 transition-all cursor-pointer"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-xl bg-white/20 flex items-center justify-center">
-                    <Smartphone className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="text-left">
-                    <div>Install ServiFlow App</div>
-                    <div className="text-[10px] text-indigo-200 font-normal">Dedicated fullscreen mobile app</div>
-                  </div>
-                </div>
-                <Download className="w-4 h-4" />
-              </button>
-
-              {/* Direct Clear Log Out Button */}
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-bold text-xs shadow-lg shadow-rose-600/25 transition-all cursor-pointer"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Log Out from Account (लॉग आउट)</span>
-              </button>
-            </div>
           </div>
         </div>
       )}
-
-      {/* Standalone Installation Modal */}
-      <InstallAppModal
-        isOpen={isInstallModalOpen}
-        onClose={() => setIsInstallModalOpen(false)}
-        deferredPrompt={deferredPrompt}
-      />
     </>
   );
 };

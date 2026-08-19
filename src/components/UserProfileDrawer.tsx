@@ -702,11 +702,14 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                   onOpenInstallModal();
                   onClose();
                 }}
-                className="w-full flex items-center justify-between p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border border-emerald-200/80 dark:border-emerald-800/60 hover:border-emerald-400 text-emerald-800 dark:text-emerald-300 text-xs font-bold transition-all shadow-xs cursor-pointer group"
               >
                 <div className="flex items-center gap-2.5">
-                  <Download className="w-4 h-4" />
-                  <span>Install Standalone Desktop & Mobile App</span>
+                  <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+                  <div className="text-left">
+                    <div>Install App on Mobile / Desktop</div>
+                    <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-normal">ऐप इंस्टॉल करें (Android, iOS & PC)</div>
+                  </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-emerald-500" />
               </button>
@@ -714,7 +717,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
 
           </div>
 
-          {/* Footer: Sign Out Action */}
+          {/* Footer: Single Unified Sign Out Action */}
           <div className="p-4 border-t border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/70">
             <button
               onClick={async () => {

@@ -29,14 +29,14 @@ interface BeforeInstallPromptEvent extends Event {
 interface InstallAppModalProps {
   isOpen: boolean;
   onClose: () => void;
-  deferredPrompt: BeforeInstallPromptEvent | null;
+  deferredPrompt?: BeforeInstallPromptEvent | null;
   onInstalled?: () => void;
 }
 
 export const InstallAppModal: React.FC<InstallAppModalProps> = ({
   isOpen,
   onClose,
-  deferredPrompt,
+  deferredPrompt = null,
   onInstalled,
 }) => {
   const { showToast, currentBusiness } = useApp();

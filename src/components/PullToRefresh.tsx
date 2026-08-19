@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { RefreshCw, CheckCircle2, ArrowDown } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -15,29 +15,28 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
   className = '',
   disabled = false,
 }) => {
-  const { syncOfflineQueue, showToast, isOffline } = useApp();
-  const containerRef = useRef<HTMLDivElement>(null);
-  
+  const { syncOfflineQueue, isOffline, showToast } = useApp();
   const [pullDistance, setPullDistance] = useState(0);
-  const [isPulling, setIsPulling] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isPulling, setIsPulling] = useState(false);
 
+  const containerRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef<number | null>(null);
   const startXRef = useRef<number | null>(null);
   const isDraggingRef = useRef(false);
   const hasFiredThresholdHapticRef = useRef(false);
 
   const PULL_THRESHOLD = 65;
-  const MAX_PULL = 95;
+  const MAX_PULL = 110;
 
-  // Safe multi-profile haptic feedback helper
+  // Safe Haptic Feedback helper
   const triggerHaptic = useCallback((pattern: number | number[]) => {
     if (typeof window !== 'undefined' && 'vibrate' in navigator) {
       try {
         navigator.vibrate(pattern);
       } catch {
-        // Ignore devices where vibration is restricted or ungranted
+        // Ignore devices where vibrate isn't allowed or supported
       }
     }
   }, []);
@@ -46,12 +45,9 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
     (e: TouchEvent) => {
       if (disabled || isRefreshing) return;
 
-      const container = containerRef.current;
-      if (!container) return;
-
-      // Only engage if container is scrolled to the absolute top
-      const isScrolledToTop = container.scrollTop <= 2 && window.scrollY <= 2;
-      if (isScrolledToTop && e.touches.length === 1) {
+      // Check if page or container is at the top before enabling pull gesture
+      const scrollTop = window.scrollY || document.documentElement.scrollTop || containerRef.current?.scrollTop || 0;
+      if (scrollTop <= 5) {
         startYRef.current = e.touches[0].clientY;
         startXRef.current = e.touches[0].clientX;
         isDraggingRef.current = true;
@@ -69,8 +65,8 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
         return;
       }
 
-      const container = containerRef.current;
-      if (!container || container.scrollTop > 2) {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop || containerRef.current?.scrollTop || 0;
+      if (scrollTop > 5) {
         setPullDistance(0);
         setIsPulling(false);
         return;
@@ -81,35 +77,24 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
       const diffY = currentY - startYRef.current;
       const diffX = Math.abs(currentX - startXRef.current);
 
-      // If user is swiping horizontally rather than pulling down, abort pull-to-refresh
-      if (diffX > Math.abs(diffY) && diffX > 15 && diffY < 20) {
-        isDraggingRef.current = false;
+      // If horizontal swipe or scrolling up, do not intercept
+      if (diffX > Math.abs(diffY) || diffY <= 0) {
         setPullDistance(0);
         setIsPulling(false);
         return;
       }
 
-      if (diffY > 0) {
-        // Elastic logarithmic spring damping
-        const dampened = Math.min(Math.pow(diffY, 0.82) * 1.6, MAX_PULL);
-        setPullDistance(dampened);
-        setIsPulling(true);
+      // Elastic pull calculation
+      const dampened = Math.min(Math.pow(diffY, 0.8) * 1.5, MAX_PULL);
+      setPullDistance(dampened);
+      setIsPulling(true);
 
-        // Haptic feedback tick when crossing threshold for the first time
-        if (dampened >= PULL_THRESHOLD && !hasFiredThresholdHapticRef.current) {
-          hasFiredThresholdHapticRef.current = true;
-          triggerHaptic(12); // Subtle crisp haptic tick
-        } else if (dampened < PULL_THRESHOLD && hasFiredThresholdHapticRef.current) {
-          hasFiredThresholdHapticRef.current = false;
-        }
-
-        // Prevent default native rubber-band bounce if user is pulling actively
-        if (e.cancelable && dampened > 10) {
-          e.preventDefault();
-        }
-      } else {
-        setPullDistance(0);
-        setIsPulling(false);
+      // Haptic tick on threshold cross
+      if (dampened >= PULL_THRESHOLD && !hasFiredThresholdHapticRef.current) {
+        hasFiredThresholdHapticRef.current = true;
+        triggerHaptic(12);
+      } else if (dampened < PULL_THRESHOLD && hasFiredThresholdHapticRef.current) {
+        hasFiredThresholdHapticRef.current = false;
       }
     },
     [isRefreshing, triggerHaptic, PULL_THRESHOLD, MAX_PULL]
@@ -127,25 +112,24 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
 
     if (pullDistance >= PULL_THRESHOLD) {
       setIsRefreshing(true);
-      setPullDistance(52); // Sits cleanly at header height while refreshing
-      triggerHaptic([15, 30, 15]); // Double pulse haptic on activation
+      setPullDistance(48);
+      triggerHaptic([15, 30, 15]);
 
       try {
         if (onRefresh) {
           await onRefresh();
         } else {
-          // Default: Sync offline queue and refresh cached tenant data
           syncOfflineQueue();
         }
 
         setIsRefreshing(false);
         setIsSuccess(true);
-        triggerHaptic([10, 40, 20]); // Confirmation success haptic
+        triggerHaptic([10, 40, 20]);
 
         showToast(
           isOffline
-            ? 'Local changes preserved offline.'
-            : 'Application data refreshed and cloud-synced!',
+            ? 'Local changes saved offline.'
+            : 'Data refreshed & cloud-synced!',
           'success'
         );
 
@@ -154,13 +138,12 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
           setPullDistance(0);
           setIsPulling(false);
           hasFiredThresholdHapticRef.current = false;
-        }, 600);
+        }, 500);
       } catch (err) {
         console.error('Pull to refresh failed:', err);
         setIsRefreshing(false);
         setPullDistance(0);
         setIsPulling(false);
-        showToast('Refresh finished.', 'info');
       }
     } else {
       setPullDistance(0);
@@ -174,9 +157,9 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
     if (!container) return;
 
     container.addEventListener('touchstart', handleTouchStart, { passive: true });
-    container.addEventListener('touchmove', handleTouchMove, { passive: false });
-    container.addEventListener('touchend', handleTouchEnd);
-    container.addEventListener('touchcancel', handleTouchEnd);
+    container.addEventListener('touchmove', handleTouchMove, { passive: true });
+    container.addEventListener('touchend', handleTouchEnd, { passive: true });
+    container.addEventListener('touchcancel', handleTouchEnd, { passive: true });
 
     return () => {
       container.removeEventListener('touchstart', handleTouchStart);
@@ -190,16 +173,13 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
   const progressRatio = Math.min(pullDistance / PULL_THRESHOLD, 1);
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative w-full h-full overflow-y-auto overscroll-y-contain ${className}`}
-    >
+    <div ref={containerRef} className={`relative w-full min-h-full ${className}`}>
       {/* Pull-To-Refresh Visual Indicator Banner */}
       {(pullDistance > 0 || isRefreshing) && (
         <div
-          className="sticky top-2 left-0 right-0 z-30 flex items-center justify-center pointer-events-none transition-transform duration-100 ease-out"
+          className="sticky top-2 left-0 right-0 z-30 flex items-center justify-center pointer-events-none transition-transform duration-100 ease-out mb-2"
           style={{
-            transform: `translateY(${Math.min(pullDistance * 0.4, 28)}px)`,
+            transform: `translateY(${Math.min(pullDistance * 0.35, 24)}px)`,
           }}
         >
           <div
@@ -223,14 +203,12 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
             ) : isRefreshing ? (
               <>
                 <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
-                <span className="text-[11px] tracking-tight">Syncing field data...</span>
+                <span className="text-[11px] tracking-tight">Syncing data...</span>
               </>
             ) : (
               <>
                 {pullDistance >= PULL_THRESHOLD ? (
-                  <ArrowDown
-                    className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 animate-bounce"
-                  />
+                  <ArrowDown className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 animate-bounce" />
                 ) : (
                   <RefreshCw
                     className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 transition-transform duration-75"
@@ -246,11 +224,11 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
         </div>
       )}
 
-      {/* Main Content Body with smooth pushdown elasticity */}
+      {/* Main Content Body */}
       <div
-        className="w-full h-full transition-transform duration-100 ease-out"
+        className="w-full transition-transform duration-100 ease-out"
         style={{
-          transform: isPulling ? `translateY(${Math.min(pullDistance * 0.25, 20)}px)` : undefined,
+          transform: isPulling ? `translateY(${Math.min(pullDistance * 0.2, 16)}px)` : undefined,
         }}
       >
         {children}

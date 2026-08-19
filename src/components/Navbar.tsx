@@ -400,26 +400,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          {/* Quick Direct Settings Gear Icon Button */}
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer ${
-              activeTab === 'settings'
-                ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-            }`}
-            title="System & Business Settings (सेटिंग्स)"
-            aria-label="Settings"
-          >
-            <SettingsIcon className="w-4 h-4" />
-          </button>
-
           {/* Direct User Profile & Settings Drawer Trigger Button */}
           <button
             onClick={() => setIsProfileDrawerOpen(true)}
             className="flex items-center gap-1.5 sm:gap-2 p-1 sm:px-2 sm:py-1 rounded-xl bg-slate-100/90 hover:bg-slate-200/90 dark:bg-slate-800/90 dark:hover:bg-slate-700/90 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 transition-all shrink-0 cursor-pointer active:scale-95 shadow-xs"
-            title="Click to Open Profile Settings, Password, Theme, Voice & Logout"
-            aria-label="User Profile & Settings"
+            title="Click to Open Profile & Settings (लॉग आउट और सेटिंग्स)"
+            aria-label="User Profile and Settings"
           >
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-600 text-white overflow-hidden ring-2 ring-indigo-500/30 flex items-center justify-center font-black text-xs shadow-xs shrink-0">
               {currentUser?.avatar ? (
@@ -433,7 +419,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {currentUser?.name || 'User Profile'}
               </span>
               <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
-                Profile & Settings ⚙
+                Profile & Settings
               </span>
             </div>
           </button>
