@@ -29,6 +29,8 @@ import {
   ActivityLog,
   Role,
   ManualSyncLog,
+  ReferralRecord,
+  ReferralPayoutRequest,
 } from '../types';
 
 /**
@@ -277,7 +279,7 @@ export class FirestoreService {
         const batch = writeBatch(db);
         usersSnap.docs.forEach((d) => {
           const uData = d.data() as User;
-          if (uData.role !== 'super_admin' && uData.email !== 'admin@serviflow.io') {
+          if (uData.role !== 'super_admin' && uData.email !== 'admin@serviflow.io' && d.id !== 'usr-admin') {
             batch.delete(d.ref);
           }
         });
@@ -287,12 +289,42 @@ export class FirestoreService {
       console.error(`Error deleting users for business ${businessId}:`, err);
     }
 
-    // 3. Delete the business document itself
+    // 3. Delete referral records and payout requests associated with this business
+    try {
+      const refQuery1 = query(collection(db, 'referrals'), where('referrerBusinessId', '==', businessId));
+      const refSnap1 = await getDocs(refQuery1);
+      if (!refSnap1.empty) {
+        const batch = writeBatch(db);
+        refSnap1.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+      const refQuery2 = query(collection(db, 'referrals'), where('referredBusinessId', '==', businessId));
+      const refSnap2 = await getDocs(refQuery2);
+      if (!refSnap2.empty) {
+        const batch = writeBatch(db);
+        refSnap2.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+      const pQuery = query(collection(db, 'referralPayouts'), where('businessId', '==', businessId));
+      const pSnap = await getDocs(pQuery);
+      if (!pSnap.empty) {
+        const batch = writeBatch(db);
+        pSnap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+    } catch (err) {
+      console.warn(`Error cleaning up referral records for ${businessId}:`, err);
+    }
+
+    // 4. Delete the business document itself (from 'businesses' and 'tenants')
     try {
       await deleteDoc(doc(db, 'businesses', businessId));
     } catch (err) {
       console.error(`Error deleting business doc ${businessId}:`, err);
     }
+    try {
+      await deleteDoc(doc(db, 'tenants', businessId));
+    } catch (err) {}
   }
 
   /**
@@ -551,6 +583,21 @@ export class FirestoreService {
 
   static async saveSystemSettings(settings: any): Promise<void> {
     await this.saveDocument('systemSettings', settings.id || 'global', settings);
+  }
+
+  // =========================================================================
+  // REFERRAL SYSTEM & BONUS SETTLEMENT
+  // =========================================================================
+  static async saveReferral(referral: ReferralRecord): Promise<void> {
+    await this.saveDocument<ReferralRecord>('referrals', referral.id, referral);
+  }
+
+  static async deleteReferral(referralId: string): Promise<void> {
+    await this.deleteDocument('referrals', referralId);
+  }
+
+  static async saveReferralPayout(payout: ReferralPayoutRequest): Promise<void> {
+    await this.saveDocument<ReferralPayoutRequest>('referralPayouts', payout.id, payout);
   }
 }
 

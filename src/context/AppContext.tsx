@@ -149,6 +149,27 @@ interface AppContextType {
     newStatus: 'approved' | 'rejected' | 'completed',
     notes?: string
   ) => void;
+  createManualReferralLink: (params: {
+    referrerBusinessId: string;
+    referredBusinessId: string;
+    bonusAmount?: number;
+    discountAmount?: number;
+    notes?: string;
+  }) => Promise<ReferralRecord>;
+  deleteReferralRecord: (referralId: string) => Promise<void>;
+  settleReferralBonusDirectly: (params: {
+    businessId: string;
+    amount: number;
+    payoutMethod: 'upi' | 'bank_transfer' | 'subscription_credit';
+    upiId?: string;
+    bankAccount?: {
+      accountNumber: string;
+      ifsc: string;
+      holderName: string;
+    };
+    transactionReference?: string;
+    notes?: string;
+  }) => Promise<ReferralPayoutRequest>;
 
   // Data collections (filtered by current business when applicable)
   customers: Customer[];
@@ -572,14 +593,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'businesses'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Business);
-        setBusinesses((prev) => {
-          const map = new Map<string, Business>();
-          prev.forEach((b) => map.set(b.id, b));
-          cloudItems.forEach((b) => map.set(b.id, b));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_businesses_cache', merged);
-          return merged;
-        });
+        setBusinesses(cloudItems);
+        saveCache('serviflow_businesses_cache', cloudItems);
         if (cloudItems.length > 0) {
           setCurrentBusiness((prev) => {
             const found = cloudItems.find((b) => b.id === prev.id);
@@ -587,6 +602,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             saveCache('serviflow_current_biz_cache', active);
             return active;
           });
+        } else {
+          setCurrentBusiness(DEFAULT_BLANK_BUSINESS);
+          saveCache('serviflow_current_biz_cache', DEFAULT_BLANK_BUSINESS);
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'businesses')
@@ -597,15 +615,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'users'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as User);
-        setUsers((prev) => {
-          const map = new Map<string, User>();
-          map.set(SUPER_ADMIN_USER.id, SUPER_ADMIN_USER);
-          prev.forEach((u) => map.set(u.id, u));
-          cloudItems.forEach((u) => map.set(u.id, u));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_users_cache', merged);
-          return merged;
-        });
+        const map = new Map<string, User>();
+        map.set(SUPER_ADMIN_USER.id, SUPER_ADMIN_USER);
+        cloudItems.forEach((u) => map.set(u.id, u));
+        const allUsers = Array.from(map.values());
+        setUsers(allUsers);
+        saveCache('serviflow_users_cache', allUsers);
 
         // Ensure Super Admin user exists in database
         const hasSuperAdmin = cloudItems.some(
@@ -617,7 +632,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         setCurrentUser((prev) => {
           if (!prev) return null;
-          const found = cloudItems.find(
+          const found = allUsers.find(
             (u) =>
               u.id === prev.id ||
               (Boolean(u.email) &&
@@ -635,14 +650,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'customers'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Customer);
-        setCustomers((prev) => {
-          const map = new Map<string, Customer>();
-          prev.forEach((c) => map.set(c.id, c));
-          cloudItems.forEach((c) => map.set(c.id, c));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_customers_cache', merged);
-          return merged;
-        });
+        setCustomers(cloudItems);
+        saveCache('serviflow_customers_cache', cloudItems);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'customers')
     );
@@ -652,14 +661,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'categories'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as ServiceCategory);
-        setCategories((prev) => {
-          const map = new Map<string, ServiceCategory>();
-          prev.forEach((c) => map.set(c.id, c));
-          cloudItems.forEach((c) => map.set(c.id, c));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_categories_cache', merged);
-          return merged;
-        });
+        setCategories(cloudItems);
+        saveCache('serviflow_categories_cache', cloudItems);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'categories')
     );
@@ -669,14 +672,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'services'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Service);
-        setServices((prev) => {
-          const map = new Map<string, Service>();
-          prev.forEach((s) => map.set(s.id, s));
-          cloudItems.forEach((s) => map.set(s.id, s));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_services_cache', merged);
-          return merged;
-        });
+        setServices(cloudItems);
+        saveCache('serviflow_services_cache', cloudItems);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'services')
     );
@@ -704,14 +701,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           isInitialJobsLoadRef.current = false;
         }
 
-        setJobs((prev) => {
-          const map = new Map<string, Job>();
-          prev.forEach((j) => map.set(j.id, j));
-          loadedJobs.forEach((j) => map.set(j.id, j));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_jobs_cache', merged);
-          return merged;
-        });
+        setJobs(loadedJobs);
+        saveCache('serviflow_jobs_cache', loadedJobs);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'jobs')
     );
@@ -721,14 +712,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'inventory'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as InventoryItem);
-        setInventory((prev) => {
-          const map = new Map<string, InventoryItem>();
-          prev.forEach((i) => map.set(i.id, i));
-          cloudItems.forEach((i) => map.set(i.id, i));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_inventory_cache', merged);
-          return merged;
-        });
+        setInventory(cloudItems);
+        saveCache('serviflow_inventory_cache', cloudItems);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'inventory')
     );
@@ -738,14 +723,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'inventoryTransactions'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as InventoryTransaction);
-        setInventoryTransactions((prev) => {
-          const map = new Map<string, InventoryTransaction>();
-          prev.forEach((t) => map.set(t.id, t));
-          cloudItems.forEach((t) => map.set(t.id, t));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_inv_tx_cache', merged);
-          return merged;
-        });
+        setInventoryTransactions(cloudItems);
+        saveCache('serviflow_inv_tx_cache', cloudItems);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'inventoryTransactions')
     );
@@ -755,14 +734,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'quotations'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Quotation);
-        setQuotations((prev) => {
-          const map = new Map<string, Quotation>();
-          prev.forEach((q) => map.set(q.id, q));
-          cloudItems.forEach((q) => map.set(q.id, q));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_quotations_cache', merged);
-          return merged;
-        });
+        setQuotations(cloudItems);
+        saveCache('serviflow_quotations_cache', cloudItems);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'quotations')
     );
@@ -772,14 +745,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'invoices'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Invoice);
-        setInvoices((prev) => {
-          const map = new Map<string, Invoice>();
-          prev.forEach((inv) => map.set(inv.id, inv));
-          cloudItems.forEach((inv) => map.set(inv.id, inv));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_invoices_cache', merged);
-          return merged;
-        });
+        setInvoices(cloudItems);
+        saveCache('serviflow_invoices_cache', cloudItems);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'invoices')
     );
@@ -789,14 +756,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'payments'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Payment);
-        setPayments((prev) => {
-          const map = new Map<string, Payment>();
-          prev.forEach((p) => map.set(p.id, p));
-          cloudItems.forEach((p) => map.set(p.id, p));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_payments_cache', merged);
-          return merged;
-        });
+        setPayments(cloudItems);
+        saveCache('serviflow_payments_cache', cloudItems);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'payments')
     );
@@ -806,14 +767,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'contracts'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as RecurringContract);
-        setContracts((prev) => {
-          const map = new Map<string, RecurringContract>();
-          prev.forEach((c) => map.set(c.id, c));
-          cloudItems.forEach((c) => map.set(c.id, c));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_contracts_cache', merged);
-          return merged;
-        });
+        setContracts(cloudItems);
+        saveCache('serviflow_contracts_cache', cloudItems);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'contracts')
     );
@@ -823,14 +778,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'expenses'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Expense);
-        setExpenses((prev) => {
-          const map = new Map<string, Expense>();
-          prev.forEach((e) => map.set(e.id, e));
-          cloudItems.forEach((e) => map.set(e.id, e));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_expenses_cache', merged);
-          return merged;
-        });
+        setExpenses(cloudItems);
+        saveCache('serviflow_expenses_cache', cloudItems);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'expenses')
     );
@@ -935,14 +884,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           cloudItems.forEach((n) => seenNotifIdsRef.current.add(n.id));
         }
 
-        setNotifications((prev) => {
-          const map = new Map<string, Notification>();
-          prev.forEach((n) => map.set(n.id, n));
-          cloudItems.forEach((n) => map.set(n.id, n));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_notifications_cache', merged);
-          return merged;
-        });
+        setNotifications(cloudItems);
+        saveCache('serviflow_notifications_cache', cloudItems);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'notifications')
     );
@@ -952,14 +895,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'activities'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as ActivityLog);
-        setActivityLogs((prev) => {
-          const map = new Map<string, ActivityLog>();
-          prev.forEach((a) => map.set(a.id, a));
-          cloudItems.forEach((a) => map.set(a.id, a));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_activity_logs_cache', merged);
-          return merged;
-        });
+        setActivityLogs(cloudItems);
+        saveCache('serviflow_activity_logs_cache', cloudItems);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'activities')
     );
@@ -969,14 +906,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'manualSyncLogs'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as ManualSyncLog);
-        setManualSyncLogs((prev) => {
-          const map = new Map<string, ManualSyncLog>();
-          prev.forEach((m) => map.set(m.id, m));
-          cloudItems.forEach((m) => map.set(m.id, m));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_manual_sync_logs_cache', merged);
-          return merged;
-        });
+        setManualSyncLogs(cloudItems);
+        saveCache('serviflow_manual_sync_logs_cache', cloudItems);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'manualSyncLogs')
     );
@@ -1042,14 +973,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'referrals'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as ReferralRecord);
-        setReferralRecords((prev) => {
-          const map = new Map<string, ReferralRecord>();
-          prev.forEach((r) => map.set(r.id, r));
-          cloudItems.forEach((r) => map.set(r.id, r));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_referrals_cache', merged);
-          return merged;
-        });
+        setReferralRecords(cloudItems);
+        saveCache('serviflow_referrals_cache', cloudItems);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'referrals')
     );
@@ -1059,14 +984,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'referralPayouts'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as ReferralPayoutRequest);
-        setReferralPayoutRequests((prev) => {
-          const map = new Map<string, ReferralPayoutRequest>();
-          prev.forEach((p) => map.set(p.id, p));
-          cloudItems.forEach((p) => map.set(p.id, p));
-          const merged = Array.from(map.values());
-          saveCache('serviflow_ref_payouts_cache', merged);
-          return merged;
-        });
+        setReferralPayoutRequests(cloudItems);
+        saveCache('serviflow_ref_payouts_cache', cloudItems);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'referralPayouts')
     );
@@ -1598,15 +1517,79 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         businessId,
         bizName
       );
-      setBusinesses((prev) => prev.filter((b) => b.id !== businessId));
-      setUsers((prev) => prev.filter((u) => u.businessId !== businessId || u.role === 'super_admin'));
+
+      // Clean local memory and persistent caches immediately
+      const remainingBizs = businesses.filter((b) => b.id !== businessId);
+      const remainingUsers = users.filter((u) => u.businessId !== businessId || u.role === 'super_admin');
+      setBusinesses(remainingBizs);
+      setUsers(remainingUsers);
+      saveCache('serviflow_businesses_cache', remainingBizs);
+      saveCache('serviflow_users_cache', remainingUsers);
+
+      // Clean operational tenant states
+      setCustomers((prev) => {
+        const updated = prev.filter((c) => c.businessId !== businessId);
+        saveCache('serviflow_customers_cache', updated);
+        return updated;
+      });
+      setJobs((prev) => {
+        const updated = prev.filter((j) => j.businessId !== businessId);
+        saveCache('serviflow_jobs_cache', updated);
+        return updated;
+      });
+      setInvoices((prev) => {
+        const updated = prev.filter((i) => i.businessId !== businessId);
+        saveCache('serviflow_invoices_cache', updated);
+        return updated;
+      });
+      setQuotations((prev) => {
+        const updated = prev.filter((q) => q.businessId !== businessId);
+        saveCache('serviflow_quotations_cache', updated);
+        return updated;
+      });
+      setServices((prev) => {
+        const updated = prev.filter((s) => s.businessId !== businessId);
+        saveCache('serviflow_services_cache', updated);
+        return updated;
+      });
+      setCategories((prev) => {
+        const updated = prev.filter((c) => c.businessId !== businessId);
+        saveCache('serviflow_categories_cache', updated);
+        return updated;
+      });
+      setInventory((prev) => {
+        const updated = prev.filter((i) => i.businessId !== businessId);
+        saveCache('serviflow_inventory_cache', updated);
+        return updated;
+      });
+      setInventoryTransactions((prev) => {
+        const updated = prev.filter((t) => t.businessId !== businessId);
+        saveCache('serviflow_inv_tx_cache', updated);
+        return updated;
+      });
+      setPayments((prev) => {
+        const updated = prev.filter((p) => p.businessId !== businessId);
+        saveCache('serviflow_payments_cache', updated);
+        return updated;
+      });
+      setContracts((prev) => {
+        const updated = prev.filter((c) => c.businessId !== businessId);
+        saveCache('serviflow_contracts_cache', updated);
+        return updated;
+      });
+      setExpenses((prev) => {
+        const updated = prev.filter((e) => e.businessId !== businessId);
+        saveCache('serviflow_expenses_cache', updated);
+        return updated;
+      });
 
       if (currentBusiness.id === businessId) {
-        const remaining = businesses.filter((b) => b.id !== businessId);
-        if (remaining.length > 0) {
-          setCurrentBusiness(remaining[0]);
+        if (remainingBizs.length > 0) {
+          setCurrentBusiness(remainingBizs[0]);
+          saveCache('serviflow_current_biz_cache', remainingBizs[0]);
         } else {
           setCurrentBusiness(DEFAULT_BLANK_BUSINESS);
+          saveCache('serviflow_current_biz_cache', DEFAULT_BLANK_BUSINESS);
         }
       }
       showToast(`Business "${bizName}" and all associated data permanently deleted.`, 'success');
@@ -2972,6 +2955,148 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logActivity('Referral Payout Processed', 'financials', requestId, `Status updated to ${newStatus}`);
   };
 
+  const createManualReferralLink = async (params: {
+    referrerBusinessId: string;
+    referredBusinessId: string;
+    bonusAmount?: number;
+    discountAmount?: number;
+    notes?: string;
+  }): Promise<ReferralRecord> => {
+    const referrer = businesses.find((b) => b.id === params.referrerBusinessId);
+    const referred = businesses.find((b) => b.id === params.referredBusinessId);
+    const referredOwner = users.find((u) => u.businessId === params.referredBusinessId && u.role === 'business_owner');
+
+    if (!referrer || !referred) {
+      throw new Error('Both parent (referrer) and child (referred) businesses must be valid.');
+    }
+
+    const bonusVal = params.bonusAmount !== undefined ? params.bonusAmount : 130;
+    const discountVal = params.discountAmount !== undefined ? params.discountAmount : 130;
+
+    const refRecord: ReferralRecord = {
+      id: `ref-tx-${Date.now()}`,
+      referrerBusinessId: referrer.id,
+      referrerCode: referrer.referralCode || `SF-${referrer.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase()}10`,
+      referrerBusinessName: referrer.name,
+      referredBusinessId: referred.id,
+      referredBusinessName: referred.name,
+      referredOwnerName: referredOwner?.name || referred.name,
+      referredOwnerPhone: referredOwner?.phone || referred.mobile,
+      planId: referred.planId || 'plan-pro',
+      planName: 'Professional Plan (Parent-Child Link)',
+      planPrice: 1299,
+      discountPercent: 10,
+      discountAmount: discountVal,
+      bonusPercent: 10,
+      bonusEarned: bonusVal,
+      status: 'credited',
+      createdAt: new Date().toISOString(),
+      notes: params.notes || `Manual parent-child relationship established by Super Admin.`,
+    };
+
+    await saveToFirestore('referrals', refRecord.id, refRecord);
+    setReferralRecords((prev) => [refRecord, ...prev.filter((r) => r.id !== refRecord.id)]);
+
+    // Update referrer business balance & earnings in Firestore and local state
+    const newEarnings = (referrer.referralEarnings || 0) + bonusVal;
+    const newBalance = (referrer.referralBalance || 0) + bonusVal;
+    await saveToFirestore('businesses', referrer.id, {
+      referralEarnings: newEarnings,
+      referralBalance: newBalance,
+    });
+    setBusinesses((prev) =>
+      prev.map((b) =>
+        b.id === referrer.id ? { ...b, referralEarnings: newEarnings, referralBalance: newBalance } : b
+      )
+    );
+
+    // Also mark referred business as referredBy
+    await saveToFirestore('businesses', referred.id, {
+      referredBy: refRecord.referrerCode,
+      referralDiscountApplied: true,
+    });
+    setBusinesses((prev) =>
+      prev.map((b) =>
+        b.id === referred.id
+          ? { ...b, referredBy: refRecord.referrerCode, referralDiscountApplied: true }
+          : b
+      )
+    );
+
+    showToast(`Referral partnership created: ${referrer.name} -> ${referred.name} (+₹${bonusVal} credited)`, 'success');
+    logActivity('Manual Referral Created', 'financials', refRecord.id, `Linked parent ${referrer.name} to child ${referred.name}`);
+    return refRecord;
+  };
+
+  const deleteReferralRecord = async (referralId: string): Promise<void> => {
+    const target = referralRecords.find((r) => r.id === referralId);
+    if (!target) return;
+
+    try {
+      await FirestoreService.deleteReferral(referralId);
+      setReferralRecords((prev) => prev.filter((r) => r.id !== referralId));
+      showToast(`Referral record deleted from Firestore.`, 'success');
+      logActivity('Referral Deleted', 'financials', referralId, `Deleted referral record between ${target.referrerBusinessName} and ${target.referredBusinessName}`);
+    } catch (err) {
+      console.error('Error deleting referral record:', err);
+      showToast('Failed to delete referral record', 'error');
+    }
+  };
+
+  const settleReferralBonusDirectly = async (params: {
+    businessId: string;
+    amount: number;
+    payoutMethod: 'upi' | 'bank_transfer' | 'subscription_credit';
+    upiId?: string;
+    bankAccount?: {
+      accountNumber: string;
+      ifsc: string;
+      holderName: string;
+    };
+    transactionReference?: string;
+    notes?: string;
+  }): Promise<ReferralPayoutRequest> => {
+    const targetBiz = businesses.find((b) => b.id === params.businessId);
+    if (!targetBiz) throw new Error('Target business not found.');
+    const owner = users.find((u) => u.businessId === targetBiz.id && u.role === 'business_owner');
+
+    const payoutReq: ReferralPayoutRequest = {
+      id: `payout-${Date.now()}`,
+      businessId: targetBiz.id,
+      businessName: targetBiz.name,
+      ownerName: owner?.name || targetBiz.name,
+      ownerPhone: owner?.phone || targetBiz.mobile || '',
+      amount: params.amount,
+      payoutMethod: params.payoutMethod,
+      upiId: params.upiId,
+      bankAccount: params.bankAccount,
+      status: 'completed',
+      requestedAt: new Date().toISOString(),
+      processedAt: new Date().toISOString(),
+      notes: params.transactionReference
+        ? `Settled by Super Admin. Ref / UTR: ${params.transactionReference}${params.notes ? ` | Note: ${params.notes}` : ''}`
+        : params.notes || 'Settled directly by Super Admin',
+    };
+
+    // Deduct balance from business
+    const curBal = targetBiz.referralBalance || 0;
+    const newBal = Math.max(0, curBal - params.amount);
+    await saveToFirestore('businesses', targetBiz.id, { referralBalance: newBal });
+    setBusinesses((prev) =>
+      prev.map((b) => (b.id === targetBiz.id ? { ...b, referralBalance: newBal } : b))
+    );
+    if (currentBusiness?.id === targetBiz.id) {
+      setCurrentBusiness((prev) => (prev ? { ...prev, referralBalance: newBal } : null));
+    }
+
+    await saveToFirestore('referralPayouts', payoutReq.id, payoutReq);
+    setReferralPayoutRequests((prev) => [payoutReq, ...prev.filter((p) => p.id !== payoutReq.id)]);
+
+    showToast(`Successfully settled ₹${params.amount} bonus for ${targetBiz.name}!`, 'success');
+    logActivity('Referral Bonus Settled', 'financials', payoutReq.id, `Settled ₹${params.amount} for ${targetBiz.name} via ${params.payoutMethod.toUpperCase()}`);
+    return payoutReq;
+  };
+
   const updateBusinessSettings = (updates: Partial<Business>) => {
     const updated = { ...currentBusiness, ...updates };
     setCurrentBusiness(updated);
@@ -3184,6 +3309,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         validateReferralCode,
         requestReferralPayout,
         processReferralPayout,
+        createManualReferralLink,
+        deleteReferralRecord,
+        settleReferralBonusDirectly,
       }}
     >
       {children}

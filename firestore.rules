@@ -179,6 +179,15 @@ service cloud.firestore {
       allow update, delete: if false; // Immutable audit trail
     }
 
+    // Referral System Collections
+    match /referrals/{referralId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /referralPayouts/{payoutId} {
+      allow read, write: if isAuthenticated();
+    }
+
     match /roles/{roleId} {
       allow read: if true;
       allow write: if isSuperAdmin();
