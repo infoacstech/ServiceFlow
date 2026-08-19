@@ -53,6 +53,7 @@ import {
   Camera,
   Wrench,
   Sliders,
+  LogOut,
 } from 'lucide-react';
 import { Plan } from '../types';
 import {
@@ -90,6 +91,7 @@ export const SettingsView: React.FC = () => {
     referralRecords,
     referralPayoutRequests,
     requestReferralPayout,
+    logoutUser,
   } = useApp();
 
   const isOwnerOrAdmin = currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin';
@@ -408,8 +410,8 @@ export const SettingsView: React.FC = () => {
           </p>
         </div>
 
-        {/* Current Plan or Role Pill */}
-        <div className="flex items-center gap-2">
+        {/* Current Plan or Role Pill & Log Out Button */}
+        <div className="flex items-center gap-2 flex-wrap">
           {isOwnerOrAdmin ? (
             <div className="px-3.5 py-1.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center gap-2">
               <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
@@ -428,6 +430,19 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* Dedicated Clear Log Out Button */}
+          <button
+            onClick={async () => {
+              await logoutUser();
+              showToast('Logged out successfully.', 'info');
+            }}
+            className="px-3.5 py-2 rounded-2xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-rose-600/25 cursor-pointer shrink-0"
+            title="Log Out from Account"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Log Out (लॉग आउट)</span>
+          </button>
         </div>
       </div>
 

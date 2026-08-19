@@ -202,7 +202,7 @@ const MainContent: React.FC = () => {
           <Sidebar activeTab={activeTab} setActiveTab={handleTabChange} />
 
           {/* View Content Area */}
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-28 sm:pb-8 overflow-y-auto min-h-0">
             <div key={activeTab} className="animate-in fade-in duration-200">
               {!currentTabAccess.allowed ? (
                 <AccessDeniedView

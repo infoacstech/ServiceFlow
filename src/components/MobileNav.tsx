@@ -22,6 +22,7 @@ import {
   KeyRound,
   Download,
   Smartphone,
+  LogOut,
 } from 'lucide-react';
 import { InstallAppModal } from './InstallAppModal';
 
@@ -36,7 +37,7 @@ interface MobileNavProps {
 }
 
 export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab }) => {
-  const { currentUser, getRolePermissions } = useApp();
+  const { currentUser, getRolePermissions, logoutUser, showToast } = useApp();
   const permissions = getRolePermissions(currentUser?.role);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
@@ -62,12 +63,14 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
         { id: 'jobs', label: 'My Jobs', icon: Briefcase },
         { id: 'customers', label: 'Customers', icon: Users },
         { id: 'notifications', label: 'Notifications', icon: Bell },
+        { id: 'settings', label: 'Profile/Settings', icon: Settings },
         { id: 'more', label: 'More', icon: Grid },
       ]
     : [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'jobs', label: 'Jobs', icon: Briefcase },
         { id: 'customers', label: 'Customers', icon: Users },
+        { id: 'settings', label: 'Settings', icon: Settings },
         { id: 'more', label: 'Modules', icon: Grid },
       ];
 
@@ -102,10 +105,17 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
     }
   };
 
+  const handleLogout = async () => {
+    setIsMoreMenuOpen(false);
+    await logoutUser();
+    setActiveTab('login');
+    showToast('Logged out successfully.', 'info');
+  };
+
   return (
     <>
       {/* Bottom Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-2 py-1.5 flex items-center justify-around">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-lg">
         {bottomItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id && !isMoreMenuOpen;
@@ -113,12 +123,12 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
             <button
               key={item.id}
               onClick={() => handleTabClick(item.id)}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl text-[10px] font-semibold transition-all ${
-                isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-800'
+              className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl text-[10px] font-semibold transition-all ${
+                isActive ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
               }`}
             >
               <Icon className={`w-5 h-5 ${isActive ? 'scale-110' : ''}`} />
-              <span>{item.label}</span>
+              <span className="truncate max-w-[64px]">{item.label}</span>
             </button>
           );
         })}
@@ -126,22 +136,29 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
 
       {/* More Modules Full-Screen Modal Drawer */}
       {isMoreMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex flex-col justify-end animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-t-3xl p-5 max-h-[80vh] overflow-y-auto border-t border-slate-200 dark:border-slate-800 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
+        <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end animate-in fade-in">
+          {/* Backdrop overlay */}
+          <div
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs cursor-pointer"
+            onClick={() => setIsMoreMenuOpen(false)}
+          />
+
+          <div className="relative z-10 bg-white dark:bg-slate-900 rounded-t-3xl p-5 max-h-[85vh] overflow-y-auto border-t border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-base">All Business Modules</h3>
-                <p className="text-xs text-slate-500">Tap to navigate</p>
+                <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-base">All Business Modules</h3>
+                <p className="text-xs text-slate-500">Tap any module to open</p>
               </div>
               <button
                 onClick={() => setIsMoreMenuOpen(false)}
-                className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600"
+                className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                title="Close"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2.5">
               {allModules
                 .filter((m) => m.visible)
                 .map((m) => {
@@ -150,12 +167,12 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
                     <button
                       key={m.id}
                       onClick={() => handleTabClick(m.id)}
-                      className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 hover:bg-indigo-50 border border-slate-200/80 dark:border-slate-700/80 text-center gap-2 transition-all active:scale-95"
+                      className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 hover:bg-indigo-50 border border-slate-200/80 dark:border-slate-700/80 text-center gap-2 transition-all active:scale-95 cursor-pointer"
                     >
-                      <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-xs">
                         <Icon className="w-5 h-5" />
                       </div>
-                      <span className="text-[11px] font-medium text-slate-800 dark:text-slate-200 line-clamp-2">
+                      <span className="text-[11px] font-semibold text-slate-800 dark:text-slate-200 line-clamp-2">
                         {m.label}
                       </span>
                     </button>
@@ -164,16 +181,16 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
             </div>
 
             {/* Install Standalone App Prompt inside drawer */}
-            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
               <button
                 onClick={() => {
                   setIsMoreMenuOpen(false);
                   setIsInstallModalOpen(true);
                 }}
-                className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-bold text-xs shadow-lg shadow-indigo-600/20 active:scale-98 transition-all"
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 active:scale-98 transition-all cursor-pointer"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+                  <div className="w-7 h-7 rounded-xl bg-white/20 flex items-center justify-center">
                     <Smartphone className="w-4 h-4 text-white" />
                   </div>
                   <div className="text-left">
@@ -182,6 +199,15 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
                   </div>
                 </div>
                 <Download className="w-4 h-4" />
+              </button>
+
+              {/* Direct Clear Log Out Button */}
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl bg-rose-600 hover:bg-rose-700 active:scale-98 text-white font-bold text-xs shadow-lg shadow-rose-600/25 transition-all cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Log Out from Account (लॉग आउट)</span>
               </button>
             </div>
           </div>
