@@ -197,6 +197,10 @@ interface AppContextType {
   setIsActivityLogOpen: (v: boolean) => void;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (v: boolean) => void;
+  isProfileDrawerOpen: boolean;
+  setIsProfileDrawerOpen: (v: boolean) => void;
+  isInstallModalOpen: boolean;
+  setIsInstallModalOpen: (v: boolean) => void;
   toasts: ToastMessage[];
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   resetDemoData: () => void;
@@ -562,6 +566,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [activeJobPopup, setActiveJobPopup] = useState<Notification | null>(null);
 
@@ -807,11 +813,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               if (currentUser.role === 'super_admin') {
                 isTargetedToMe = true;
               } else if (notif.actionType === 'assigned') {
-                // IMPORTANT: Owner should NOT be notified when assigning jobs to others
-                if (currentUser.role === 'business_owner') {
+                // IMPORTANT: Owner and Manager should NOT receive audio alert when scheduling or assigning jobs to others
+                if (currentUser.role === 'business_owner' || currentUser.role === 'manager') {
                   isTargetedToMe = false;
-                } else {
-                  // Check if this technician matches targetUserId
+                } else if (currentUser.role === 'technician') {
+                  // Only the specifically assigned technician receives the voice alert and popup
                   if (notif.targetUserId) {
                     if (notif.targetUserId === currentUser.id || notif.targetUserId === currentUser.email) {
                       isTargetedToMe = true;
@@ -825,8 +831,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                         }
                       }
                     }
-                  } else if (currentUser.role === 'technician') {
-                    isTargetedToMe = true;
                   }
                 }
               } else if (notif.actionType === 'accepted' || notif.actionType === 'started' || notif.actionType === 'completed') {
@@ -1820,14 +1824,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const filteredPayments = isSuperAdminUser ? payments : payments.filter((p) => p.businessId === currBizId);
   const filteredContracts = isSuperAdminUser ? contracts : contracts.filter((c) => c.businessId === currBizId);
   const filteredExpenses = isSuperAdminUser ? expenses : expenses.filter((e) => e.businessId === currBizId);
-  const filteredNotifications = isSuperAdminUser
+  const filteredNotifications = (isSuperAdminUser
     ? notifications
     : notifications.filter((n) => {
         if (n.businessId !== currBizId) return false;
         if (!currentUser) return true;
 
-        if (currentUser.role === 'business_owner') {
-          // Business owner does not need to see technician assignment notifications
+        if (currentUser.role === 'business_owner' || currentUser.role === 'manager') {
+          // Business owner and manager do not need to see technician assignment notifications
           if (n.actionType === 'assigned') return false;
           return true;
         }
@@ -1855,7 +1859,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return currentUser.role === n.targetRoleId;
         }
         return true;
-      });
+      }))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 10);
   const filteredActivityLogs = isSuperAdminUser ? activityLogs : activityLogs.filter((a) => a.businessId === currBizId);
   const filteredStaff = isSuperAdminUser ? users : users.filter((u) => u.businessId === currBizId && u.role !== 'super_admin');
   const filteredReferralRecords = isSuperAdminUser
@@ -1999,9 +2005,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     logActivity('Job Created', 'job', newJob.id, `Created job ${jobId}`);
 
-    // Voice notification should only play for the assigned technician (not owner who created it)
-    const isCurrentUserTheTechnician = currentUser?.id === data.assignedStaffId || (currentUser?.role === 'technician' && !currentUser?.role.includes('owner'));
-    if (isCurrentUserTheTechnician) {
+    // Voice notification should only play for the assigned technician (never for the business owner who created it)
+    const isCurrentUserTheAssignedTechnician =
+      currentUser?.role === 'technician' &&
+      (currentUser?.id === data.assignedStaffId ||
+        (Boolean(currentUser?.email) &&
+          Boolean(assignedStaff?.email) &&
+          currentUser?.email?.toLowerCase() === assignedStaff?.email?.toLowerCase()));
+
+    if (isCurrentUserTheAssignedTechnician) {
       playJobVoiceNotification(jobId, data.description || 'New Service Task', data.location, assignedStaff?.name);
       setActiveJobPopup(newNotif);
     }
@@ -3227,6 +3239,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsActivityLogOpen,
         isAuthModalOpen,
         setIsAuthModalOpen,
+        isProfileDrawerOpen,
+        setIsProfileDrawerOpen,
+        isInstallModalOpen,
+        setIsInstallModalOpen,
         toasts,
         showToast,
         resetDemoData,

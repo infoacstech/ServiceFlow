@@ -163,16 +163,16 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-[9999] overflow-hidden animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[99999] overflow-hidden animate-in fade-in duration-200">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity cursor-pointer z-[9999]"
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity cursor-pointer z-[99999]"
         onClick={onClose}
       />
 
       {/* Slide-over panel */}
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10 z-[10000]">
-        <div className="w-screen max-w-lg bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col justify-between overflow-hidden">
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10 z-[100000]">
+        <div className="w-screen max-w-lg h-full max-h-screen bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col justify-between overflow-hidden">
           
           {/* Header */}
           <div className="p-4 sm:p-5 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md">

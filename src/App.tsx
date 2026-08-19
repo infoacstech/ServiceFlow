@@ -14,6 +14,8 @@ import { AccessDeniedView } from './components/AccessDeniedView';
 import { PullToRefresh } from './components/PullToRefresh';
 import { JobNotificationPopup } from './components/JobNotificationPopup';
 import { QuickActionFab } from './components/QuickActionFab';
+import { UserProfileDrawer } from './components/UserProfileDrawer';
+import { InstallAppModal } from './components/InstallAppModal';
 
 import { DashboardView } from './views/DashboardView';
 import { CustomersView } from './views/CustomersView';
@@ -36,7 +38,17 @@ import { NotificationsView } from './views/NotificationsView';
 import { LoginView } from './views/LoginView';
 
 const MainContent: React.FC = () => {
-  const { currentUser, isAuthInitializing, isAuthModalOpen, setIsAuthModalOpen, getRolePermissions } = useApp();
+  const {
+    currentUser,
+    isAuthInitializing,
+    isAuthModalOpen,
+    setIsAuthModalOpen,
+    isProfileDrawerOpen,
+    setIsProfileDrawerOpen,
+    isInstallModalOpen,
+    setIsInstallModalOpen,
+    getRolePermissions,
+  } = useApp();
   const [activeTab, setActiveTab] = useState<string>(() => {
     return sessionStorage.getItem('serviflow_active_tab') || 'dashboard';
   });
@@ -292,6 +304,30 @@ const MainContent: React.FC = () => {
         onOpenNewJob={handleOpenNewJob}
         onNavigate={handleTabChange}
       />
+
+      {/* Root-Level Full Viewport User Profile & Settings Drawer */}
+      <UserProfileDrawer
+        isOpen={isProfileDrawerOpen}
+        onClose={() => setIsProfileDrawerOpen(false)}
+        onNavigateToSettings={() => {
+          handleTabChange('settings');
+          setIsProfileDrawerOpen(false);
+        }}
+        onOpenInstallModal={() => {
+          setIsInstallModalOpen(true);
+          setIsProfileDrawerOpen(false);
+        }}
+        onSignOut={() => {
+          handleTabChange('login');
+        }}
+      />
+
+      {/* Root-Level Standalone Installation Modal */}
+      <InstallAppModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+      />
+
       <ToastContainer />
     </div>
   );

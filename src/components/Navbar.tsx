@@ -33,8 +33,6 @@ import {
   Settings as SettingsIcon,
 } from 'lucide-react';
 import { UserRole } from '../types';
-import { InstallAppModal } from './InstallAppModal';
-import { UserProfileDrawer } from './UserProfileDrawer';
 import {
   isVoiceNotificationEnabled,
   setVoiceNotificationEnabled,
@@ -82,6 +80,10 @@ export const Navbar: React.FC<NavbarProps> = ({
     setIsActivityLogOpen,
     syncOfflineQueue,
     pendingSyncQueue,
+    isProfileDrawerOpen,
+    setIsProfileDrawerOpen,
+    isInstallModalOpen,
+    setIsInstallModalOpen,
     showToast,
     logoutUser,
   } = useApp();
@@ -89,8 +91,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   type ActiveMenu = 'tenant' | 'notif' | null;
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
   const [isRefreshingPage, setIsRefreshingPage] = useState(false);
-  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
-  const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isStandalone, setIsStandalone] = useState(false);
 
@@ -438,33 +438,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
       </div>
-
-      {/* Comprehensive User Profile & Account Drawer */}
-      <UserProfileDrawer
-        isOpen={isProfileDrawerOpen}
-        onClose={() => setIsProfileDrawerOpen(false)}
-        onNavigateToSettings={() => {
-          setActiveTab('settings');
-          setIsProfileDrawerOpen(false);
-        }}
-        onOpenInstallModal={() => {
-          setIsInstallModalOpen(true);
-          setIsProfileDrawerOpen(false);
-        }}
-        onSignOut={() => {
-          setActiveTab('login');
-        }}
-      />
-
-      {/* Standalone Installation Modal */}
-      <InstallAppModal
-        isOpen={isInstallModalOpen}
-        onClose={() => setIsInstallModalOpen(false)}
-        deferredPrompt={deferredPrompt}
-        onInstalled={() => {
-          setIsStandalone(true);
-        }}
-      />
     </header>
   );
 };
