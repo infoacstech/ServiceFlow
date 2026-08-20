@@ -74,7 +74,7 @@ const MainContent: React.FC = () => {
           setActiveTab(savedTab);
         }
       } else if (!savedTab || savedTab === 'login') {
-        const defaultTab = isSuperUser ? 'super_admin' : 'dashboard';
+        const defaultTab = isSuperUser ? 'super_admin_dashboard' : 'dashboard';
         setActiveTab(defaultTab);
         sessionStorage.setItem('serviflow_active_tab', defaultTab);
       } else {
@@ -89,6 +89,9 @@ const MainContent: React.FC = () => {
     let targetTab = tab;
     if (currentUser?.role === 'technician' && tab === 'dashboard') {
       targetTab = 'jobs';
+    }
+    if (currentUser?.role === 'super_admin' && tab === 'super_admin') {
+      targetTab = 'super_admin_dashboard';
     }
     setActiveTab(targetTab);
     if (currentUser) {
@@ -134,6 +137,9 @@ const MainContent: React.FC = () => {
   const permissions = getRolePermissions(currentUser?.role);
 
   const getTabAccess = (tab: string) => {
+    if (tab === 'super_admin' || tab.startsWith('super_admin_')) {
+      return { allowed: permissions.canAccessSuperAdmin, label: 'SaaS Platform Super Admin' };
+    }
     switch (tab) {
       case 'dashboard':
         return {
@@ -162,8 +168,6 @@ const MainContent: React.FC = () => {
         return { allowed: permissions.canManageJobs || permissions.canViewFinancials, label: 'Admin or Manager' };
       case 'customer_portal':
         return { allowed: permissions.canAccessCustomerPortal, label: 'Admin or Manager' };
-      case 'super_admin':
-        return { allowed: permissions.canAccessSuperAdmin, label: 'Super Admin' };
       case 'settings':
         return { allowed: true, label: '' };
       case 'notifications':
@@ -265,7 +269,12 @@ const MainContent: React.FC = () => {
 
                   {activeTab === 'customer_portal' && <CustomerPortalView />}
 
-                  {activeTab === 'super_admin' && <SuperAdminView />}
+                  {(activeTab === 'super_admin' || activeTab.startsWith('super_admin_')) && (
+                    <SuperAdminView
+                      activeSubSection={activeTab}
+                      onNavigate={handleTabChange}
+                    />
+                  )}
 
                   {activeTab === 'settings' && <SettingsView />}
 

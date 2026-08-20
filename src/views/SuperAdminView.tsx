@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { SystemSettings, Business } from '../types';
 import { FirestoreService } from '../services/FirestoreService';
@@ -8,6 +8,7 @@ import {
   Users,
   CheckCircle2,
   XCircle,
+  X,
   Clock,
   Ban,
   RotateCcw,
@@ -44,11 +45,29 @@ import {
   Award,
   ExternalLink,
   QrCode,
+  Activity,
+  BarChart3,
+  Bell,
+  Send,
+  Globe,
+  PackageCheck,
+  SlidersHorizontal,
+  Radio,
+  Zap,
+  Filter,
 } from 'lucide-react';
 import { ReferralRecord, ReferralPayoutRequest } from '../types';
 import { ReferralAnalytics } from '../components/ReferralAnalytics';
 
-export const SuperAdminView: React.FC = () => {
+export interface SuperAdminViewProps {
+  activeSubSection?: string;
+  onNavigate?: (tab: string) => void;
+}
+
+export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
+  activeSubSection = 'super_admin_dashboard',
+  onNavigate,
+}) => {
   const {
     businesses,
     users,
@@ -90,8 +109,78 @@ export const SuperAdminView: React.FC = () => {
   } = useApp();
 
   const [activeTabSection, setActiveTabSection] = useState<
-    'approvals' | 'tenants' | 'referrals' | 'cleanup' | 'support' | 'settings' | 'audit' | 'sessions'
-  >('approvals');
+    | 'overview'
+    | 'approvals'
+    | 'tenants'
+    | 'analytics'
+    | 'referrals'
+    | 'cleanup'
+    | 'support'
+    | 'notifications'
+    | 'settings'
+    | 'plans'
+    | 'audit'
+    | 'sessions'
+  >('overview');
+
+  // Tenant Filters & Search State
+  const [tenantStatusFilter, setTenantStatusFilter] = useState<'all' | 'active' | 'pending' | 'suspended' | 'trial'>('all');
+  const [tenantSearchQuery, setTenantSearchQuery] = useState('');
+  const [tenantPlanFilter, setTenantPlanFilter] = useState<string>('all');
+  const [selectedTenantDetails, setSelectedTenantDetails] = useState<Business | null>(null);
+
+  // Sync sub-section routing when activeSubSection prop changes
+  useEffect(() => {
+    if (!activeSubSection) return;
+    switch (activeSubSection) {
+      case 'super_admin':
+      case 'super_admin_dashboard':
+        setActiveTabSection('overview');
+        break;
+      case 'super_admin_tenants':
+        setActiveTabSection('tenants');
+        setTenantStatusFilter('all');
+        break;
+      case 'super_admin_pending':
+      case 'super_admin_approvals':
+        setActiveTabSection('approvals');
+        break;
+      case 'super_admin_suspended':
+        setActiveTabSection('tenants');
+        setTenantStatusFilter('suspended');
+        break;
+      case 'super_admin_analytics':
+        setActiveTabSection('analytics');
+        break;
+      case 'super_admin_referrals':
+        setActiveTabSection('referrals');
+        break;
+      case 'super_admin_support':
+        setActiveTabSection('support');
+        break;
+      case 'super_admin_notifications':
+        setActiveTabSection('notifications');
+        break;
+      case 'super_admin_audit':
+        setActiveTabSection('audit');
+        break;
+      case 'super_admin_security':
+      case 'super_admin_access_history':
+        setActiveTabSection('sessions');
+        break;
+      case 'super_admin_settings':
+        setActiveTabSection('settings');
+        break;
+      case 'super_admin_plans':
+        setActiveTabSection('plans');
+        break;
+      case 'super_admin_data_maintenance':
+        setActiveTabSection('cleanup');
+        break;
+      default:
+        break;
+    }
+  }, [activeSubSection]);
 
   // Payout Process Modal State
   const [selectedPayoutForAction, setSelectedPayoutForAction] = useState<ReferralPayoutRequest | null>(null);
@@ -498,6 +587,18 @@ export const SuperAdminView: React.FC = () => {
       {/* Navigation Tabs Bar */}
       <div className="flex items-center gap-2 overflow-x-auto p-1.5 bg-slate-200/60 dark:bg-slate-900/80 rounded-2xl border border-slate-300/60 dark:border-slate-800 text-xs font-bold scrollbar-none">
         <button
+          onClick={() => setActiveTabSection('overview')}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTabSection === 'overview'
+              ? 'bg-purple-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Activity className="w-4 h-4" />
+          <span>Platform Overview</span>
+        </button>
+
+        <button
           onClick={() => setActiveTabSection('approvals')}
           className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
             activeTabSection === 'approvals'
@@ -506,11 +607,14 @@ export const SuperAdminView: React.FC = () => {
           }`}
         >
           <Clock className="w-4 h-4" />
-          <span>Pending Registrations ({pendingCount})</span>
+          <span>Pending Approvals ({pendingCount})</span>
         </button>
 
         <button
-          onClick={() => setActiveTabSection('tenants')}
+          onClick={() => {
+            setActiveTabSection('tenants');
+            setTenantStatusFilter('all');
+          }}
           className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
             activeTabSection === 'tenants'
               ? 'bg-indigo-600 text-white shadow-md'
@@ -518,7 +622,19 @@ export const SuperAdminView: React.FC = () => {
           }`}
         >
           <Building2 className="w-4 h-4" />
-          <span>Tenant Businesses ({businesses.length})</span>
+          <span>Tenant Directory ({businesses.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTabSection('analytics')}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTabSection === 'analytics'
+              ? 'bg-blue-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>Platform Analytics</span>
         </button>
 
         <button
@@ -530,24 +646,12 @@ export const SuperAdminView: React.FC = () => {
           }`}
         >
           <Gift className="w-4 h-4" />
-          <span>Referral Analytics ({referralRecords.length})</span>
+          <span>Referral Engine ({referralRecords.length})</span>
           {referralPayoutRequests.filter(p => p.status === 'pending').length > 0 && (
             <span className="text-[10px] px-1.5 py-0.5 rounded-full font-black bg-rose-500 text-white animate-pulse">
               {referralPayoutRequests.filter(p => p.status === 'pending').length}
             </span>
           )}
-        </button>
-
-        <button
-          onClick={() => setActiveTabSection('cleanup')}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTabSection === 'cleanup'
-              ? 'bg-rose-600 text-white shadow-md'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
-          }`}
-        >
-          <Sparkles className="w-4 h-4 text-amber-300" />
-          <span>Clean State & Data Purge</span>
         </button>
 
         <button
@@ -559,7 +663,36 @@ export const SuperAdminView: React.FC = () => {
           }`}
         >
           <Headphones className="w-4 h-4" />
-          <span>Audited Support Access</span>
+          <span>Audited Support</span>
+          {activeSupportSession && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-amber-400 text-slate-950 animate-pulse">
+              ACTIVE
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTabSection('notifications')}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTabSection === 'notifications'
+              ? 'bg-violet-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Bell className="w-4 h-4" />
+          <span>Broadcast Alerts</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTabSection('plans')}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTabSection === 'plans'
+              ? 'bg-teal-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <CreditCard className="w-4 h-4" />
+          <span>Plans & Tiers</span>
         </button>
 
         <button
@@ -571,7 +704,7 @@ export const SuperAdminView: React.FC = () => {
           }`}
         >
           <Sliders className="w-4 h-4" />
-          <span>System Settings & MFA</span>
+          <span>SaaS Settings & MFA</span>
         </button>
 
         <button
@@ -583,7 +716,7 @@ export const SuperAdminView: React.FC = () => {
           }`}
         >
           <FileText className="w-4 h-4" />
-          <span>Security Audit Logs</span>
+          <span>Security Audit Trail</span>
         </button>
 
         <button
@@ -595,58 +728,310 @@ export const SuperAdminView: React.FC = () => {
           }`}
         >
           <UserX className="w-4 h-4" />
-          <span>Active Sessions & Security Controls</span>
+          <span>Active Sessions</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTabSection('cleanup')}
+          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            activeTabSection === 'cleanup'
+              ? 'bg-rose-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-300" />
+          <span>Clean State Reset</span>
         </button>
       </div>
 
-      {/* Stats Quick Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Tenants</span>
-            <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
-              <Building2 className="w-4 h-4" />
+      {/* SECTION 0: Master Platform Overview */}
+      {activeTabSection === 'overview' && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* Quick Metrics Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Tenants</span>
+                <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
+                  <Building2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-slate-900 dark:text-slate-100">{businesses.length}</div>
+              <div className="text-[10px] text-slate-400 mt-1">Isolated Data Environments</div>
             </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-slate-100">{businesses.length}</div>
-          <div className="text-[10px] text-slate-400 mt-1">Isolated Data Environments</div>
-        </div>
 
-        <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pending Approvals</span>
-            <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
-              <Clock className="w-4 h-4" />
+            <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pending Approvals</span>
+                <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                  <Clock className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-amber-600 dark:text-amber-400">{pendingCount}</div>
+              <div className="text-[10px] text-amber-700 dark:text-amber-300 font-medium mt-1">
+                {pendingCount > 0 ? 'Requires Super Admin Action' : 'All Clear — No Pending Approvals'}
+              </div>
             </div>
-          </div>
-          <div className="text-2xl font-black text-amber-600 dark:text-amber-400">{pendingCount}</div>
-          <div className="text-[10px] text-amber-700 dark:text-amber-300 font-medium mt-1">
-            {pendingCount > 0 ? 'Requires Super Admin Action' : 'All Clear — No Pending Approvals'}
-          </div>
-        </div>
 
-        <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Businesses</span>
-            <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="w-4 h-4" />
+            <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Businesses</span>
+                <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{activeCount}</div>
+              <div className="text-[10px] text-emerald-600 font-semibold mt-1">Active ERP Workspaces</div>
             </div>
-          </div>
-          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{activeCount}</div>
-          <div className="text-[10px] text-emerald-600 font-semibold mt-1">Active Accounts</div>
-        </div>
 
-        <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Suspended</span>
-            <div className="p-2 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
-              <Ban className="w-4 h-4" />
+            <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Suspended</span>
+                <div className="p-2 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
+                  <Ban className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-rose-600 dark:text-rose-400">{suspendedCount}</div>
+              <div className="text-[10px] text-rose-600 font-semibold mt-1">Access Revoked / Suspended</div>
             </div>
           </div>
-          <div className="text-2xl font-black text-rose-600 dark:text-rose-400">{suspendedCount}</div>
-          <div className="text-[10px] text-rose-600 font-semibold mt-1">Access Revoked / Suspended</div>
+
+          {/* Quick Action Launcher Bar */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                  Quick Administration Actions
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Frequently executed Super Admin operations and diagnostics
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewTenantForm({
+                      businessName: '',
+                      industryType: 'CCTV & Security',
+                      ownerName: '',
+                      ownerEmail: '',
+                      ownerPhone: '',
+                      ownerPassword: '1234',
+                      initialStatus: 'active',
+                    });
+                    setIsAddTenantModalOpen(true);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-all"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Onboard New Tenant</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSimulateTestRegistration}
+                  className="px-3.5 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 dark:bg-amber-950/60 dark:hover:bg-amber-900 dark:text-amber-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-amber-200 dark:border-amber-800"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Simulate Signup Request</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTabSection('notifications')}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                >
+                  <Bell className="w-3.5 h-3.5" />
+                  <span>Broadcast Notice</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTabSection('cleanup')}
+                  className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:hover:bg-rose-900/80 dark:text-rose-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-rose-200 dark:border-rose-900/60"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Reset Demo Data</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Pending Registrations Preview if any */}
+          {pendingCount > 0 && (
+            <div className="bg-amber-50/80 dark:bg-amber-950/30 rounded-3xl border border-amber-200/80 dark:border-amber-900/60 p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-amber-500 text-white rounded-xl">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-sm text-amber-950 dark:text-amber-100">
+                      Pending Approvals Action Queue ({pendingCount})
+                    </h4>
+                    <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                      New businesses awaiting your Super Admin verification
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setActiveTabSection('approvals')}
+                  className="text-xs font-bold text-amber-900 dark:text-amber-200 underline hover:no-underline"
+                >
+                  View All Pending ({pendingCount})
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                {pendingRegistrations.slice(0, 4).map((item, idx) => (
+                  <div
+                    key={item.businessId || `pending-summary-${idx}`}
+                    className="p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-amber-200/60 dark:border-amber-900/40 flex items-center justify-between text-xs"
+                  >
+                    <div>
+                      <div className="font-extrabold text-slate-900 dark:text-slate-100">{item.businessName}</div>
+                      <div className="text-[11px] text-slate-500">
+                        {item.ownerName} • {item.type}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">{item.ownerEmail}</div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => updateBusinessAndOwnerStatus(item.businessId, 'active')}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer shadow-xs"
+                      >
+                        <CheckCircle2 className="w-3 h-3" />
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => updateBusinessAndOwnerStatus(item.businessId, 'rejected')}
+                        className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer shadow-xs"
+                      >
+                        <XCircle className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Quick Active Tenants Overview */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                  Active Tenant Workspaces
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Recently active businesses running on the ServiFlow platform
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setActiveTabSection('tenants');
+                  setTenantStatusFilter('all');
+                }}
+                className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+              >
+                View Full Directory ({businesses.length}) →
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {businesses.slice(0, 6).map((b, idx) => {
+                const owner = users.find((u) => u.businessId === b.id && u.role === 'business_owner');
+                const staffCount = users.filter((u) => u.businessId === b.id).length;
+                return (
+                  <div
+                    key={b.id || `quick-biz-${idx}`}
+                    className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col justify-between space-y-3"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-extrabold text-xs text-slate-900 dark:text-slate-100 truncate">
+                          {b.name}
+                        </span>
+                        <span
+                          className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                            b.status === 'active'
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                              : b.status === 'suspended'
+                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
+                              : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                          }`}
+                        >
+                          {b.status}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1">
+                        {b.type} • {staffCount} Staff Members
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                        Owner: {owner?.name || b.email?.split('@')[0] || 'N/A'}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700/60">
+                      <button
+                        onClick={() => setSelectedTenantDetails(b)}
+                        className="text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:text-indigo-600 flex items-center gap-1 cursor-pointer"
+                      >
+                        <Eye className="w-3 h-3" />
+                        Inspect
+                      </button>
+                      <button
+                        onClick={() => handleOpenSupportModal(b.id, b.name)}
+                        className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] flex items-center gap-1 cursor-pointer shadow-xs"
+                      >
+                        <Headphones className="w-3 h-3" />
+                        Support Access
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Recent Security Logs Feed */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                  Live Security & Governance Activity Stream
+                </h3>
+              </div>
+              <button
+                onClick={() => setActiveTabSection('audit')}
+                className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+              >
+                Full Audit Trail ({securityAuditLogs.length}) →
+              </button>
+            </div>
+
+            <div className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+              {securityAuditLogs.slice(0, 5).map((log, idx) => (
+                <div key={log.id || `stream-log-${idx}`} className="py-2.5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-mono text-[10px] text-slate-400">
+                      {new Date(log.timestamp).toLocaleTimeString()}
+                    </span>
+                    <span className="font-bold text-purple-700 dark:text-purple-300">{log.action}</span>
+                    <span className="text-slate-600 dark:text-slate-400 text-[11px] truncate max-w-md">
+                      {log.details}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400">{log.actorName}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* SECTION 1: Pending Owner Approvals */}
       {activeTabSection === 'approvals' && (
@@ -872,158 +1257,508 @@ export const SuperAdminView: React.FC = () => {
         </div>
       )}
 
-      {/* SECTION 2: All Business Tenants */}
+      {/* SECTION 2: All Business Tenants with Enhanced Search & Filters */}
       {activeTabSection === 'tenants' && (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm">
-          <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
-                Registered Business Tenants & Access Control
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                View onboarded companies, request audited time-limited support access, or suspend access.
-              </p>
+        <div className="space-y-4 animate-in fade-in">
+          {/* Tenant Search & Filter Bar */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                  Registered Business Tenants Directory
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Manage multi-tenant isolated workspaces, inspect configurations, and control platform access.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewTenantForm({
+                      businessName: '',
+                      industryType: 'CCTV & Security',
+                      ownerName: '',
+                      ownerEmail: '',
+                      ownerPhone: '',
+                      ownerPassword: '1234',
+                      initialStatus: 'active',
+                    });
+                    setIsAddTenantModalOpen(true);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Onboard New Tenant</span>
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setNewTenantForm({
-                    businessName: '',
-                    industryType: 'CCTV & Security',
-                    ownerName: '',
-                    ownerEmail: '',
-                    ownerPhone: '',
-                    ownerPassword: '1234',
-                    initialStatus: 'active',
-                  });
-                  setIsAddTenantModalOpen(true);
-                }}
-                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Onboard New Tenant</span>
-              </button>
-              <span className="text-xs font-bold text-slate-500">{businesses.length} Total</span>
+
+            {/* Filters Row */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+              {/* Search Bar */}
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={tenantSearchQuery}
+                  onChange={(e) => setTenantSearchQuery(e.target.value)}
+                  placeholder="Search by business name, ID, owner email, phone, or industry..."
+                  className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Status Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto text-xs font-bold scrollbar-none">
+                <button
+                  onClick={() => setTenantStatusFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                    tenantStatusFilter === 'all'
+                      ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs'
+                      : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  All ({businesses.length})
+                </button>
+                <button
+                  onClick={() => setTenantStatusFilter('active')}
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                    tenantStatusFilter === 'active'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  Active ({activeCount})
+                </button>
+                <button
+                  onClick={() => setTenantStatusFilter('pending')}
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                    tenantStatusFilter === 'pending'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  Pending ({pendingCount})
+                </button>
+                <button
+                  onClick={() => setTenantStatusFilter('suspended')}
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                    tenantStatusFilter === 'suspended'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  Suspended ({suspendedCount})
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-bold uppercase">
-                <tr>
-                  <th className="p-4">Business Name</th>
-                  <th className="p-4">Industry Type</th>
-                  <th className="p-4">Owner / Email</th>
-                  <th className="p-4">GSTIN / Contact</th>
-                  <th className="p-4">Platform Status</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {businesses.map((b, idx) => {
-                  const owner = users.find((u) => u.businessId === b.id && u.role === 'business_owner');
-                  const isPending = b.status === 'pending' || owner?.approvalStatus === 'pending';
-                  const isSuspended = b.status === 'suspended' || owner?.approvalStatus === 'suspended';
-                  const isRejected = b.status === 'rejected' || owner?.approvalStatus === 'rejected';
+          {/* Tenants Table */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-bold uppercase">
+                  <tr>
+                    <th className="p-4">Business Profile</th>
+                    <th className="p-4">Industry / Category</th>
+                    <th className="p-4">Owner & Contact</th>
+                    <th className="p-4">Staff & Plan</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {businesses
+                    .filter((b) => {
+                      const owner = users.find((u) => u.businessId === b.id && u.role === 'business_owner');
+                      // Status filter
+                      if (tenantStatusFilter === 'active' && b.status !== 'active' && b.status !== 'trial') return false;
+                      if (tenantStatusFilter === 'pending' && b.status !== 'pending' && owner?.approvalStatus !== 'pending') return false;
+                      if (tenantStatusFilter === 'suspended' && b.status !== 'suspended' && owner?.approvalStatus !== 'suspended') return false;
+                      if (tenantStatusFilter === 'trial' && b.status !== 'trial') return false;
 
+                      // Search query
+                      if (tenantSearchQuery.trim()) {
+                        const q = tenantSearchQuery.toLowerCase();
+                        const matchName = b.name.toLowerCase().includes(q);
+                        const matchId = b.id.toLowerCase().includes(q);
+                        const matchType = b.type?.toLowerCase().includes(q);
+                        const matchOwner = owner?.name?.toLowerCase().includes(q);
+                        const matchEmail = owner?.email?.toLowerCase().includes(q) || b.email?.toLowerCase().includes(q);
+                        const matchPhone = owner?.phone?.includes(q) || b.mobile?.includes(q);
+                        if (!matchName && !matchId && !matchType && !matchOwner && !matchEmail && !matchPhone) {
+                          return false;
+                        }
+                      }
+                      return true;
+                    })
+                    .map((b, idx) => {
+                      const owner = users.find((u) => u.businessId === b.id && u.role === 'business_owner');
+                      const staffCount = users.filter((u) => u.businessId === b.id).length;
+                      const isPending = b.status === 'pending' || owner?.approvalStatus === 'pending';
+                      const isSuspended = b.status === 'suspended' || owner?.approvalStatus === 'suspended';
+                      const isRejected = b.status === 'rejected' || owner?.approvalStatus === 'rejected';
+
+                      return (
+                        <tr key={b.id || `biz-row-${idx}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="p-4 font-extrabold text-slate-900 dark:text-slate-100">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center font-black text-xs shrink-0">
+                                {b.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="font-bold">{b.name}</div>
+                                <div className="text-[10px] text-slate-400 font-mono">ID: {b.id}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-900/50">
+                              {b.type}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div className="font-bold text-slate-800 dark:text-slate-200">
+                              {owner?.name || (b.email ? b.email.split('@')[0] : 'Business Owner')}
+                            </div>
+                            <div className="text-[10px] text-slate-500">{owner?.email || b.email || 'N/A'}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">{b.mobile || owner?.phone}</div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-1.5">
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                {staffCount} Staff
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 capitalize">
+                                {b.plan || 'Professional'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            {isPending ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 uppercase tracking-wider">
+                                PENDING
+                              </span>
+                            ) : isSuspended ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-200 uppercase tracking-wider">
+                                SUSPENDED
+                              </span>
+                            ) : isRejected ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                                REJECTED
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 uppercase tracking-wider">
+                                ACTIVE
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="inline-flex items-center gap-1.5 justify-end">
+                              {/* Inspect Details Button */}
+                              <button
+                                onClick={() => setSelectedTenantDetails(b)}
+                                className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-all cursor-pointer"
+                                title="Inspect Tenant Details"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Time-Limited Audited Support Request Button */}
+                              <button
+                                onClick={() => handleOpenSupportModal(b.id, b.name)}
+                                className="px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                                title="Request temporary audited support access to customer data"
+                              >
+                                <Headphones className="w-3.5 h-3.5" />
+                                <span>Support</span>
+                              </button>
+
+                              {/* Suspend / Restore Toggle Button */}
+                              {isSuspended ? (
+                                <button
+                                  onClick={() => updateBusinessAndOwnerStatus(b.id, 'active')}
+                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" />
+                                  <span>Restore</span>
+                                </button>
+                              ) : isPending ? (
+                                <button
+                                  onClick={() => updateBusinessAndOwnerStatus(b.id, 'active')}
+                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-xs transition-all flex items-center gap-1 cursor-pointer"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Approve</span>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => updateBusinessAndOwnerStatus(b.id, 'suspended')}
+                                  className="px-2.5 py-1.5 rounded-xl border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/60 font-bold text-[11px] transition-all flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Ban className="w-3.5 h-3.5" />
+                                  <span>Suspend</span>
+                                </button>
+                              )}
+
+                              {/* Delete Business Tenant & Owner Button */}
+                              <button
+                                onClick={() => {
+                                  setTenantToDelete({ id: b.id, name: b.name });
+                                  setDeleteTenantConfirmText('');
+                                }}
+                                className="p-1.5 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/60 dark:hover:text-rose-400 font-bold transition-all cursor-pointer"
+                                title="Delete this business tenant, owner account, and all records"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 2.5: Platform Analytics */}
+      {activeTabSection === 'analytics' && (
+        <div className="space-y-6 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm">
+            <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-4 mb-6">
+              <div className="p-2.5 bg-blue-600 text-white rounded-2xl">
+                <BarChart3 className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">
+                  Platform Growth & Tenant Distribution Analytics
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Real-time operational volume, industry vertical distribution, and platform adoption metrics
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800">
+                <div className="text-xs font-bold text-slate-500">Total Registered Tenants</div>
+                <div className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">{businesses.length}</div>
+                <div className="text-[10px] text-emerald-600 font-bold mt-1">100% Isolated Partitions</div>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800">
+                <div className="text-xs font-bold text-slate-500">Total Platform Users</div>
+                <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">{users.length}</div>
+                <div className="text-[10px] text-slate-400 mt-1">Admins, Techs & Staff</div>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800">
+                <div className="text-xs font-bold text-slate-500">Total Jobs Dispatched</div>
+                <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{jobs.length}</div>
+                <div className="text-[10px] text-slate-400 mt-1">Across all active businesses</div>
+              </div>
+
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800">
+                <div className="text-xs font-bold text-slate-500">Invoices Generated</div>
+                <div className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-1">{invoices.length}</div>
+                <div className="text-[10px] text-slate-400 mt-1">Billing records logged</div>
+              </div>
+            </div>
+
+            {/* Industry Breakdown */}
+            <div className="space-y-4">
+              <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                Industry Vertical Distribution
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {['CCTV & Security', 'Solar & Renewable', 'HVAC & AC Service', 'Electrical Contracting', 'Plumbing & Water', 'IT & Computer Networking'].map((ind) => {
+                  const count = businesses.filter((b) => b.type === ind).length;
+                  const pct = businesses.length > 0 ? Math.round((count / businesses.length) * 100) : 0;
                   return (
-                    <tr key={b.id || `biz-row-${idx}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="p-4 font-extrabold text-slate-900 dark:text-slate-100">
-                        <div>{b.name}</div>
-                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">ID: {b.id}</div>
-                      </td>
-                      <td className="p-4">
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
-                          {b.type}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <div className="font-bold text-slate-800 dark:text-slate-200">
-                          {owner?.name || (b.email ? b.email.split('@')[0] : 'Business Owner')}
-                        </div>
-                        <div className="text-[10px] text-slate-500">{owner?.email || b.email || 'N/A'}</div>
-                      </td>
-                      <td className="p-4 text-slate-500">
-                        <div className="font-mono">{b.gstNumber || 'Unregistered'}</div>
-                        <div className="text-[10px] text-slate-400">{b.mobile}</div>
-                      </td>
-                      <td className="p-4">
-                        {isPending ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 uppercase tracking-wider">
-                            PENDING APPROVAL
-                          </span>
-                        ) : isSuspended ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-200 uppercase tracking-wider">
-                            SUSPENDED
-                          </span>
-                        ) : isRejected ? (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                            REJECTED
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 uppercase tracking-wider">
-                            ACTIVE
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="inline-flex items-center gap-2 justify-end">
-                          {/* Time-Limited Audited Support Request Button */}
-                          <button
-                            onClick={() => handleOpenSupportModal(b.id, b.name)}
-                            className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1 cursor-pointer"
-                            title="Request temporary audited support access to customer data"
-                          >
-                            <Headphones className="w-3.5 h-3.5" />
-                            <span>Support Access</span>
-                          </button>
-
-                          {/* Suspend / Restore Toggle Button */}
-                          {isSuspended ? (
-                            <button
-                              onClick={() => updateBusinessAndOwnerStatus(b.id, 'active')}
-                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1 cursor-pointer"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                              <span>Restore</span>
-                            </button>
-                          ) : isPending ? (
-                            <button
-                              onClick={() => updateBusinessAndOwnerStatus(b.id, 'active')}
-                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1 cursor-pointer"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Approve</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => updateBusinessAndOwnerStatus(b.id, 'suspended')}
-                              className="px-3 py-1.5 rounded-xl border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/60 font-bold text-xs transition-all flex items-center gap-1 cursor-pointer"
-                            >
-                              <Ban className="w-3.5 h-3.5" />
-                              <span>Suspend</span>
-                            </button>
-                          )}
-
-                          {/* Delete Business Tenant & Owner Button */}
-                          <button
-                            onClick={() => {
-                              setTenantToDelete({ id: b.id, name: b.name });
-                              setDeleteTenantConfirmText('');
-                            }}
-                            className="p-1.5 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/60 dark:hover:text-rose-400 font-bold transition-all cursor-pointer"
-                            title="Delete this business tenant, owner account, and all records"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    <div key={ind} className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
+                        <span>{ind}</span>
+                        <span className="text-indigo-600 dark:text-indigo-400">{count} ({pct}%)</span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full mt-2 overflow-hidden">
+                        <div
+                          className="h-full bg-indigo-600 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.max(pct, 5)}%` }}
+                        />
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION: Global Broadcast Notifications */}
+      {activeTabSection === 'notifications' && (
+        <div className="space-y-6 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm space-y-6">
+            <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+              <div className="p-2.5 bg-violet-600 text-white rounded-2xl">
+                <Bell className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">
+                  Global Platform Announcements & Broadcast Alerts
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Broadcast real-time announcement banners, system update notices, or maintenance alerts to all tenant users.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Active Global System Notice Banner:
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={systemSettings.globalNoticeBanner || ''}
+                    onChange={(e) => updateSystemSettings({ globalNoticeBanner: e.target.value })}
+                    placeholder="e.g. Scheduled maintenance on Sunday 2:00 AM IST. ServiFlow remains operational."
+                    className="flex-1 p-3 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      showToast('Broadcast notice published successfully across all tenant portals.', 'success');
+                    }}
+                    className="px-5 py-3 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-xs flex items-center gap-2 cursor-pointer shadow-md transition-all"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Broadcast Notice</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1.5">
+                  When set, this banner is displayed immediately across all active Business Owner and Technician views.
+                </p>
+              </div>
+
+              {systemSettings.globalNoticeBanner && (
+                <div className="p-4 bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 rounded-2xl flex items-center justify-between text-xs text-violet-900 dark:text-violet-200">
+                  <div className="flex items-center gap-2">
+                    <Radio className="w-4 h-4 text-violet-600 animate-pulse" />
+                    <span className="font-bold">Live Banner Preview: </span>
+                    <span>{systemSettings.globalNoticeBanner}</span>
+                  </div>
+                  <button
+                    onClick={() => updateSystemSettings({ globalNoticeBanner: '' })}
+                    className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
+                  >
+                    Clear Banner
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION: Plans & Subscriptions Management */}
+      {activeTabSection === 'plans' && (
+        <div className="space-y-6 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm space-y-6">
+            <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+              <div className="p-2.5 bg-teal-600 text-white rounded-2xl">
+                <CreditCard className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">
+                  Subscription Plans & Tier Entitlements
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Manage plan feature limits, pricing tiers, technician capacity quotas, and premium add-ons
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Starter Plan */}
+              <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-teal-600">Starter Tier</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 font-bold">
+                    Active
+                  </span>
+                </div>
+                <div>
+                  <div className="text-2xl font-black text-slate-900 dark:text-slate-100">₹999 <span className="text-xs font-normal text-slate-500">/ mo</span></div>
+                  <div className="text-xs text-slate-500 mt-1">Ideal for solo contractors & small service shops</div>
+                </div>
+                <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> Up to 3 Technicians</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> Standard Invoicing & GST</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> WhatsApp Job Alerts</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> Zero-Trust Support Access</div>
+                </div>
+                <div className="pt-2 text-xs font-bold text-slate-500">
+                  {businesses.filter(b => b.plan === 'Starter').length} Tenants Subscribed
+                </div>
+              </div>
+
+              {/* Professional Plan */}
+              <div className="p-6 rounded-3xl border-2 border-indigo-600 bg-white dark:bg-slate-900 shadow-md space-y-4 relative">
+                <div className="absolute -top-3 right-6 bg-indigo-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  Popular
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-indigo-600">Professional Tier</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 font-bold">
+                    Active
+                  </span>
+                </div>
+                <div>
+                  <div className="text-2xl font-black text-slate-900 dark:text-slate-100">₹2,499 <span className="text-xs font-normal text-slate-500">/ mo</span></div>
+                  <div className="text-xs text-slate-500 mt-1">For growing service & installation companies</div>
+                </div>
+                <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> Up to 15 Technicians</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> AMC Contracts & Auto Renewal</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> Inventory & Stock Tracking</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> Referral Engine & Rewards</div>
+                </div>
+                <div className="pt-2 text-xs font-bold text-slate-500">
+                  {businesses.filter(b => b.plan === 'Professional' || !b.plan).length} Tenants Subscribed
+                </div>
+              </div>
+
+              {/* Enterprise / Business Plan */}
+              <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-purple-600">Business / Enterprise</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 font-bold">
+                    Custom
+                  </span>
+                </div>
+                <div>
+                  <div className="text-2xl font-black text-slate-900 dark:text-slate-100">₹4,999 <span className="text-xs font-normal text-slate-500">/ mo</span></div>
+                  <div className="text-xs text-slate-500 mt-1">Multi-branch enterprise operations</div>
+                </div>
+                <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Unlimited Technicians & Staff</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Multi-Branch Workspaces</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Dedicated Account Manager</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Custom Domain & Branding</div>
+                </div>
+                <div className="pt-2 text-xs font-bold text-slate-500">
+                  {businesses.filter(b => b.plan === 'Enterprise').length} Tenants Subscribed
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -2531,6 +3266,158 @@ export const SuperAdminView: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* TENANT DETAILS INSPECTION MODAL */}
+      {selectedTenantDetails && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-xl w-full p-6 shadow-2xl space-y-5 animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-md">
+                  {selectedTenantDetails.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-slate-900 dark:text-slate-100">
+                    {selectedTenantDetails.name}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-mono">Workspace ID: {selectedTenantDetails.id}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedTenantDetails(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Profile Overview */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
+                <span className="text-slate-400 text-[10px] uppercase font-bold block">Industry Category</span>
+                <span className="font-extrabold text-slate-800 dark:text-slate-200 mt-0.5 block">
+                  {selectedTenantDetails.type || 'General Services'}
+                </span>
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
+                <span className="text-slate-400 text-[10px] uppercase font-bold block">Plan Tier</span>
+                <span className="font-extrabold text-purple-600 dark:text-purple-400 mt-0.5 block capitalize">
+                  {selectedTenantDetails.plan || 'Professional'}
+                </span>
+              </div>
+
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
+                <span className="text-slate-400 text-[10px] uppercase font-bold block">Workspace Status</span>
+                <span
+                  className={`font-extrabold mt-0.5 block uppercase ${
+                    selectedTenantDetails.status === 'active'
+                      ? 'text-emerald-600'
+                      : selectedTenantDetails.status === 'suspended'
+                      ? 'text-rose-600'
+                      : 'text-amber-600'
+                  }`}
+                >
+                  {selectedTenantDetails.status || 'Active'}
+                </span>
+              </div>
+            </div>
+
+            {/* Owner & Contact Details */}
+            {(() => {
+              const owner = users.find(
+                (u) => u.businessId === selectedTenantDetails.id && u.role === 'business_owner'
+              );
+              const staff = users.filter((u) => u.businessId === selectedTenantDetails.id);
+              const tenantJobs = jobs.filter((j) => j.businessId === selectedTenantDetails.id);
+              const tenantInvoices = invoices.filter((i) => i.businessId === selectedTenantDetails.id);
+
+              return (
+                <div className="space-y-3 text-xs">
+                  <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 space-y-2">
+                    <h4 className="font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-indigo-600" />
+                      Business Owner & Identity
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <span className="text-slate-400">Owner Name:</span>{' '}
+                        <strong className="text-slate-800 dark:text-slate-200">
+                          {owner?.name || selectedTenantDetails.name}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400">Email:</span>{' '}
+                        <strong className="text-slate-800 dark:text-slate-200">
+                          {owner?.email || selectedTenantDetails.email || 'N/A'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400">Phone:</span>{' '}
+                        <strong className="text-slate-800 dark:text-slate-200">
+                          {selectedTenantDetails.mobile || owner?.phone || 'N/A'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400">GSTIN / Tax:</span>{' '}
+                        <strong className="text-slate-800 dark:text-slate-200 font-mono">
+                          {selectedTenantDetails.gstNumber || 'Unregistered'}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Volume Counters */}
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-900/40">
+                      <div className="text-lg font-black text-indigo-600 dark:text-indigo-400">
+                        {staff.length}
+                      </div>
+                      <div className="text-[10px] font-bold text-slate-500">Staff Members</div>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-900/40">
+                      <div className="text-lg font-black text-emerald-600 dark:text-emerald-400">
+                        {tenantJobs.length}
+                      </div>
+                      <div className="text-[10px] font-bold text-slate-500">Active Jobs</div>
+                    </div>
+                    <div className="p-3 rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200/60 dark:border-purple-900/40">
+                      <div className="text-lg font-black text-purple-600 dark:text-purple-400">
+                        {tenantInvoices.length}
+                      </div>
+                      <div className="text-[10px] font-bold text-slate-500">Invoices</div>
+                    </div>
+                  </div>
+
+                  {/* Quick Action Buttons */}
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = selectedTenantDetails;
+                        setSelectedTenantDetails(null);
+                        handleOpenSupportModal(target.id, target.name);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md"
+                    >
+                      <Headphones className="w-3.5 h-3.5" />
+                      <span>Start Audited Support</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTenantDetails(null)}
+                      className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs cursor-pointer"
+                    >
+                      Close Inspection
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

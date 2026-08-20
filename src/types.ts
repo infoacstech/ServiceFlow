@@ -54,6 +54,7 @@ export interface Business {
   currency: string; // Default '₹' or '$', '€', '£', etc.
   createdAt: string;
   planId: string;
+  plan?: string;
   status: 'active' | 'suspended' | 'pending' | 'rejected' | 'trial';
   referralCode?: string; // Unique business referral code (e.g. SF-APEX10)
   referredBy?: string; // Code of the referrer who invited this business
