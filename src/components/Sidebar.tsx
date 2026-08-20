@@ -106,17 +106,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
         },
         {
           id: 'super_admin_pending',
-          label: 'Pending Registrations',
+          label: 'Pending Approvals',
           icon: Clock,
           badge: pendingApprovalsCount > 0 ? String(pendingApprovalsCount) : null,
           badgeColor: 'bg-amber-500 text-slate-950 font-black animate-pulse',
-        },
-        {
-          id: 'super_admin_approvals',
-          label: 'Business Approvals',
-          icon: CheckCircle2,
-          badge: null,
-          badgeColor: '',
         },
         {
           id: 'super_admin_suspended',
@@ -146,7 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
         },
         {
           id: 'super_admin_support',
-          label: 'Audited Support Access',
+          label: 'Support Access',
           icon: Headphones,
           badge: activeSupportSession ? 'LIVE' : null,
           badgeColor: 'bg-emerald-500 text-white font-black animate-pulse',
@@ -357,15 +350,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
           </div>
           <div className="min-w-0">
             <div className="font-black text-sm text-white tracking-tight flex items-center gap-1.5">
-              <span>ServiFlow</span>
+              <span>{isSuperAdmin ? 'SERVIFLOW' : 'ServiFlow'}</span>
               {isSuperAdmin && (
                 <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 font-black tracking-widest uppercase">
                   MASTER
                 </span>
               )}
             </div>
-            <div className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase truncate">
-              {isSuperAdmin ? 'Platform Admin' : currentBusiness?.name || 'Field ERP'}
+            <div className="text-[10px] text-slate-400 font-bold tracking-wider uppercase truncate">
+              {isSuperAdmin ? 'PLATFORM ADMIN' : currentBusiness?.name || 'Field ERP'}
             </div>
           </div>
         </div>

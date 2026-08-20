@@ -75,20 +75,19 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
 
   // Super Admin Drawer Modules
   const superAdminModules = [
-    { id: 'super_admin_dashboard', label: 'Platform Overview', icon: LayoutDashboard },
-    { id: 'super_admin_tenants', label: 'All Tenants', icon: Building2 },
-    { id: 'super_admin_pending', label: 'Pending Registrations', icon: Clock },
-    { id: 'super_admin_approvals', label: 'Business Approvals', icon: CheckCircle2 },
+    { id: 'super_admin_dashboard', label: 'Platform Dashboard', icon: LayoutDashboard },
+    { id: 'super_admin_tenants', label: 'Tenant Businesses', icon: Building2 },
+    { id: 'super_admin_pending', label: 'Pending Approvals', icon: Clock },
     { id: 'super_admin_suspended', label: 'Suspended Businesses', icon: Ban },
     { id: 'super_admin_analytics', label: 'Platform Analytics', icon: BarChart3 },
-    { id: 'super_admin_referrals', label: 'Referral Payouts', icon: Gift },
+    { id: 'super_admin_referrals', label: 'Referral Analytics', icon: Gift },
     { id: 'super_admin_support', label: 'Support Access', icon: Headphones },
     { id: 'super_admin_notifications', label: 'System Notifications', icon: Bell },
     { id: 'super_admin_audit', label: 'Security Audit Logs', icon: FileCode },
     { id: 'super_admin_security', label: 'Security & Access', icon: ShieldAlert },
-    { id: 'super_admin_settings', label: 'Global Settings', icon: Sliders },
-    { id: 'super_admin_plans', label: 'Plans & Pricing', icon: Layers },
-    { id: 'super_admin_data_maintenance', label: 'Clean State', icon: Trash2 },
+    { id: 'super_admin_settings', label: 'Global Settings & MFA', icon: Sliders },
+    { id: 'super_admin_plans', label: 'Plans & Subscriptions', icon: Layers },
+    { id: 'super_admin_data_maintenance', label: 'Data & Maintenance', icon: Trash2 },
     { id: 'settings', label: 'Profile Settings', icon: Settings },
   ];
 

@@ -549,19 +549,19 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in">
-      {/* Top Banner Header */}
+      {/* 3. HERO SECTION */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 space-y-1">
-          <div className="inline-flex items-center gap-2 bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full border border-purple-500/30 text-xs font-semibold mb-1">
+        <div className="relative z-10 space-y-1.5">
+          <div className="inline-flex items-center gap-2 bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full border border-purple-500/30 text-xs font-semibold mb-0.5">
             <ShieldCheck className="w-4 h-4 text-purple-300" />
             <span>SaaS Super Administrator Master Console</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Platform Security, Support & Tenant Control
+            Platform Administration
           </h1>
           <p className="text-xs sm:text-sm text-purple-200/80 max-w-2xl">
-            Manage tenant signups, request audited time-limited support access, configure global system policies, and review platform security logs.
+            Manage tenants, platform operations, security, subscriptions and global settings.
           </p>
         </div>
 
@@ -576,7 +576,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
             </span>
             <button
               onClick={() => endSupportSession('Super Admin ended session from master console')}
-              className="mt-1 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-[11px] transition-all"
+              className="mt-1 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-[11px] transition-all cursor-pointer shadow-xs"
             >
               End Support Access
             </button>
@@ -584,11 +584,11 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         )}
       </div>
 
-      {/* Navigation Tabs Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto p-1.5 bg-slate-200/60 dark:bg-slate-900/80 rounded-2xl border border-slate-300/60 dark:border-slate-800 text-xs font-bold scrollbar-none">
+      {/* 2. DASHBOARD TABS - High-Value Platform Views */}
+      <div className="flex items-center gap-1.5 overflow-x-auto p-1.5 bg-slate-200/60 dark:bg-slate-900/80 rounded-2xl border border-slate-300/60 dark:border-slate-800 text-xs font-bold scrollbar-none">
         <button
           onClick={() => setActiveTabSection('overview')}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
             activeTabSection === 'overview'
               ? 'bg-purple-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
@@ -600,14 +600,19 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
 
         <button
           onClick={() => setActiveTabSection('approvals')}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
             activeTabSection === 'approvals'
               ? 'bg-amber-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
           }`}
         >
           <Clock className="w-4 h-4" />
-          <span>Pending Approvals ({pendingCount})</span>
+          <span>Pending Approvals</span>
+          {pendingCount > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-amber-200 dark:bg-amber-950 text-amber-950 dark:text-amber-200 animate-pulse">
+              {pendingCount}
+            </span>
+          )}
         </button>
 
         <button
@@ -615,19 +620,22 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
             setActiveTabSection('tenants');
             setTenantStatusFilter('all');
           }}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
             activeTabSection === 'tenants'
               ? 'bg-indigo-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
           }`}
         >
           <Building2 className="w-4 h-4" />
-          <span>Tenant Directory ({businesses.length})</span>
+          <span>Tenant Directory</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-slate-300/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+            {businesses.length}
+          </span>
         </button>
 
         <button
           onClick={() => setActiveTabSection('analytics')}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
             activeTabSection === 'analytics'
               ? 'bg-blue-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
@@ -639,176 +647,129 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
 
         <button
           onClick={() => setActiveTabSection('referrals')}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
             activeTabSection === 'referrals'
               ? 'bg-amber-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
           }`}
         >
           <Gift className="w-4 h-4" />
-          <span>Referral Engine ({referralRecords.length})</span>
-          {referralPayoutRequests.filter(p => p.status === 'pending').length > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-black bg-rose-500 text-white animate-pulse">
-              {referralPayoutRequests.filter(p => p.status === 'pending').length}
+          <span>Referral Analytics</span>
+          {referralPayoutRequests.filter((p) => p.status === 'pending').length > 0 && (
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full font-black bg-rose-500 text-white animate-pulse">
+              {referralPayoutRequests.filter((p) => p.status === 'pending').length}
             </span>
           )}
-        </button>
-
-        <button
-          onClick={() => setActiveTabSection('support')}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTabSection === 'support'
-              ? 'bg-purple-600 text-white shadow-md'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
-          }`}
-        >
-          <Headphones className="w-4 h-4" />
-          <span>Audited Support</span>
-          {activeSupportSession && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-amber-400 text-slate-950 animate-pulse">
-              ACTIVE
-            </span>
-          )}
-        </button>
-
-        <button
-          onClick={() => setActiveTabSection('notifications')}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTabSection === 'notifications'
-              ? 'bg-violet-600 text-white shadow-md'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
-          }`}
-        >
-          <Bell className="w-4 h-4" />
-          <span>Broadcast Alerts</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTabSection('plans')}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTabSection === 'plans'
-              ? 'bg-teal-600 text-white shadow-md'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
-          }`}
-        >
-          <CreditCard className="w-4 h-4" />
-          <span>Plans & Tiers</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTabSection('settings')}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTabSection === 'settings'
-              ? 'bg-slate-800 text-white shadow-md'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
-          }`}
-        >
-          <Sliders className="w-4 h-4" />
-          <span>SaaS Settings & MFA</span>
         </button>
 
         <button
           onClick={() => setActiveTabSection('audit')}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
             activeTabSection === 'audit'
               ? 'bg-emerald-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
           }`}
         >
           <FileText className="w-4 h-4" />
-          <span>Security Audit Trail</span>
+          <span>Security / Audit</span>
         </button>
 
-        <button
-          onClick={() => setActiveTabSection('sessions')}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTabSection === 'sessions'
-              ? 'bg-rose-600 text-white shadow-md'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
-          }`}
-        >
-          <UserX className="w-4 h-4" />
-          <span>Active Sessions</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTabSection('cleanup')}
-          className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-            activeTabSection === 'cleanup'
-              ? 'bg-rose-600 text-white shadow-md'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
-          }`}
-        >
-          <Sparkles className="w-4 h-4 text-amber-300" />
-          <span>Clean State Reset</span>
-        </button>
+        {/* Secondary section active indicator when navigated via sidebar */}
+        {!['overview', 'approvals', 'tenants', 'analytics', 'referrals', 'audit'].includes(activeTabSection) && (
+          <div className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-600/15 border border-purple-500/30 text-purple-700 dark:text-purple-300 font-bold text-xs">
+            <span className="capitalize">
+              {activeTabSection === 'support' && 'Audited Support View'}
+              {activeTabSection === 'notifications' && 'System Notifications View'}
+              {activeTabSection === 'plans' && 'Plans & Pricing View'}
+              {activeTabSection === 'settings' && 'Global Settings View'}
+              {activeTabSection === 'sessions' && 'Security & Access View'}
+              {activeTabSection === 'cleanup' && 'Data & Maintenance View'}
+            </span>
+            <button
+              onClick={() => setActiveTabSection('overview')}
+              className="p-0.5 rounded-md hover:bg-purple-500/20 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
+              title="Return to Overview"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* SECTION 0: Master Platform Overview */}
       {activeTabSection === 'overview' && (
         <div className="space-y-6 animate-in fade-in">
-          {/* Quick Metrics Grid */}
+          {/* 4. KPI CARDS */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Tenants</span>
-                <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
-                  <Building2 className="w-4 h-4" />
+            <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Tenants</span>
+                  <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
+                    <Building2 className="w-4 h-4" />
+                  </div>
                 </div>
+                <div className="text-2xl font-black text-slate-900 dark:text-slate-100">{businesses.length}</div>
               </div>
-              <div className="text-2xl font-black text-slate-900 dark:text-slate-100">{businesses.length}</div>
-              <div className="text-[10px] text-slate-400 mt-1">Isolated Data Environments</div>
+              <div className="text-[11px] text-slate-400 font-medium mt-2">Isolated Data Workspaces</div>
             </div>
 
-            <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pending Approvals</span>
-                <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
-                  <Clock className="w-4 h-4" />
+            <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Pending Approvals</span>
+                  <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                    <Clock className="w-4 h-4" />
+                  </div>
                 </div>
+                <div className="text-2xl font-black text-amber-600 dark:text-amber-400">{pendingCount}</div>
               </div>
-              <div className="text-2xl font-black text-amber-600 dark:text-amber-400">{pendingCount}</div>
-              <div className="text-[10px] text-amber-700 dark:text-amber-300 font-medium mt-1">
+              <div className="text-[11px] text-amber-700 dark:text-amber-300 font-medium mt-2">
                 {pendingCount > 0 ? 'Requires Super Admin Action' : 'All Clear — No Pending Approvals'}
               </div>
             </div>
 
-            <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Businesses</span>
-                <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="w-4 h-4" />
+            <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Businesses</span>
+                  <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
                 </div>
+                <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{activeCount}</div>
               </div>
-              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{activeCount}</div>
-              <div className="text-[10px] text-emerald-600 font-semibold mt-1">Active ERP Workspaces</div>
+              <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-2">Active ERP Workspaces</div>
             </div>
 
-            <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Suspended</span>
-                <div className="p-2 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
-                  <Ban className="w-4 h-4" />
+            <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Suspended Businesses</span>
+                  <div className="p-2 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
+                    <Ban className="w-4 h-4" />
+                  </div>
                 </div>
+                <div className="text-2xl font-black text-rose-600 dark:text-rose-400">{suspendedCount}</div>
               </div>
-              <div className="text-2xl font-black text-rose-600 dark:text-rose-400">{suspendedCount}</div>
-              <div className="text-[10px] text-rose-600 font-semibold mt-1">Access Revoked / Suspended</div>
+              <div className="text-[11px] text-rose-600 dark:text-rose-400 font-medium mt-2">Access Restricted / Blocked</div>
             </div>
           </div>
 
-          {/* Quick Action Launcher Bar */}
+          {/* 5. QUICK ADMINISTRATION ACTIONS */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
                 <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
                   Quick Administration Actions
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Frequently executed Super Admin operations and diagnostics
+                  Frequently executed Super Admin operations and tenant onboarding
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Primary Action */}
                 <button
                   type="button"
                   onClick={() => {
@@ -823,38 +784,48 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                     });
                     setIsAddTenantModalOpen(true);
                   }}
-                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-all"
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Onboard New Tenant</span>
+                  <Plus className="w-4 h-4" />
+                  <span>+ Onboard New Tenant</span>
                 </button>
 
+                {/* Secondary Action 1 */}
                 <button
                   type="button"
                   onClick={handleSimulateTestRegistration}
-                  className="px-3.5 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 dark:bg-amber-950/60 dark:hover:bg-amber-900 dark:text-amber-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-amber-200 dark:border-amber-800"
+                  className="px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:hover:bg-amber-900/60 dark:text-amber-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-amber-200/80 dark:border-amber-800"
+                  title="Simulate a new incoming business owner signup request"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                   <span>Simulate Signup Request</span>
                 </button>
 
+                {/* Secondary Action 2 */}
                 <button
                   type="button"
                   onClick={() => setActiveTabSection('notifications')}
-                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-slate-200/70 dark:border-slate-700"
                 >
-                  <Bell className="w-3.5 h-3.5" />
+                  <Bell className="w-3.5 h-3.5 text-slate-500" />
                   <span>Broadcast Notice</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveTabSection('cleanup')}
-                  className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:hover:bg-rose-900/80 dark:text-rose-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-rose-200 dark:border-rose-900/60"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Reset Demo Data</span>
-                </button>
+                {/* Visually Separated Danger / Demo Function */}
+                <div className="pl-1 sm:pl-2 border-l border-slate-200 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTabSection('cleanup')}
+                    className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 dark:text-rose-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-rose-200/80 dark:border-rose-900/50"
+                    title="Development/Demo only: Wipe database records except Super Admin"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Reset Demo Data</span>
+                    <span className="text-[9px] px-1 py-0.2 rounded bg-rose-200/70 dark:bg-rose-900 text-rose-900 dark:text-rose-200 font-extrabold uppercase">
+                      Dev
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -864,7 +835,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
             <div className="bg-amber-50/80 dark:bg-amber-950/30 rounded-3xl border border-amber-200/80 dark:border-amber-900/60 p-5 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 bg-amber-500 text-white rounded-xl">
+                  <div className="p-2 bg-amber-500 text-white rounded-xl shadow-xs">
                     <Clock className="w-4 h-4" />
                   </div>
                   <div>
@@ -880,7 +851,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                   onClick={() => setActiveTabSection('approvals')}
                   className="text-xs font-bold text-amber-900 dark:text-amber-200 underline hover:no-underline"
                 >
-                  View All Pending ({pendingCount})
+                  View All Pending ({pendingCount}) →
                 </button>
               </div>
 
@@ -918,7 +889,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
             </div>
           )}
 
-          {/* Quick Active Tenants Overview */}
+          {/* 6. ACTIVE TENANT WORKSPACES */}
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <div>
@@ -940,22 +911,25 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
               {businesses.slice(0, 6).map((b, idx) => {
                 const owner = users.find((u) => u.businessId === b.id && u.role === 'business_owner');
                 const staffCount = users.filter((u) => u.businessId === b.id).length;
+                const tenantJobs = jobs.filter((j) => j.businessId === b.id);
+                const tenantInvoices = invoices.filter((i) => i.businessId === b.id);
+
                 return (
                   <div
                     key={b.id || `quick-biz-${idx}`}
-                    className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col justify-between space-y-3"
+                    className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex flex-col justify-between space-y-3 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition-all"
                   >
                     <div>
-                      <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center justify-between gap-2">
                         <span className="font-extrabold text-xs text-slate-900 dark:text-slate-100 truncate">
                           {b.name}
                         </span>
                         <span
-                          className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                          className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase shrink-0 ${
                             b.status === 'active'
                               ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                               : b.status === 'suspended'
@@ -966,20 +940,38 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                           {b.status}
                         </span>
                       </div>
-                      <div className="text-[11px] text-slate-500 mt-1">
-                        {b.type} • {staffCount} Staff Members
+
+                      <div className="text-[11px] text-slate-500 mt-1 flex items-center justify-between">
+                        <span>{b.type}</span>
+                        <span className="px-1.5 py-0.2 rounded bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 text-[10px] font-bold capitalize">
+                          {b.plan || 'Professional'}
+                        </span>
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+
+                      <div className="text-[10px] text-slate-400 font-mono mt-1 truncate">
                         Owner: {owner?.name || b.email?.split('@')[0] || 'N/A'}
+                      </div>
+
+                      {/* Operational metrics tags */}
+                      <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/40 text-[10px] text-slate-500 font-semibold">
+                        <span className="px-1.5 py-0.5 rounded bg-slate-200/60 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          {staffCount} Staff
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
+                          {tenantJobs.length} Jobs
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                          {tenantInvoices.length} Invoices
+                        </span>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700/60">
                       <button
                         onClick={() => setSelectedTenantDetails(b)}
-                        className="text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:text-indigo-600 flex items-center gap-1 cursor-pointer"
+                        className="text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1 cursor-pointer"
                       >
-                        <Eye className="w-3 h-3" />
+                        <Eye className="w-3.5 h-3.5" />
                         Inspect
                       </button>
                       <button
@@ -1013,22 +1005,28 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
               </button>
             </div>
 
-            <div className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
-              {securityAuditLogs.slice(0, 5).map((log, idx) => (
-                <div key={log.id || `stream-log-${idx}`} className="py-2.5 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono text-[10px] text-slate-400">
-                      {new Date(log.timestamp).toLocaleTimeString()}
-                    </span>
-                    <span className="font-bold text-purple-700 dark:text-purple-300">{log.action}</span>
-                    <span className="text-slate-600 dark:text-slate-400 text-[11px] truncate max-w-md">
-                      {log.details}
-                    </span>
+            {securityAuditLogs.length === 0 ? (
+              <div className="py-6 text-center text-xs text-slate-400">
+                No security audit events recorded yet.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                {securityAuditLogs.slice(0, 5).map((log, idx) => (
+                  <div key={log.id || `stream-log-${idx}`} className="py-2.5 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="font-mono text-[10px] text-slate-400">
+                        {new Date(log.timestamp).toLocaleTimeString()}
+                      </span>
+                      <span className="font-bold text-purple-700 dark:text-purple-300">{log.action}</span>
+                      <span className="text-slate-600 dark:text-slate-400 text-[11px] truncate max-w-md">
+                        {log.details}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-400">{log.actorName}</span>
                   </div>
-                  <span className="text-[10px] font-mono text-slate-400">{log.actorName}</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1370,8 +1368,8 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {businesses
-                    .filter((b) => {
+                  {(() => {
+                    const filtered = businesses.filter((b) => {
                       const owner = users.find((u) => u.businessId === b.id && u.role === 'business_owner');
                       // Status filter
                       if (tenantStatusFilter === 'active' && b.status !== 'active' && b.status !== 'trial') return false;
@@ -1393,8 +1391,36 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                         }
                       }
                       return true;
-                    })
-                    .map((b, idx) => {
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center">
+                            <div className="flex flex-col items-center justify-center space-y-2 text-slate-400">
+                              <Building2 className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                              <span className="font-bold text-sm text-slate-600 dark:text-slate-400">No matching business tenants found</span>
+                              <p className="text-xs text-slate-400 max-w-sm">
+                                {tenantSearchQuery ? `No results matching "${tenantSearchQuery}". Try adjusting your search or filters.` : `No tenants found in this category.`}
+                              </p>
+                              {(tenantSearchQuery || tenantStatusFilter !== 'all') && (
+                                <button
+                                  onClick={() => {
+                                    setTenantSearchQuery('');
+                                    setTenantStatusFilter('all');
+                                  }}
+                                  className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer"
+                                >
+                                  Reset Filters
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filtered.map((b, idx) => {
                       const owner = users.find((u) => u.businessId === b.id && u.role === 'business_owner');
                       const staffCount = users.filter((u) => u.businessId === b.id).length;
                       const isPending = b.status === 'pending' || owner?.approvalStatus === 'pending';
@@ -1518,7 +1544,8 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                           </td>
                         </tr>
                       );
-                    })}
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
