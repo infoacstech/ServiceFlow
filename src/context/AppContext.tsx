@@ -2663,7 +2663,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const normalizedEmail = (data.email || '').trim().toLowerCase();
     const cleanPhoneDigits = (data.phone || '').replace(/[^0-9]/g, '');
 
-    // 1. Strict Duplicate Account Check
+    // 1. Duplicate Account Check - Only flag as duplicate if the user belongs to an active existing business tenant
     const existingAccount = users.find((u) => {
       const uEmail = (u.email || '').trim().toLowerCase();
       const uPhoneDigits = (u.phone || '').replace(/[^0-9]/g, '');
@@ -2672,7 +2672,13 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cleanPhoneDigits.length >= 10 &&
         uPhoneDigits.length >= 10 &&
         uPhoneDigits.slice(-10) === cleanPhoneDigits.slice(-10);
-      return isEmailMatch || isPhoneMatch;
+
+      if (!isEmailMatch && !isPhoneMatch) return false;
+      if (u.role === 'super_admin') return false;
+
+      // If the user's business tenant was deleted, this is not an active duplicate
+      const hasActiveBusiness = businesses.some((b) => b.id === u.businessId);
+      return hasActiveBusiness;
     });
 
     if (existingAccount) {
@@ -2680,7 +2686,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         existingAccount.email?.trim().toLowerCase() === normalizedEmail
           ? `Email address (${data.email})`
           : `Mobile number (${data.phone})`;
-      const errorMsg = `${matchedField} is already registered. Please login to your account.`;
+      const errorMsg = `${matchedField} is already registered with an active business. Please login to your account.`;
       showToast(errorMsg, 'error');
       throw new Error(errorMsg);
     }

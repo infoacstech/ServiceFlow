@@ -271,22 +271,51 @@ export class FirestoreService {
     // 1. Purge all transactional records for this business
     await this.purgeTenantTransactionalData(businessId);
 
-    // 2. Delete all non-admin users for this business
+    // 2. Delete all non-admin users and memberships for this business
     try {
-      const usersQuery = query(collection(db, 'users'), where('businessId', '==', businessId));
-      const usersSnap = await getDocs(usersQuery);
-      if (!usersSnap.empty) {
+      const allUsersSnap = await getDocs(collection(db, 'users'));
+      if (!allUsersSnap.empty) {
         const batch = writeBatch(db);
-        usersSnap.docs.forEach((d) => {
+        let count = 0;
+        allUsersSnap.docs.forEach((d) => {
           const uData = d.data() as User;
-          if (uData.role !== 'super_admin' && uData.email !== 'admin@serviflow.io' && d.id !== 'usr-admin') {
+          if (
+            uData.businessId === businessId &&
+            uData.role !== 'super_admin' &&
+            uData.email !== 'admin@serviflow.io' &&
+            d.id !== 'usr-admin'
+          ) {
             batch.delete(d.ref);
+            count++;
           }
         });
-        await batch.commit();
+        if (count > 0) {
+          await batch.commit();
+        }
       }
     } catch (err) {
       console.error(`Error deleting users for business ${businessId}:`, err);
+    }
+
+    // 2b. Delete tenantMemberships
+    try {
+      const memSnap = await getDocs(collection(db, 'tenantMembers'));
+      if (!memSnap.empty) {
+        const batch = writeBatch(db);
+        let memCount = 0;
+        memSnap.docs.forEach((d) => {
+          const mData = d.data() as any;
+          if (mData.tenantId === businessId || d.id.startsWith(`${businessId}_`)) {
+            batch.delete(d.ref);
+            memCount++;
+          }
+        });
+        if (memCount > 0) {
+          await batch.commit();
+        }
+      }
+    } catch (err) {
+      console.warn(`Error deleting memberships for business ${businessId}:`, err);
     }
 
     // 3. Delete referral records and payout requests associated with this business

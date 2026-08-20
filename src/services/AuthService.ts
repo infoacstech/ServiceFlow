@@ -11,6 +11,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   collection,
   query,
   where,
@@ -77,11 +78,34 @@ export class AuthService {
       uid = authCredential.user.uid;
     } catch (authErr: any) {
       if (authErr.code === 'auth/email-already-in-use') {
+        // Check if there is an active tenant associated with this email in Firestore
+        const existingUsersSnap = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
+        let isExistingActiveInFirestore = false;
+        for (const uDoc of existingUsersSnap.docs) {
+          const u = uDoc.data() as User;
+          if (u.role !== 'super_admin' && u.businessId) {
+            const bSnap = await getDoc(doc(db, 'businesses', u.businessId));
+            if (bSnap.exists()) {
+              isExistingActiveInFirestore = true;
+              break;
+            }
+          }
+        }
+
+        if (isExistingActiveInFirestore) {
+          throw new Error(`Email address (${email}) is already registered with an active business. Please login to your account.`);
+        }
+
+        // Previous tenant was deleted or no active business exists!
+        // Sign in to reuse the Auth UID for the fresh new tenant
         try {
           const signInCred = await signInWithEmailAndPassword(auth, email, params.password);
           uid = signInCred.user.uid;
-        } catch {
-          throw new Error(`Email address (${email}) is already registered in Firebase Authentication. Please login to your account.`);
+        } catch (signInErr: any) {
+          if (signInErr.code === 'auth/wrong-password') {
+            throw new Error(`This email was registered previously. Please enter your existing password for this email to register your new business, or reset your password.`);
+          }
+          throw signInErr;
         }
       } else {
         throw authErr;
@@ -306,20 +330,24 @@ export class AuthService {
         user = { ...(qSnap.docs[0].data() as User), id: authUser.uid };
         // Migrate/normalize user document to auth UID
         await setDoc(doc(db, 'users', authUser.uid), user, { merge: true });
-      } else {
-        // Create baseline profile if none exists
+      } else if (targetEmail === 'admin@serviflow.io' || targetEmail.includes('admin')) {
+        // Only provision baseline profile for Super Admin
         user = {
           id: authUser.uid,
-          name: authUser.displayName || targetEmail.split('@')[0],
+          name: authUser.displayName || 'Platform Super Admin',
           email: targetEmail,
-          phone: authUser.phoneNumber || '+91 98765 00000',
-          role: targetEmail.includes('admin') ? 'super_admin' : 'business_owner',
-          businessId: targetEmail.includes('admin') ? 'all' : `tenant-${Date.now()}`,
+          phone: authUser.phoneNumber || '+91 90000 00000',
+          role: 'super_admin',
+          businessId: 'all',
           status: 'active',
           approvalStatus: 'active',
           joiningDate: new Date().toISOString().split('T')[0],
         };
         await setDoc(doc(db, 'users', authUser.uid), user);
+      } else {
+        // Account has been deleted! Do NOT recreate or resurrect
+        await signOut(auth);
+        throw new Error(`Account for (${targetEmail}) has been deleted or does not exist. Please register a new business account.`);
       }
     } else {
       user = userSnap.data() as User;
@@ -329,9 +357,11 @@ export class AuthService {
     // Security Status Checks
     if (user.role !== 'super_admin') {
       if (user.approvalStatus === 'pending') {
+        await signOut(auth);
         throw new Error('Your account registration is pending approval from the administrator.');
       }
       if (user.approvalStatus === 'blocked' || user.approvalStatus === 'suspended' || user.status === 'inactive') {
+        await signOut(auth);
         throw new Error('Your account access has been suspended or revoked. Contact support.');
       }
     }
@@ -367,28 +397,17 @@ export class AuthService {
         if (tSnap.exists()) {
           tenant = tSnap.data() as Business;
         } else {
-          tenant = {
-            id: user.businessId,
-            name: `${user.name}'s Business`,
-            type: 'CCTV & Security',
-            logo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&auto=format&fit=crop&q=80',
-            mobile: user.phone,
-            whatsapp: user.phone,
-            email: user.email,
-            address: 'Main Service Hub',
-            city: 'New Delhi',
-            state: 'Delhi',
-            pin: '110001',
-            currency: '₹',
-            createdAt: new Date().toISOString().split('T')[0],
-            planId: 'plan-pro',
-            status: 'active',
-          };
-          await setDoc(doc(db, 'businesses', user.businessId), tenant);
+          // The business tenant was deleted by Super Admin! Block login and clean up orphan user doc
+          try {
+            await deleteDoc(doc(db, 'users', user.id));
+          } catch {}
+          await signOut(auth);
+          throw new Error('The business tenant for this account has been deleted. Please register a new business account.');
         }
       }
 
       if (tenant.status === 'suspended' || tenant.status === 'rejected') {
+        await signOut(auth);
         throw new Error('This business account has been suspended by the platform administrator.');
       }
     }
