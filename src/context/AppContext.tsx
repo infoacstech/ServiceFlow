@@ -51,7 +51,7 @@ import {
   DEMO_REFERRALS,
   DEMO_REFERRAL_PAYOUTS,
 } from '../data/demoData';
-import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } from '../lib/firebase';
 import { AuthService } from '../services/AuthService';
 import {
   updatePassword as firebaseUpdatePassword,
@@ -432,7 +432,7 @@ const saveCache = (key: string, data: any) => {
 // Firestore helper wrappers
 const saveToFirestore = async (colName: string, id: string, data: any) => {
   try {
-    await setDoc(doc(db, colName, id), data, { merge: true });
+    await setDoc(doc(db, colName, id), cleanFirestoreData(data), { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `${colName}/${id}`);
   }
@@ -1717,14 +1717,17 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ownerData?: { name?: string; email?: string; phone?: string; password?: string }
   ) => {
     const newBizId = bData.id || `biz-${Date.now()}`;
+    const cleanEmail = (bData.email || ownerData?.email || 'contact@business.com').trim().toLowerCase();
+    const cleanMobile = (bData.mobile || ownerData?.phone || '+91 99999 88888').trim();
+
     const newBiz: Business = {
       id: newBizId,
       name: bData.name || 'New Service Business',
       type: bData.type || 'CCTV & Security',
       logo: bData.logo || 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&auto=format&fit=crop&q=80',
-      mobile: bData.mobile || '+91 99999 88888',
-      whatsapp: bData.whatsapp || bData.mobile || '+91 99999 88888',
-      email: bData.email || 'contact@business.com',
+      mobile: cleanMobile,
+      whatsapp: bData.whatsapp || cleanMobile,
+      email: cleanEmail,
       address: bData.address || 'Main Market Street',
       city: bData.city || 'Delhi',
       state: bData.state || 'Delhi',
@@ -1736,9 +1739,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: isPending ? 'pending' : 'active',
     };
 
-    const ownerName = ownerData?.name || (newBiz.email ? newBiz.email.split('@')[0] : `${newBiz.name} Admin`);
-    const ownerEmail = ownerData?.email || newBiz.email;
-    const rawPhone = ownerData?.phone || newBiz.mobile;
+    const ownerName = ownerData?.name || (cleanEmail ? cleanEmail.split('@')[0] : `${newBiz.name} Admin`);
+    const ownerEmail = cleanEmail;
+    const rawPhone = ownerData?.phone || cleanMobile;
     const ownerPhone = rawPhone.startsWith('+') ? rawPhone : `+91 ${rawPhone}`;
     const ownerPassword = ownerData?.password || '1234';
 
@@ -1775,7 +1778,17 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     saveToFirestore('businesses', newBiz.id, newBiz);
+    saveToFirestore('tenants', newBiz.id, { ...newBiz, ownerId: ownerUser.id });
     saveToFirestore('users', ownerUser.id, ownerUser);
+    saveToFirestore('tenantMembers', `${newBiz.id}_${ownerUser.id}`, {
+      id: `${newBiz.id}_${ownerUser.id}`,
+      tenantId: newBiz.id,
+      userId: ownerUser.id,
+      role: 'business_owner',
+      status: isPending ? 'pending' : 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
     saveToFirestore('categories', defaultCategory.id, defaultCategory);
     saveToFirestore('services', defaultService.id, defaultService);
 
@@ -2525,6 +2538,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     newStatus: 'active' | 'pending' | 'rejected' | 'suspended'
   ) => {
     saveToFirestore('businesses', businessId, { status: newStatus });
+    saveToFirestore('tenants', businessId, { status: newStatus });
     setBusinesses((prev) => {
       const updated = prev.map((b) => (b.id === businessId ? { ...b, status: newStatus } : b));
       saveCache('serviflow_businesses_cache', updated);
@@ -2539,6 +2553,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         status: targetStatus,
       };
       saveToFirestore('users', owner.id, userUpdates);
+      saveToFirestore('tenantMembers', `${businessId}_${owner.id}`, {
+        status: newStatus === 'active' ? 'active' : 'suspended',
+        updatedAt: new Date().toISOString(),
+      });
     });
 
     setUsers((prev) => {

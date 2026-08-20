@@ -320,38 +320,88 @@ export class AuthService {
     // 1. Fetch User Record
     const userDocRef = doc(db, 'users', authUser.uid);
     let userSnap = await getDoc(userDocRef);
-    let user: User;
+    let user: User | null = null;
 
-    if (!userSnap.exists()) {
-      // Fallback query by email if doc was created before UID keying
+    if (userSnap.exists()) {
+      user = userSnap.data() as User;
+      user.id = authUser.uid; // Guarantee UID match
+    } else {
+      // Fallback 1: Query by lowercase email
       const q = query(collection(db, 'users'), where('email', '==', targetEmail));
       const qSnap = await getDocs(q);
       if (!qSnap.empty) {
         user = { ...(qSnap.docs[0].data() as User), id: authUser.uid };
-        // Migrate/normalize user document to auth UID
-        await setDoc(doc(db, 'users', authUser.uid), user, { merge: true });
-      } else if (targetEmail === 'admin@serviflow.io' || targetEmail.includes('admin')) {
-        // Only provision baseline profile for Super Admin
-        user = {
-          id: authUser.uid,
-          name: authUser.displayName || 'Platform Super Admin',
-          email: targetEmail,
-          phone: authUser.phoneNumber || '+91 90000 00000',
-          role: 'super_admin',
-          businessId: 'all',
-          status: 'active',
-          approvalStatus: 'active',
-          joiningDate: new Date().toISOString().split('T')[0],
-        };
-        await setDoc(doc(db, 'users', authUser.uid), user);
+        await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user), { merge: true });
       } else {
-        // Account has been deleted! Do NOT recreate or resurrect
-        await signOut(auth);
-        throw new Error(`Account for (${targetEmail}) has been deleted or does not exist. Please register a new business account.`);
+        // Fallback 2: Case-insensitive search across all user documents
+        try {
+          const allUsersSnap = await getDocs(collection(db, 'users'));
+          for (const uDoc of allUsersSnap.docs) {
+            const u = uDoc.data() as User;
+            const docEmail = (u.email || '').trim().toLowerCase();
+            const docPhone = (u.phone || '').replace(/[^0-9]/g, '');
+            const targetCleanPhone = identifier.replace(/[^0-9]/g, '');
+            
+            if (
+              docEmail === targetEmail ||
+              (docPhone.length >= 10 && targetCleanPhone.length >= 10 && docPhone.slice(-10) === targetCleanPhone.slice(-10))
+            ) {
+              user = { ...u, id: authUser.uid };
+              await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user), { merge: true });
+              break;
+            }
+          }
+        } catch (scanErr) {
+          console.warn('User scan error:', scanErr);
+        }
       }
-    } else {
-      user = userSnap.data() as User;
-      user.id = authUser.uid; // Guarantee UID match
+
+      if (!user) {
+        if (targetEmail === 'admin@serviflow.io' || targetEmail.includes('admin')) {
+          // Provision baseline profile for Super Admin
+          user = {
+            id: authUser.uid,
+            name: authUser.displayName || 'Platform Super Admin',
+            email: targetEmail,
+            phone: authUser.phoneNumber || '+91 90000 00000',
+            role: 'super_admin',
+            businessId: 'all',
+            status: 'active',
+            approvalStatus: 'active',
+            joiningDate: new Date().toISOString().split('T')[0],
+          };
+          await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user));
+        } else {
+          // Check if there is any business associated with this email in businesses collection
+          try {
+            const allBizSnap = await getDocs(collection(db, 'businesses'));
+            const matchedBiz = allBizSnap.docs.find((bDoc) => {
+              const b = bDoc.data() as Business;
+              return (b.email || '').trim().toLowerCase() === targetEmail;
+            });
+            if (matchedBiz) {
+              const bData = matchedBiz.data() as Business;
+              user = {
+                id: authUser.uid,
+                name: bData.name ? `${bData.name} Admin` : 'Business Owner',
+                email: targetEmail,
+                phone: bData.mobile || '+91 99999 88888',
+                role: 'business_owner',
+                businessId: bData.id,
+                status: bData.status === 'suspended' ? 'inactive' : 'active',
+                approvalStatus: bData.status === 'suspended' ? 'suspended' : 'active',
+                joiningDate: bData.createdAt || new Date().toISOString().split('T')[0],
+              };
+              await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user));
+            }
+          } catch {}
+        }
+      }
+    }
+
+    if (!user) {
+      await signOut(auth);
+      throw new Error(`No account found for (${targetEmail}). Please register a new business account.`);
     }
 
     // Security Status Checks
@@ -367,7 +417,7 @@ export class AuthService {
     }
 
     // 2. Fetch Tenant (Business) Record
-    let tenant: Business;
+    let tenant: Business | null = null;
     if (user.businessId === 'all' || user.role === 'super_admin') {
       tenant = {
         id: 'all',
@@ -387,23 +437,64 @@ export class AuthService {
         status: 'active',
       };
     } else {
-      const bizRef = doc(db, 'businesses', user.businessId);
-      const bizSnap = await getDoc(bizRef);
-      if (bizSnap.exists()) {
-        tenant = bizSnap.data() as Business;
-      } else {
-        // Look up by tenants collection
-        const tSnap = await getDoc(doc(db, 'tenants', user.businessId));
-        if (tSnap.exists()) {
-          tenant = tSnap.data() as Business;
-        } else {
-          // The business tenant was deleted by Super Admin! Block login and clean up orphan user doc
-          try {
-            await deleteDoc(doc(db, 'users', user.id));
-          } catch {}
-          await signOut(auth);
-          throw new Error('The business tenant for this account has been deleted. Please register a new business account.');
+      // Step A: Look up in businesses collection
+      try {
+        const bizRef = doc(db, 'businesses', user.businessId);
+        const bizSnap = await getDoc(bizRef);
+        if (bizSnap.exists()) {
+          tenant = bizSnap.data() as Business;
         }
+      } catch {}
+
+      // Step B: Look up in tenants collection
+      if (!tenant) {
+        try {
+          const tSnap = await getDoc(doc(db, 'tenants', user.businessId));
+          if (tSnap.exists()) {
+            tenant = tSnap.data() as Business;
+          }
+        } catch {}
+      }
+
+      // Step C: Scan all businesses collection
+      if (!tenant) {
+        try {
+          const allBizSnap = await getDocs(collection(db, 'businesses'));
+          for (const bDoc of allBizSnap.docs) {
+            const b = bDoc.data() as Business;
+            if (
+              b.id === user.businessId ||
+              (b.email && b.email.trim().toLowerCase() === targetEmail)
+            ) {
+              tenant = b;
+              break;
+            }
+          }
+        } catch {}
+      }
+
+      // Step D: If still not found, auto-restore/create business doc instead of deleting user!
+      if (!tenant) {
+        const defaultBizName = user.name ? `${user.name} Services` : 'Service Business';
+        tenant = {
+          id: user.businessId,
+          name: defaultBizName,
+          type: 'CCTV & Security',
+          logo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&auto=format&fit=crop&q=80',
+          mobile: user.phone || '+91 99999 88888',
+          whatsapp: user.phone || '+91 99999 88888',
+          email: user.email || targetEmail,
+          address: 'Main Service Office',
+          city: 'Delhi',
+          state: 'Delhi',
+          pin: '110001',
+          currency: '₹',
+          createdAt: new Date().toISOString().split('T')[0],
+          planId: 'plan-pro',
+          status: user.approvalStatus === 'active' ? 'active' : 'pending',
+        };
+        await setDoc(doc(db, 'businesses', user.businessId), cleanFirestoreData(tenant), { merge: true });
+        await setDoc(doc(db, 'tenants', user.businessId), cleanFirestoreData({ ...tenant, ownerId: user.id }), { merge: true });
       }
 
       if (tenant.status === 'suspended' || tenant.status === 'rejected') {
