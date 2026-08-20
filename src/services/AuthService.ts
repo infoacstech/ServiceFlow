@@ -18,7 +18,7 @@ import {
   getDocs,
   serverTimestamp,
 } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { auth, db, cleanFirestoreData } from '../lib/firebase';
 import { User, Business, UserRole, ServiceCategory, Service } from '../types';
 
 export interface TenantMembership {
@@ -142,8 +142,8 @@ export class AuthService {
       planId: 'plan-pro',
       status: 'active',
       referralCode: newReferralCode,
-      referredBy: params.referredBy ? params.referredBy.trim().toUpperCase() : undefined,
-      referralDiscountApplied: Boolean(params.referredBy),
+      ...(params.referredBy?.trim() ? { referredBy: params.referredBy.trim().toUpperCase() } : {}),
+      referralDiscountApplied: Boolean(params.referredBy?.trim()),
       referralEarnings: 0,
       referralBalance: 0,
     };
@@ -197,12 +197,12 @@ export class AuthService {
 
     // Commit all records to Firestore
     await Promise.all([
-      setDoc(doc(db, 'users', uid), user),
-      setDoc(doc(db, 'businesses', tenantId), tenant),
-      setDoc(doc(db, 'tenants', tenantId), { ...tenant, ownerId: uid }),
-      setDoc(doc(db, 'tenantMembers', membershipId), membership),
-      setDoc(doc(db, 'categories', defaultCategory.id), defaultCategory),
-      setDoc(doc(db, 'services', defaultService.id), defaultService),
+      setDoc(doc(db, 'users', uid), cleanFirestoreData(user)),
+      setDoc(doc(db, 'businesses', tenantId), cleanFirestoreData(tenant)),
+      setDoc(doc(db, 'tenants', tenantId), cleanFirestoreData({ ...tenant, ownerId: uid })),
+      setDoc(doc(db, 'tenantMembers', membershipId), cleanFirestoreData(membership)),
+      setDoc(doc(db, 'categories', defaultCategory.id), cleanFirestoreData(defaultCategory)),
+      setDoc(doc(db, 'services', defaultService.id), cleanFirestoreData(defaultService)),
     ]);
 
     return { user, tenant, membership };

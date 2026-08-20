@@ -10,7 +10,7 @@ import {
   query,
   where,
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, cleanFirestoreData } from '../lib/firebase';
 import {
   Customer,
   Job,
@@ -69,7 +69,7 @@ export class FirestoreService {
     data: Partial<T>
   ): Promise<void> {
     try {
-      await setDoc(doc(db, collectionName, id), data, { merge: true });
+      await setDoc(doc(db, collectionName, id), cleanFirestoreData(data), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `${collectionName}/${id}`);
     }
