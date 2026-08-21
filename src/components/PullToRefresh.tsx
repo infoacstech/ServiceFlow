@@ -9,6 +9,106 @@ interface PullToRefreshProps {
   disabled?: boolean;
 }
 
+/**
+ * Global helper that detects whether ANY interactive overlay is currently active in the DOM.
+ * Detects: Modals, Drawers, Bottom sheets, Dialogs, Full-screen forms, Side panels, Popups, and Backdrops.
+ */
+export function isAnyOverlayActive(): boolean {
+  if (typeof document === 'undefined') return false;
+
+  // 1. Check for standard dialog / modal / drawer ARIA and data markers
+  const roleElements = document.querySelectorAll(
+    '[role="dialog"], [role="alertdialog"], [aria-modal="true"], [data-overlay="true"], [data-modal="true"], [data-drawer="true"], [data-sheet="true"]'
+  );
+  for (let i = 0; i < roleElements.length; i++) {
+    const el = roleElements[i] as HTMLElement;
+    if (el.offsetWidth > 0 && el.offsetHeight > 0 && window.getComputedStyle(el).display !== 'none') {
+      return true;
+    }
+  }
+
+  // 2. Check for fixed full-screen or slide-over overlays in the DOM
+  const fixedElements = document.querySelectorAll(
+    '.fixed.inset-0, .fixed.inset-y-0, .fixed.inset-x-0, [class*="fixed inset-0"], [class*="fixed inset-y-0"]'
+  );
+  for (let i = 0; i < fixedElements.length; i++) {
+    const el = fixedElements[i] as HTMLElement;
+    if (el.offsetWidth > 0 && el.offsetHeight > 0) {
+      const style = window.getComputedStyle(el);
+      if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+        const rect = el.getBoundingClientRect();
+        // If element covers at least 40% of viewport width & height, or full viewport height for slide-overs
+        if (
+          (rect.width >= window.innerWidth * 0.4 && rect.height >= window.innerHeight * 0.4) ||
+          rect.height >= window.innerHeight * 0.75
+        ) {
+          return true;
+        }
+      }
+    }
+  }
+
+  // 3. Check for any backdrop overlay or modal containers (e.g. backdrop-blur or dark transparent covers)
+  const backdropElements = document.querySelectorAll(
+    '[class*="backdrop-blur"], [class*="bg-slate-900/"], [class*="bg-black/"], [class*="bg-slate-950/"], [class*="bg-stone-900/"]'
+  );
+  for (let i = 0; i < backdropElements.length; i++) {
+    const el = backdropElements[i] as HTMLElement;
+    const style = window.getComputedStyle(el);
+    if (
+      (style.position === 'fixed' || style.position === 'absolute') &&
+      el.offsetWidth >= window.innerWidth * 0.4 &&
+      el.offsetHeight >= window.innerHeight * 0.4
+    ) {
+      if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+        return true;
+      }
+    }
+  }
+
+  // 4. Check for native HTML dialogs or modal-open classes
+  if (document.querySelector('dialog[open], .modal-open, .overlay-open, [data-state="open"][role="dialog"]')) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Checks if a specific event target or any of its ancestors is inside an overlay element.
+ */
+export function isEventInsideOverlay(target: EventTarget | null): boolean {
+  if (!target || !(target instanceof Element)) return false;
+
+  const overlayAncestor = target.closest(
+    '[role="dialog"], [role="alertdialog"], [aria-modal="true"], ' +
+    '[data-overlay], [data-modal], [data-drawer], [data-sheet], ' +
+    '.modal, .drawer, .sheet, .dialog, .popup, ' +
+    '.fixed.inset-0, .fixed.inset-y-0, [class*="fixed inset-0"], [class*="fixed inset-y-0"]'
+  );
+  if (overlayAncestor) {
+    return true;
+  }
+
+  // Traverse up parent hierarchy for fixed/absolute containers with zIndex >= 30
+  let current: Element | null = target;
+  while (current && current !== document.body && current !== document.documentElement) {
+    const style = window.getComputedStyle(current);
+    if (style.position === 'fixed' || style.position === 'absolute') {
+      const zIndex = parseInt(style.zIndex, 10);
+      if (zIndex >= 30) {
+        const isBottomNav = current.tagName === 'NAV' && current.classList.contains('bottom-0') && current.clientHeight < 100;
+        if (!isBottomNav) {
+          return true;
+        }
+      }
+    }
+    current = current.parentElement;
+  }
+
+  return false;
+}
+
 export const PullToRefresh: React.FC<PullToRefreshProps> = ({
   children,
   onRefresh,
@@ -20,6 +120,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
+  const [hasActiveOverlay, setHasActiveOverlay] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef<number | null>(null);
@@ -29,6 +130,49 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
 
   const PULL_THRESHOLD = 65;
   const MAX_PULL = 110;
+
+  // Real-time MutationObserver to keep track of active modals/drawers/dialogs/sheets
+  useEffect(() => {
+    const checkOverlayState = () => {
+      const isActive = isAnyOverlayActive();
+      setHasActiveOverlay(isActive);
+      if (isActive) {
+        setPullDistance(0);
+        setIsPulling(false);
+        isDraggingRef.current = false;
+        startYRef.current = null;
+        startXRef.current = null;
+      }
+    };
+
+    checkOverlayState();
+
+    const observer = new MutationObserver(() => {
+      checkOverlayState();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style', 'open', 'data-state', 'aria-modal'],
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  // Lock background scroll when an overlay is active so that background page doesn't scroll
+  useEffect(() => {
+    if (hasActiveOverlay) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow || '';
+      };
+    }
+  }, [hasActiveOverlay]);
 
   // Safe Haptic Feedback helper
   const triggerHaptic = useCallback((pattern: number | number[]) => {
@@ -43,7 +187,15 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
 
   const handleTouchStart = useCallback(
     (e: TouchEvent) => {
-      if (disabled || isRefreshing) return;
+      // Disable pull-to-refresh completely if any overlay is active or touch started inside an overlay
+      if (disabled || isRefreshing || hasActiveOverlay || isAnyOverlayActive() || isEventInsideOverlay(e.target)) {
+        isDraggingRef.current = false;
+        startYRef.current = null;
+        startXRef.current = null;
+        setPullDistance(0);
+        setIsPulling(false);
+        return;
+      }
 
       // Check if page or container is at the top before enabling pull gesture
       const scrollTop = window.scrollY || document.documentElement.scrollTop || containerRef.current?.scrollTop || 0;
@@ -56,12 +208,25 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
         isDraggingRef.current = false;
       }
     },
-    [disabled, isRefreshing]
+    [disabled, isRefreshing, hasActiveOverlay]
   );
 
   const handleTouchMove = useCallback(
     (e: TouchEvent) => {
-      if (!isDraggingRef.current || startYRef.current === null || startXRef.current === null || isRefreshing) {
+      if (
+        !isDraggingRef.current ||
+        startYRef.current === null ||
+        startXRef.current === null ||
+        isRefreshing ||
+        hasActiveOverlay ||
+        isAnyOverlayActive() ||
+        isEventInsideOverlay(e.target)
+      ) {
+        if (pullDistance > 0 || isPulling) {
+          setPullDistance(0);
+          setIsPulling(false);
+        }
+        isDraggingRef.current = false;
         return;
       }
 
@@ -97,12 +262,14 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
         hasFiredThresholdHapticRef.current = false;
       }
     },
-    [isRefreshing, triggerHaptic, PULL_THRESHOLD, MAX_PULL]
+    [isRefreshing, hasActiveOverlay, triggerHaptic, PULL_THRESHOLD, MAX_PULL, pullDistance, isPulling]
   );
 
   const handleTouchEnd = useCallback(async () => {
-    if (!isDraggingRef.current || startYRef.current === null || isRefreshing) {
+    if (!isDraggingRef.current || startYRef.current === null || isRefreshing || hasActiveOverlay || isAnyOverlayActive()) {
       isDraggingRef.current = false;
+      setPullDistance(0);
+      setIsPulling(false);
       return;
     }
 
@@ -150,7 +317,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
       setIsPulling(false);
       hasFiredThresholdHapticRef.current = false;
     }
-  }, [pullDistance, PULL_THRESHOLD, isRefreshing, onRefresh, syncOfflineQueue, isOffline, showToast, triggerHaptic]);
+  }, [pullDistance, PULL_THRESHOLD, isRefreshing, hasActiveOverlay, onRefresh, syncOfflineQueue, isOffline, showToast, triggerHaptic]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -174,8 +341,8 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
 
   return (
     <div ref={containerRef} className={`relative w-full min-h-full ${className}`}>
-      {/* Pull-To-Refresh Visual Indicator Banner */}
-      {(pullDistance > 0 || isRefreshing) && (
+      {/* Pull-To-Refresh Visual Indicator Banner (Never shown when any overlay is active) */}
+      {(pullDistance > 0 || isRefreshing) && !hasActiveOverlay && !isAnyOverlayActive() && (
         <div
           className="sticky top-2 left-0 right-0 z-30 flex items-center justify-center pointer-events-none transition-transform duration-100 ease-out mb-2"
           style={{
@@ -228,7 +395,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
       <div
         className="w-full transition-transform duration-100 ease-out"
         style={{
-          transform: isPulling ? `translateY(${Math.min(pullDistance * 0.2, 16)}px)` : undefined,
+          transform: isPulling && !hasActiveOverlay ? `translateY(${Math.min(pullDistance * 0.2, 16)}px)` : undefined,
         }}
       >
         {children}
@@ -236,3 +403,4 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
     </div>
   );
 };
+
