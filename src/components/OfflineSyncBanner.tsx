@@ -21,7 +21,7 @@ export const OfflineSyncBanner: React.FC = () => {
   const handleManualSync = () => {
     setIsSyncing(true);
     setTimeout(() => {
-      syncOfflineQueue();
+      syncOfflineQueue(true);
       setIsSyncing(false);
     }, 600);
   };

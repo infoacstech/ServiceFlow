@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { EnquiryFormModal } from '../components/enquiries/EnquiryFormModal';
 import {
   Briefcase,
   Users,
@@ -76,12 +77,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     setIsActivityLogOpen,
     addCustomer,
     addQuotation,
+    isOffline,
     syncOfflineQueue,
     pendingSyncQueue,
     showToast,
   } = useApp();
 
   // Quick Action Modal States
+  const [isNewEnquiryOpen, setIsNewEnquiryOpen] = useState(false);
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [custName, setCustName] = useState('');
   const [custMobile, setCustMobile] = useState('');
@@ -173,16 +176,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const handleSyncData = () => {
     setIsSyncing(true);
-    syncOfflineQueue();
-    setTimeout(() => {
+    try {
+      syncOfflineQueue(false);
+      setTimeout(() => {
+        setIsSyncing(false);
+        showToast(
+          isOffline
+            ? 'Local changes saved offline.'
+            : 'Data refreshed & cloud-synced!',
+          'success'
+        );
+      }, 600);
+    } catch (err) {
+      console.error('Dashboard sync error:', err);
       setIsSyncing(false);
-      showToast(
-        pendingSyncQueue.length > 0
-          ? 'Synchronized offline queue with server database!'
-          : 'All field technician data is synchronized and up-to-date!',
-        'success'
-      );
-    }, 600);
+      showToast('Failed to refresh data. Please try again.', 'error');
+    }
   };
 
   const curr = currentBusiness.currency;
@@ -362,7 +371,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          {/* Action 1: Add Customer */}
+          {/* Action 1: New Enquiry */}
+          <button
+            onClick={() => setIsNewEnquiryOpen(true)}
+            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/80 hover:bg-blue-50 dark:bg-slate-800/60 dark:hover:bg-blue-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-blue-300 dark:hover:border-blue-600/50 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-300 transition-all group active:scale-95 cursor-pointer"
+          >
+            <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 mb-1.5 group-hover:scale-110 transition-transform">
+              <HelpCircle className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-bold">New Enquiry</span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500">Capture a new service enquiry</span>
+          </button>
+
+          {/* Action 2: Add Customer */}
           <button
             onClick={() => setIsAddCustomerOpen(true)}
             className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/80 hover:bg-indigo-50 dark:bg-slate-800/60 dark:hover:bg-indigo-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-indigo-300 dark:hover:border-indigo-600/50 text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-300 transition-all group active:scale-95 cursor-pointer"
@@ -374,18 +395,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-[10px] text-slate-400 dark:text-slate-500">Create CRM entry</span>
           </button>
 
-          {/* Action 2: Quick Quote */}
-          <button
-            onClick={() => setIsQuickQuoteOpen(true)}
-            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/80 hover:bg-emerald-50 dark:bg-slate-800/60 dark:hover:bg-emerald-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-emerald-300 dark:hover:border-emerald-600/50 text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-300 transition-all group active:scale-95 cursor-pointer"
-          >
-            <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 mb-1.5 group-hover:scale-110 transition-transform">
-              <FileText className="w-4 h-4" />
-            </div>
-            <span className="text-xs font-bold">Quick Quote</span>
-            <span className="text-[10px] text-slate-400 dark:text-slate-500">Generate estimate</span>
-          </button>
-
           {/* Action 3: Schedule Job */}
           <button
             onClick={onOpenNewJob}
@@ -395,19 +404,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Plus className="w-4 h-4" />
             </div>
             <span className="text-xs font-bold">Schedule Job</span>
-            <span className="text-[10px] text-slate-400 dark:text-slate-500">Dispatch tech</span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500">Dispatch field technician</span>
           </button>
 
-          {/* Action 4: Create Invoice */}
+          {/* Action 4: Quick Quote */}
           <button
-            onClick={() => navigate('invoices', { statusFilter: 'all' })}
-            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/80 hover:bg-rose-50 dark:bg-slate-800/60 dark:hover:bg-rose-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-rose-300 dark:hover:border-rose-600/50 text-slate-700 dark:text-slate-200 hover:text-rose-600 dark:hover:text-rose-300 transition-all group active:scale-95 cursor-pointer"
+            onClick={() => setIsQuickQuoteOpen(true)}
+            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/80 hover:bg-emerald-50 dark:bg-slate-800/60 dark:hover:bg-emerald-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-emerald-300 dark:hover:border-emerald-600/50 text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-300 transition-all group active:scale-95 cursor-pointer"
           >
-            <div className="p-2 rounded-xl bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 mb-1.5 group-hover:scale-110 transition-transform">
-              <Receipt className="w-4 h-4" />
+            <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 mb-1.5 group-hover:scale-110 transition-transform">
+              <FileText className="w-4 h-4" />
             </div>
-            <span className="text-xs font-bold">Create Invoice</span>
-            <span className="text-[10px] text-slate-400 dark:text-slate-500">Bill & payment</span>
+            <span className="text-xs font-bold">Quick Quote</span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500">Generate estimate</span>
           </button>
         </div>
       </div>
@@ -958,6 +967,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           })}
         </div>
       </div>
+
+      {/* New Enquiry Modal */}
+      <EnquiryFormModal
+        isOpen={isNewEnquiryOpen}
+        onClose={() => setIsNewEnquiryOpen(false)}
+      />
 
       {/* Add Customer Modal */}
       {isAddCustomerOpen && (

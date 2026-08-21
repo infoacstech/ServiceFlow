@@ -78,6 +78,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     theme,
     toggleTheme,
     setIsActivityLogOpen,
+    isOffline,
     syncOfflineQueue,
     pendingSyncQueue,
     isProfileDrawerOpen,
@@ -302,16 +303,22 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={() => {
               setIsRefreshingPage(true);
-              syncOfflineQueue();
-              setTimeout(() => {
+              try {
+                syncOfflineQueue(false);
+                setTimeout(() => {
+                  setIsRefreshingPage(false);
+                  showToast(
+                    isOffline
+                      ? 'Local changes saved offline.'
+                      : 'Data refreshed & cloud-synced!',
+                    'success'
+                  );
+                }, 600);
+              } catch (err) {
+                console.error('Navbar sync error:', err);
                 setIsRefreshingPage(false);
-                showToast(
-                  pendingSyncQueue.length > 0
-                    ? `Synchronized ${pendingSyncQueue.length} offline updates with cloud database!`
-                    : 'Cloud sync complete. All local and field data is up to date.',
-                  'success'
-                );
-              }, 600);
+                showToast('Failed to refresh data. Please try again.', 'error');
+              }
             }}
             disabled={isRefreshingPage}
             className={`flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer ${

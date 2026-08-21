@@ -286,7 +286,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
         if (onRefresh) {
           await onRefresh();
         } else {
-          syncOfflineQueue();
+          syncOfflineQueue(false);
         }
 
         setIsRefreshing(false);
@@ -311,6 +311,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
         setIsRefreshing(false);
         setPullDistance(0);
         setIsPulling(false);
+        showToast('Failed to refresh data. Please try again.', 'error');
       }
     } else {
       setPullDistance(0);

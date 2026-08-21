@@ -298,10 +298,13 @@ interface AppContextType {
   isOffline: boolean;
   isSimulatedOffline: boolean;
   pendingSyncQueue: OfflineSyncItem[];
-  syncOfflineQueue: () => void;
+  syncOfflineQueue: (showToastNotification?: boolean) => void;
   toggleSimulateOffline: () => void;
   manualSyncLogs: ManualSyncLog[];
-  triggerManualSync: (triggerType?: 'MANUAL_BUTTON' | 'AUTO_RECONNECT' | 'FORCED_REFRESH') => void;
+  triggerManualSync: (
+    triggerType?: 'MANUAL_BUTTON' | 'AUTO_RECONNECT' | 'FORCED_REFRESH',
+    showToastNotification?: boolean
+  ) => void;
   clearSyncLogs: () => void;
 
   // Super Admin Support Access & Security Engine
@@ -1260,7 +1263,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const triggerManualSync = (
-    triggerType: 'MANUAL_BUTTON' | 'AUTO_RECONNECT' | 'FORCED_REFRESH' = 'MANUAL_BUTTON'
+    triggerType: 'MANUAL_BUTTON' | 'AUTO_RECONNECT' | 'FORCED_REFRESH' = 'MANUAL_BUTTON',
+    showToastNotification: boolean = true
   ) => {
     const isOff = isOffline || isSimulatedOffline;
     const nowISO = new Date().toISOString();
@@ -1279,7 +1283,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         networkLatencyMs: 0,
       };
       saveToFirestore('manualSyncLogs', logEntry.id, logEntry);
-      showToast(`Device is Offline. ${pendingSyncQueue.length} update(s) remain queued in local storage.`, 'info');
+      if (showToastNotification) {
+        showToast(`Device is Offline. ${pendingSyncQueue.length} update(s) remain queued in local storage.`, 'info');
+      }
       return;
     }
 
@@ -1318,7 +1324,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       saveToFirestore('manualSyncLogs', logEntry.id, logEntry);
       setPendingSyncQueue([]);
-      showToast(`Successfully synchronized ${syncedItems.length} queued update(s) to Firestore!`, 'success');
+      if (showToastNotification) {
+        showToast('Data refreshed & cloud-synced!', 'success');
+      }
     } else {
       const logEntry: ManualSyncLog = {
         id: `sync-log-${Date.now()}`,
@@ -1333,12 +1341,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       saveToFirestore('manualSyncLogs', logEntry.id, logEntry);
-      showToast('Sync check complete! All records are in sync with Firestore.', 'info');
+      if (showToastNotification) {
+        showToast('Data refreshed & cloud-synced!', 'success');
+      }
     }
   };
 
-  const syncOfflineQueue = () => {
-    triggerManualSync('AUTO_RECONNECT');
+  const syncOfflineQueue = (showToastNotification: boolean = false) => {
+    triggerManualSync('AUTO_RECONNECT', showToastNotification);
   };
 
   const clearSyncLogs = () => {
@@ -1349,7 +1359,13 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     const id = Date.now().toString() + Math.random();
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts((prev) => {
+      // Prevent identical duplicate toast popups if the message is already active
+      if (prev.some((t) => t.message === message)) {
+        return prev;
+      }
+      return [...prev, { id, message, type }];
+    });
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4000);
