@@ -497,7 +497,13 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return null;
   });
-  const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(true);
+  const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(() => {
+    try {
+      return !localStorage.getItem('serviflow_user_session');
+    } catch {
+      return false;
+    }
+  });
 
   const [enquiries, setEnquiries] = useState<Enquiry[]>(() =>
     loadCache('serviflow_enquiries_cache', [])

@@ -51,7 +51,7 @@ const MainContent: React.FC = () => {
     getRolePermissions,
   } = useApp();
   const [activeTab, setActiveTab] = useState<string>(() => {
-    return sessionStorage.getItem('serviflow_active_tab') || 'dashboard';
+    return localStorage.getItem('serviflow_active_tab') || sessionStorage.getItem('serviflow_active_tab') || 'dashboard';
   });
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isCreateJobOpen, setIsCreateJobOpen] = useState(false);
@@ -64,12 +64,13 @@ const MainContent: React.FC = () => {
     if (currentUser) {
       const isTechUser = currentUser.role === 'technician';
       const isSuperUser = currentUser.role === 'super_admin';
-      const savedTab = sessionStorage.getItem('serviflow_active_tab');
+      const savedTab = localStorage.getItem('serviflow_active_tab') || sessionStorage.getItem('serviflow_active_tab');
 
       if (isTechUser) {
         // Technicians & staff must default to 'jobs' (My Jobs) and are restricted from dashboard
         if (!savedTab || savedTab === 'login' || savedTab === 'dashboard') {
           setActiveTab('jobs');
+          localStorage.setItem('serviflow_active_tab', 'jobs');
           sessionStorage.setItem('serviflow_active_tab', 'jobs');
         } else {
           setActiveTab(savedTab);
@@ -77,6 +78,7 @@ const MainContent: React.FC = () => {
       } else if (!savedTab || savedTab === 'login') {
         const defaultTab = isSuperUser ? 'super_admin_dashboard' : 'dashboard';
         setActiveTab(defaultTab);
+        localStorage.setItem('serviflow_active_tab', defaultTab);
         sessionStorage.setItem('serviflow_active_tab', defaultTab);
       } else {
         setActiveTab(savedTab);
@@ -96,12 +98,13 @@ const MainContent: React.FC = () => {
     }
     setActiveTab(targetTab);
     if (currentUser) {
+      localStorage.setItem('serviflow_active_tab', targetTab);
       sessionStorage.setItem('serviflow_active_tab', targetTab);
     }
   };
 
-  // 1. Loading / Splash Screen while Firebase Auth is resolving
-  if (isAuthInitializing) {
+  // 1. Loading / Splash Screen ONLY while resolving if NO cached session exists
+  if (isAuthInitializing && !currentUser) {
     return (
       <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
         <div className="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-indigo-600/30 mb-6 animate-pulse">
