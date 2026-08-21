@@ -6,6 +6,8 @@ import type {
   Role,
   RolePermission,
   Enquiry,
+  EnquiryFollowUp,
+  EnquiryActivity,
   Customer,
   ServiceCategory,
   Service,
@@ -15,6 +17,7 @@ import type {
   InventoryItem,
   InventoryTransaction,
   Quotation,
+  LineItem,
   Invoice,
   Payment,
   RecurringContract,
@@ -218,6 +221,20 @@ interface AppContextType {
   updateEnquiry: (id: string, updates: Partial<Enquiry>) => void;
   deleteEnquiry: (id: string) => void;
   convertEnquiryToJob: (enquiryId: string, jobData?: Partial<Job>) => Promise<Job>;
+  convertEnquiryToQuote: (
+    enquiryId: string,
+    quoteData: {
+      items: LineItem[];
+      validUntil?: string;
+      notes?: string;
+      terms?: string;
+    }
+  ) => Promise<Quotation>;
+  addEnquiryFollowUp: (enquiryId: string, followUp: Omit<EnquiryFollowUp, 'id' | 'createdAt'>) => void;
+  linkCustomerToEnquiry: (enquiryId: string, customerId: string) => void;
+  createAndLinkCustomerFromEnquiry: (enquiryId: string, customerOverrides?: Partial<Customer>) => Customer;
+  markEnquiryQualified: (enquiryId: string, notes?: string) => void;
+  markEnquiryLost: (enquiryId: string, reason: string, notes?: string) => void;
   addEnquiryActivity: (enquiryId: string, action: string, details: string) => void;
 
   addCustomer: (c: Omit<Customer, 'id' | 'businessId' | 'createdAt'>) => Customer;
@@ -1079,7 +1096,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // FIREBASE AUTH PERSISTENCE & SESSION RESTORATION
   // -------------------------------------------------------------
   useEffect(() => {
+    let isMounted = true;
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!isMounted) return;
+
       if (firebaseUser) {
         try {
           let userRecord: User | null = null;
@@ -1103,7 +1124,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
           }
 
-          if (userRecord) {
+          if (userRecord && isMounted) {
             setCurrentUser(userRecord);
             localStorage.setItem('serviflow_user_session', JSON.stringify(userRecord));
             localStorage.setItem('serviflow_logged_in_email', userRecord.email);
@@ -1148,16 +1169,30 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.error('Error fetching user on auth change:', err);
         }
       } else {
-        // Clear session on sign out
-        localStorage.removeItem('serviflow_user_session');
-        localStorage.removeItem('serviflow_logged_in_email');
-        localStorage.removeItem('serviflow_logged_in_uid');
-        setCurrentUser(null);
+        // If firebaseUser is null on refresh, check if we already have a valid cached user session
+        const cachedSession = localStorage.getItem('serviflow_user_session');
+        if (cachedSession) {
+          try {
+            const parsedUser = JSON.parse(cachedSession) as User;
+            if (parsedUser && parsedUser.id) {
+              if (isMounted && !currentUser) {
+                setCurrentUser(parsedUser);
+              }
+            }
+          } catch (e) {
+            console.warn('Error reading cached user session:', e);
+          }
+        }
       }
-      setIsAuthInitializing(false);
+      if (isMounted) {
+        setIsAuthInitializing(false);
+      }
     });
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [businesses]);
 
   const loginUser = async (userToLogin: User, password?: string): Promise<User> => {
@@ -2003,6 +2038,276 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logActivity(`Enquiry: ${action}`, 'enquiry', enquiryId, details);
   };
 
+  const addEnquiryFollowUp = (enquiryId: string, followUpData: Omit<EnquiryFollowUp, 'id' | 'createdAt'>) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = enquiries.find((e) => e.id === enquiryId);
+    if (!target) return;
+    if (target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot modify enquiry belonging to another tenant business.', 'error');
+      return;
+    }
+
+    const newFollowUp: EnquiryFollowUp = {
+      ...followUpData,
+      id: `flw-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser?.name || 'Staff User',
+    };
+
+    const updatedFollowUps = [...(target.followUps || []), newFollowUp];
+    const activityDetails = `Follow-up set for ${followUpData.date} ${followUpData.time || ''}. Note: ${followUpData.notes}${followUpData.outcome ? ` | Outcome: ${followUpData.outcome}` : ''}`;
+    
+    const newActivity: EnquiryActivity = {
+      id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      timestamp: new Date().toISOString(),
+      action: 'Follow-up Added',
+      actorName: currentUser?.name || 'Staff User',
+      details: activityDetails,
+    };
+
+    const updatedHistory = [...(target.activityHistory || []), newActivity];
+
+    const updates: Partial<Enquiry> = {
+      followUps: updatedFollowUps,
+      followUpDate: followUpData.date,
+      followUpTime: followUpData.time || '',
+      activityHistory: updatedHistory,
+    };
+
+    if (target.status === 'new' || target.status === 'contacted') {
+      updates.status = 'follow_up';
+    }
+
+    firestoreService.saveDocument<Enquiry>('enquiries', enquiryId, updates);
+    logActivity('Enquiry Follow-up', 'enquiry', enquiryId, activityDetails);
+    showToast('Follow-up recorded successfully', 'success');
+  };
+
+  const linkCustomerToEnquiry = (enquiryId: string, customerId: string) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = enquiries.find((e) => e.id === enquiryId);
+    const cust = customers.find((c) => c.id === customerId);
+    if (!target || !cust) return;
+    if (target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot modify enquiry belonging to another tenant business.', 'error');
+      return;
+    }
+
+    const linkActivity: EnquiryActivity = {
+      id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      timestamp: new Date().toISOString(),
+      action: 'Customer Linked',
+      actorName: currentUser?.name || 'Staff User',
+      details: `Linked to existing customer ${cust.name} (${cust.mobile})`,
+    };
+
+    const updatedHistory = [...(target.activityHistory || []), linkActivity];
+
+    firestoreService.saveDocument<Enquiry>('enquiries', enquiryId, {
+      customerId: cust.id,
+      customerName: cust.name,
+      customerPhone: cust.mobile,
+      customerEmail: cust.email || target.customerEmail,
+      companyName: cust.companyName || target.companyName,
+      location: cust.address || target.location,
+      activityHistory: updatedHistory,
+    });
+
+    logActivity('Enquiry Customer Linked', 'enquiry', enquiryId, `Linked enquiry ${target.enquiryId} to customer ${cust.name}`);
+    showToast(`Linked enquiry to ${cust.name}`, 'success');
+  };
+
+  const createAndLinkCustomerFromEnquiry = (enquiryId: string, customerOverrides?: Partial<Customer>): Customer => {
+    if (checkReadOnlySupportGuard()) return {} as Customer;
+    const target = enquiries.find((e) => e.id === enquiryId);
+    if (!target) throw new Error('Enquiry not found');
+
+    const newCust = addCustomer({
+      name: customerOverrides?.name || target.customerName,
+      companyName: customerOverrides?.companyName || target.companyName || '',
+      mobile: customerOverrides?.mobile || target.customerPhone,
+      email: customerOverrides?.email || target.customerEmail || '',
+      address: customerOverrides?.address || target.location || target.address || currentBusiness.address || 'Service Location',
+      city: customerOverrides?.city || currentBusiness.city || 'City',
+      state: customerOverrides?.state || currentBusiness.state || 'State',
+      pin: customerOverrides?.pin || currentBusiness.pin || '000000',
+      customerType: customerOverrides?.customerType || (target.companyName ? 'commercial' : 'individual'),
+      notes: customerOverrides?.notes || `Created from Enquiry ${target.enquiryId}. ${target.notes || ''}`.trim(),
+    });
+
+    if (newCust) {
+      const linkActivity: EnquiryActivity = {
+        id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+        timestamp: new Date().toISOString(),
+        action: 'Customer Created & Linked',
+        actorName: currentUser?.name || 'Staff User',
+        details: `Created new customer record ${newCust.name} (${newCust.mobile}) and linked to enquiry`,
+      };
+
+      const updatedHistory = [...(target.activityHistory || []), linkActivity];
+
+      firestoreService.saveDocument<Enquiry>('enquiries', enquiryId, {
+        customerId: newCust.id,
+        customerName: newCust.name,
+        customerPhone: newCust.mobile,
+        customerEmail: newCust.email,
+        companyName: newCust.companyName,
+        location: newCust.address,
+        activityHistory: updatedHistory,
+      });
+
+      logActivity('Customer Created from Enquiry', 'customer', newCust.id, `Created customer ${newCust.name} from enquiry ${target.enquiryId}`);
+    }
+
+    return newCust || ({} as Customer);
+  };
+
+  const markEnquiryQualified = (enquiryId: string, notes?: string) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = enquiries.find((e) => e.id === enquiryId);
+    if (!target) return;
+    if (target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot modify enquiry belonging to another tenant business.', 'error');
+      return;
+    }
+
+    const qualActivity: EnquiryActivity = {
+      id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      timestamp: new Date().toISOString(),
+      action: 'Qualified Enquiry',
+      actorName: currentUser?.name || 'Staff User',
+      details: `Enquiry marked as Qualified.${notes ? ` Note: ${notes}` : ''}`,
+    };
+
+    const updatedHistory = [...(target.activityHistory || []), qualActivity];
+
+    firestoreService.saveDocument<Enquiry>('enquiries', enquiryId, {
+      status: 'qualified',
+      activityHistory: updatedHistory,
+    });
+
+    logActivity('Enquiry Qualified', 'enquiry', enquiryId, `Marked enquiry ${target.enquiryId} as Qualified`);
+    showToast(`Enquiry ${target.enquiryId} marked as Qualified!`, 'success');
+  };
+
+  const markEnquiryLost = (enquiryId: string, reason: string, notes?: string) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = enquiries.find((e) => e.id === enquiryId);
+    if (!target) return;
+    if (target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot modify enquiry belonging to another tenant business.', 'error');
+      return;
+    }
+
+    const lostActivity: EnquiryActivity = {
+      id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      timestamp: new Date().toISOString(),
+      action: 'Marked Lost',
+      actorName: currentUser?.name || 'Staff User',
+      details: `Reason: ${reason}${notes ? ` | Notes: ${notes}` : ''}`,
+    };
+
+    const updatedHistory = [...(target.activityHistory || []), lostActivity];
+
+    firestoreService.saveDocument<Enquiry>('enquiries', enquiryId, {
+      status: 'lost',
+      lostReason: reason,
+      lostNotes: notes || '',
+      activityHistory: updatedHistory,
+    });
+
+    logActivity('Enquiry Lost', 'enquiry', enquiryId, `Marked enquiry ${target.enquiryId} as Lost: ${reason}`);
+    showToast(`Enquiry ${target.enquiryId} marked as Lost`, 'info');
+  };
+
+  const convertEnquiryToQuote = async (
+    enquiryId: string,
+    quoteData: {
+      items: LineItem[];
+      validUntil?: string;
+      notes?: string;
+      terms?: string;
+    }
+  ): Promise<Quotation> => {
+    if (checkReadOnlySupportGuard()) throw new Error('Read-only mode active');
+    const enq = enquiries.find((e) => e.id === enquiryId);
+    if (!enq) throw new Error('Enquiry not found');
+
+    // 1. Ensure or find matching customer
+    let custId = enq.customerId;
+    if (!custId) {
+      const existingCustomer = customers.find(
+        (c) =>
+          c.businessId === currentBusiness.id &&
+          (c.mobile === enq.customerPhone || (c.email && c.email.toLowerCase() === enq.customerEmail?.toLowerCase()))
+      );
+      if (existingCustomer) {
+        custId = existingCustomer.id;
+      } else {
+        const newCust = addCustomer({
+          name: enq.customerName,
+          companyName: enq.companyName,
+          mobile: enq.customerPhone,
+          email: enq.customerEmail || '',
+          address: enq.location || enq.address || currentBusiness.address || 'Customer site location',
+          city: currentBusiness.city || 'City',
+          state: currentBusiness.state || 'State',
+          pin: currentBusiness.pin || '000000',
+          customerType: enq.companyName ? 'commercial' : 'individual',
+          notes: `Created automatically from Enquiry ${enq.enquiryId}`,
+        });
+        if (newCust) {
+          custId = newCust.id;
+        }
+      }
+    }
+
+    // Calculate totals
+    const subtotal = quoteData.items.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
+    const taxTotal = quoteData.items.reduce((sum, item) => sum + ((item.quantity * item.rate * (item.taxPercent || 0)) / 100), 0);
+    const grandTotal = subtotal + taxTotal;
+
+    const validUntil = quoteData.validUntil || new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0];
+
+    // 2. Create quotation
+    const newQuotation = addQuotation({
+      customerId: custId || '',
+      enquiryId: enq.id,
+      date: new Date().toISOString().split('T')[0],
+      validUntil,
+      status: 'sent',
+      items: quoteData.items,
+      subtotal,
+      taxTotal,
+      discountTotal: 0,
+      grandTotal,
+      notes: quoteData.notes || `Generated from Enquiry ${enq.enquiryId} for ${enq.serviceRequired}`,
+      terms: quoteData.terms || 'Standard service terms apply. Validity: 15 days.',
+    });
+
+    // 3. Mark Enquiry as Quoted
+    const quoteActivity: EnquiryActivity = {
+      id: `act-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      action: 'Quote Created',
+      actorName: currentUser?.name || 'Staff User',
+      details: `Generated Quotation ${newQuotation.quotationNumber} for amount ${currentBusiness.currency}${grandTotal.toLocaleString()}`,
+    };
+    const updatedHistory = [...(enq.activityHistory || []), quoteActivity];
+
+    firestoreService.saveDocument<Enquiry>('enquiries', enq.id, {
+      status: 'quoted',
+      convertedQuotationId: newQuotation.id,
+      convertedQuotationNumber: newQuotation.quotationNumber,
+      customerId: custId,
+      activityHistory: updatedHistory,
+    });
+
+    logActivity('Enquiry Quoted', 'enquiry', enq.id, `Created quotation ${newQuotation.quotationNumber} for enquiry ${enq.enquiryId}`);
+    showToast(`Quotation ${newQuotation.quotationNumber} created for ${enq.customerName}!`, 'success');
+    return newQuotation;
+  };
+
   const convertEnquiryToJob = async (enquiryId: string, jobOverrides?: Partial<Job>): Promise<Job> => {
     if (checkReadOnlySupportGuard()) throw new Error('Read-only mode active');
     const enq = enquiries.find((e) => e.id === enquiryId);
@@ -2042,7 +2347,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       assignedStaffId: jobOverrides?.assignedStaffId || enq.assignedStaffId || '',
       serviceId: jobOverrides?.serviceId || enq.serviceId || '',
       status: jobOverrides?.status || 'assigned',
-      priority: jobOverrides?.priority || enq.priority || 'medium',
+      priority:
+        jobOverrides?.priority ||
+        (enq.priority === 'urgent'
+          ? 'urgent'
+          : enq.priority === 'high'
+          ? 'high'
+          : enq.priority === 'low'
+          ? 'low'
+          : 'medium'),
       scheduledDate: jobOverrides?.scheduledDate || enq.preferredDate || enq.followUpDate || new Date().toISOString().split('T')[0],
       scheduledTime: jobOverrides?.scheduledTime || enq.preferredTimeSlot || enq.followUpTime || '09:00 AM - 11:00 AM',
       scheduledTimeSlot: jobOverrides?.scheduledTimeSlot || enq.preferredTimeSlot || enq.followUpTime || '09:00 AM - 11:00 AM',
@@ -2076,6 +2389,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     firestoreService.saveDocument<Enquiry>('enquiries', enq.id, {
       status: 'converted',
       convertedJobId: newJob.id,
+      convertedJobNumber: newJob.jobId,
       customerId: custId,
       activityHistory: updatedHistory,
     });
@@ -3480,6 +3794,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateEnquiry,
         deleteEnquiry,
         convertEnquiryToJob,
+        convertEnquiryToQuote,
+        addEnquiryFollowUp,
+        linkCustomerToEnquiry,
+        createAndLinkCustomerFromEnquiry,
+        markEnquiryQualified,
+        markEnquiryLost,
         addEnquiryActivity,
 
         addCustomer,

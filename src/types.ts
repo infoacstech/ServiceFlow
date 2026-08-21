@@ -112,21 +112,36 @@ export type EnquiryStatus =
   | 'contacted'
   | 'follow_up'
   | 'qualified'
+  | 'quoted'
   | 'converted'
   | 'closed'
   | 'lost';
 
-export type EnquiryPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type EnquiryPriority = 'low' | 'normal' | 'medium' | 'high' | 'urgent';
 
 export type EnquirySource =
-  | 'website'
   | 'phone'
   | 'whatsapp'
-  | 'referral'
   | 'walk_in'
+  | 'website'
+  | 'referral'
+  | 'existing_customer'
   | 'google'
   | 'social_media'
   | 'other';
+
+export interface EnquiryFollowUp {
+  id: string;
+  date: string;
+  time?: string;
+  channel?: 'phone' | 'whatsapp' | 'email' | 'visit' | 'other' | string;
+  notes: string;
+  outcome?: string;
+  completed: boolean;
+  createdAt: string;
+  createdBy?: string;
+  actorName?: string;
+}
 
 export interface EnquiryActivity {
   id: string;
@@ -143,6 +158,7 @@ export interface Enquiry {
   customerId?: string;
   customerName: string;
   customerPhone: string;
+  customerPhoneAlt?: string;
   customerEmail?: string;
   companyName?: string;
   serviceRequired: string;
@@ -156,13 +172,20 @@ export interface Enquiry {
   priority: EnquiryPriority;
   assignedStaffId?: string;
   assignedStaffName?: string;
+  enquiryDate?: string;
   createdAt: string;
   followUpDate?: string;
   followUpTime?: string;
+  followUps?: EnquiryFollowUp[];
   notes?: string;
   status: EnquiryStatus;
   estimatedValue?: number;
   convertedJobId?: string;
+  convertedJobNumber?: string;
+  convertedQuotationId?: string;
+  convertedQuotationNumber?: string;
+  lostReason?: string;
+  lostNotes?: string;
   activityHistory?: EnquiryActivity[];
 }
 
@@ -291,6 +314,7 @@ export interface Quotation {
   businessId: string;
   quotationNumber: string; // e.g. QT-2026-001
   customerId: string;
+  enquiryId?: string;
   date: string;
   validUntil: string;
   status: QuotationStatus;
