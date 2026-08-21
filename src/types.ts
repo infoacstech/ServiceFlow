@@ -1,6 +1,7 @@
 export type UserRole = 'super_admin' | 'business_owner' | 'manager' | 'technician';
 
 export interface RolePermission {
+  canManageEnquiries?: boolean;
   canManageJobs: boolean;
   canViewFinancials: boolean; // Invoices, Quotations, Payments, Expenses
   canManageStaff: boolean;
@@ -106,6 +107,65 @@ export interface Customer {
   createdAt: string;
 }
 
+export type EnquiryStatus =
+  | 'new'
+  | 'contacted'
+  | 'follow_up'
+  | 'qualified'
+  | 'converted'
+  | 'closed'
+  | 'lost';
+
+export type EnquiryPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export type EnquirySource =
+  | 'website'
+  | 'phone'
+  | 'whatsapp'
+  | 'referral'
+  | 'walk_in'
+  | 'google'
+  | 'social_media'
+  | 'other';
+
+export interface EnquiryActivity {
+  id: string;
+  timestamp: string;
+  action: string;
+  actorName: string;
+  details: string;
+}
+
+export interface Enquiry {
+  id: string;
+  businessId: string;
+  enquiryId: string; // e.g. "ENQ-1001"
+  customerId?: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  companyName?: string;
+  serviceRequired: string;
+  serviceId?: string;
+  description: string;
+  location?: string;
+  address?: string;
+  preferredDate?: string;
+  preferredTimeSlot?: string;
+  source: EnquirySource;
+  priority: EnquiryPriority;
+  assignedStaffId?: string;
+  assignedStaffName?: string;
+  createdAt: string;
+  followUpDate?: string;
+  followUpTime?: string;
+  notes?: string;
+  status: EnquiryStatus;
+  estimatedValue?: number;
+  convertedJobId?: string;
+  activityHistory?: EnquiryActivity[];
+}
+
 export interface ServiceCategory {
   id: string;
   businessId: string;
@@ -128,15 +188,26 @@ export type JobStatus =
   | 'new'
   | 'assigned'
   | 'accepted'
+  | 'scheduled'
   | 'on_the_way'
   | 'started'
   | 'in_progress'
+  | 'on_hold'
   | 'completed'
   | 'verified'
   | 'closed'
   | 'cancelled';
 
 export type JobPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface JobActivityItem {
+  id: string;
+  timestamp: string;
+  action: string;
+  actorName: string;
+  details: string;
+  status?: JobStatus;
+}
 
 export interface JobMaterialUsed {
   inventoryItemId: string;
@@ -150,10 +221,12 @@ export interface Job {
   businessId: string;
   jobId: string; // e.g., "JOB-1024"
   customerId: string;
+  relatedEnquiryId?: string;
   serviceId: string;
   description: string;
   priority: JobPriority;
   assignedStaffId?: string;
+  assignedStaffName?: string;
   scheduledDate: string;
   scheduledTime: string;
   scheduledTimeSlot?: string;
@@ -161,6 +234,7 @@ export interface Job {
   estimatedAmount: number;
   status: JobStatus;
   notes?: string;
+  completionNotes?: string;
   beforePhotos?: string[];
   afterPhotos?: string[];
   startTime?: string;
@@ -171,6 +245,7 @@ export interface Job {
   customerRating?: number; // 1-5
   customerFeedback?: string;
   materialsUsed?: JobMaterialUsed[];
+  activityHistory?: JobActivityItem[];
   createdAt: string;
 }
 
@@ -329,7 +404,7 @@ export interface ActivityLog {
   id: string;
   businessId: string;
   action: string;
-  entityType: 'customer' | 'job' | 'invoice' | 'quotation' | 'payment' | 'inventory' | 'contract' | 'staff' | 'settings' | 'financials';
+  entityType: 'enquiry' | 'customer' | 'job' | 'invoice' | 'quotation' | 'payment' | 'inventory' | 'contract' | 'staff' | 'settings' | 'financials';
   entityId: string;
   description: string;
   timestamp: string;

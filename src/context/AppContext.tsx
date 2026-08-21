@@ -5,6 +5,7 @@ import type {
   UserRole,
   Role,
   RolePermission,
+  Enquiry,
   Customer,
   ServiceCategory,
   Service,
@@ -33,6 +34,7 @@ import type {
 import {
   DEMO_BUSINESSES,
   DEMO_USERS,
+  DEMO_ENQUIRIES,
   DEMO_CUSTOMERS,
   DEMO_CATEGORIES,
   DEMO_SERVICES,
@@ -172,6 +174,7 @@ interface AppContextType {
   }) => Promise<ReferralPayoutRequest>;
 
   // Data collections (filtered by current business when applicable)
+  enquiries: Enquiry[];
   customers: Customer[];
   categories: ServiceCategory[];
   services: Service[];
@@ -211,6 +214,12 @@ interface AppContextType {
   firestoreService: typeof FirestoreService;
 
   // Actions
+  addEnquiry: (enq: Omit<Enquiry, 'id' | 'businessId' | 'enquiryId' | 'createdAt'>) => Enquiry;
+  updateEnquiry: (id: string, updates: Partial<Enquiry>) => void;
+  deleteEnquiry: (id: string) => void;
+  convertEnquiryToJob: (enquiryId: string, jobData?: Partial<Job>) => Promise<Job>;
+  addEnquiryActivity: (enquiryId: string, action: string, details: string) => void;
+
   addCustomer: (c: Omit<Customer, 'id' | 'businessId' | 'createdAt'>) => Customer;
   updateCustomer: (id: string, updates: Partial<Customer>) => void;
   deleteCustomer: (id: string) => void;
@@ -490,6 +499,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [isAuthInitializing, setIsAuthInitializing] = useState<boolean>(true);
 
+  const [enquiries, setEnquiries] = useState<Enquiry[]>(() =>
+    loadCache('serviflow_enquiries_cache', [])
+  );
   const [customers, setCustomers] = useState<Customer[]>(() =>
     loadCache('serviflow_customers_cache', [])
   );
@@ -649,6 +661,17 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'users')
+    );
+
+    // 2.5 Enquiries
+    const unsubEnquiries = onSnapshot(
+      collection(db, 'enquiries'),
+      (snapshot) => {
+        const cloudItems = snapshot.docs.map((d) => d.data() as Enquiry);
+        setEnquiries(cloudItems);
+        saveCache('serviflow_enquiries_cache', cloudItems);
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'enquiries')
     );
 
     // 3. Customers
@@ -1000,6 +1023,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       unsubBiz();
       unsubUsers();
+      unsubEnquiries();
       unsubCustomers();
       unsubCategories();
       unsubServices();
@@ -1462,6 +1486,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         'SETTINGS',
         `Super Admin wiped ${res.totalDocsDeleted} dummy transactional records across collections: ${res.clearedCollections.join(', ')}`
       );
+      setEnquiries([]);
       setCustomers([]);
       setJobs([]);
       setServices([]);
@@ -1534,6 +1559,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       saveCache('serviflow_users_cache', remainingUsers);
 
       // Clean operational tenant states
+      setEnquiries((prev) => {
+        const updated = prev.filter((e) => e.businessId !== businessId);
+        saveCache('serviflow_enquiries_cache', updated);
+        return updated;
+      });
       setCustomers((prev) => {
         const updated = prev.filter((c) => c.businessId !== businessId);
         saveCache('serviflow_customers_cache', updated);
@@ -1830,6 +1860,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Business-filtered helpers
   const isSuperAdminUser = currentUser?.role === 'super_admin';
   const currBizId = currentBusiness?.id;
+  const filteredEnquiries = isSuperAdminUser ? enquiries : enquiries.filter((e) => e.businessId === currBizId);
   const filteredCustomers = isSuperAdminUser ? customers : customers.filter((c) => c.businessId === currBizId);
   const filteredCategories = isSuperAdminUser ? categories : categories.filter((c) => c.businessId === currBizId);
   const filteredServices = isSuperAdminUser ? services : services.filter((s) => s.businessId === currBizId);
@@ -1895,6 +1926,158 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const filteredReferralPayouts = isSuperAdminUser
     ? referralPayoutRequests
     : referralPayoutRequests.filter((p) => p.businessId === currBizId);
+
+  // Enquiry Actions
+  const addEnquiry = (data: Omit<Enquiry, 'id' | 'businessId' | 'enquiryId' | 'createdAt'>) => {
+    if (checkReadOnlySupportGuard()) return {} as Enquiry;
+    const count = filteredEnquiries.length + 101;
+    const enquiryId = `ENQ-${new Date().getFullYear()}-${count}`;
+    const id = `enq-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newEnquiry: Enquiry = {
+      ...data,
+      id,
+      businessId: currentBusiness.id,
+      enquiryId,
+      createdAt: new Date().toISOString().split('T')[0],
+      activityHistory: [
+        {
+          id: `act-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          action: 'Created',
+          actorName: currentUser?.name || 'Staff User',
+          details: `Enquiry recorded via ${data.source || 'Direct Contact'}`,
+        },
+      ],
+    };
+    firestoreService.saveDocument<Enquiry>('enquiries', newEnquiry.id, newEnquiry);
+    logActivity('Enquiry Received', 'enquiry', newEnquiry.id, `New enquiry ${enquiryId} from ${newEnquiry.customerName}`);
+    showToast(`Enquiry ${enquiryId} recorded successfully`, 'success');
+    return newEnquiry;
+  };
+
+  const updateEnquiry = (id: string, updates: Partial<Enquiry>) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = enquiries.find((e) => e.id === id);
+    if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot modify enquiry belonging to another tenant business.', 'error');
+      return;
+    }
+    firestoreService.saveDocument<Enquiry>('enquiries', id, updates);
+    logActivity('Enquiry Updated', 'enquiry', id, `Updated enquiry details for ${target?.enquiryId || id}`);
+    showToast('Enquiry updated successfully', 'success');
+  };
+
+  const deleteEnquiry = (id: string) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = enquiries.find((e) => e.id === id);
+    if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot delete enquiry belonging to another tenant business.', 'error');
+      return;
+    }
+    firestoreService.deleteDocument('enquiries', id);
+    logActivity('Enquiry Deleted', 'enquiry', id, `Deleted enquiry ${target?.enquiryId || id}`);
+    showToast('Enquiry removed', 'info');
+  };
+
+  const addEnquiryActivity = (enquiryId: string, action: string, details: string) => {
+    if (checkReadOnlySupportGuard()) return;
+    const target = enquiries.find((e) => e.id === enquiryId);
+    if (!target) return;
+
+    const newActivity = {
+      id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      timestamp: new Date().toISOString(),
+      action,
+      actorName: currentUser?.name || 'Staff User',
+      details,
+    };
+
+    const updatedHistory = [...(target.activityHistory || []), newActivity];
+    firestoreService.saveDocument<Enquiry>('enquiries', enquiryId, { activityHistory: updatedHistory });
+    logActivity(`Enquiry: ${action}`, 'enquiry', enquiryId, details);
+  };
+
+  const convertEnquiryToJob = async (enquiryId: string, jobOverrides?: Partial<Job>): Promise<Job> => {
+    if (checkReadOnlySupportGuard()) throw new Error('Read-only mode active');
+    const enq = enquiries.find((e) => e.id === enquiryId);
+    if (!enq) throw new Error('Enquiry not found');
+
+    // 1. Ensure or find matching customer
+    let custId = enq.customerId;
+    if (!custId) {
+      const existingCustomer = customers.find(
+        (c) => c.businessId === currentBusiness.id &&
+               (c.mobile === enq.customerPhone || (c.email && c.email.toLowerCase() === enq.customerEmail?.toLowerCase()))
+      );
+      if (existingCustomer) {
+        custId = existingCustomer.id;
+      } else {
+        const newCust = addCustomer({
+          name: enq.customerName,
+          companyName: enq.companyName,
+          mobile: enq.customerPhone,
+          email: enq.customerEmail || '',
+          address: enq.location || enq.address || 'Customer site location',
+          city: currentBusiness.city || 'City',
+          state: currentBusiness.state || 'State',
+          pin: currentBusiness.pin || '000000',
+          customerType: enq.companyName ? 'commercial' : 'individual',
+          notes: `Created automatically from Enquiry ${enq.enquiryId}`,
+        });
+        if (newCust) {
+          custId = newCust.id;
+        }
+      }
+    }
+
+    // 2. Create the Job
+    const newJob = addJob({
+      customerId: custId || '',
+      assignedStaffId: jobOverrides?.assignedStaffId || enq.assignedStaffId || '',
+      serviceId: jobOverrides?.serviceId || enq.serviceId || '',
+      status: jobOverrides?.status || 'assigned',
+      priority: jobOverrides?.priority || enq.priority || 'medium',
+      scheduledDate: jobOverrides?.scheduledDate || enq.preferredDate || enq.followUpDate || new Date().toISOString().split('T')[0],
+      scheduledTime: jobOverrides?.scheduledTime || enq.preferredTimeSlot || enq.followUpTime || '09:00 AM - 11:00 AM',
+      scheduledTimeSlot: jobOverrides?.scheduledTimeSlot || enq.preferredTimeSlot || enq.followUpTime || '09:00 AM - 11:00 AM',
+      location: jobOverrides?.location || enq.location || enq.address || currentBusiness.address || '',
+      description: jobOverrides?.description || enq.serviceRequired || 'Field Service Job',
+      estimatedAmount: jobOverrides?.estimatedAmount ?? (enq.estimatedValue || 0),
+      notes: `Converted from Enquiry ${enq.enquiryId}. ${enq.notes || ''}\n${jobOverrides?.notes || ''}`.trim(),
+      relatedEnquiryId: enq.id,
+      activityHistory: [
+        {
+          id: `act-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          action: 'Converted from Enquiry',
+          actorName: currentUser?.name || 'System',
+          details: `Job created from Enquiry ${enq.enquiryId}`,
+          status: 'assigned',
+        },
+      ],
+    });
+
+    // 3. Mark Enquiry as converted
+    const conversionActivity = {
+      id: `act-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      action: 'Converted to Job',
+      actorName: currentUser?.name || 'Staff User',
+      details: `Enquiry converted into Job ${newJob.jobId}`,
+    };
+    const updatedHistory = [...(enq.activityHistory || []), conversionActivity];
+
+    firestoreService.saveDocument<Enquiry>('enquiries', enq.id, {
+      status: 'converted',
+      convertedJobId: newJob.id,
+      customerId: custId,
+      activityHistory: updatedHistory,
+    });
+
+    logActivity('Enquiry Converted', 'enquiry', enq.id, `Converted enquiry ${enq.enquiryId} to job ${newJob.jobId}`);
+    showToast(`Converted enquiry to Job ${newJob.jobId}!`, 'success');
+    return newJob;
+  };
 
   // Customer Actions
   const addCustomer = (data: Omit<Customer, 'id' | 'businessId' | 'createdAt'>) => {
@@ -3249,6 +3432,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateUserProfile,
         registerUser,
 
+        enquiries: filteredEnquiries,
         customers: filteredCustomers,
         categories: filteredCategories,
         services: filteredServices,
@@ -3285,6 +3469,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         logActivity,
 
         firestoreService,
+
+        addEnquiry,
+        updateEnquiry,
+        deleteEnquiry,
+        convertEnquiryToJob,
+        addEnquiryActivity,
 
         addCustomer,
         updateCustomer,

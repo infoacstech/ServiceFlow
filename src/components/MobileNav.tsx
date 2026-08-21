@@ -30,6 +30,7 @@ import {
   Layers,
   Trash2,
   ShieldAlert,
+  HelpCircle,
 } from 'lucide-react';
 
 interface MobileNavProps {
@@ -94,6 +95,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
   // Tenant ERP Drawer Modules
   const tenantModules = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: !isTech && (permissions.canManageJobs || permissions.canViewFinancials) },
+    { id: 'enquiries', label: 'Enquiries & Intake', icon: HelpCircle, visible: !isTech && (permissions.canManageJobs || permissions.canManageStaff) },
     { id: 'jobs', label: 'Jobs & Field Work', icon: Briefcase, visible: permissions.canManageJobs },
     { id: 'customers', label: 'Customers CRM', icon: Users, visible: permissions.canManageJobs || permissions.canManageStaff },
     { id: 'services', label: 'Service Catalog', icon: Wrench, visible: permissions.canManageServices },

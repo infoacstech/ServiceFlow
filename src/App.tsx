@@ -18,6 +18,7 @@ import { UserProfileDrawer } from './components/UserProfileDrawer';
 import { InstallAppModal } from './components/InstallAppModal';
 
 import { DashboardView } from './views/DashboardView';
+import { EnquiriesView } from './views/EnquiriesView';
 import { CustomersView } from './views/CustomersView';
 import { ServicesView } from './views/ServicesView';
 import { JobsView, JobInitialFilter } from './views/JobsView';
@@ -146,6 +147,11 @@ const MainContent: React.FC = () => {
           allowed: currentUser?.role !== 'technician' && (permissions.canManageJobs || permissions.canViewFinancials),
           label: 'Admin or Manager'
         };
+      case 'enquiries':
+        return {
+          allowed: currentUser?.role !== 'technician' && (permissions.canManageJobs || permissions.canManageStaff),
+          label: 'Admin or Manager'
+        };
       case 'jobs':
         return { allowed: permissions.canManageJobs, label: 'Technician, Manager, or Admin' };
       case 'customers':
@@ -233,6 +239,8 @@ const MainContent: React.FC = () => {
                       onOpenNewJob={handleOpenNewJob}
                     />
                   )}
+
+                  {activeTab === 'enquiries' && <EnquiriesView onNavigate={handleTabChange} />}
 
                   {activeTab === 'customers' && <CustomersView />}
 

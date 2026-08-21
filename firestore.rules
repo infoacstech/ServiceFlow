@@ -63,6 +63,14 @@ service cloud.firestore {
     }
 
     // Tenant Operational Collections (Protected by Tenant Membership & Super Admin)
+    match /enquiries/{docId} {
+      allow read, write: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) ||
+        isTenantMember(request.resource.data.businessId) ||
+        isSuperAdmin()
+      );
+    }
+
     match /customers/{docId} {
       allow read, write: if isAuthenticated() && (
         isTenantMember(resource.data.businessId) ||

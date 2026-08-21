@@ -13,6 +13,7 @@ import {
 import { db, handleFirestoreError, OperationType, cleanFirestoreData } from '../lib/firebase';
 import {
   Customer,
+  Enquiry,
   Job,
   Invoice,
   Quotation,
@@ -92,6 +93,7 @@ export class FirestoreService {
    */
   static async purgeAllTransactionalData(): Promise<{ clearedCollections: string[]; totalDocsDeleted: number }> {
     const transactionalCollections = [
+      'enquiries',
       'customers',
       'jobs',
       'services',
@@ -140,6 +142,7 @@ export class FirestoreService {
 
     // 1. Purge all transactional and operational collections
     const collectionsToWipe = [
+      'enquiries',
       'customers',
       'jobs',
       'services',
@@ -199,6 +202,7 @@ export class FirestoreService {
     try {
       localStorage.removeItem('serviflow_businesses_cache');
       localStorage.removeItem('serviflow_users_cache');
+      localStorage.removeItem('serviflow_enquiries_cache');
       localStorage.removeItem('serviflow_customers_cache');
       localStorage.removeItem('serviflow_jobs_cache');
       localStorage.removeItem('serviflow_invoices_cache');
@@ -221,6 +225,7 @@ export class FirestoreService {
     if (!businessId || businessId === 'all') return { clearedCollections: [], totalDocsDeleted: 0 };
 
     const tenantCollections = [
+      'enquiries',
       'customers',
       'jobs',
       'services',
@@ -375,6 +380,48 @@ export class FirestoreService {
       console.error(`Error deleting user ${userId}:`, err);
       throw err;
     }
+  }
+
+  // =========================================================================
+  // ENQUIRY CRUD OPERATIONS
+  // =========================================================================
+  static subscribeEnquiries(onData: (enquiries: Enquiry[]) => void): () => void {
+    return this.subscribeCollection<Enquiry>('enquiries', onData);
+  }
+
+  static async createEnquiry(
+    data: Omit<Enquiry, 'id' | 'businessId' | 'enquiryId' | 'createdAt'>,
+    businessId: string,
+    enquiryCount: number
+  ): Promise<Enquiry> {
+    const id = `enq-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const enquiryId = `ENQ-${new Date().getFullYear()}-${enquiryCount + 101}`;
+    const newEnquiry: Enquiry = {
+      ...data,
+      id,
+      businessId,
+      enquiryId,
+      createdAt: new Date().toISOString().split('T')[0],
+      activityHistory: [
+        {
+          id: `act-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          action: 'Created',
+          actorName: 'System',
+          details: `Enquiry logged for ${data.customerName || 'Customer'}`,
+        },
+      ],
+    };
+    await this.saveDocument<Enquiry>('enquiries', id, newEnquiry);
+    return newEnquiry;
+  }
+
+  static async updateEnquiry(id: string, updates: Partial<Enquiry>): Promise<void> {
+    await this.saveDocument<Enquiry>('enquiries', id, updates);
+  }
+
+  static async deleteEnquiry(id: string): Promise<void> {
+    await this.deleteDocument('enquiries', id);
   }
 
   // =========================================================================

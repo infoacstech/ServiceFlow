@@ -34,6 +34,7 @@ import {
   ShieldAlert,
   CheckCircle2,
   Radio,
+  HelpCircle,
 } from 'lucide-react';
 import { PricingModal } from './PricingModal';
 
@@ -224,6 +225,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
           label: 'Dashboard',
           icon: LayoutDashboard,
           visible: !isTech && (permissions.canManageJobs || permissions.canViewFinancials),
+        },
+        {
+          id: 'enquiries',
+          label: 'Enquiries & Intake',
+          icon: HelpCircle,
+          visible: !isTech && (permissions.canManageJobs || permissions.canManageStaff),
         },
         {
           id: 'jobs',

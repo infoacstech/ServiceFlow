@@ -4,6 +4,7 @@ import {
   Role,
   Plan,
   Customer,
+  Enquiry,
   ServiceCategory,
   Service,
   Job,
@@ -27,6 +28,7 @@ export const DEMO_ROLES: Role[] = [
     description: 'SaaS Platform Owner with full multi-tenant control across all businesses & billing',
     isSystemRole: true,
     permissions: {
+      canManageEnquiries: true,
       canManageJobs: true,
       canViewFinancials: true,
       canManageStaff: true,
@@ -45,6 +47,7 @@ export const DEMO_ROLES: Role[] = [
     description: 'Full business operations, staff dispatch, invoices, quotations, settings & analytics',
     isSystemRole: true,
     permissions: {
+      canManageEnquiries: true,
       canManageJobs: true,
       canViewFinancials: true,
       canManageStaff: true,
@@ -60,9 +63,10 @@ export const DEMO_ROLES: Role[] = [
     id: 'role-manager',
     name: 'Service Operations Manager',
     code: 'manager',
-    description: 'Manages field dispatch, customers, inventory stock, invoices, and team dispatch',
+    description: 'Manages field dispatch, customer enquiries, inventory stock, invoices, and team dispatch',
     isSystemRole: true,
     permissions: {
+      canManageEnquiries: true,
       canManageJobs: true,
       canViewFinancials: true,
       canManageStaff: true,
@@ -81,6 +85,7 @@ export const DEMO_ROLES: Role[] = [
     description: 'Field service worker focusing on assigned job tickets, status updates & material usage',
     isSystemRole: true,
     permissions: {
+      canManageEnquiries: false,
       canManageJobs: true,
       canViewFinancials: false,
       canManageStaff: false,
@@ -175,6 +180,7 @@ export const SUPER_ADMIN_USER: User = {
 export const DEMO_BUSINESSES: Business[] = [];
 export const DEMO_USERS: User[] = [SUPER_ADMIN_USER];
 export const DEMO_CUSTOMERS: Customer[] = [];
+export const DEMO_ENQUIRIES: Enquiry[] = [];
 export const DEMO_CATEGORIES: ServiceCategory[] = [];
 export const DEMO_SERVICES: Service[] = [];
 export const DEMO_JOBS: Job[] = [];
