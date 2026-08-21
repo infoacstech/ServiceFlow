@@ -1717,72 +1717,72 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
               {/* Starter Plan */}
               <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black uppercase tracking-wider text-teal-600">Starter Tier</span>
+                  <span className="text-xs font-black uppercase tracking-wider text-teal-600">Starter Plan</span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 font-bold">
                     Active
                   </span>
                 </div>
                 <div>
-                  <div className="text-2xl font-black text-slate-900 dark:text-slate-100">₹999 <span className="text-xs font-normal text-slate-500">/ mo</span></div>
-                  <div className="text-xs text-slate-500 mt-1">Ideal for solo contractors & small service shops</div>
+                  <div className="text-2xl font-black text-slate-900 dark:text-slate-100">₹299 <span className="text-xs font-normal text-slate-500">/ mo</span></div>
+                  <div className="text-xs text-slate-500 mt-1">For small service businesses</div>
                 </div>
                 <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> Up to 3 Technicians</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> Standard Invoicing & GST</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> WhatsApp Job Alerts</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> Zero-Trust Support Access</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> Up to 2 Staff / Technicians</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> Up to 100 Jobs / month</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> Enquiries, Follow-ups & Jobs</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> Basic Quotations & Reports</div>
                 </div>
                 <div className="pt-2 text-xs font-bold text-slate-500">
-                  {businesses.filter(b => b.plan === 'Starter').length} Tenants Subscribed
+                  {businesses.filter(b => b.plan === 'Starter' || b.planId === 'plan-starter').length} Tenants Subscribed
                 </div>
               </div>
 
               {/* Professional Plan */}
               <div className="p-6 rounded-3xl border-2 border-indigo-600 bg-white dark:bg-slate-900 shadow-md space-y-4 relative">
                 <div className="absolute -top-3 right-6 bg-indigo-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                  Popular
+                  MOST POPULAR
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black uppercase tracking-wider text-indigo-600">Professional Tier</span>
+                  <span className="text-xs font-black uppercase tracking-wider text-indigo-600">Professional Plan</span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 font-bold">
                     Active
                   </span>
                 </div>
                 <div>
-                  <div className="text-2xl font-black text-slate-900 dark:text-slate-100">₹2,499 <span className="text-xs font-normal text-slate-500">/ mo</span></div>
-                  <div className="text-xs text-slate-500 mt-1">For growing service & installation companies</div>
+                  <div className="text-2xl font-black text-slate-900 dark:text-slate-100">₹599 <span className="text-xs font-normal text-slate-500">/ mo</span></div>
+                  <div className="text-xs text-slate-500 mt-1">For growing service teams</div>
                 </div>
                 <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> Up to 15 Technicians</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> AMC Contracts & Auto Renewal</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> Inventory & Stock Tracking</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> Referral Engine & Rewards</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> Up to 7 Staff / Technicians</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> Up to 500 Jobs / month</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> Advanced Scheduling & Portal</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> Priority Support & Analytics</div>
                 </div>
                 <div className="pt-2 text-xs font-bold text-slate-500">
-                  {businesses.filter(b => b.plan === 'Professional' || !b.plan).length} Tenants Subscribed
+                  {businesses.filter(b => b.plan === 'Professional' || b.planId === 'plan-pro' || (!b.plan && !b.planId)).length} Tenants Subscribed
                 </div>
               </div>
 
-              {/* Enterprise / Business Plan */}
+              {/* Business Plan */}
               <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black uppercase tracking-wider text-purple-600">Business / Enterprise</span>
+                  <span className="text-xs font-black uppercase tracking-wider text-purple-600">Business Plan</span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 font-bold">
-                    Custom
+                    Active
                   </span>
                 </div>
                 <div>
-                  <div className="text-2xl font-black text-slate-900 dark:text-slate-100">₹4,999 <span className="text-xs font-normal text-slate-500">/ mo</span></div>
-                  <div className="text-xs text-slate-500 mt-1">Multi-branch enterprise operations</div>
+                  <div className="text-2xl font-black text-slate-900 dark:text-slate-100">₹999 <span className="text-xs font-normal text-slate-500">/ mo</span></div>
+                  <div className="text-xs text-slate-500 mt-1">For larger service operations</div>
                 </div>
                 <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Unlimited Technicians & Staff</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Multi-Branch Workspaces</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Dedicated Account Manager</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Custom Domain & Branding</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Up to 15 Staff / Technicians</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Up to 1,500 Jobs / month</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Multi-Location Support</div>
+                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Advanced Staff & Business Controls</div>
                 </div>
                 <div className="pt-2 text-xs font-bold text-slate-500">
-                  {businesses.filter(b => b.plan === 'Enterprise').length} Tenants Subscribed
+                  {businesses.filter(b => b.plan === 'Business' || b.planId === 'plan-biz' || b.plan === 'Enterprise').length} Tenants Subscribed
                 </div>
               </div>
             </div>

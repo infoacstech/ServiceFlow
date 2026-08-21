@@ -56,6 +56,7 @@ import {
   DEMO_REFERRALS,
   DEMO_REFERRAL_PAYOUTS,
 } from '../data/demoData';
+import { checkStaffCapacity, checkMonthlyJobCapacity, getPlanById } from '../utils/planUtils';
 import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } from '../lib/firebase';
 import { AuthService } from '../services/AuthService';
 import {
@@ -2487,6 +2488,25 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Job Actions
   const addJob = (data: Omit<Job, 'id' | 'businessId' | 'jobId' | 'createdAt'>) => {
     if (checkReadOnlySupportGuard()) return;
+
+    if (currentBusiness.id !== 'all' && currentUser?.role !== 'super_admin') {
+      const currentMonthPrefix = new Date().toISOString().substring(0, 7);
+      const monthlyJobCount = (jobs || []).filter(
+        (j) =>
+          j.businessId === currentBusiness.id &&
+          (j.createdAt?.startsWith(currentMonthPrefix) || j.scheduledDate?.startsWith(currentMonthPrefix))
+      ).length;
+      const capacity = checkMonthlyJobCapacity(monthlyJobCount, currentBusiness.planId || currentBusiness.plan);
+      if (!capacity.allowed) {
+        showToast(
+          capacity.message ||
+            `Monthly job limit reached (${monthlyJobCount}/${capacity.maxJobs}) for ${capacity.planName} plan. Upgrade to create more jobs.`,
+          'error'
+        );
+        return;
+      }
+    }
+
     const count = filteredJobs.length + 101;
     const jobId = `JOB-${new Date().getFullYear()}-${count}`;
     const id = `job-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
@@ -3002,6 +3022,22 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Staff & User Auth Actions
   const addStaff = (data: Omit<User, 'id' | 'businessId'>) => {
     if (checkReadOnlySupportGuard()) return;
+
+    if (currentBusiness.id !== 'all' && currentUser?.role !== 'super_admin') {
+      const activeTenantStaff = (users || []).filter(
+        (u) => u.businessId === currentBusiness.id && u.status === 'active'
+      );
+      const capacity = checkStaffCapacity(activeTenantStaff.length, currentBusiness.planId || currentBusiness.plan);
+      if (!capacity.allowed) {
+        showToast(
+          capacity.message ||
+            `Staff limit reached (${activeTenantStaff.length}/${capacity.maxStaff}) for ${capacity.planName} plan. Upgrade to add more staff.`,
+          'error'
+        );
+        return;
+      }
+    }
+
     const newStaff: User = {
       ...data,
       id: `usr-${Date.now()}`,

@@ -58,6 +58,7 @@ import {
   Download,
 } from 'lucide-react';
 import { InstallAppModal } from '../components/InstallAppModal';
+import { calculateAnnualPricing } from '../utils/planUtils';
 import { Plan } from '../types';
 import {
   isVoiceNotificationEnabled,
@@ -974,15 +975,13 @@ export const SettingsView: React.FC = () => {
           </div>
 
           {/* 3-Tier SaaS Pricing Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
             {plans.map((plan) => {
-              const isCurrent = currentBusiness.planId === plan.id;
+              const isCurrent =
+                currentBusiness.planId === plan.id ||
+                currentBusiness.plan?.toLowerCase() === plan.name.toLowerCase();
               const isPro = plan.id === 'plan-pro';
-              const price =
-                billingCycle === 'yearly'
-                  ? Math.round((plan.yearlyPrice || plan.price * 10) / 12)
-                  : plan.price;
-              const yearlyTotal = plan.yearlyPrice || plan.price * 10;
+              const annualInfo = calculateAnnualPricing(plan.price);
 
               return (
                 <div
@@ -995,16 +994,10 @@ export const SettingsView: React.FC = () => {
                       : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
                   }`}
                 >
-                  {plan.badge && (
-                    <div
-                      className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1 ${
-                        isPro
-                          ? 'bg-indigo-600 text-white shadow-indigo-600/40'
-                          : 'bg-slate-800 text-slate-200'
-                      }`}
-                    >
-                      {isPro && <Flame className="w-3 h-3 text-amber-300" />}
-                      <span>{plan.badge}</span>
+                  {isPro && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1 bg-indigo-600 text-white shadow-indigo-600/40">
+                      <Flame className="w-3 h-3 text-amber-300" />
+                      <span>MOST POPULAR</span>
                     </div>
                   )}
 
@@ -1014,92 +1007,120 @@ export const SettingsView: React.FC = () => {
                         {plan.name}
                       </h3>
                       {isCurrent && (
-                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-extrabold uppercase">
-                          Current Tier
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-extrabold uppercase">
+                          CURRENT PLAN
                         </span>
                       )}
                     </div>
-                    {plan.targetAudience && (
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
-                        {plan.targetAudience}
-                      </p>
-                    )}
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                      {plan.targetAudience}
+                    </p>
                   </div>
 
-                  <div className="mb-5 pb-4 border-b border-slate-200 dark:border-slate-800">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-xs font-bold text-slate-400">₹</span>
-                      <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                        {price.toLocaleString('en-IN')}
-                      </span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                        / month
-                      </span>
-                    </div>
-
-                    {billingCycle === 'yearly' ? (
-                      <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                        Billed annually: ₹{yearlyTotal.toLocaleString('en-IN')}/year (2 Months Free)
+                  <div className="mb-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+                    {billingCycle === 'monthly' ? (
+                      <div>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-xs font-bold text-slate-400">₹</span>
+                          <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                            {plan.price.toLocaleString('en-IN')}
+                          </span>
+                          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                            / month
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-1">
+                          Billed monthly, cancel anytime
+                        </div>
                       </div>
                     ) : (
-                      <div className="text-[11px] text-slate-400 mt-1">
-                        Billed monthly, cancel anytime
+                      <div>
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-slate-400">₹</span>
+                          <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                            {annualInfo.discountedAnnual.toLocaleString('en-IN')}
+                          </span>
+                          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                            / year
+                          </span>
+                          <span className="text-xs line-through text-slate-400 font-medium ml-1">
+                            ₹{annualInfo.originalAnnual.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                          <span>Billed annually (Save 20% • ₹{annualInfo.savings.toLocaleString('en-IN')})</span>
+                        </div>
                       </div>
                     )}
                   </div>
 
                   {/* Quota Highlights */}
                   <div className="grid grid-cols-2 gap-2 mb-4">
-                    <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800/70 text-center">
+                    <div className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800/70 text-center">
                       <div className="text-[10px] text-slate-500 font-semibold">Staff Limit</div>
                       <div className="text-xs font-extrabold text-slate-900 dark:text-slate-100">
-                        {plan.maxStaff >= 999 ? 'Unlimited' : `Up to ${plan.maxStaff} Techs`}
+                        Up to {plan.maxStaff} Techs
                       </div>
                     </div>
-                    <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800/70 text-center">
+                    <div className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800/70 text-center">
                       <div className="text-[10px] text-slate-500 font-semibold">Jobs / Month</div>
                       <div className="text-xs font-extrabold text-slate-900 dark:text-slate-100">
-                        {plan.maxJobs >= 9999 ? 'Unlimited' : `${plan.maxJobs} Jobs`}
+                        Up to {plan.maxJobs.toLocaleString('en-IN')} Jobs
                       </div>
                     </div>
                   </div>
 
                   {/* Feature Checklist */}
                   <div className="space-y-2 flex-1 mb-6 text-xs text-slate-700 dark:text-slate-300">
-                    {plan.features.map((feat, idx) => (
-                      <div key={idx} className="flex items-start gap-2">
-                        <div className="p-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0">
-                          <Check className="w-3 h-3" />
+                    <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      Core Features:
+                    </div>
+                    {plan.features.map((feat, idx) => {
+                      const isHeader = feat.startsWith('Everything in');
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex items-start gap-2 ${
+                            isHeader
+                              ? 'font-bold text-indigo-700 dark:text-indigo-300 pb-0.5'
+                              : ''
+                          }`}
+                        >
+                          {!isHeader && (
+                            <div className="p-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0">
+                              <Check className="w-3 h-3" />
+                            </div>
+                          )}
+                          <span className="leading-snug text-[11px]">{feat}</span>
                         </div>
-                        <span className="leading-snug text-[11px]">{feat}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handlePlanUpgrade(plan)}
-                    disabled={isUpgradingPlan}
-                    className={`w-full py-2.5 px-4 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm ${
-                      isCurrent
-                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
-                        : isPro
-                        ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/30'
-                        : 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900'
-                    }`}
-                  >
-                    {isCurrent ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                        <span>Active Plan</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Upgrade to {plan.name}</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </>
-                    )}
-                  </button>
+                  {isCurrent ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="w-full py-2.5 px-4 rounded-2xl font-extrabold text-xs bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center gap-2 cursor-default"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      <span>Current Plan</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handlePlanUpgrade(plan)}
+                      disabled={isUpgradingPlan}
+                      className={`w-full py-2.5 px-4 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm ${
+                        isPro
+                          ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/30'
+                          : 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900'
+                      }`}
+                    >
+                      <span>Choose {plan.name}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               );
             })}

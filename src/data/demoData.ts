@@ -99,71 +99,9 @@ export const DEMO_ROLES: Role[] = [
   },
 ];
 
-export const DEMO_PLANS: Plan[] = [
-  {
-    id: 'plan-starter',
-    name: 'Starter',
-    price: 499,
-    yearlyPrice: 4999,
-    billingCycle: 'monthly',
-    maxJobs: 100,
-    maxStaff: 2,
-    maxCustomers: 250,
-    targetAudience: 'Small Agencies / Freelancers (1 Owner + 2 Field Techs)',
-    badge: 'CHHOTE BUSINESS',
-    features: [
-      'Up to 2 Field Staff / Technicians',
-      'Job Scheduling & Real-time Dispatch',
-      'GST Invoicing & Quotations with PDF',
-      'In-App Audio Voice Announcements',
-      'Basic Inventory (Up to 50 items/parts)',
-      'Customer Digital Signature & Rating',
-    ],
-  },
-  {
-    id: 'plan-pro',
-    name: 'Professional',
-    price: 1299,
-    yearlyPrice: 12499,
-    billingCycle: 'monthly',
-    maxJobs: 1000,
-    maxStaff: 7,
-    maxCustomers: 2000,
-    popular: true,
-    badge: 'MOST POPULAR',
-    targetAudience: 'Mid-size Service Agencies (CCTV, AC, RO, Electrical, 5-10 Staff)',
-    features: [
-      'Up to 7 Field Staff / Technicians',
-      'Unlimited Jobs, Invoices & Quotations',
-      'Multi-Language Voice Alerts (Hindi, Marathi, Gujarati, English)',
-      'Background Push & OS Notifications (Service Worker)',
-      'Advanced Inventory & Auto-Parts Usage Deduction',
-      'AMC & Recurring Service Maintenance Contracts',
-      'Automated WhatsApp / SMS Customer Alerts',
-      'Staff Performance Tracking & Financial P&L Reports',
-    ],
-  },
-  {
-    id: 'plan-biz',
-    name: 'Business',
-    price: 2999,
-    yearlyPrice: 28999,
-    billingCycle: 'monthly',
-    maxJobs: 99999,
-    maxStaff: 999,
-    maxCustomers: 99999,
-    badge: 'ENTERPRISE ELITE',
-    targetAudience: 'Multi-Branch Service Companies & Security Enterprises',
-    features: [
-      'Unlimited Technicians & Office Staff',
-      'Custom Business Branding & Logo on Invoices & Portals',
-      'Complete Security Audit Logs & Multi-Tenant Management',
-      'Multi-Branch & Location Dispatch Tracking',
-      'Priority 24/7 Dedicated Support & Training',
-      'Automated Cloud Backup & Single-Click Data Purge / Export',
-    ],
-  },
-];
+import { PLANS } from '../utils/planUtils';
+
+export const DEMO_PLANS: Plan[] = PLANS;
 
 export const SUPER_ADMIN_USER: User = {
   id: 'usr-admin',
