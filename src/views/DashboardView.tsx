@@ -318,30 +318,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Top Banner Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 sm:p-6 rounded-3xl shadow-xl w-full max-w-full overflow-hidden">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1.5">
             <span className="text-xs bg-indigo-500/20 text-indigo-300 font-bold px-2.5 py-0.5 rounded-full border border-indigo-500/30 truncate max-w-full">
-              {currentBusiness.type}
+              {currentBusiness.type || "Service Business"}
             </span>
-            <span className="text-xs text-slate-400">Live Operations Dashboard</span>
+            <span className="text-xs text-slate-400 font-medium">Today's Operations</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-black tracking-tight break-words">{currentBusiness.name}</h1>
-          <p className="text-xs text-slate-300 mt-0.5">
-            Overview of jobs, dispatches, technician tracking, & financial metrics for today.
+          <p className="text-xs text-slate-300 mt-1 max-w-2xl">
+            Overview of jobs, enquiries, technician activity & business performance for today.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setIsActivityLogOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs border border-white/20 transition-all active:scale-95"
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs border border-white/20 transition-all active:scale-95 cursor-pointer"
           >
             <History className="w-4 h-4 text-indigo-300" /> Activity Log
           </button>
           <button
-            onClick={onOpenNewJob}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all shadow-md active:scale-95"
+            onClick={() => navigate('jobs', { datePreset: 'today' })}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer"
           >
-            <Plus className="w-4 h-4" /> Schedule New Job
+            <Calendar className="w-4 h-4" /> Today's Schedule
           </button>
         </div>
       </div>
@@ -371,127 +371,166 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          {/* Action 1: New Enquiry */}
+          {/* Action 1: New Enquiry (Primary Entry Point) */}
           <button
             onClick={() => setIsNewEnquiryOpen(true)}
-            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/80 hover:bg-blue-50 dark:bg-slate-800/60 dark:hover:bg-blue-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-blue-300 dark:hover:border-blue-600/50 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-300 transition-all group active:scale-95 cursor-pointer"
+            className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-slate-50/80 hover:bg-blue-50 dark:bg-slate-800/60 dark:hover:bg-blue-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-blue-300 dark:hover:border-blue-600/50 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-300 transition-all group active:scale-95 cursor-pointer min-h-[96px]"
           >
-            <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 mb-1.5 group-hover:scale-110 transition-transform">
-              <HelpCircle className="w-4 h-4" />
+            <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 mb-1.5 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <HelpCircle className="w-5 h-5" />
             </div>
-            <span className="text-xs font-bold">New Enquiry</span>
-            <span className="text-[10px] text-slate-400 dark:text-slate-500">Capture a new service enquiry</span>
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">New Enquiry</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">Capture intake</span>
           </button>
 
           {/* Action 2: Add Customer */}
           <button
             onClick={() => setIsAddCustomerOpen(true)}
-            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/80 hover:bg-indigo-50 dark:bg-slate-800/60 dark:hover:bg-indigo-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-indigo-300 dark:hover:border-indigo-600/50 text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-300 transition-all group active:scale-95 cursor-pointer"
+            className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-slate-50/80 hover:bg-indigo-50 dark:bg-slate-800/60 dark:hover:bg-indigo-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-indigo-300 dark:hover:border-indigo-600/50 text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-300 transition-all group active:scale-95 cursor-pointer min-h-[96px]"
           >
-            <div className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 mb-1.5 group-hover:scale-110 transition-transform">
-              <UserPlus className="w-4 h-4" />
+            <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 mb-1.5 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <UserPlus className="w-5 h-5" />
             </div>
-            <span className="text-xs font-bold">Add Customer</span>
-            <span className="text-[10px] text-slate-400 dark:text-slate-500">Create CRM entry</span>
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">Add Customer</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">Create CRM entry</span>
           </button>
 
           {/* Action 3: Schedule Job */}
           <button
             onClick={onOpenNewJob}
-            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/80 hover:bg-purple-50 dark:bg-slate-800/60 dark:hover:bg-purple-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-purple-300 dark:hover:border-purple-600/50 text-slate-700 dark:text-slate-200 hover:text-purple-600 dark:hover:text-purple-300 transition-all group active:scale-95 cursor-pointer"
+            className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-slate-50/80 hover:bg-purple-50 dark:bg-slate-800/60 dark:hover:bg-purple-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-purple-300 dark:hover:border-purple-600/50 text-slate-700 dark:text-slate-200 hover:text-purple-600 dark:hover:text-purple-300 transition-all group active:scale-95 cursor-pointer min-h-[96px]"
           >
-            <div className="p-2 rounded-xl bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 mb-1.5 group-hover:scale-110 transition-transform">
-              <Plus className="w-4 h-4" />
+            <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 mb-1.5 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Plus className="w-5 h-5" />
             </div>
-            <span className="text-xs font-bold">Schedule Job</span>
-            <span className="text-[10px] text-slate-400 dark:text-slate-500">Dispatch field technician</span>
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">Schedule Job</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">Dispatch technician</span>
           </button>
 
           {/* Action 4: Quick Quote */}
           <button
             onClick={() => setIsQuickQuoteOpen(true)}
-            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/80 hover:bg-emerald-50 dark:bg-slate-800/60 dark:hover:bg-emerald-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-emerald-300 dark:hover:border-emerald-600/50 text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-300 transition-all group active:scale-95 cursor-pointer"
+            className="flex flex-col items-center justify-center p-3.5 rounded-2xl bg-slate-50/80 hover:bg-emerald-50 dark:bg-slate-800/60 dark:hover:bg-emerald-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-emerald-300 dark:hover:border-emerald-600/50 text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-300 transition-all group active:scale-95 cursor-pointer min-h-[96px]"
           >
-            <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 mb-1.5 group-hover:scale-110 transition-transform">
-              <FileText className="w-4 h-4" />
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 mb-1.5 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <FileText className="w-5 h-5" />
             </div>
-            <span className="text-xs font-bold">Quick Quote</span>
-            <span className="text-[10px] text-slate-400 dark:text-slate-500">Generate estimate</span>
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">Quick Quote</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">Generate estimate</span>
           </button>
         </div>
       </div>
 
       {/* Interactive Featured Summary Cards: Urgent Jobs & Today's Revenue */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Urgent Jobs Interactive Summary Card */}
-        <div
-          onClick={() => setIsUrgentModalOpen(true)}
-          className="relative p-5 rounded-3xl bg-gradient-to-br from-rose-50 via-amber-50/40 to-white dark:from-rose-950/40 dark:via-amber-950/20 dark:to-slate-900 border-2 border-rose-200 dark:border-rose-800/80 hover:border-rose-400 dark:hover:border-rose-600 shadow-sm hover:shadow-xl transition-all cursor-pointer group overflow-hidden"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="relative p-3 rounded-2xl bg-rose-600 text-white shadow-md shadow-rose-600/30 shrink-0">
-                <AlertTriangle className="w-6 h-6 animate-pulse" />
-                <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-rose-600 border-2 border-white dark:border-slate-900"></span>
+        {/* Urgent Jobs Summary Card (Compact positive state when 0, prominent alert when >0) */}
+        {urgentJobsList.length === 0 ? (
+          <div
+            onClick={() => navigate('jobs', { statusFilter: 'all' })}
+            className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700 transition-all group"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/60">
+                      All Normal
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">
+                    No Urgent Jobs
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    All service requests are currently under control.
+                  </p>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-1 rounded-xl">
+                  0 Urgent
                 </span>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/80 px-2.5 py-0.5 rounded-full">
-                    High Priority Dispatch
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <span>View all scheduled jobs</span>
+              <span className="text-indigo-600 font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                Open Jobs <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div
+            onClick={() => setIsUrgentModalOpen(true)}
+            className="relative p-5 rounded-3xl bg-gradient-to-br from-rose-50 via-amber-50/40 to-white dark:from-rose-950/40 dark:via-amber-950/20 dark:to-slate-900 border-2 border-rose-200 dark:border-rose-800/80 hover:border-rose-400 dark:hover:border-rose-600 shadow-sm hover:shadow-xl transition-all cursor-pointer group overflow-hidden"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="relative p-3 rounded-2xl bg-rose-600 text-white shadow-md shadow-rose-600/30 shrink-0">
+                  <AlertTriangle className="w-6 h-6 animate-pulse" />
+                  <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-rose-600 border-2 border-white dark:border-slate-900"></span>
                   </span>
                 </div>
-                <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 mt-0.5 group-hover:text-rose-600 transition-colors">
-                  Urgent Jobs Summary
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Critical tickets requiring immediate technician dispatch & resolution
-                </p>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/80 px-2.5 py-0.5 rounded-full">
+                      High Priority Dispatch
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 mt-0.5 group-hover:text-rose-600 transition-colors">
+                    Urgent Jobs Summary
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Critical tickets requiring immediate technician dispatch & resolution
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-right shrink-0">
+                <div className="text-2xl font-black text-rose-600 dark:text-rose-400">
+                  {urgentJobsList.length}
+                </div>
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Total Urgent
+                </div>
               </div>
             </div>
 
-            <div className="text-right shrink-0">
-              <div className="text-2xl font-black text-rose-600 dark:text-rose-400">
-                {urgentJobsList.length}
+            {/* Metric Quick Stats Pills */}
+            <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-rose-200/60 dark:border-rose-900/40">
+              <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Active Pending</div>
+                <div className="text-sm font-extrabold text-amber-600 dark:text-amber-400">{activeUrgentJobs.length}</div>
               </div>
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                Total Urgent
+
+              <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Unassigned Techs</div>
+                <div className="text-sm font-extrabold text-rose-600 dark:text-rose-400">{unassignedUrgentJobs.length}</div>
               </div>
+
+              <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Est. Job Value</div>
+                <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                  {curr}{urgentJobsList.reduce((sum, j) => sum + j.estimatedAmount, 0).toLocaleString()}
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Action Footer */}
+            <div className="mt-3 flex items-center justify-between text-xs font-bold text-rose-600 dark:text-rose-400 pt-1">
+              <span className="flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5" /> Quick Access Filtered List
+              </span>
+              <span className="inline-flex items-center gap-1 bg-rose-600 text-white text-[11px] font-bold px-3 py-1 rounded-xl group-hover:bg-rose-700 transition-colors shadow-xs">
+                View List <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              </span>
             </div>
           </div>
-
-          {/* Metric Quick Stats Pills */}
-          <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-rose-200/60 dark:border-rose-900/40">
-            <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Active Pending</div>
-              <div className="text-sm font-extrabold text-amber-600 dark:text-amber-400">{activeUrgentJobs.length}</div>
-            </div>
-
-            <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Unassigned Techs</div>
-              <div className="text-sm font-extrabold text-rose-600 dark:text-rose-400">{unassignedUrgentJobs.length}</div>
-            </div>
-
-            <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Est. Job Value</div>
-              <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
-                {curr}{urgentJobsList.reduce((sum, j) => sum + j.estimatedAmount, 0).toLocaleString()}
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Action Footer */}
-          <div className="mt-3 flex items-center justify-between text-xs font-bold text-rose-600 dark:text-rose-400 pt-1">
-            <span className="flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5" /> Quick Access Filtered List
-            </span>
-            <span className="inline-flex items-center gap-1 bg-rose-600 text-white text-[11px] font-bold px-3 py-1 rounded-xl group-hover:bg-rose-700 transition-colors shadow-xs">
-              View List <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </span>
-          </div>
-        </div>
+        )}
 
         {/* Today's Revenue Interactive Summary Card */}
         <div
