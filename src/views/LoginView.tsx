@@ -101,12 +101,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [isResetting, setIsResetting] = useState(false);
 
   // Registration Form State
-  const [registerRole, setRegisterRole] = useState<'business_owner' | 'manager' | 'technician'>('business_owner');
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
-  const [regBusinessId, setRegBusinessId] = useState(businesses[0]?.id || 'biz-1');
   const [regBusinessName, setRegBusinessName] = useState('');
   const [regBusinessType, setRegBusinessType] = useState('CCTV & Security');
 
@@ -129,9 +127,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   );
 
   let activeBusiness = null;
-  if (authTab === 'register' && registerRole !== 'business_owner') {
-    activeBusiness = businesses.find((b) => b.id === regBusinessId) || null;
-  } else if (matchedUser) {
+  if (matchedUser) {
     activeBusiness = businesses.find((b) => b.id === matchedUser.businessId) || null;
   } else if (businesses.length > 0 && businesses[0]?.logo) {
     activeBusiness = businesses[0];
@@ -165,11 +161,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  // Handle Account Registration
+  // Handle Business Owner Account Registration
   const handleDirectRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regName.trim() || !regEmail.trim() || !regPhone.trim() || !regPassword.trim()) {
-      showToast('Please complete all required fields including password', 'error');
+    if (!regName.trim() || !regEmail.trim() || !regPhone.trim() || !regPassword.trim() || !regBusinessName.trim()) {
+      showToast('Please complete all required fields including Business Name and Password', 'error');
       return;
     }
 
@@ -186,11 +182,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         email: regEmail.trim(),
         phone: regPhone.trim(),
         password: regPassword,
-        role: registerRole,
-        businessId: registerRole !== 'business_owner' ? regBusinessId : undefined,
-        businessName: registerRole === 'business_owner' ? regBusinessName || `${regName.trim()}'s Services` : undefined,
-        businessType: registerRole === 'business_owner' ? regBusinessType : undefined,
-        referralCode: registerRole === 'business_owner' && regReferralCode.trim() ? regReferralCode.trim().toUpperCase() : undefined,
+        role: 'business_owner',
+        businessName: regBusinessName.trim() || `${regName.trim()}'s Services`,
+        businessType: regBusinessType || 'CCTV & Security',
       });
 
       if (result.isPending) {
@@ -200,6 +194,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         setRegEmail('');
         setRegPhone('');
         setRegPassword('');
+        setRegBusinessName('');
       } else {
         sessionStorage.setItem('serviflow_active_tab', 'dashboard');
         if (onLoginSuccess) onLoginSuccess();
@@ -502,40 +497,20 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     </div>
                   )}
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Account Type *
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setRegisterRole('business_owner')}
-                        className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all text-center ${
-                          registerRole === 'business_owner'
-                            ? 'bg-indigo-50 dark:bg-indigo-950/80 border-indigo-500 text-indigo-700 dark:text-indigo-300'
-                            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                        }`}
-                      >
-                        Business Owner
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setRegisterRole('technician')}
-                        className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all text-center ${
-                          registerRole !== 'business_owner'
-                            ? 'bg-indigo-50 dark:bg-indigo-950/80 border-indigo-500 text-indigo-700 dark:text-indigo-300'
-                            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                        }`}
-                      >
-                        Field Executive / Staff
-                      </button>
+                  {/* Header Info */}
+                  <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-2xl border border-indigo-100 dark:border-indigo-900/50 space-y-1">
+                    <div className="font-extrabold text-xs text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>Create Your Business Workspace</span>
                     </div>
+                    <p className="text-[11px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                      Register your field service company to manage jobs, field staff, quotes, and billing.
+                    </p>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Full Name *
+                      Business Owner Name *
                     </label>
                     <input
                       type="text"
@@ -543,7 +518,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       onChange={(e) => setRegName(e.target.value)}
                       placeholder="e.g. Rahul Sharma"
                       required
-                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                     />
                   </div>
 
@@ -558,7 +533,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         onChange={(e) => setRegEmail(e.target.value)}
                         placeholder="rahul@company.com"
                         required
-                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                       />
                     </div>
 
@@ -572,121 +547,81 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         onChange={(e) => setRegPhone(e.target.value)}
                         placeholder="9876543210"
                         required
-                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                       />
                     </div>
                   </div>
 
-                  {registerRole === 'business_owner' ? (
-                    <div className="space-y-2.5">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                          Business Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={regBusinessName}
-                          onChange={(e) => setRegBusinessName(e.target.value)}
-                          placeholder="e.g. Apex Security Solutions"
-                          required
-                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                          Industry Type
-                        </label>
-                        <select
-                          value={regBusinessType}
-                          onChange={(e) => setRegBusinessType(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                        >
-                          <option value="CCTV & Security">CCTV & Security Systems</option>
-                          <option value="Solar & Energy">Solar & Renewable Energy</option>
-                          <option value="AC Service & HVAC">AC Service & HVAC</option>
-                          <option value="Electrical Services">Electrical Services</option>
-                          <option value="Plumbing Services">Plumbing Services</option>
-                          <option value="Computer & IT Repair">Computer & IT Repair</option>
-                        </select>
-                      </div>
-
-                      {/* Optional Referral Code for Business Owners with Instant 10% Discount Badge */}
-                      <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/60 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
-                            <Gift className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                            <span>Referral Code (Optional)</span>
-                          </label>
-                          <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full font-extrabold flex items-center gap-1 border border-emerald-300 dark:border-emerald-800">
-                            <Tag className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                            Instant 10% Discount
-                          </span>
-                        </div>
-                        <input
-                          type="text"
-                          value={regReferralCode}
-                          onChange={(e) => handleReferralCodeInput(e.target.value)}
-                          placeholder="e.g. SF-APEX10 (or leave blank)"
-                          className="w-full px-3 py-2 rounded-lg border border-amber-200 dark:border-amber-800/80 bg-white dark:bg-slate-900 text-xs font-mono font-bold tracking-wider text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-amber-500 outline-hidden uppercase placeholder:normal-case placeholder:font-normal placeholder:tracking-normal"
-                        />
-                        {referralValidation && (
-                          <div
-                            className={`text-[11px] font-semibold flex items-center gap-1.5 ${
-                              referralValidation.isValid
-                                ? 'text-emerald-700 dark:text-emerald-400'
-                                : 'text-rose-600 dark:text-rose-400'
-                            }`}
-                          >
-                            {referralValidation.isValid ? (
-                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                            ) : (
-                              <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-600 dark:text-rose-400" />
-                            )}
-                            <span>{referralValidation.message}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
+                  <div className="space-y-2.5">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Select Business Organization *
+                        Business / Company Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={regBusinessName}
+                        onChange={(e) => setRegBusinessName(e.target.value)}
+                        placeholder="e.g. Apex Security Solutions"
+                        required
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Industry / Service Domain *
                       </label>
                       <select
-                        value={regBusinessId}
-                        onChange={(e) => setRegBusinessId(e.target.value)}
-                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                        value={regBusinessType}
+                        onChange={(e) => setRegBusinessType(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                       >
-                        {businesses.map((b, idx) => (
-                          <option key={b.id ? `reg-org-${b.id}-${idx}` : `reg-biz-${idx}`} value={b.id}>
-                            {b.name} ({b.type})
-                          </option>
-                        ))}
+                        <option value="CCTV & Security">CCTV & Security Systems</option>
+                        <option value="Solar & Energy">Solar & Renewable Energy</option>
+                        <option value="AC Service & HVAC">AC Service & HVAC</option>
+                        <option value="Electrical Services">Electrical Services</option>
+                        <option value="Plumbing Services">Plumbing Services</option>
+                        <option value="Computer & IT Repair">Computer & IT Repair</option>
                       </select>
                     </div>
-                  )}
+                  </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Set Account Password *
+                      Set Master Account Password *
                     </label>
                     <input
                       type="password"
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="Password (min 4 characters)"
+                      placeholder="Password (min 6 characters)"
                       required
-                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                      minLength={6}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                     />
                   </div>
 
                   <button
                     type="submit"
-                    className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
+                    disabled={isSubmitting}
+                    className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
                   >
                     <UserPlus className="w-4 h-4" />
-                    <span>Create Account</span>
+                    <span>{isSubmitting ? 'Creating Business Workspace...' : 'Create Business Account'}</span>
                   </button>
+
+                  {/* Staff Notice */}
+                  <div className="pt-2 text-center">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
+                      Are you a field technician or staff member? Your business owner will invite you and provide your credentials.{' '}
+                      <button
+                        type="button"
+                        onClick={() => setAuthTab('login')}
+                        className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer"
+                      >
+                        Sign in here
+                      </button>
+                    </p>
+                  </div>
                 </form>
               )}
             </div>

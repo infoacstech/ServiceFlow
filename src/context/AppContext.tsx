@@ -284,7 +284,7 @@ interface AppContextType {
 
   addContract: (c: Omit<RecurringContract, 'id' | 'businessId' | 'contractNumber'>) => RecurringContract;
   addExpense: (e: Omit<Expense, 'id' | 'businessId'>) => void;
-  addStaff: (st: Omit<User, 'id' | 'businessId'>) => User;
+  addStaff: (st: Omit<User, 'id' | 'businessId'>) => Promise<User | undefined>;
   deleteStaff: (userId: string) => void;
   updateBusinessSettings: (updates: Partial<Business>) => void;
   updateBusinessProfile: (updates: Partial<Business>) => void;
@@ -3036,12 +3036,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Staff & User Auth Actions
-  const addStaff = (data: Omit<User, 'id' | 'businessId'>) => {
+  const addStaff = async (data: Omit<User, 'id' | 'businessId'>): Promise<User | undefined> => {
     if (checkReadOnlySupportGuard()) return;
 
     if (currentBusiness.id !== 'all' && currentUser?.role !== 'super_admin') {
       const activeTenantStaff = (users || []).filter(
-        (u) => u.businessId === currentBusiness.id && u.status === 'active'
+        (u) => u.businessId === currentBusiness.id && (u.status === 'active' || !u.status) && u.role !== 'super_admin'
       );
       const capacity = checkStaffCapacity(activeTenantStaff.length, currentBusiness.planId || currentBusiness.plan);
       if (!capacity.allowed) {
@@ -3054,25 +3054,56 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    const newStaff: User = {
-      ...data,
-      id: `usr-${Date.now()}`,
-      businessId: currentBusiness.id,
-      approvalStatus: data.approvalStatus || 'active',
-      status: data.status || 'active',
-    };
-    saveToFirestore('users', newStaff.id, newStaff);
-    saveToFirestore('tenantMembers', `${currentBusiness.id}_${newStaff.id}`, {
-      id: `${currentBusiness.id}_${newStaff.id}`,
-      tenantId: currentBusiness.id,
-      userId: newStaff.id,
-      role: newStaff.role,
-      status: 'active',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    showToast(`Staff member "${newStaff.name}" added`, 'success');
-    return newStaff;
+    try {
+      const result = await AuthService.createStaffMember({
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        role: (data.role === 'manager' ? 'manager' : 'technician'),
+        businessId: currentBusiness.id,
+        skills: data.skills,
+        password: data.password || 'ServiFlow@123',
+      });
+
+      const newStaff: User = {
+        ...result.user,
+        ...data,
+        id: result.user.id,
+        businessId: currentBusiness.id,
+        approvalStatus: 'active',
+        status: data.status || 'active',
+      };
+
+      setUsers((prev) => [...prev.filter((u) => u.id !== newStaff.id), newStaff]);
+      showToast(`Staff member "${newStaff.name}" added and assigned to ${currentBusiness.name}`, 'success');
+      logActivity('Staff Created', 'staff', newStaff.id, `Created staff member ${newStaff.name} as ${newStaff.role}`);
+      return newStaff;
+    } catch (err: any) {
+      console.error('Error creating staff member:', err);
+      // Fallback local persistence if offline
+      const fallbackStaff: User = {
+        ...data,
+        id: `usr-${Date.now()}`,
+        businessId: currentBusiness.id,
+        approvalStatus: data.approvalStatus || 'active',
+        status: data.status || 'active',
+        joiningDate: data.joiningDate || new Date().toISOString().split('T')[0],
+      };
+      saveToFirestore('users', fallbackStaff.id, fallbackStaff);
+      saveToFirestore('tenantMembers', `${currentBusiness.id}_${fallbackStaff.id}`, {
+        id: `${currentBusiness.id}_${fallbackStaff.id}`,
+        tenantId: currentBusiness.id,
+        userId: fallbackStaff.id,
+        role: fallbackStaff.role,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      setUsers((prev) => [...prev.filter((u) => u.id !== fallbackStaff.id), fallbackStaff]);
+      showToast(`Staff member "${fallbackStaff.name}" added`, 'success');
+      logActivity('Staff Created', 'staff', fallbackStaff.id, `Created staff member ${fallbackStaff.name}`);
+      return fallbackStaff;
+    }
   };
 
   const deleteStaff = (userId: string) => {
@@ -3374,51 +3405,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         throw err;
       }
     } else {
-      // Staff account registration
-      const bId = data.businessId || currentBusiness.id;
-      let newStaffUid = `usr-${Date.now()}`;
-      
-      try {
-        const cred = await createUserWithEmailAndPassword(auth, data.email, data.password);
-        newStaffUid = cred.user.uid;
-      } catch (authErr: any) {
-        if (authErr.code !== 'auth/email-already-in-use') {
-          console.warn('Firebase Auth user creation note for staff:', authErr);
-        }
-      }
-
-      const newStaff: User = {
-        id: newStaffUid,
-        name: data.name,
-        email: data.email,
-        phone: data.phone.startsWith('+') ? data.phone : `+91 ${data.phone}`,
-        role: data.role,
-        businessId: bId,
-        joiningDate: new Date().toISOString().split('T')[0],
-        requestedDate: new Date().toISOString().split('T')[0],
-        status: 'active',
-        approvalStatus: 'active',
-      };
-
-      await saveToFirestore('users', newStaff.id, newStaff);
-      await saveToFirestore('tenantMembers', `${bId}_${newStaff.id}`, {
-        id: `${bId}_${newStaff.id}`,
-        tenantId: bId,
-        userId: newStaff.id,
-        role: data.role,
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      setUsers((prev) => {
-        const updated = [...prev.filter((u) => u.id !== newStaff.id), newStaff];
-        saveCache('serviflow_users_cache', updated);
-        return updated;
-      });
-
-      showToast(`Account created for ${newStaff.name}.`, 'success');
-      return { user: newStaff, isPending: false };
+      const errorMsg = 'Staff and field executives cannot self-register. Please ask your Business Owner to add you from their ServiFlow dashboard.';
+      showToast(errorMsg, 'error');
+      throw new Error(errorMsg);
     }
   };
 

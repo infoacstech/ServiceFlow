@@ -57,9 +57,13 @@ service cloud.firestore {
     // Users Collection
     match /users/{userId} {
       allow read: if isAuthenticated() || true; // Public read for lookup during login
-      allow create: if isAuthenticated() || true; // Self-registration
-      allow update: if isUserSelf(userId) || isSuperAdmin();
-      allow delete: if isSuperAdmin();
+      allow create: if isAuthenticated() || true; // Tenant creation & owner-created staff
+      allow update: if isUserSelf(userId) || isSuperAdmin() || (
+        isAuthenticated() && resource.data.businessId != null && isTenantMember(resource.data.businessId)
+      );
+      allow delete: if isSuperAdmin() || (
+        isAuthenticated() && resource.data.businessId != null && isTenantMember(resource.data.businessId)
+      );
     }
 
     // Tenant Operational Collections (Protected by Tenant Membership & Super Admin)

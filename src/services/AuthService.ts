@@ -209,6 +209,84 @@ export class AuthService {
   }
 
   /**
+   * Create or Invite a new Staff Member by Business Owner / Admin
+   * Scopes the staff member strictly to the owner's Business Tenant.
+   */
+  static async createStaffMember(params: SignUpStaffParams): Promise<{
+    user: User;
+    membership: TenantMembership;
+  }> {
+    const email = params.email.trim().toLowerCase();
+    const phone = params.phone.trim();
+    const name = params.name.trim();
+    const tempPassword = params.password?.trim() || 'ServiFlow@123';
+    const nowIso = new Date().toISOString();
+    const today = nowIso.split('T')[0];
+
+    // Verify tenant business exists
+    const bizSnap = await getDoc(doc(db, 'businesses', params.businessId));
+    if (!bizSnap.exists()) {
+      throw new Error(`Business organization with ID (${params.businessId}) does not exist.`);
+    }
+
+    let uid = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
+    // Try to create Firebase Auth user for staff login
+    try {
+      const authCredential = await createUserWithEmailAndPassword(auth, email, tempPassword);
+      uid = authCredential.user.uid;
+    } catch (authErr: any) {
+      if (authErr.code === 'auth/email-already-in-use') {
+        const existingUsersSnap = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
+        if (!existingUsersSnap.empty) {
+          const existingUserDoc = existingUsersSnap.docs[0];
+          const existingUser = existingUserDoc.data() as User;
+          if (existingUser.businessId && existingUser.businessId !== params.businessId) {
+            throw new Error(`Email address (${email}) is already registered with another business.`);
+          }
+          uid = existingUserDoc.id;
+        }
+      } else {
+        console.warn('Firebase Auth user creation note for staff:', authErr);
+      }
+    }
+
+    const user: User = {
+      id: uid,
+      name: name,
+      email: email,
+      phone: phone.startsWith('+') ? phone : `+91 ${phone}`,
+      role: params.role,
+      businessId: params.businessId,
+      status: 'active',
+      approvalStatus: 'active',
+      skills: params.skills && params.skills.length > 0 ? params.skills : ['General Field Service'],
+      joiningDate: today,
+      requestedDate: today,
+      password: tempPassword,
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+    };
+
+    const membershipId = `${params.businessId}_${uid}`;
+    const membership: TenantMembership = {
+      id: membershipId,
+      tenantId: params.businessId,
+      userId: uid,
+      role: params.role,
+      status: 'active',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    await Promise.all([
+      setDoc(doc(db, 'users', uid), cleanFirestoreData(user)),
+      setDoc(doc(db, 'tenantMembers', membershipId), cleanFirestoreData(membership)),
+    ]);
+
+    return { user, membership };
+  }
+
+  /**
    * Log in user using Firebase Authentication and fetch their authorized user profile & tenant
    */
   static async loginWithCredentials(

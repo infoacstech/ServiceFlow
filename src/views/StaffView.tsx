@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { User, UserRole } from '../types';
 import { StaffCalendarTimeline } from '../components/StaffCalendarTimeline';
+import { checkStaffCapacity } from '../utils/planUtils';
 import {
   UserCheck,
   UserX,
@@ -20,6 +21,7 @@ import {
   AlertCircle,
   Lock,
   Trash2,
+  Sparkles,
 } from 'lucide-react';
 
 export const StaffView: React.FC = () => {
@@ -32,6 +34,7 @@ export const StaffView: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('ServiFlow@123');
   const [selectedRole, setSelectedRole] = useState<UserRole>('technician');
   const [skills, setSkills] = useState('');
 
@@ -40,22 +43,48 @@ export const StaffView: React.FC = () => {
     (u) => u.businessId === currentBusiness.id || currentBusiness.id === 'all'
   );
 
+  const activeStaffCount = businessUsers.filter(
+    (u) => (u.status === 'active' || !u.status) && u.role !== 'super_admin'
+  ).length;
+
+  const capacity = checkStaffCapacity(activeStaffCount, currentBusiness.planId || currentBusiness.plan);
+
   const pendingApprovals = businessUsers.filter((u) => u.approvalStatus === 'pending');
   const isOwnerOrAdmin = currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin';
 
-  const handleAddStaffSubmit = (e: React.FormEvent) => {
+  // Filter roles available for assignment to staff members (exclude super_admin & business_owner)
+  const assignableRoles = roles.filter(
+    (r) => r.code !== 'super_admin' && r.code !== 'business_owner'
+  );
+
+  const handleAddStaffSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) {
       showToast('Please enter full name and email address', 'error');
       return;
     }
 
+    if (!isOwnerOrAdmin) {
+      showToast('Unauthorized: Only Business Owners can add staff members.', 'error');
+      return;
+    }
+
+    if (!capacity.allowed) {
+      showToast(
+        capacity.message ||
+          `Staff limit reached (${activeStaffCount}/${capacity.maxStaff}) for your ${capacity.planName} plan. Please upgrade to add more staff.`,
+        'error'
+      );
+      return;
+    }
+
     const skillsArray = skills.split(',').map((s) => s.trim()).filter(Boolean);
 
-    addStaff({
+    await addStaff({
       name: name.trim(),
       email: email.trim(),
       phone: phone.trim() || '+91 98765 00000',
+      password: password.trim() || 'ServiFlow@123',
       role: selectedRole,
       skills: skillsArray.length > 0 ? skillsArray : ['General Field Service'],
       joiningDate: new Date().toISOString().split('T')[0],
@@ -64,10 +93,10 @@ export const StaffView: React.FC = () => {
       avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80`,
     });
 
-    showToast(`Successfully created ${name} as ${selectedRole.replace('_', ' ')}!`, 'success');
     setName('');
     setEmail('');
     setPhone('');
+    setPassword('ServiFlow@123');
     setSkills('');
     setSelectedRole('technician');
     setIsAddModalOpen(false);
@@ -78,10 +107,15 @@ export const StaffView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <UserCheck className="w-5 h-5 text-indigo-600" /> Staff & Field Executives
-          </h1>
-          <p className="text-xs text-slate-500">Manage field technicians, dispatch calendar, and account approvals</p>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-indigo-600" /> Staff & Field Executives
+            </h1>
+            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
+              {activeStaffCount} / {capacity.maxStaff} Staff Used ({capacity.planName})
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mt-1">Manage field technicians, dispatch calendar, and account credentials</p>
         </div>
 
         {/* View Switcher Tabs & Add Staff Button */}
@@ -418,11 +452,30 @@ export const StaffView: React.FC = () => {
               </div>
 
               <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Initial Login Password *
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
+                  <input
+                    type="text"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="e.g. ServiFlow@123"
+                    required
+                    minLength={6}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Provide this password to the staff member so they can sign in immediately.</p>
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                   Assign System Role
                 </label>
                 <div className="grid grid-cols-1 gap-2">
-                  {roles.map((r) => (
+                  {assignableRoles.map((r) => (
                     <button
                       type="button"
                       key={r.id}
