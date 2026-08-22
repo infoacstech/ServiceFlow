@@ -16,6 +16,7 @@ import { JobNotificationPopup } from './components/JobNotificationPopup';
 import { QuickActionFab } from './components/QuickActionFab';
 import { UserProfileDrawer } from './components/UserProfileDrawer';
 import { InstallAppModal } from './components/InstallAppModal';
+import { PwaInstallPrompt } from './components/PwaInstallPrompt';
 
 import { DashboardView } from './views/DashboardView';
 import { EnquiriesView } from './views/EnquiriesView';
@@ -347,6 +348,9 @@ const MainContent: React.FC = () => {
         isOpen={isInstallModalOpen}
         onClose={() => setIsInstallModalOpen(false)}
       />
+
+      {/* PWA Floating Install Prompt for mobile/desktop browsers */}
+      <PwaInstallPrompt />
 
       <ToastContainer />
     </div>

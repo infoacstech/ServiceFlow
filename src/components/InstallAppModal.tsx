@@ -26,6 +26,15 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+// Global cached prompt
+let globalDeferredPrompt: BeforeInstallPromptEvent | null = null;
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e: Event) => {
+    e.preventDefault();
+    globalDeferredPrompt = e as BeforeInstallPromptEvent;
+  });
+}
+
 interface InstallAppModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -44,8 +53,27 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
   const [isStandalone, setIsStandalone] = useState(false);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [localPrompt, setLocalPrompt] = useState<BeforeInstallPromptEvent | null>(deferredPrompt || globalDeferredPrompt);
 
   const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
+
+  useEffect(() => {
+    if (deferredPrompt) {
+      setLocalPrompt(deferredPrompt);
+    } else if (globalDeferredPrompt) {
+      setLocalPrompt(globalDeferredPrompt);
+    }
+
+    const handlePrompt = (e: Event) => {
+      e.preventDefault();
+      const p = e as BeforeInstallPromptEvent;
+      globalDeferredPrompt = p;
+      setLocalPrompt(p);
+    };
+
+    window.addEventListener('beforeinstallprompt', handlePrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handlePrompt);
+  }, [deferredPrompt]);
 
   useEffect(() => {
     // Detect Standalone execution
@@ -71,13 +99,17 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
 
   if (!isOpen) return null;
 
+  const activePrompt = deferredPrompt || localPrompt || globalDeferredPrompt;
+
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
+    if (activePrompt) {
       try {
-        await deferredPrompt.prompt();
-        const choice = await deferredPrompt.userChoice;
+        await activePrompt.prompt();
+        const choice = await activePrompt.userChoice;
         if (choice.outcome === 'accepted') {
           showToast('ServiFlow App installed successfully on your device!', 'success');
+          globalDeferredPrompt = null;
+          setLocalPrompt(null);
           if (onInstalled) onInstalled();
           onClose();
         } else {
