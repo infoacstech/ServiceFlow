@@ -27,8 +27,10 @@ import {
   EyeOff,
   Settings as SettingsIcon,
   ChevronRight,
+  RefreshCw,
 } from 'lucide-react';
 import { UserRole } from '../types';
+import { clearAppCache } from '../utils/cacheUtils';
 import {
   isVoiceNotificationEnabled,
   setVoiceNotificationEnabled,
@@ -91,6 +93,26 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
   const [voiceEnabled, setVoiceEnabled] = useState(isVoiceNotificationEnabled());
   const [voiceVolume, setVoiceVolumeState] = useState(getVoiceVolume());
   const [voiceLang, setVoiceLang] = useState<VoiceLanguageCode>(getSelectedVoiceLanguage());
+
+  // Cache clearing state
+  const [isClearingCache, setIsClearingCache] = useState(false);
+
+  const handleClearCache = async () => {
+    setIsClearingCache(true);
+    try {
+      showToast('Clearing active service workers & cache storage...', 'info');
+      const res = await clearAppCache(true);
+      if (res.success) {
+        showToast('App cache cleared successfully! Reloading latest version...', 'success');
+      } else {
+        showToast(res.error || 'Failed to clear app cache', 'error');
+        setIsClearingCache(false);
+      }
+    } catch (err: any) {
+      showToast(err?.message || 'Error clearing app cache', 'error');
+      setIsClearingCache(false);
+    }
+  };
 
   // Keep state in sync if currentUser changes
   React.useEffect(() => {
@@ -712,6 +734,22 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-emerald-500" />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleClearCache}
+                disabled={isClearingCache}
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-amber-50/80 to-orange-50/80 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200/80 dark:border-amber-800/60 hover:border-amber-400 text-amber-900 dark:text-amber-200 text-xs font-bold transition-all shadow-xs cursor-pointer group disabled:opacity-50"
+              >
+                <div className="flex items-center gap-2.5">
+                  <RefreshCw className={`w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 ${isClearingCache ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+                  <div className="text-left">
+                    <div>Clear App Cache & Reload (कैश साफ़ करें)</div>
+                    <div className="text-[10px] text-amber-700/80 dark:text-amber-400/80 font-normal">Unregister service workers & fetch latest assets</div>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-amber-500 shrink-0" />
               </button>
             </div>
 

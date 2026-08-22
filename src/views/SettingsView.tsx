@@ -60,6 +60,7 @@ import {
 import { InstallAppModal } from '../components/InstallAppModal';
 import { calculateAnnualPricing } from '../utils/planUtils';
 import { Plan } from '../types';
+import { clearAppCache } from '../utils/cacheUtils';
 import {
   isVoiceNotificationEnabled,
   setVoiceNotificationEnabled,
@@ -123,6 +124,26 @@ export const SettingsView: React.FC = () => {
   const [voiceVolume, setVoiceVol] = useState(getVoiceVolume());
   const [voiceLang, setVoiceLang] = useState(getSelectedVoiceLanguage());
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+
+  // App Cache clearing state
+  const [isClearingCache, setIsClearingCache] = useState(false);
+
+  const handleClearCache = async () => {
+    setIsClearingCache(true);
+    try {
+      showToast('Clearing active service workers & cache storage...', 'info');
+      const res = await clearAppCache(true);
+      if (res.success) {
+        showToast('App cache cleared successfully! Reloading latest production assets...', 'success');
+      } else {
+        showToast(res.error || 'Failed to clear app cache', 'error');
+        setIsClearingCache(false);
+      }
+    } catch (err: any) {
+      showToast(err?.message || 'Error clearing app cache', 'error');
+      setIsClearingCache(false);
+    }
+  };
 
   const handleUserProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2190,6 +2211,36 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* App Cache & Production Asset Updates Section */}
+          <div className="pt-6 border-t border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/60">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-amber-600 text-white flex items-center justify-center shadow-md shadow-amber-600/20 shrink-0">
+                <RefreshCw className={`w-5 h-5 ${isClearingCache ? 'animate-spin' : ''}`} />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <span>Clear App Cache & Reload (ऐप कैश साफ़ करें)</span>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-200/80 dark:bg-amber-900/80 text-amber-900 dark:text-amber-200">
+                    Latest Assets
+                  </span>
+                </h4>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 max-w-xl">
+                  Unregisters active service workers and purges browser asset caches (<code className="text-[11px] font-mono text-amber-700 dark:text-amber-300">CacheStorage</code>), forcing the app to fetch the latest production JavaScript, CSS, and UI bundle on reload.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleClearCache}
+              disabled={isClearingCache}
+              className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-amber-600/20 shrink-0 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${isClearingCache ? 'animate-spin' : ''}`} />
+              <span>{isClearingCache ? 'Clearing Cache...' : 'Clear Cache & Update'}</span>
+            </button>
           </div>
 
           {/* Standalone App Installation Section */}
