@@ -721,6 +721,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         setCurrentUser((prev) => {
           if (!prev) return null;
+          const isSuperAdmin = prev.role === 'super_admin' || prev.email === 'admin@serviflow.io';
+          if (isSuperAdmin) return prev;
           const found = allUsers.find(
             (u) =>
               u.id === prev.id ||
@@ -728,7 +730,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 Boolean(prev.email) &&
                 (u.email || '').trim().toLowerCase() === (prev.email || '').trim().toLowerCase())
           );
-          return found || prev;
+          if (!found) {
+            // User was deleted from Firestore. Invalidate session.
+            localStorage.removeItem('serviflow_user_session');
+            localStorage.removeItem('serviflow_logged_in_email');
+            localStorage.removeItem('serviflow_logged_in_uid');
+            return null;
+          }
+          return found;
         });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'users')
@@ -1212,24 +1221,27 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 }
               }
             }
+          } else if (!userRecord && isMounted) {
+            // Account was deleted in Firestore. Force sign-out of Firebase Auth and clear local state.
+            try {
+              await signOut(auth);
+            } catch {}
+            setCurrentUser(null);
+            setCurrentBusiness(DEFAULT_BLANK_BUSINESS);
+            localStorage.removeItem('serviflow_user_session');
+            localStorage.removeItem('serviflow_logged_in_email');
+            localStorage.removeItem('serviflow_logged_in_uid');
+            localStorage.removeItem('serviflow_current_biz_cache');
           }
         } catch (err) {
           console.error('Error fetching user on auth change:', err);
         }
       } else {
-        // If firebaseUser is null on refresh, check if we already have a valid cached user session
-        const cachedSession = localStorage.getItem('serviflow_user_session');
-        if (cachedSession) {
-          try {
-            const parsedUser = JSON.parse(cachedSession) as User;
-            if (parsedUser && parsedUser.id) {
-              if (isMounted && !currentUser) {
-                setCurrentUser(parsedUser);
-              }
-            }
-          } catch (e) {
-            console.warn('Error reading cached user session:', e);
-          }
+        if (isMounted) {
+          setCurrentUser(null);
+          localStorage.removeItem('serviflow_user_session');
+          localStorage.removeItem('serviflow_logged_in_email');
+          localStorage.removeItem('serviflow_logged_in_uid');
         }
       }
       if (isMounted) {

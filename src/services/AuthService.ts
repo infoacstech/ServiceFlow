@@ -454,39 +454,81 @@ export class AuthService {
     }
 
     const authPass = password || 'ServiFlow@123';
-    let authUser: FirebaseUser | null = null;
+    const isSuperAdminEmail =
+      targetEmail === 'admin@serviflow.io' || targetEmail === 'superadmin@serviflow.io';
 
+    // 1. Check if user document exists in Firestore first
+    let user: User | null = null;
+    try {
+      const q = query(collection(db, 'users'), where('email', '==', targetEmail));
+      const qSnap = await getDocs(q);
+      if (!qSnap.empty) {
+        user = qSnap.docs[0].data() as User;
+        user.id = qSnap.docs[0].id;
+      } else {
+        // Search by phone or case-insensitive match
+        const allUsersSnap = await getDocs(collection(db, 'users'));
+        const targetCleanPhone = identifier.replace(/[^0-9]/g, '');
+        for (const uDoc of allUsersSnap.docs) {
+          const u = uDoc.data() as User;
+          const docEmail = (u.email || '').trim().toLowerCase();
+          const docPhone = (u.phone || '').replace(/[^0-9]/g, '');
+          if (
+            docEmail === targetEmail ||
+            (targetCleanPhone.length >= 10 && docPhone.length >= 10 && docPhone.slice(-10) === targetCleanPhone.slice(-10))
+          ) {
+            user = { ...u, id: uDoc.id };
+            break;
+          }
+        }
+      }
+    } catch (lookupErr) {
+      console.warn('Firestore user lookup error:', lookupErr);
+    }
+
+    // 2. If no user found in database:
+    // If it's NOT the platform Super Admin, STRICTLY REJECT login. NEVER auto-create users on login.
+    if (!user) {
+      if (!isSuperAdminEmail) {
+        throw new Error(`No account found for (${targetEmail}). If this account was deleted or not registered, please register a new account.`);
+      }
+    }
+
+    // 3. Authenticate with Firebase Auth
+    let authUser: FirebaseUser | null = null;
     try {
       const cred = await signInWithEmailAndPassword(auth, targetEmail, authPass);
       authUser = cred.user;
     } catch (authErr: any) {
-      // If user doesn't exist yet in Firebase Authentication (e.g. first-time login, super admin, or pre-seeded user),
-      // auto-provision the Auth credential seamlessly
       if (
         authErr.code === 'auth/user-not-found' ||
         authErr.code === 'auth/invalid-credential' ||
         authErr.code === 'auth/invalid-email'
       ) {
-        try {
-          const createCred = await createUserWithEmailAndPassword(auth, targetEmail, authPass);
-          authUser = createCred.user;
-        } catch (createErr: any) {
-          if (createErr.code === 'auth/email-already-in-use') {
-            // Re-attempt sign in if password was different or user was just created
-            try {
-              const retryCred = await signInWithEmailAndPassword(auth, targetEmail, authPass);
-              authUser = retryCred.user;
-            } catch {
-              throw new Error('Invalid email or password. Please check your credentials or reset password.');
+        // If user already exists in Firestore or is Super Admin, ensure Firebase Auth user is in sync
+        if (user || isSuperAdminEmail) {
+          try {
+            const createCred = await createUserWithEmailAndPassword(auth, targetEmail, authPass);
+            authUser = createCred.user;
+          } catch (createErr: any) {
+            if (createErr.code === 'auth/email-already-in-use') {
+              try {
+                const retryCred = await signInWithEmailAndPassword(auth, targetEmail, authPass);
+                authUser = retryCred.user;
+              } catch {
+                throw new Error('Invalid email or password. Please check your credentials.');
+              }
+            } else {
+              throw new Error('Invalid email or password. Please check your credentials.');
             }
-          } else {
-            throw new Error('Invalid email or password. Please check your credentials.');
           }
+        } else {
+          throw new Error(`No account found for (${targetEmail}). Please register a new account.`);
         }
       } else if (authErr.code === 'auth/wrong-password') {
         throw new Error('Incorrect password. Please try again or use Forgot Password.');
       } else if (authErr.code === 'auth/too-many-requests') {
-        throw new Error('Too many failed attempts. Please try again later or reset password.');
+        throw new Error('Too many failed attempts. Please try again later.');
       } else {
         throw authErr;
       }
@@ -496,90 +538,23 @@ export class AuthService {
       throw new Error('Authentication failed. Please check your credentials.');
     }
 
-    // 1. Fetch User Record
-    const userDocRef = doc(db, 'users', authUser.uid);
-    let userSnap = await getDoc(userDocRef);
-    let user: User | null = null;
-
-    if (userSnap.exists()) {
-      user = userSnap.data() as User;
-      user.id = authUser.uid; // Guarantee UID match
-    } else {
-      // Fallback 1: Query by lowercase email
-      const q = query(collection(db, 'users'), where('email', '==', targetEmail));
-      const qSnap = await getDocs(q);
-      if (!qSnap.empty) {
-        user = { ...(qSnap.docs[0].data() as User), id: authUser.uid };
-        await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user), { merge: true });
-      } else {
-        // Fallback 2: Case-insensitive search across all user documents
-        try {
-          const allUsersSnap = await getDocs(collection(db, 'users'));
-          for (const uDoc of allUsersSnap.docs) {
-            const u = uDoc.data() as User;
-            const docEmail = (u.email || '').trim().toLowerCase();
-            const docPhone = (u.phone || '').replace(/[^0-9]/g, '');
-            const targetCleanPhone = identifier.replace(/[^0-9]/g, '');
-            
-            if (
-              docEmail === targetEmail ||
-              (docPhone.length >= 10 && targetCleanPhone.length >= 10 && docPhone.slice(-10) === targetCleanPhone.slice(-10))
-            ) {
-              user = { ...u, id: authUser.uid };
-              await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user), { merge: true });
-              break;
-            }
-          }
-        } catch (scanErr) {
-          console.warn('User scan error:', scanErr);
-        }
-      }
-
-      if (!user) {
-        if (targetEmail === 'admin@serviflow.io' || targetEmail === 'superadmin@serviflow.io') {
-          // Provision baseline profile strictly for authorized Super Admin
-          user = {
-            id: authUser.uid,
-            name: authUser.displayName || 'Platform Super Admin',
-            email: targetEmail,
-            phone: authUser.phoneNumber || '+91 90000 00000',
-            role: 'super_admin',
-            businessId: 'all',
-            status: 'active',
-            approvalStatus: 'active',
-            joiningDate: new Date().toISOString().split('T')[0],
-          };
-          await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user));
-        } else {
-          // Check if there is any business associated with this email in businesses collection
-          const fallbackTenantId = `tenant-${Date.now()}`;
-          let matchedBizData: Business | null = null;
-          try {
-            const allBizSnap = await getDocs(collection(db, 'businesses'));
-            const matchedBiz = allBizSnap.docs.find((bDoc) => {
-              const b = bDoc.data() as Business;
-              return (b.email || '').trim().toLowerCase() === targetEmail;
-            });
-            if (matchedBiz) {
-              matchedBizData = matchedBiz.data() as Business;
-            }
-          } catch {}
-
-          const assignedBizId = matchedBizData?.id || fallbackTenantId;
-          user = {
-            id: authUser.uid,
-            name: matchedBizData?.name ? `${matchedBizData.name} Admin` : 'Business Owner',
-            email: targetEmail,
-            phone: matchedBizData?.mobile || '+91 99999 88888',
-            role: 'business_owner',
-            businessId: assignedBizId,
-            status: matchedBizData?.status === 'suspended' ? 'inactive' : 'active',
-            approvalStatus: matchedBizData?.status === 'suspended' ? 'suspended' : 'active',
-            joiningDate: matchedBizData?.createdAt || new Date().toISOString().split('T')[0],
-          };
-          await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user));
-        }
-      }
+    // 4. Finalize user profile
+    if (!user && isSuperAdminEmail) {
+      user = {
+        id: authUser.uid,
+        name: authUser.displayName || 'Platform Super Admin',
+        email: targetEmail,
+        phone: authUser.phoneNumber || '+91 90000 00000',
+        role: 'super_admin',
+        businessId: 'all',
+        status: 'active',
+        approvalStatus: 'active',
+        joiningDate: new Date().toISOString().split('T')[0],
+      };
+      await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user));
+    } else if (user) {
+      user.id = authUser.uid;
+      await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user), { merge: true });
     }
 
     if (!user) {
