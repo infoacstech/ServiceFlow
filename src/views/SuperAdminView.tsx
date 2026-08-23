@@ -1579,9 +1579,11 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
               </div>
 
               <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800">
-                <div className="text-xs font-bold text-slate-500">Total Platform Users</div>
-                <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">{users.length}</div>
-                <div className="text-[10px] text-slate-400 mt-1">Admins, Techs & Staff</div>
+                <div className="text-xs font-bold text-slate-500">Tenant Users & Staff</div>
+                <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
+                  {users.filter((u) => u.role !== 'super_admin' && u.email !== 'admin@serviflow.io').length}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-1">Owners, Techs & Staff</div>
               </div>
 
               <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200/60 dark:border-slate-800">
@@ -1934,7 +1936,9 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                     <Check className="w-4 h-4 text-emerald-600" />
                     <span className="font-bold text-slate-800 dark:text-slate-200">Business Owners & Registered Users</span>
                   </div>
-                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">{users.length} Users</span>
+                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">
+                    {users.filter((u) => u.role !== 'super_admin' && u.email !== 'admin@serviflow.io').length} Users
+                  </span>
                 </div>
 
                 <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 flex items-center justify-between">
