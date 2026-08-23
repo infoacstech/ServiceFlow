@@ -137,7 +137,7 @@ export class FirestoreService {
    * Performs a 100% complete database wipe, deleting all dummy businesses, tenant associations,
    * all dummy staff/owners/customers/records, and preserving ONLY the Super Admin account.
    */
-  static async wipeAllExceptSuperAdmin(): Promise<{ totalDocsDeleted: number }> {
+  static async wipeAllExceptSuperAdmin(): Promise<{ totalDocsDeleted: number; clearedCollections: string[] }> {
     let totalDocsDeleted = 0;
 
     // 1. Purge all transactional, tenant, and operational collections
@@ -224,7 +224,7 @@ export class FirestoreService {
       console.warn('Cache clear error:', e);
     }
 
-    return { totalDocsDeleted };
+    return { totalDocsDeleted, clearedCollections: collectionsToWipe };
   }
 
   /**

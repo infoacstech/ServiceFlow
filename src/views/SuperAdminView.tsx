@@ -2166,7 +2166,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                 <div>
                   <span className="font-extrabold">Clean State Activated Successfully: </span>
                   <span>
-                    Purged {lastPurgeResult.totalDocsDeleted} documents across collections ({lastPurgeResult.clearedCollections.join(', ')}).
+                    Purged {lastPurgeResult.totalDocsDeleted} documents across collections ({lastPurgeResult.clearedCollections?.join(', ') || 'All Collections'}).
                   </span>
                 </div>
               </div>

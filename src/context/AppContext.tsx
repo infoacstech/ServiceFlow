@@ -343,7 +343,7 @@ interface AppContextType {
   // Safe Clean State Testing Data Purge
   purgeAllTransactionalData: () => Promise<{ clearedCollections: string[]; totalDocsDeleted: number }>;
   purgeTenantTransactionalData: (businessId?: string) => Promise<{ clearedCollections: string[]; totalDocsDeleted: number }>;
-  wipeAllExceptSuperAdmin: () => Promise<{ totalDocsDeleted: number }>;
+  wipeAllExceptSuperAdmin: () => Promise<{ clearedCollections: string[]; totalDocsDeleted: number }>;
   cleanupOrphanUsers: () => Promise<number>;
 
   // Tenant and User Deletion
@@ -1704,7 +1704,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       logSecurityEvent(
         'PURGE_ALL_TRANSACTIONAL_DATA',
         'SETTINGS',
-        `Super Admin wiped ${res.totalDocsDeleted} dummy transactional records across collections: ${res.clearedCollections.join(', ')}`
+        `Super Admin wiped ${res.totalDocsDeleted} dummy transactional records across collections: ${res.clearedCollections?.join(', ') || 'All Collections'}`
       );
       setEnquiries([]);
       setCustomers([]);
@@ -1752,10 +1752,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const wipeAllExceptSuperAdmin = async (): Promise<{ totalDocsDeleted: number }> => {
+  const wipeAllExceptSuperAdmin = async (): Promise<{ clearedCollections: string[]; totalDocsDeleted: number }> => {
     if (currentUser?.role !== 'super_admin') {
       showToast('Unauthorized: Only Super Administrators can wipe platform data.', 'error');
-      return { totalDocsDeleted: 0 };
+      return { clearedCollections: [], totalDocsDeleted: 0 };
     }
     try {
       const res = await FirestoreService.wipeAllExceptSuperAdmin();
@@ -1799,7 +1799,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err) {
       console.error('Wipe error:', err);
       showToast('Failed to execute global wipe: ' + String(err), 'error');
-      return { totalDocsDeleted: 0 };
+      return { clearedCollections: [], totalDocsDeleted: 0 };
     }
   };
 
