@@ -7,9 +7,11 @@ import {
   inMemoryPersistence,
 } from 'firebase/auth';
 import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   getFirestore,
   doc,
-  getDocFromServer,
   collection,
   getDocs,
   setDoc,
@@ -22,7 +24,27 @@ import {
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
+
+// Initialize Firestore with robust long-polling auto-detection and persistent multi-tab cache
+let dbInstance;
+try {
+  dbInstance = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  }, (firebaseConfig as any).firestoreDatabaseId);
+} catch (e) {
+  try {
+    dbInstance = initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+    }, (firebaseConfig as any).firestoreDatabaseId);
+  } catch (e2) {
+    dbInstance = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
+  }
+}
+
+export const db = dbInstance;
 export const auth = getAuth(app);
 
 // Gracefully configure auth persistence with multi-tier fallback
@@ -104,15 +126,3 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.warn('Firestore Operation Info: ', JSON.stringify(errInfo));
   return errInfo;
 }
-
-// Test initial connection
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, '_connection_test_', 'test'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Please check your Firebase configuration.');
-    }
-  }
-}
-testConnection();

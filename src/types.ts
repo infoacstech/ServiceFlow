@@ -408,7 +408,7 @@ export interface Notification {
   businessId: string;
   title: string;
   message: string;
-  type: 'job' | 'payment' | 'inventory' | 'contract' | 'system';
+  type: 'job' | 'payment' | 'inventory' | 'contract' | 'system' | 'broadcast';
   read: boolean;
   createdAt: string;
   targetRoleId?: UserRole;
@@ -422,6 +422,8 @@ export interface Notification {
   scheduledTime?: string;
   priority?: JobPriority;
   actionType?: 'assigned' | 'accepted' | 'started' | 'completed' | 'general';
+  broadcastSeverity?: 'info' | 'warning' | 'critical' | 'success';
+  authorName?: string;
 }
 
 export interface ActivityLog {
@@ -486,6 +488,8 @@ export interface SystemSettings {
   defaultTrialDays: number;
   globalNoticeBanner: string;
   isNoticeActive: boolean;
+  noticeSeverity?: 'info' | 'warning' | 'critical' | 'success';
+  noticeTitle?: string;
   mfaEnforcement: 'optional' | 'required_super_admin' | 'required_all';
   minPasswordLength: number;
   sessionTimeoutMinutes: number;

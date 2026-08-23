@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { speakText } from '../utils/audioNotification';
 import { EnquiryFormModal } from '../components/enquiries/EnquiryFormModal';
 import {
   Briefcase,
@@ -32,6 +33,9 @@ import {
   ExternalLink,
   HelpCircle,
   CalendarClock,
+  Megaphone,
+  Volume2,
+  Radio,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -81,6 +85,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     syncOfflineQueue,
     pendingSyncQueue,
     showToast,
+    systemSettings,
   } = useApp();
 
   // Quick Action Modal States
@@ -345,6 +350,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Super Admin Platform Announcement Broadcast Card (If Active) */}
+      {systemSettings?.isNoticeActive && systemSettings?.globalNoticeBanner?.trim() && (
+        <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-blue-50 dark:from-indigo-950/60 dark:via-purple-950/40 dark:to-slate-900 p-4 sm:p-5 rounded-3xl border border-indigo-200/80 dark:border-indigo-800/80 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-indigo-600 text-white shadow-xs shrink-0 mt-0.5 sm:mt-0">
+              <Megaphone className="w-4 h-4 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-black uppercase tracking-wider bg-indigo-600 text-white px-2 py-0.5 rounded-full">
+                  Super Admin Broadcast
+                </span>
+                <span className="text-[11px] text-slate-500 font-medium hidden xs:inline">
+                  {systemSettings.noticeTitle || 'Official Platform Notice'}
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100 mt-1 leading-snug">
+                {systemSettings.globalNoticeBanner}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => speakText(`Platform Broadcast: ${systemSettings.globalNoticeBanner}`)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 font-bold text-xs border border-indigo-200 dark:border-indigo-800 shadow-2xs transition-all active:scale-95 shrink-0 self-end sm:self-center cursor-pointer"
+            title="Listen to broadcast"
+          >
+            <Volume2 className="w-3.5 h-3.5" /> Listen Audio
+          </button>
+        </div>
+      )}
 
       {/* Quick Actions Bar */}
       <div className="bg-white dark:bg-slate-900 p-4.5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">

@@ -37,6 +37,7 @@ export const StaffView: React.FC = () => {
   const [password, setPassword] = useState('ServiFlow@123');
   const [selectedRole, setSelectedRole] = useState<UserRole>('technician');
   const [skills, setSkills] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Filter staff & pending users for current business
   const businessUsers = (users || staff).filter(
@@ -51,6 +52,35 @@ export const StaffView: React.FC = () => {
 
   const pendingApprovals = businessUsers.filter((u) => u.approvalStatus === 'pending');
   const isOwnerOrAdmin = currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin';
+
+  // Real-time Owner Credentials Conflict Checks
+  const cleanEnteredEmail = email.trim().toLowerCase();
+  const cleanEnteredPhoneDigits = phone.replace(/[^0-9]/g, '');
+
+  const ownerEmail = (currentUser?.email || currentBusiness.email || '').trim().toLowerCase();
+  const ownerPhoneDigits = (currentUser?.phone || currentBusiness.mobile || '').replace(/[^0-9]/g, '');
+
+  const isOwnerEmailCollision = Boolean(
+    cleanEnteredEmail && ownerEmail && cleanEnteredEmail === ownerEmail
+  );
+
+  const isOwnerPhoneCollision = Boolean(
+    cleanEnteredPhoneDigits.length >= 10 &&
+    ownerPhoneDigits.length >= 10 &&
+    ownerPhoneDigits.slice(-10) === cleanEnteredPhoneDigits.slice(-10)
+  );
+
+  const existingUserWithEmail = cleanEnteredEmail
+    ? users.find((u) => (u.email || '').trim().toLowerCase() === cleanEnteredEmail)
+    : null;
+
+  const existingUserWithPhone =
+    cleanEnteredPhoneDigits.length >= 10
+      ? users.find((u) => {
+          const uDigits = (u.phone || '').replace(/[^0-9]/g, '');
+          return uDigits.length >= 10 && uDigits.slice(-10) === cleanEnteredPhoneDigits.slice(-10);
+        })
+      : null;
 
   // Filter roles available for assignment to staff members (exclude super_admin & business_owner)
   const assignableRoles = roles.filter(
@@ -69,6 +99,40 @@ export const StaffView: React.FC = () => {
       return;
     }
 
+    // 1. Owner Credential Collision Check
+    if (isOwnerEmailCollision) {
+      showToast(
+        "Cannot use Business Owner's email address for a staff member. Please enter the staff member's unique email.",
+        'error'
+      );
+      return;
+    }
+
+    if (isOwnerPhoneCollision) {
+      showToast(
+        "Cannot use Business Owner's phone number for a staff member. Please enter the staff member's unique mobile number.",
+        'error'
+      );
+      return;
+    }
+
+    // 2. Existing User Collision Check
+    if (existingUserWithEmail) {
+      showToast(
+        `Email address (${email.trim()}) is already registered with an existing account (${existingUserWithEmail.name || existingUserWithEmail.email}).`,
+        'error'
+      );
+      return;
+    }
+
+    if (existingUserWithPhone) {
+      showToast(
+        `Mobile phone (${phone.trim()}) is already registered with an existing account (${existingUserWithPhone.name || existingUserWithPhone.email}).`,
+        'error'
+      );
+      return;
+    }
+
     if (!capacity.allowed) {
       showToast(
         capacity.message ||
@@ -80,26 +144,33 @@ export const StaffView: React.FC = () => {
 
     const skillsArray = skills.split(',').map((s) => s.trim()).filter(Boolean);
 
-    await addStaff({
-      name: name.trim(),
-      email: email.trim(),
-      phone: phone.trim() || '+91 98765 00000',
-      password: password.trim() || 'ServiFlow@123',
-      role: selectedRole,
-      skills: skillsArray.length > 0 ? skillsArray : ['General Field Service'],
-      joiningDate: new Date().toISOString().split('T')[0],
-      status: 'active',
-      approvalStatus: 'active',
-      avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80`,
-    });
+    setIsSubmitting(true);
+    try {
+      await addStaff({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim() || '+91 98765 00000',
+        password: password.trim() || 'ServiFlow@123',
+        role: selectedRole,
+        skills: skillsArray.length > 0 ? skillsArray : ['General Field Service'],
+        joiningDate: new Date().toISOString().split('T')[0],
+        status: 'active',
+        approvalStatus: 'active',
+        avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80`,
+      });
 
-    setName('');
-    setEmail('');
-    setPhone('');
-    setPassword('ServiFlow@123');
-    setSkills('');
-    setSelectedRole('technician');
-    setIsAddModalOpen(false);
+      setName('');
+      setEmail('');
+      setPhone('');
+      setPassword('ServiFlow@123');
+      setSkills('');
+      setSelectedRole('technician');
+      setIsAddModalOpen(false);
+    } catch (err: any) {
+      console.error('Staff creation caught in view:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -433,8 +504,22 @@ export const StaffView: React.FC = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="suresh@company.com"
                     required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 outline-hidden transition-all ${
+                      isOwnerEmailCollision || existingUserWithEmail
+                        ? 'border-rose-500 ring-1 ring-rose-500 focus:ring-rose-500'
+                        : 'border-slate-200 dark:border-slate-700 focus:ring-indigo-500'
+                    }`}
                   />
+                  {isOwnerEmailCollision && (
+                    <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" /> Cannot use Business Owner's email.
+                    </p>
+                  )}
+                  {!isOwnerEmailCollision && existingUserWithEmail && (
+                    <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" /> Email already registered ({existingUserWithEmail.name || 'User'}).
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -446,8 +531,22 @@ export const StaffView: React.FC = () => {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+91 98765 43210"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                    className={`w-full px-3.5 py-2.5 rounded-xl border bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 outline-hidden transition-all ${
+                      isOwnerPhoneCollision || existingUserWithPhone
+                        ? 'border-rose-500 ring-1 ring-rose-500 focus:ring-rose-500'
+                        : 'border-slate-200 dark:border-slate-700 focus:ring-indigo-500'
+                    }`}
                   />
+                  {isOwnerPhoneCollision && (
+                    <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" /> Cannot use Business Owner's phone.
+                    </p>
+                  )}
+                  {!isOwnerPhoneCollision && existingUserWithPhone && (
+                    <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" /> Mobile already registered ({existingUserWithPhone.name || 'User'}).
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -534,9 +633,14 @@ export const StaffView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2"
+                  disabled={isSubmitting || isOwnerEmailCollision || isOwnerPhoneCollision || Boolean(existingUserWithEmail) || Boolean(existingUserWithPhone)}
+                  className={`px-6 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2 ${
+                    isSubmitting || isOwnerEmailCollision || isOwnerPhoneCollision || Boolean(existingUserWithEmail) || Boolean(existingUserWithPhone)
+                      ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed shadow-none'
+                      : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                  }`}
                 >
-                  <UserPlus className="w-4 h-4" /> Create & Assign Role
+                  <UserPlus className="w-4 h-4" /> {isSubmitting ? 'Validating & Adding...' : 'Create & Assign Role'}
                 </button>
               </div>
             </form>

@@ -9,6 +9,7 @@ import { ToastContainer } from './components/ToastContainer';
 import { ActivityLogDrawer } from './components/ActivityLogDrawer';
 import { OfflineSyncBanner } from './components/OfflineSyncBanner';
 import { SupportSessionBanner } from './components/SupportSessionBanner';
+import { GlobalBroadcastBanner } from './components/GlobalBroadcastBanner';
 import { AuthModal } from './components/AuthModal';
 import { AccessDeniedView } from './components/AccessDeniedView';
 import { PullToRefresh } from './components/PullToRefresh';
@@ -212,6 +213,9 @@ const MainContent: React.FC = () => {
 
       {/* Offline Sync Banner for Technicians */}
       <OfflineSyncBanner />
+
+      {/* Global Platform Broadcast Announcement Banner */}
+      <GlobalBroadcastBanner />
 
       {/* Top Navbar Header */}
       <Navbar

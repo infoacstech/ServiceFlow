@@ -209,6 +209,97 @@ export class AuthService {
   }
 
   /**
+   * Validate that staff credentials (email & phone) do not conflict with the Business Owner
+   * or any existing registered account.
+   */
+  static async validateStaffUniqueness(businessId: string, email: string, phone: string): Promise<void> {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPhoneDigits = phone.replace(/[^0-9]/g, '');
+
+    // 1. Fetch the business / tenant record
+    const bizSnap = await getDoc(doc(db, 'businesses', businessId));
+    if (bizSnap.exists()) {
+      const biz = bizSnap.data() as Business;
+      const bizEmail = (biz.email || '').trim().toLowerCase();
+      const bizPhoneDigits = (biz.mobile || '').replace(/[^0-9]/g, '');
+
+      if (bizEmail && cleanEmail && bizEmail === cleanEmail) {
+        throw new Error(
+          `Cannot use Business Owner's email address (${email}) for a staff member. Please provide a separate unique email for this staff member.`
+        );
+      }
+
+      if (
+        cleanPhoneDigits.length >= 10 &&
+        bizPhoneDigits.length >= 10 &&
+        bizPhoneDigits.slice(-10) === cleanPhoneDigits.slice(-10)
+      ) {
+        throw new Error(
+          `Cannot use Business Owner's mobile number (${phone}) for a staff member. Please provide a separate unique mobile number for this staff member.`
+        );
+      }
+    }
+
+    // 2. Check all existing user accounts in Firestore
+    try {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      for (const uDoc of usersSnap.docs) {
+        const u = uDoc.data() as User;
+        const uEmail = (u.email || '').trim().toLowerCase();
+        const uPhoneDigits = (u.phone || '').replace(/[^0-9]/g, '');
+
+        const isEmailMatch = uEmail && cleanEmail && uEmail === cleanEmail;
+        const isPhoneMatch =
+          cleanPhoneDigits.length >= 10 &&
+          uPhoneDigits.length >= 10 &&
+          uPhoneDigits.slice(-10) === cleanPhoneDigits.slice(-10);
+
+        if (isEmailMatch) {
+          if (u.role === 'business_owner' && u.businessId === businessId) {
+            throw new Error(
+              `Cannot use Business Owner's email address (${email}) for a staff member. Please use the staff member's unique email.`
+            );
+          }
+          if (u.role === 'business_owner') {
+            throw new Error(
+              `This email address (${email}) is already registered as a Business Owner on the platform. Please use another email.`
+            );
+          }
+          if (u.role === 'super_admin') {
+            throw new Error(
+              `This email address (${email}) is reserved for SaaS Administration.`
+            );
+          }
+          throw new Error(
+            `Email address (${email}) is already registered with an existing ${u.role.replace('_', ' ')} account.`
+          );
+        }
+
+        if (isPhoneMatch) {
+          if (u.role === 'business_owner' && u.businessId === businessId) {
+            throw new Error(
+              `Cannot use Business Owner's mobile number (${phone}) for a staff member. Please use the staff member's unique mobile number.`
+            );
+          }
+          if (u.role === 'business_owner') {
+            throw new Error(
+              `This phone number (${phone}) is already registered to a Business Owner on the platform.`
+            );
+          }
+          throw new Error(
+            `Phone number (${phone}) is already registered with an existing ${u.role.replace('_', ' ')} account.`
+          );
+        }
+      }
+    } catch (err: any) {
+      if (err.message && (err.message.includes('Cannot use') || err.message.includes('already registered') || err.message.includes('reserved'))) {
+        throw err;
+      }
+      console.warn('User uniqueness pre-check notice:', err);
+    }
+  }
+
+  /**
    * Create or Invite a new Staff Member by Business Owner / Admin
    * Scopes the staff member strictly to the owner's Business Tenant.
    */
@@ -229,6 +320,9 @@ export class AuthService {
       throw new Error(`Business organization with ID (${params.businessId}) does not exist.`);
     }
 
+    // Strict validation: Reject if staff email or phone matches owner or any existing account
+    await AuthService.validateStaffUniqueness(params.businessId, email, phone);
+
     let uid = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
 
     // Try to create Firebase Auth user for staff login
@@ -237,15 +331,9 @@ export class AuthService {
       uid = authCredential.user.uid;
     } catch (authErr: any) {
       if (authErr.code === 'auth/email-already-in-use') {
-        const existingUsersSnap = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
-        if (!existingUsersSnap.empty) {
-          const existingUserDoc = existingUsersSnap.docs[0];
-          const existingUser = existingUserDoc.data() as User;
-          if (existingUser.businessId && existingUser.businessId !== params.businessId) {
-            throw new Error(`Email address (${email}) is already registered with another business.`);
-          }
-          uid = existingUserDoc.id;
-        }
+        throw new Error(
+          `The email address (${email}) is already registered with an existing account in Firebase Authentication. Please use a unique email for this staff member.`
+        );
       } else {
         console.warn('Firebase Auth user creation note for staff:', authErr);
       }
@@ -307,17 +395,21 @@ export class AuthService {
 
       try {
         const usersSnap = await getDocs(collection(db, 'users'));
-        const foundDoc = usersSnap.docs.find((d) => {
-          const u = d.data() as User;
-          const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
-          return (
-            (uPhone.length >= 10 && cleanDigits.length >= 10 && uPhone.slice(-10) === cleanDigits.slice(-10)) ||
-            (uPhone.length >= 6 && cleanDigits.length >= 6 && uPhone.endsWith(cleanDigits.slice(-10)))
-          );
-        });
+        const matchedDocs = usersSnap.docs
+          .map((d) => d.data() as User)
+          .filter((u) => {
+            const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
+            return (
+              (uPhone.length >= 10 && cleanDigits.length >= 10 && uPhone.slice(-10) === cleanDigits.slice(-10)) ||
+              (uPhone.length >= 6 && cleanDigits.length >= 6 && uPhone.endsWith(cleanDigits.slice(-10)))
+            );
+          });
 
-        if (foundDoc) {
-          foundEmail = (foundDoc.data() as User).email.toLowerCase();
+        if (matchedDocs.length > 0) {
+          // Prioritize business_owner or super_admin if there was any ambiguity
+          const ownerMatch = matchedDocs.find((u) => u.role === 'business_owner' || u.role === 'super_admin');
+          const chosenUser = ownerMatch || matchedDocs[0];
+          foundEmail = chosenUser.email ? chosenUser.email.toLowerCase() : null;
         }
       } catch (err) {
         console.warn('Firestore user fetch note:', err);
@@ -329,15 +421,19 @@ export class AuthService {
           const rawCached = localStorage.getItem('serviflow_users_cache');
           if (rawCached) {
             const cachedUsers = JSON.parse(rawCached) as User[];
-            const foundCached = cachedUsers.find((u) => {
+            const matchedCached = cachedUsers.filter((u) => {
               const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
               return (
                 (uPhone.length >= 10 && cleanDigits.length >= 10 && uPhone.slice(-10) === cleanDigits.slice(-10)) ||
                 (uPhone.length >= 6 && cleanDigits.length >= 6 && uPhone.endsWith(cleanDigits.slice(-10)))
               );
             });
-            if (foundCached && foundCached.email) {
-              foundEmail = foundCached.email.toLowerCase();
+            if (matchedCached.length > 0) {
+              const ownerMatch = matchedCached.find((u) => u.role === 'business_owner' || u.role === 'super_admin');
+              const chosenUser = ownerMatch || matchedCached[0];
+              if (chosenUser.email) {
+                foundEmail = chosenUser.email.toLowerCase();
+              }
             }
           }
         } catch (e) {

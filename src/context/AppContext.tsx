@@ -320,6 +320,13 @@ interface AppContextType {
 
   systemSettings: SystemSettings;
   updateSystemSettings: (updates: Partial<SystemSettings>) => void;
+  sendBroadcastNotification: (params: {
+    title: string;
+    message: string;
+    targetRole?: UserRole | 'all';
+    targetBusinessId?: string | 'all';
+    severity?: 'info' | 'warning' | 'critical' | 'success';
+  }) => Promise<void>;
 
   securityAuditLogs: SecurityAuditLog[];
   logSecurityEvent: (
@@ -401,6 +408,8 @@ const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   defaultTrialDays: 14,
   globalNoticeBanner: 'ServiFlow Platform v2.4 Multi-Tenant Engine — All operational nodes green.',
   isNoticeActive: true,
+  noticeSeverity: 'info',
+  noticeTitle: 'Platform System Announcement',
   mfaEnforcement: 'required_super_admin',
   minPasswordLength: 8,
   sessionTimeoutMinutes: 60,
@@ -1505,6 +1514,63 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveToFirestore('systemSettings', 'global', updated);
     logSecurityEvent('SYSTEM_SETTINGS_UPDATED', 'SETTINGS', `Updated global platform configuration settings.`);
     showToast('Global system settings updated and synchronized to cloud.', 'success');
+  };
+
+  const sendBroadcastNotification = async (params: {
+    title: string;
+    message: string;
+    targetRole?: UserRole | 'all';
+    targetBusinessId?: string | 'all';
+    severity?: 'info' | 'warning' | 'critical' | 'success';
+  }) => {
+    if (currentUser?.role !== 'super_admin') {
+      showToast('Unauthorized: Only Super Admin can send platform broadcasts.', 'error');
+      return;
+    }
+
+    try {
+      const nowISO = new Date().toISOString();
+      const targetBizs =
+        params.targetBusinessId && params.targetBusinessId !== 'all'
+          ? businesses.filter((b) => b.id === params.targetBusinessId)
+          : businesses.length > 0
+          ? businesses
+          : [currentBusiness];
+
+      const newNotifs: Notification[] = [];
+
+      for (const biz of targetBizs) {
+        const notif: Notification = {
+          id: `notif-bc-${Date.now()}-${biz.id}-${Math.random().toString(36).substring(2, 6)}`,
+          businessId: biz.id,
+          title: params.title,
+          message: params.message,
+          type: 'broadcast',
+          broadcastSeverity: params.severity || 'info',
+          authorName: currentUser?.name || 'Super Admin',
+          read: false,
+          createdAt: nowISO,
+          targetRoleId: params.targetRole !== 'all' ? params.targetRole : undefined,
+        };
+        newNotifs.push(notif);
+        await saveToFirestore('notifications', notif.id, notif);
+      }
+
+      setNotifications((prev) => [...newNotifs, ...prev]);
+      saveCache('serviflow_notifications_cache', [...newNotifs, ...notifications]);
+
+      logSecurityEvent(
+        'BROADCAST_ANNOUNCEMENT_SENT',
+        'SETTINGS',
+        `Dispatched broadcast "${params.title}" to ${targetBizs.length} tenant business(es). Severity: ${params.severity || 'info'}`
+      );
+
+      playCustomVoiceNotification('Platform Announcement', params.title);
+      showToast(`Broadcast notification dispatched to ${targetBizs.length} tenant workspace(s)!`, 'success');
+    } catch (err) {
+      console.error('Error sending broadcast:', err);
+      showToast('Failed to send broadcast notification: ' + String(err), 'error');
+    }
   };
 
   const revokeUserSession = (userId: string) => {
@@ -3039,6 +3105,58 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addStaff = async (data: Omit<User, 'id' | 'businessId'>): Promise<User | undefined> => {
     if (checkReadOnlySupportGuard()) return;
 
+    const normalizedEmail = (data.email || '').trim().toLowerCase();
+    const cleanPhoneDigits = (data.phone || '').replace(/[^0-9]/g, '');
+
+    // 1. Check against current Business Owner and Business Contact Info
+    const bizEmail = (currentBusiness.email || '').trim().toLowerCase();
+    const bizPhoneDigits = (currentBusiness.mobile || '').replace(/[^0-9]/g, '');
+
+    if (bizEmail && normalizedEmail && bizEmail === normalizedEmail) {
+      const msg = `Cannot use Business Owner's email address (${data.email}) for a staff member. Please provide a unique email address.`;
+      showToast(msg, 'error');
+      throw new Error(msg);
+    }
+
+    if (
+      cleanPhoneDigits.length >= 10 &&
+      bizPhoneDigits.length >= 10 &&
+      bizPhoneDigits.slice(-10) === cleanPhoneDigits.slice(-10)
+    ) {
+      const msg = `Cannot use Business Owner's phone number (${data.phone}) for a staff member. Please provide a unique mobile number.`;
+      showToast(msg, 'error');
+      throw new Error(msg);
+    }
+
+    // 2. Check against all loaded user profiles in memory
+    const existingConflict = users.find((u) => {
+      const uEmail = (u.email || '').trim().toLowerCase();
+      const uPhoneDigits = (u.phone || '').replace(/[^0-9]/g, '');
+      const emailMatches = uEmail && normalizedEmail && uEmail === normalizedEmail;
+      const phoneMatches =
+        cleanPhoneDigits.length >= 10 &&
+        uPhoneDigits.length >= 10 &&
+        uPhoneDigits.slice(-10) === cleanPhoneDigits.slice(-10);
+
+      return emailMatches || phoneMatches;
+    });
+
+    if (existingConflict) {
+      if (existingConflict.role === 'business_owner') {
+        const msg = `Cannot use Business Owner's credentials (${
+          existingConflict.email.toLowerCase() === normalizedEmail ? data.email : data.phone
+        }) for a staff member. Staff accounts must have distinct credentials.`;
+        showToast(msg, 'error');
+        throw new Error(msg);
+      } else {
+        const msg = `An account with this ${
+          existingConflict.email.toLowerCase() === normalizedEmail ? 'email address' : 'phone number'
+        } is already registered (${existingConflict.name || existingConflict.email}).`;
+        showToast(msg, 'error');
+        throw new Error(msg);
+      }
+    }
+
     if (currentBusiness.id !== 'all' && currentUser?.role !== 'super_admin') {
       const activeTenantStaff = (users || []).filter(
         (u) => u.businessId === currentBusiness.id && (u.status === 'active' || !u.status) && u.role !== 'super_admin'
@@ -3080,29 +3198,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return newStaff;
     } catch (err: any) {
       console.error('Error creating staff member:', err);
-      // Fallback local persistence if offline
-      const fallbackStaff: User = {
-        ...data,
-        id: `usr-${Date.now()}`,
-        businessId: currentBusiness.id,
-        approvalStatus: data.approvalStatus || 'active',
-        status: data.status || 'active',
-        joiningDate: data.joiningDate || new Date().toISOString().split('T')[0],
-      };
-      saveToFirestore('users', fallbackStaff.id, fallbackStaff);
-      saveToFirestore('tenantMembers', `${currentBusiness.id}_${fallbackStaff.id}`, {
-        id: `${currentBusiness.id}_${fallbackStaff.id}`,
-        tenantId: currentBusiness.id,
-        userId: fallbackStaff.id,
-        role: fallbackStaff.role,
-        status: 'active',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-      setUsers((prev) => [...prev.filter((u) => u.id !== fallbackStaff.id), fallbackStaff]);
-      showToast(`Staff member "${fallbackStaff.name}" added`, 'success');
-      logActivity('Staff Created', 'staff', fallbackStaff.id, `Created staff member ${fallbackStaff.name}`);
-      return fallbackStaff;
+      showToast(err.message || 'Failed to create staff member. Please check details.', 'error');
+      throw err;
     }
   };
 
@@ -3897,6 +3994,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         endSupportSession,
         systemSettings,
         updateSystemSettings,
+        sendBroadcastNotification,
         securityAuditLogs,
         logSecurityEvent,
         revokeUserSession,
