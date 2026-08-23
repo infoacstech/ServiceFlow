@@ -24,6 +24,7 @@ import {
   ChevronUp,
   Zap,
   ShieldCheck,
+  ShieldAlert,
   Activity,
   ArrowUpRight,
   KeyRound,
@@ -99,12 +100,13 @@ export const SettingsView: React.FC = () => {
     logoutUser,
   } = useApp();
 
-  const isOwnerOrAdmin = currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin';
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const isOwner = currentUser?.role === 'business_owner';
   const isTech = currentUser?.role === 'technician';
 
   const [activeSettingsTab, setActiveSettingsTab] = useState<
     'my_profile' | 'profile' | 'subscription' | 'referrals' | 'sync' | 'security' | 'appearance' | 'reset'
-  >(isOwnerOrAdmin ? 'profile' : 'my_profile');
+  >(isOwner ? 'profile' : 'my_profile');
 
   // User Profile Form State
   const [userProfileData, setUserProfileData] = useState({
@@ -400,7 +402,15 @@ export const SettingsView: React.FC = () => {
     );
   };
 
-  const tabs = isOwnerOrAdmin
+  const tabs = isSuperAdmin
+    ? [
+        { id: 'my_profile', label: 'Super Admin Profile', icon: UserCheck },
+        { id: 'security', label: 'Password & Security', icon: KeyRound },
+        { id: 'appearance', label: 'Theme & Audio Preferences', icon: Sun },
+        { id: 'sync', label: 'Offline Sync & Diagnostics', icon: RefreshCw },
+        { id: 'reset', label: 'Data Reset & Clean State', icon: Trash2 },
+      ]
+    : isOwner
     ? [
         { id: 'profile', label: 'Company Profile & Logo', icon: Building2 },
         { id: 'my_profile', label: 'Owner Profile', icon: UserCheck },
@@ -425,12 +435,20 @@ export const SettingsView: React.FC = () => {
         <div>
           <h1 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Sliders className="w-5 h-5 text-indigo-600" />
-            {isTech ? 'Technician Profile & Settings' : isOwnerOrAdmin ? 'Profile & Business Settings' : 'Staff Profile & Settings'}
+            {isSuperAdmin
+              ? 'Super Admin Profile & Preferences'
+              : isTech
+              ? 'Technician Profile & Settings'
+              : isOwner
+              ? 'Profile & Business Settings'
+              : 'Staff Profile & Settings'}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            {isTech
+            {isSuperAdmin
+              ? 'Manage your platform administrator account, password, sound alerts, and cloud sync'
+              : isTech
               ? 'Manage your personal profile, technical skills, voice language preferences, and security'
-              : isOwnerOrAdmin
+              : isOwner
               ? 'Manage company profile, SaaS subscription & pricing plans, offline sync logs, and security'
               : 'Manage your staff profile details, audio preferences, and security'}
           </p>
@@ -438,7 +456,14 @@ export const SettingsView: React.FC = () => {
 
         {/* Current Plan or Role Pill */}
         <div className="flex items-center gap-2 flex-wrap">
-          {isOwnerOrAdmin ? (
+          {isSuperAdmin ? (
+            <div className="px-3.5 py-1.5 rounded-2xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 flex items-center gap-2">
+              <ShieldAlert className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+              <div className="text-xs font-extrabold text-purple-900 dark:text-purple-200">
+                Super Admin (Platform Level)
+              </div>
+            </div>
+          ) : isOwner ? (
             <div className="px-3.5 py-1.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center gap-2">
               <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
               <div className="text-xs">

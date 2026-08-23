@@ -170,7 +170,6 @@ export class FirestoreService {
         if (!snap.empty) {
           const batch = writeBatch(db);
           snap.docs.forEach((d) => {
-            if (colName === 'businesses' && d.id === 'all') return;
             batch.delete(d.ref);
             totalDocsDeleted++;
           });
@@ -238,12 +237,30 @@ export class FirestoreService {
         getDocs(collection(db, 'users')),
       ]);
 
-      const validBizIds = new Set(bizSnap.docs.map((d) => d.id));
-      validBizIds.add('all');
-
       let deletedCount = 0;
+      const batch = writeBatch(db);
+
+      // 1. Remove phantom/placeholder businesses from Firestore (e.g. 'all', 'biz-default', 'ServiFlow Global Network')
+      const validBizIds = new Set<string>();
+      bizSnap.docs.forEach((d) => {
+        const data = d.data() as Partial<Business>;
+        const isPlaceholder =
+          d.id === 'all' ||
+          d.id === 'biz-default' ||
+          !d.id ||
+          data.name === 'ServiFlow Global Network' ||
+          (data.name === 'ServiFlow Workspace' && (!data.email || data.email === ''));
+
+        if (isPlaceholder) {
+          batch.delete(d.ref);
+          deletedCount++;
+        } else {
+          validBizIds.add(d.id);
+        }
+      });
+
+      // 2. Remove orphaned non-admin users
       if (!usersSnap.empty) {
-        const batch = writeBatch(db);
         usersSnap.docs.forEach((d) => {
           const u = d.data() as User;
           const uEmail = (u.email || '').trim().toLowerCase();
@@ -255,19 +272,20 @@ export class FirestoreService {
 
           if (!isSuper) {
             const hasValidBiz = u.businessId && validBizIds.has(u.businessId);
-            if (!hasValidBiz || validBizIds.size <= 1) { // only 'all' or empty
+            if (!hasValidBiz || validBizIds.size === 0) {
               batch.delete(d.ref);
               deletedCount++;
             }
           }
         });
-        if (deletedCount > 0) {
-          await batch.commit();
-        }
+      }
+
+      if (deletedCount > 0) {
+        await batch.commit();
       }
       return deletedCount;
     } catch (err) {
-      console.error('Error cleaning up orphan users:', err);
+      console.error('Error cleaning up orphan users and phantom businesses:', err);
       return 0;
     }
   }

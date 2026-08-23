@@ -648,7 +648,16 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubBiz = onSnapshot(
       collection(db, 'businesses'),
       (snapshot) => {
-        const cloudItems = snapshot.docs.map((d) => d.data() as Business);
+        const cloudItems = snapshot.docs
+          .map((d) => ({ ...(d.data() as Business), id: d.id || (d.data() as Business).id }))
+          .filter(
+            (b) =>
+              b.id &&
+              b.id !== 'all' &&
+              b.id !== 'biz-default' &&
+              b.name !== 'ServiFlow Global Network' &&
+              b.name !== 'ServiFlow Workspace'
+          );
         setBusinesses(cloudItems);
         saveCache('serviflow_businesses_cache', cloudItems);
         if (cloudItems.length > 0) {
@@ -3967,6 +3976,18 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = { ...currentBusiness, ...updates };
     setCurrentBusiness(updated);
     saveCache('serviflow_current_biz_cache', updated);
+
+    // Guard: Platform Super Admin or placeholder instances do not persist into tenant business collection
+    if (
+      currentUser?.role === 'super_admin' ||
+      !currentBusiness?.id ||
+      currentBusiness.id === 'all' ||
+      currentBusiness.id === 'biz-default'
+    ) {
+      showToast('Settings saved successfully', 'success');
+      return;
+    }
+
     setBusinesses((prev) => {
       const updatedList = prev.map((b) => (b.id === updated.id ? updated : b));
       saveCache('serviflow_businesses_cache', updatedList);
