@@ -11,9 +11,8 @@ service cloud.firestore {
     function isSuperAdmin() {
       return isAuthenticated() && (
         request.auth.token.email == 'admin@serviflow.io' ||
-        request.auth.uid == 'usr-admin' ||
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin'
+        request.auth.token.email == 'superadmin@serviflow.io' ||
+        request.auth.uid == 'usr-admin'
       );
     }
 
@@ -58,8 +57,10 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated() || true; // Public read for lookup during login
       allow create: if isAuthenticated() || true; // Tenant creation & owner-created staff
-      allow update: if isUserSelf(userId) || isSuperAdmin() || (
-        isAuthenticated() && resource.data.businessId != null && isTenantMember(resource.data.businessId)
+      allow update: if isSuperAdmin() || (
+        isUserSelf(userId) && request.resource.data.role != 'super_admin' && request.resource.data.businessId != 'all'
+      ) || (
+        isAuthenticated() && resource.data.businessId != null && isTenantMember(resource.data.businessId) && request.resource.data.role != 'super_admin'
       );
       allow delete: if isSuperAdmin() || (
         isAuthenticated() && resource.data.businessId != null && isTenantMember(resource.data.businessId)

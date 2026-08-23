@@ -71,6 +71,11 @@ export class AuthService {
     const phone = params.phone.trim();
     const name = params.name.trim();
 
+    // 0. Super Admin Reservation Check
+    if (email === 'admin@serviflow.io' || email === 'superadmin@serviflow.io') {
+      throw new Error('This email address is reserved for Platform Super Admin. Please use your business email.');
+    }
+
     // 1. Create or sync Firebase Auth user
     let uid: string;
     try {
@@ -148,7 +153,7 @@ export class AuthService {
       referralBalance: 0,
     };
 
-    // 3. Create User Record (Keyed strictly by Firebase UID)
+    // 3. Create User Record (Keyed strictly by Firebase UID with business_owner role)
     const user: User = {
       id: uid,
       name: name,
@@ -531,8 +536,8 @@ export class AuthService {
       }
 
       if (!user) {
-        if (targetEmail === 'admin@serviflow.io' || targetEmail.includes('admin')) {
-          // Provision baseline profile for Super Admin
+        if (targetEmail === 'admin@serviflow.io' || targetEmail === 'superadmin@serviflow.io') {
+          // Provision baseline profile strictly for authorized Super Admin
           user = {
             id: authUser.uid,
             name: authUser.displayName || 'Platform Super Admin',
@@ -547,6 +552,8 @@ export class AuthService {
           await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user));
         } else {
           // Check if there is any business associated with this email in businesses collection
+          const fallbackTenantId = `tenant-${Date.now()}`;
+          let matchedBizData: Business | null = null;
           try {
             const allBizSnap = await getDocs(collection(db, 'businesses'));
             const matchedBiz = allBizSnap.docs.find((bDoc) => {
@@ -554,21 +561,23 @@ export class AuthService {
               return (b.email || '').trim().toLowerCase() === targetEmail;
             });
             if (matchedBiz) {
-              const bData = matchedBiz.data() as Business;
-              user = {
-                id: authUser.uid,
-                name: bData.name ? `${bData.name} Admin` : 'Business Owner',
-                email: targetEmail,
-                phone: bData.mobile || '+91 99999 88888',
-                role: 'business_owner',
-                businessId: bData.id,
-                status: bData.status === 'suspended' ? 'inactive' : 'active',
-                approvalStatus: bData.status === 'suspended' ? 'suspended' : 'active',
-                joiningDate: bData.createdAt || new Date().toISOString().split('T')[0],
-              };
-              await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user));
+              matchedBizData = matchedBiz.data() as Business;
             }
           } catch {}
+
+          const assignedBizId = matchedBizData?.id || fallbackTenantId;
+          user = {
+            id: authUser.uid,
+            name: matchedBizData?.name ? `${matchedBizData.name} Admin` : 'Business Owner',
+            email: targetEmail,
+            phone: matchedBizData?.mobile || '+91 99999 88888',
+            role: 'business_owner',
+            businessId: assignedBizId,
+            status: matchedBizData?.status === 'suspended' ? 'inactive' : 'active',
+            approvalStatus: matchedBizData?.status === 'suspended' ? 'suspended' : 'active',
+            joiningDate: matchedBizData?.createdAt || new Date().toISOString().split('T')[0],
+          };
+          await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user));
         }
       }
     }
@@ -576,6 +585,25 @@ export class AuthService {
     if (!user) {
       await signOut(auth);
       throw new Error(`No account found for (${targetEmail}). Please register a new business account.`);
+    }
+
+    // Strict Role Integrity & Super Admin Isolation Enforcement
+    const isAuthorizedSuperAdminEmail =
+      (user.email || '').trim().toLowerCase() === 'admin@serviflow.io' ||
+      (user.email || '').trim().toLowerCase() === 'superadmin@serviflow.io';
+
+    if (user.role === 'super_admin' && !isAuthorizedSuperAdminEmail) {
+      console.warn(`[Security Alert] Non-authorized user (${user.email}) possessed super_admin role. Enforcing correction to business_owner.`);
+      user.role = 'business_owner';
+      if (!user.businessId || user.businessId === 'all') {
+        user.businessId = `tenant-${user.id}`;
+      }
+      await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user), { merge: true });
+    }
+
+    if (user.role !== 'super_admin' && (user.businessId === 'all' || !user.businessId)) {
+      user.businessId = `tenant-${user.id}`;
+      await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user), { merge: true });
     }
 
     // Security Status Checks
@@ -592,7 +620,7 @@ export class AuthService {
 
     // 2. Fetch Tenant (Business) Record
     let tenant: Business | null = null;
-    if (user.businessId === 'all' || user.role === 'super_admin') {
+    if (user.businessId === 'all' || (user.role === 'super_admin' && isAuthorizedSuperAdminEmail)) {
       tenant = {
         id: 'all',
         name: 'ServiFlow Global Network',

@@ -669,16 +669,51 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       collection(db, 'users'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as User);
+
+        // Security & Account Isolation Migration Routine:
+        // Audit all user profiles and revert unauthorized super_admin roles to business_owner
+        cloudItems.forEach((u) => {
+          const uEmail = (u.email || '').trim().toLowerCase();
+          const isAuthorizedSuperAdmin =
+            uEmail === 'admin@serviflow.io' ||
+            uEmail === 'superadmin@serviflow.io' ||
+            u.id === SUPER_ADMIN_USER.id;
+
+          if (u.role === 'super_admin' && !isAuthorizedSuperAdmin) {
+            console.warn(
+              `[Security Audit Auto-Correction] Account ${u.email || u.id} was inappropriately marked as super_admin. Correcting to business_owner.`
+            );
+            const correctedBizId = u.businessId && u.businessId !== 'all' ? u.businessId : `tenant-${u.id}`;
+            saveToFirestore('users', u.id, {
+              role: 'business_owner',
+              businessId: correctedBizId,
+            });
+            u.role = 'business_owner';
+            u.businessId = correctedBizId;
+          } else if (u.role !== 'super_admin' && u.businessId === 'all') {
+            const correctedBizId = `tenant-${u.id}`;
+            saveToFirestore('users', u.id, { businessId: correctedBizId });
+            u.businessId = correctedBizId;
+          }
+        });
+
         const map = new Map<string, User>();
         map.set(SUPER_ADMIN_USER.id, SUPER_ADMIN_USER);
-        cloudItems.forEach((u) => map.set(u.id, u));
+        cloudItems.forEach((u) => {
+          if (u.id === SUPER_ADMIN_USER.id && u.email !== 'admin@serviflow.io') {
+            return;
+          }
+          map.set(u.id, u);
+        });
         const allUsers = Array.from(map.values());
         setUsers(allUsers);
         saveCache('serviflow_users_cache', allUsers);
 
         // Ensure Super Admin user exists in database
         const hasSuperAdmin = cloudItems.some(
-          (u) => u.role === 'super_admin' || u.email === 'admin@serviflow.io'
+          (u) =>
+            (u.role === 'super_admin' && u.email === 'admin@serviflow.io') ||
+            u.id === SUPER_ADMIN_USER.id
         );
         if (!hasSuperAdmin) {
           saveToFirestore('users', SUPER_ADMIN_USER.id, SUPER_ADMIN_USER);
@@ -1238,6 +1273,13 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Error signing out:', err);
     }
     setCurrentUser(null);
+    setCurrentBusiness(DEFAULT_BLANK_BUSINESS);
+    localStorage.removeItem('serviflow_user_session');
+    localStorage.removeItem('serviflow_logged_in_email');
+    localStorage.removeItem('serviflow_logged_in_uid');
+    localStorage.removeItem('serviflow_current_biz_cache');
+    sessionStorage.removeItem('serviflow_active_tab');
+    setActiveSupportSession(null);
     showToast('Signed out successfully.', 'info');
   };
 
@@ -1803,19 +1845,26 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return false;
   };
 
-  // Switch role helper for live demo toggling
+  // Switch role helper for role testing within authorized boundaries
   const switchRole = async (role: UserRole) => {
     if (role === 'super_admin') {
-      const adminUser = users.find((u) => u.role === 'super_admin') || {
-        id: 'usr-admin',
-        name: 'SaaS Platform Admin',
-        email: 'admin@serviflow.io',
-        phone: '+91 90000 00000',
-        role: 'super_admin' as const,
-        businessId: 'all',
-        status: 'active' as const,
-      };
-      await loginUser(adminUser, 'ServiFlow@123');
+      const isCurrentlySuperAdmin =
+        currentUser?.role === 'super_admin' &&
+        ((currentUser?.email || '').trim().toLowerCase() === 'admin@serviflow.io' ||
+          (currentUser?.email || '').trim().toLowerCase() === 'superadmin@serviflow.io');
+
+      if (!isCurrentlySuperAdmin) {
+        showToast(
+          'Access Denied: Super Admin console requires dedicated credentials (admin@serviflow.io). Please log in via the Super Admin portal.',
+          'error'
+        );
+        return;
+      }
+      return;
+    }
+
+    if (!currentBusiness?.id || currentBusiness.id === 'all') {
+      showToast('Please select a business tenant first.', 'error');
       return;
     }
 
@@ -1873,6 +1922,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newBizId = bData.id || `biz-${Date.now()}`;
     const cleanEmail = (bData.email || ownerData?.email || 'contact@business.com').trim().toLowerCase();
     const cleanMobile = (bData.mobile || ownerData?.phone || '+91 99999 88888').trim();
+
+    if (cleanEmail === 'admin@serviflow.io' || cleanEmail === 'superadmin@serviflow.io') {
+      showToast('Cannot use Platform Super Admin email to create a business tenant.', 'error');
+      throw new Error('Cannot use Platform Super Admin email to create a business tenant.');
+    }
 
     const newBiz: Business = {
       id: newBizId,
@@ -3363,6 +3417,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }): Promise<{ user: User; isPending: boolean }> => {
     const normalizedEmail = (data.email || '').trim().toLowerCase();
     const cleanPhoneDigits = (data.phone || '').replace(/[^0-9]/g, '');
+
+    if (normalizedEmail === 'admin@serviflow.io' || normalizedEmail === 'superadmin@serviflow.io') {
+      const errorMsg = 'This email address is reserved for Platform Super Admin. Please use your business email address.';
+      showToast(errorMsg, 'error');
+      throw new Error(errorMsg);
+    }
 
     // 1. Duplicate Account Check - Only flag as duplicate if the user belongs to an active existing business tenant
     const existingAccount = users.find((u) => {

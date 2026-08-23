@@ -177,12 +177,15 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
     }
   };
 
-  const rolesList: { id: UserRole; label: string; desc: string }[] = [
-    { id: 'business_owner', label: 'Business Owner', desc: 'Full administrative and financial access' },
-    { id: 'manager', label: 'Manager', desc: 'Dispatch, job management, invoices & inventory' },
-    { id: 'technician', label: 'Field Technician', desc: 'Assigned jobs, voice notes & field execution' },
-    { id: 'super_admin', label: 'Super Admin', desc: 'Multi-tenant cloud platform administrator' },
-  ];
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+
+  const rolesList: { id: UserRole; label: string; desc: string }[] = isSuperAdmin
+    ? [{ id: 'super_admin', label: 'Super Admin', desc: 'Multi-tenant cloud platform administrator' }]
+    : [
+        { id: 'business_owner', label: 'Business Owner', desc: 'Full administrative and financial access' },
+        { id: 'manager', label: 'Manager', desc: 'Dispatch, job management, invoices & inventory' },
+        { id: 'technician', label: 'Field Technician', desc: 'Assigned jobs, voice notes & field execution' },
+      ];
 
   return (
     <div className="fixed inset-0 z-[99999] overflow-hidden animate-in fade-in duration-200">
@@ -659,8 +662,8 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                   </div>
                 </div>
 
-                {/* Multi-Tenant Switcher (If multiple businesses exist) */}
-                {businesses.length > 1 && (
+                {/* Multi-Tenant Switcher (Exclusively for Platform Super Admin) */}
+                {isSuperAdmin && businesses.length > 1 && (
                   <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-sm">
                     <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
                       <Building2 className="w-4 h-4 text-indigo-600" /> Switch Business Organization

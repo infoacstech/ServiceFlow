@@ -21,6 +21,8 @@ import {
   AlertCircle,
   Gift,
   Tag,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface LoginViewProps {
@@ -88,6 +90,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       discountPercent: val.discountPercent,
     });
   };
+
+  // Super Admin Credentials State
+  const [superAdminEmail, setSuperAdminEmail] = useState('admin@serviflow.io');
+  const [superAdminPassword, setSuperAdminPassword] = useState('');
+  const [showSuperAdminPassword, setShowSuperAdminPassword] = useState(false);
+  const [isSuperAdminSubmitting, setIsSuperAdminSubmitting] = useState(false);
 
   // Forgot Password State
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
@@ -214,10 +222,38 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  const handleSuperAdminLogin = () => {
-    switchRole('super_admin');
-    showToast('Authenticated as SaaS Super Admin', 'success');
-    if (onLoginSuccess) onLoginSuccess();
+  const handleSuperAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = superAdminEmail.trim().toLowerCase();
+    if (!cleanEmail || !superAdminPassword) {
+      showToast('Please enter Super Admin email and password', 'error');
+      return;
+    }
+
+    if (cleanEmail !== 'admin@serviflow.io' && cleanEmail !== 'superadmin@serviflow.io') {
+      showToast('Invalid Super Admin credentials. Access is strictly restricted to authorized platform administrators.', 'error');
+      return;
+    }
+
+    setIsSuperAdminSubmitting(true);
+    try {
+      const loggedIn = await loginUser(
+        { email: cleanEmail, id: '', name: '', phone: '', role: 'super_admin', businessId: 'all', status: 'active' },
+        superAdminPassword
+      );
+
+      if (loggedIn.role !== 'super_admin') {
+        showToast('Access denied: Account is not authorized for Super Administrator access.', 'error');
+        return;
+      }
+
+      sessionStorage.setItem('serviflow_active_tab', 'super_admin');
+      if (onLoginSuccess) onLoginSuccess();
+    } catch (err: any) {
+      console.error('Super Admin sign in error:', err);
+    } finally {
+      setIsSuperAdminSubmitting(false);
+    }
   };
 
   // FORGOT PASSWORD WORKFLOW HANDLERS
@@ -636,18 +672,65 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   <span>SaaS Platform Super Admin</span>
                 </div>
                 <p className="text-xs text-purple-700 dark:text-purple-300 leading-relaxed">
-                  Grants platform administrative access to manage all business tenants, owner approvals, and billing control.
+                  Dedicated high-security portal for platform administrators to manage multi-tenant businesses, global policies, and system operations.
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={handleSuperAdminLogin}
-                className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/30 transition-all flex items-center justify-center gap-2"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Enter Super Admin Console</span>
-              </button>
+              <form onSubmit={handleSuperAdminLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Super Admin Email
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="email"
+                      required
+                      value={superAdminEmail}
+                      onChange={(e) => setSuperAdminEmail(e.target.value)}
+                      placeholder="admin@serviflow.io"
+                      className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium focus:ring-2 focus:ring-purple-500 focus:bg-white dark:focus:bg-slate-900 outline-hidden transition-all text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Master Password
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <input
+                      type={showSuperAdminPassword ? 'text' : 'password'}
+                      required
+                      value={superAdminPassword}
+                      onChange={(e) => setSuperAdminPassword(e.target.value)}
+                      placeholder="Enter Super Admin password"
+                      className="w-full pl-10 pr-10 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium focus:ring-2 focus:ring-purple-500 focus:bg-white dark:focus:bg-slate-900 outline-hidden transition-all text-slate-900 dark:text-slate-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSuperAdminPassword(!showSuperAdminPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    >
+                      {showSuperAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSuperAdminSubmitting}
+                  className="w-full py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-purple-600/30 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>{isSuperAdminSubmitting ? 'Authenticating Super Admin...' : 'Sign In to Super Admin Console'}</span>
+                </button>
+              </form>
             </div>
           )}
         </div>

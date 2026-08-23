@@ -49,6 +49,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
   const [isResetting, setIsResetting] = useState(false);
 
+  // Super Admin States
+  const [superAdminEmail, setSuperAdminEmail] = useState('admin@serviflow.io');
+  const [superAdminPassword, setSuperAdminPassword] = useState('');
+  const [isSuperAdminSubmitting, setIsSuperAdminSubmitting] = useState(false);
+
   // Direct Registration States
   const [registerRole, setRegisterRole] = useState<'business_owner' | 'manager' | 'technician'>('business_owner');
   const [regName, setRegName] = useState('');
@@ -120,10 +125,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleSuperAdminLogin = () => {
-    switchRole('super_admin');
-    showToast('Authenticated as SaaS Super Admin', 'success');
-    onClose();
+  const handleSuperAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = superAdminEmail.trim().toLowerCase();
+    if (!cleanEmail || !superAdminPassword) {
+      showToast('Please enter Super Admin email and password', 'error');
+      return;
+    }
+
+    if (cleanEmail !== 'admin@serviflow.io' && cleanEmail !== 'superadmin@serviflow.io') {
+      showToast('Invalid Super Admin credentials. Access is strictly restricted to platform administrators.', 'error');
+      return;
+    }
+
+    setIsSuperAdminSubmitting(true);
+    try {
+      const loggedIn = await loginUser(
+        { email: cleanEmail, id: '', name: '', phone: '', role: 'super_admin', businessId: 'all', status: 'active' },
+        superAdminPassword
+      );
+
+      if (loggedIn.role !== 'super_admin') {
+        showToast('Access denied: Account is not authorized for Super Administrator access.', 'error');
+        return;
+      }
+
+      sessionStorage.setItem('serviflow_active_tab', 'super_admin');
+      onClose();
+    } catch (err: any) {
+      console.error('Super Admin sign in error in modal:', err);
+    } finally {
+      setIsSuperAdminSubmitting(false);
+    }
   };
 
   // Forgot Password Handlers
@@ -630,7 +663,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
           {/* Super Admin Access Tab */}
           {authMode === 'super_admin' && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="p-4 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 rounded-2xl space-y-2">
                 <div className="text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400" />
@@ -640,14 +673,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   Access platform-wide administrative controls, manage multi-tenant registrations, and oversee tenant operations.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={handleSuperAdminLogin}
-                className="w-full py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Enter Super Admin Console</span>
-              </button>
+
+              <form onSubmit={handleSuperAdminLogin} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Super Admin Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={superAdminEmail}
+                    onChange={(e) => setSuperAdminEmail(e.target.value)}
+                    placeholder="admin@serviflow.io"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium focus:ring-2 focus:ring-purple-500 outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Master Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={superAdminPassword}
+                    onChange={(e) => setSuperAdminPassword(e.target.value)}
+                    placeholder="Enter Super Admin password"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium focus:ring-2 focus:ring-purple-500 outline-hidden"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSuperAdminSubmitting}
+                  className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>{isSuperAdminSubmitting ? 'Authenticating...' : 'Sign In to Super Admin Console'}</span>
+                </button>
+              </form>
             </div>
           )}
         </div>
