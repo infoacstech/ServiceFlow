@@ -140,7 +140,7 @@ export class FirestoreService {
   static async wipeAllExceptSuperAdmin(): Promise<{ totalDocsDeleted: number }> {
     let totalDocsDeleted = 0;
 
-    // 1. Purge all transactional and operational collections
+    // 1. Purge all transactional, tenant, and operational collections
     const collectionsToWipe = [
       'enquiries',
       'customers',
@@ -159,6 +159,8 @@ export class FirestoreService {
       'manualSyncLogs',
       'tenantMembers',
       'tenants',
+      'referrals',
+      'referralPayouts',
       'businesses',
     ];
 
@@ -168,7 +170,6 @@ export class FirestoreService {
         if (!snap.empty) {
           const batch = writeBatch(db);
           snap.docs.forEach((d) => {
-            // Keep 'all' platform business if present, wipe everything else
             if (colName === 'businesses' && d.id === 'all') return;
             batch.delete(d.ref);
             totalDocsDeleted++;
@@ -180,14 +181,20 @@ export class FirestoreService {
       }
     }
 
-    // 2. Wipe all non-SuperAdmin users
+    // 2. Wipe ALL non-SuperAdmin users from Firestore
     try {
       const usersSnap = await getDocs(collection(db, 'users'));
       if (!usersSnap.empty) {
         const batch = writeBatch(db);
         usersSnap.docs.forEach((d) => {
           const u = d.data() as User;
-          if (u.role !== 'super_admin' && u.email !== 'admin@serviflow.io' && d.id !== 'usr-admin') {
+          const uEmail = (u.email || '').trim().toLowerCase();
+          const isSuper =
+            u.role === 'super_admin' ||
+            uEmail === 'admin@serviflow.io' ||
+            uEmail === 'superadmin@serviflow.io' ||
+            d.id === 'usr-admin';
+          if (!isSuper) {
             batch.delete(d.ref);
             totalDocsDeleted++;
           }
@@ -211,11 +218,58 @@ export class FirestoreService {
       localStorage.removeItem('serviflow_payments_cache');
       localStorage.removeItem('serviflow_contracts_cache');
       localStorage.removeItem('serviflow_expenses_cache');
+      localStorage.removeItem('serviflow_inv_tx_cache');
+      localStorage.removeItem('serviflow_activities_cache');
+      localStorage.removeItem('serviflow_notifications_cache');
     } catch (e) {
       console.warn('Cache clear error:', e);
     }
 
     return { totalDocsDeleted };
+  }
+
+  /**
+   * Cleans up orphaned users in Firestore whose associated business does not exist.
+   */
+  static async cleanupOrphanUsers(): Promise<number> {
+    try {
+      const [bizSnap, usersSnap] = await Promise.all([
+        getDocs(collection(db, 'businesses')),
+        getDocs(collection(db, 'users')),
+      ]);
+
+      const validBizIds = new Set(bizSnap.docs.map((d) => d.id));
+      validBizIds.add('all');
+
+      let deletedCount = 0;
+      if (!usersSnap.empty) {
+        const batch = writeBatch(db);
+        usersSnap.docs.forEach((d) => {
+          const u = d.data() as User;
+          const uEmail = (u.email || '').trim().toLowerCase();
+          const isSuper =
+            u.role === 'super_admin' ||
+            uEmail === 'admin@serviflow.io' ||
+            uEmail === 'superadmin@serviflow.io' ||
+            d.id === 'usr-admin';
+
+          if (!isSuper) {
+            const hasValidBiz = u.businessId && validBizIds.has(u.businessId);
+            if (!hasValidBiz || validBizIds.size <= 1) { // only 'all' or empty
+              batch.delete(d.ref);
+              deletedCount++;
+            }
+          }
+        });
+        if (deletedCount > 0) {
+          await batch.commit();
+        }
+      }
+      return deletedCount;
+    } catch (err) {
+      console.error('Error cleaning up orphan users:', err);
+      return 0;
+    }
   }
 
   /**

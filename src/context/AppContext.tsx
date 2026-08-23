@@ -343,6 +343,8 @@ interface AppContextType {
   // Safe Clean State Testing Data Purge
   purgeAllTransactionalData: () => Promise<{ clearedCollections: string[]; totalDocsDeleted: number }>;
   purgeTenantTransactionalData: (businessId?: string) => Promise<{ clearedCollections: string[]; totalDocsDeleted: number }>;
+  wipeAllExceptSuperAdmin: () => Promise<{ totalDocsDeleted: number }>;
+  cleanupOrphanUsers: () => Promise<number>;
 
   // Tenant and User Deletion
   deleteBusinessTenant: (businessId: string) => Promise<void>;
@@ -697,14 +699,45 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         });
 
+        // Deduplicate and canonicalize Super Admin
+        const superAdminRecord = cloudItems.find(
+          (u) =>
+            (u.email || '').trim().toLowerCase() === 'admin@serviflow.io' ||
+            (u.email || '').trim().toLowerCase() === 'superadmin@serviflow.io' ||
+            u.role === 'super_admin' ||
+            u.id === SUPER_ADMIN_USER.id
+        ) || SUPER_ADMIN_USER;
+
+        const canonicalSuperAdmin: User = {
+          ...SUPER_ADMIN_USER,
+          ...superAdminRecord,
+          id: SUPER_ADMIN_USER.id,
+          role: 'super_admin',
+          email: 'admin@serviflow.io',
+          businessId: 'all',
+          status: 'active',
+          approvalStatus: 'active',
+        };
+
         const map = new Map<string, User>();
-        map.set(SUPER_ADMIN_USER.id, SUPER_ADMIN_USER);
+        map.set(SUPER_ADMIN_USER.id, canonicalSuperAdmin);
+
         cloudItems.forEach((u) => {
-          if (u.id === SUPER_ADMIN_USER.id && u.email !== 'admin@serviflow.io') {
+          const uEmail = (u.email || '').trim().toLowerCase();
+          const isSuper =
+            u.role === 'super_admin' ||
+            uEmail === 'admin@serviflow.io' ||
+            uEmail === 'superadmin@serviflow.io' ||
+            u.id === SUPER_ADMIN_USER.id;
+
+          if (isSuper) {
+            // Already handled in canonicalSuperAdmin
             return;
           }
+
           map.set(u.id, u);
         });
+
         const allUsers = Array.from(map.values());
         setUsers(allUsers);
         saveCache('serviflow_users_cache', allUsers);
@@ -712,11 +745,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Ensure Super Admin user exists in database
         const hasSuperAdmin = cloudItems.some(
           (u) =>
-            (u.role === 'super_admin' && u.email === 'admin@serviflow.io') ||
+            (u.role === 'super_admin' && (u.email || '').trim().toLowerCase() === 'admin@serviflow.io') ||
             u.id === SUPER_ADMIN_USER.id
         );
         if (!hasSuperAdmin) {
-          saveToFirestore('users', SUPER_ADMIN_USER.id, SUPER_ADMIN_USER);
+          saveToFirestore('users', SUPER_ADMIN_USER.id, canonicalSuperAdmin);
         }
 
         setCurrentUser((prev) => {
@@ -1707,6 +1740,80 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error('Tenant purge error:', err);
       showToast('Failed to purge tenant data: ' + String(err), 'error');
       return { clearedCollections: [], totalDocsDeleted: 0 };
+    }
+  };
+
+  const wipeAllExceptSuperAdmin = async (): Promise<{ totalDocsDeleted: number }> => {
+    if (currentUser?.role !== 'super_admin') {
+      showToast('Unauthorized: Only Super Administrators can wipe platform data.', 'error');
+      return { totalDocsDeleted: 0 };
+    }
+    try {
+      const res = await FirestoreService.wipeAllExceptSuperAdmin();
+      logSecurityEvent(
+        'GLOBAL_PLATFORM_WIPE',
+        'SETTINGS',
+        `Super Admin wiped all test businesses, tenant users, and dummy transactional records (${res.totalDocsDeleted} documents).`
+      );
+
+      const canonicalAdmin: User = {
+        ...SUPER_ADMIN_USER,
+        id: SUPER_ADMIN_USER.id,
+        role: 'super_admin',
+        email: 'admin@serviflow.io',
+        businessId: 'all',
+        status: 'active',
+        approvalStatus: 'active',
+      };
+
+      setBusinesses([]);
+      setUsers([canonicalAdmin]);
+      setCurrentBusiness(DEFAULT_BLANK_BUSINESS);
+      setEnquiries([]);
+      setCustomers([]);
+      setJobs([]);
+      setServices([]);
+      setCategories([]);
+      setInventory([]);
+      setInventoryTransactions([]);
+      setQuotations([]);
+      setInvoices([]);
+      setPayments([]);
+      setContracts([]);
+      setExpenses([]);
+      setNotifications([]);
+      setActivityLogs([]);
+      setManualSyncLogs([]);
+
+      showToast(`Global Clean State Active: Database wiped to 0. 0 businesses, 0 tenant users. Only Super Admin preserved.`, 'success');
+      return res;
+    } catch (err) {
+      console.error('Wipe error:', err);
+      showToast('Failed to execute global wipe: ' + String(err), 'error');
+      return { totalDocsDeleted: 0 };
+    }
+  };
+
+  const cleanupOrphanUsers = async (): Promise<number> => {
+    try {
+      const count = await FirestoreService.cleanupOrphanUsers();
+      if (count > 0) {
+        setUsers((prev) =>
+          prev.filter((u) => {
+            const uEmail = (u.email || '').trim().toLowerCase();
+            const isSuper = u.role === 'super_admin' || uEmail === 'admin@serviflow.io';
+            if (isSuper) return true;
+            return businesses.some((b) => b.id === u.businessId);
+          })
+        );
+        showToast(`Cleaned up ${count} orphaned test user record(s).`, 'success');
+      } else {
+        showToast('All user profiles are cleanly mapped to active businesses.', 'info');
+      }
+      return count;
+    } catch (err) {
+      console.error('Orphan user cleanup error:', err);
+      return 0;
     }
   };
 
@@ -4075,6 +4182,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Safe Clean State Testing Data Purge
         purgeAllTransactionalData,
         purgeTenantTransactionalData,
+        wipeAllExceptSuperAdmin,
+        cleanupOrphanUsers,
 
         // Tenant and User Deletion
         deleteBusinessTenant,

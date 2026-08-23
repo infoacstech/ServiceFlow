@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { SystemSettings, Business } from '../types';
 import { FirestoreService } from '../services/FirestoreService';
@@ -100,6 +100,8 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
     forcePasswordReset,
     purgeAllTransactionalData,
     purgeTenantTransactionalData,
+    wipeAllExceptSuperAdmin,
+    cleanupOrphanUsers,
     deleteBusinessTenant,
     deleteUserAccount,
     showToast,
@@ -107,6 +109,24 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
     referralPayoutRequests,
     processReferralPayout,
   } = useApp();
+
+  const [isCleaningOrphans, setIsCleaningOrphans] = useState(false);
+
+  // Exact registered tenant users who belong to active, existing businesses
+  const registeredTenantUsers = useMemo(() => {
+    if (!businesses || businesses.length === 0) return [];
+    const validBizIds = new Set(businesses.map((b) => b.id));
+    return users.filter((u) => {
+      const uEmail = (u.email || '').trim().toLowerCase();
+      const isSuper =
+        u.role === 'super_admin' ||
+        uEmail === 'admin@serviflow.io' ||
+        uEmail === 'superadmin@serviflow.io' ||
+        u.id === 'usr-admin';
+      if (isSuper) return false;
+      return Boolean(u.businessId && validBizIds.has(u.businessId));
+    });
+  }, [users, businesses]);
 
   const [activeTabSection, setActiveTabSection] = useState<
     | 'overview'
@@ -489,7 +509,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
     try {
       let result;
       if (purgeTargetMode === 'global') {
-        result = await purgeAllTransactionalData();
+        result = await wipeAllExceptSuperAdmin();
       } else {
         result = await purgeTenantTransactionalData(selectedTenantForPurge);
       }
@@ -1937,7 +1957,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                     <span className="font-bold text-slate-800 dark:text-slate-200">Business Owners & Registered Users</span>
                   </div>
                   <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">
-                    {users.filter((u) => u.role !== 'super_admin' && u.email !== 'admin@serviflow.io').length} Users
+                    {registeredTenantUsers.length} Users
                   </span>
                 </div>
 
@@ -1949,12 +1969,23 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                   <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">{plans.length} Tier Plans</span>
                 </div>
 
-                <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-600" />
-                    <span className="font-bold text-slate-800 dark:text-slate-200">System Roles & Permissions Matrix</span>
-                  </div>
-                  <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">{roles.length} Role Profiles</span>
+                <div className="pt-2 flex items-center justify-end">
+                  <button
+                    type="button"
+                    disabled={isCleaningOrphans}
+                    onClick={async () => {
+                      setIsCleaningOrphans(true);
+                      try {
+                        await cleanupOrphanUsers();
+                      } finally {
+                        setIsCleaningOrphans(false);
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isCleaningOrphans ? 'animate-spin' : ''}`} />
+                    <span>{isCleaningOrphans ? 'Cleaning Orphans...' : 'Clean Orphan Users & Sync (to 0)'}</span>
+                  </button>
                 </div>
               </div>
             </div>
