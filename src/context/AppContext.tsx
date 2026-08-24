@@ -831,20 +831,44 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (!prev) return null;
           const isSuperAdmin = prev.role === 'super_admin' || prev.email === 'admin@serviflow.io';
           if (isSuperAdmin) return prev;
-          const found = allUsers.find(
-            (u) =>
+
+          const prevEmail = (prev.email || '').trim().toLowerCase();
+          const prevPhone = (prev.phone || '').replace(/[^0-9]/g, '');
+
+          const found = allUsers.find((u) => {
+            const uEmail = (u.email || '').trim().toLowerCase();
+            const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
+            return (
               u.id === prev.id ||
-              (Boolean(u.email) &&
-                Boolean(prev.email) &&
-                (u.email || '').trim().toLowerCase() === (prev.email || '').trim().toLowerCase())
-          );
+              (Boolean(uEmail) && Boolean(prevEmail) && uEmail === prevEmail) ||
+              (uPhone.length >= 10 && prevPhone.length >= 10 && uPhone.slice(-10) === prevPhone.slice(-10))
+            );
+          });
+
           if (!found) {
-            // User was deleted from Firestore. Invalidate session.
-            localStorage.removeItem('serviflow_user_session');
-            localStorage.removeItem('serviflow_logged_in_email');
-            localStorage.removeItem('serviflow_logged_in_uid');
-            return null;
+            // Only invalidate if we are certain cloud data loaded and user genuinely no longer exists
+            if (cloudItems.length > 0) {
+              const stillInCloud = cloudItems.some((u) => {
+                const uEmail = (u.email || '').trim().toLowerCase();
+                const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
+                return (
+                  u.id === prev.id ||
+                  (Boolean(uEmail) && Boolean(prevEmail) && uEmail === prevEmail) ||
+                  (uPhone.length >= 10 && prevPhone.length >= 10 && uPhone.slice(-10) === prevPhone.slice(-10))
+                );
+              });
+
+              if (!stillInCloud) {
+                localStorage.removeItem('serviflow_user_session');
+                localStorage.removeItem('serviflow_logged_in_email');
+                localStorage.removeItem('serviflow_logged_in_uid');
+                return null;
+              }
+            }
+            return prev;
           }
+
+          localStorage.setItem('serviflow_user_session', JSON.stringify(found));
           return found;
         });
       },
@@ -1345,7 +1369,18 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
             }
           } else if (!userRecord && isMounted) {
-            // Account was deleted in Firestore. Force sign-out of Firebase Auth and clear local state.
+            // Check if there is a valid session in localStorage before signing out
+            const savedSessionRaw = localStorage.getItem('serviflow_user_session');
+            if (savedSessionRaw) {
+              try {
+                const parsed = JSON.parse(savedSessionRaw) as User;
+                if (parsed && parsed.id) {
+                  setCurrentUser(parsed);
+                  if (isMounted) setIsAuthInitializing(false);
+                  return;
+                }
+              } catch {}
+            }
             try {
               await signOut(auth);
             } catch {}
@@ -1360,11 +1395,66 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.error('Error fetching user on auth change:', err);
         }
       } else {
+        // Firebase Auth is null on this device / browser.
+        // Check persistent local storage session (e.g. staff member or field technician)
         if (isMounted) {
-          setCurrentUser(null);
-          localStorage.removeItem('serviflow_user_session');
-          localStorage.removeItem('serviflow_logged_in_email');
-          localStorage.removeItem('serviflow_logged_in_uid');
+          const savedSessionRaw = localStorage.getItem('serviflow_user_session');
+          if (savedSessionRaw) {
+            try {
+              const savedUser = JSON.parse(savedSessionRaw) as User;
+              if (savedUser && savedUser.id && (savedUser.email || savedUser.phone)) {
+                setCurrentUser(savedUser);
+
+                // Restore business tenant
+                if (savedUser.businessId === 'all' || savedUser.role === 'super_admin') {
+                  const globalBiz: Business = {
+                    id: 'all',
+                    name: 'ServiFlow Global Network',
+                    type: 'Platform Management',
+                    logo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&auto=format&fit=crop&q=80',
+                    mobile: '+91 90000 00000',
+                    whatsapp: '+91 90000 00000',
+                    email: 'admin@serviflow.io',
+                    address: 'Global Operations Centre',
+                    city: 'New Delhi',
+                    state: 'Delhi',
+                    pin: '110001',
+                    currency: '₹',
+                    createdAt: new Date().toISOString().split('T')[0],
+                    planId: 'plan-enterprise',
+                    status: 'active',
+                  };
+                  setCurrentBusiness(globalBiz);
+                } else if (savedUser.businessId) {
+                  try {
+                    const bizSnap = await getDoc(doc(db, 'businesses', savedUser.businessId));
+                    if (bizSnap.exists()) {
+                      setCurrentBusiness(bizSnap.data() as Business);
+                    } else {
+                      const tenantSnap = await getDoc(doc(db, 'tenants', savedUser.businessId));
+                      if (tenantSnap.exists()) {
+                        setCurrentBusiness(tenantSnap.data() as Business);
+                      }
+                    }
+                  } catch (e) {
+                    console.warn('Tenant restore notice:', e);
+                  }
+                }
+              } else {
+                setCurrentUser(null);
+                localStorage.removeItem('serviflow_user_session');
+                localStorage.removeItem('serviflow_logged_in_email');
+                localStorage.removeItem('serviflow_logged_in_uid');
+              }
+            } catch {
+              setCurrentUser(null);
+              localStorage.removeItem('serviflow_user_session');
+              localStorage.removeItem('serviflow_logged_in_email');
+              localStorage.removeItem('serviflow_logged_in_uid');
+            }
+          } else {
+            setCurrentUser(null);
+          }
         }
       }
       if (isMounted) {
