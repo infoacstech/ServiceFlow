@@ -12,7 +12,10 @@ export const ServicesView: React.FC = () => {
     deleteService,
     addServiceCategory,
     currentBusiness,
+    currentUser,
   } = useApp();
+
+  const isOwnerOrAdmin = currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin';
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
@@ -137,14 +140,17 @@ export const ServicesView: React.FC = () => {
                   <span className="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600">
                     {category?.name || 'Service'}
                   </span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => deleteService(service.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {isOwnerOrAdmin && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => deleteService(service.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
+                        title="Delete Service Offering"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 mb-1">{service.name}</h3>

@@ -86,6 +86,17 @@ import {
   deleteDoc,
   onSnapshot,
 } from 'firebase/firestore';
+import {
+  isBusinessOwnerOrAdmin,
+  isManagerRole,
+  isStaffOrTechnician,
+  canCreateRecord,
+  canUpdateRecord,
+  canDeleteRecord,
+  canManageStaffMembers,
+  canManageBusinessSettings,
+  validateTenantIsolation,
+} from '../utils/rbac';
 
 export interface ToastMessage {
   id: string;
@@ -2434,6 +2445,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Enquiry Actions
   const addEnquiry = (data: Omit<Enquiry, 'id' | 'businessId' | 'enquiryId' | 'createdAt'>) => {
     if (checkReadOnlySupportGuard()) return {} as Enquiry;
+    const perm = canCreateRecord(currentUser, 'enquiry');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Cannot create enquiries.', 'error');
+      return {} as Enquiry;
+    }
     const count = filteredEnquiries.length + 101;
     const enquiryId = `ENQ-${new Date().getFullYear()}-${count}`;
     const id = `enq-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
@@ -2461,6 +2477,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateEnquiry = (id: string, updates: Partial<Enquiry>) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canUpdateRecord(currentUser, 'enquiry');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Only Business Owners can edit enquiries.', 'error');
+      return;
+    }
     const target = enquiries.find((e) => e.id === id);
     if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
       showToast('Unauthorized: Cannot modify enquiry belonging to another tenant business.', 'error');
@@ -2473,6 +2494,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteEnquiry = (id: string) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canDeleteRecord(currentUser, 'enquiry');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Only Business Owners can delete enquiries.', 'error');
+      return;
+    }
     const target = enquiries.find((e) => e.id === id);
     if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
       showToast('Unauthorized: Cannot delete enquiry belonging to another tenant business.', 'error');
@@ -2865,6 +2891,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Customer Actions
   const addCustomer = (data: Omit<Customer, 'id' | 'businessId' | 'createdAt'>) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canCreateRecord(currentUser, 'customer');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Cannot create customer records.', 'error');
+      return;
+    }
     const id = `cust-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newCust: Customer = {
       ...data,
@@ -2880,6 +2911,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateCustomer = (id: string, updates: Partial<Customer>) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canUpdateRecord(currentUser, 'customer');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Only Business Owners can edit customer records.', 'error');
+      return;
+    }
     const target = customers.find((c) => c.id === id);
     if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
       showToast('Unauthorized: Cannot modify customer belonging to another tenant business.', 'error');
@@ -2891,6 +2927,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteCustomer = (id: string) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canDeleteRecord(currentUser, 'customer');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Only Business Owners can delete customer records.', 'error');
+      return;
+    }
     const target = customers.find((c) => c.id === id);
     if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
       showToast('Unauthorized: Cannot delete customer belonging to another tenant business.', 'error');
@@ -2903,6 +2944,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Services Actions
   const addServiceCategory = (name: string, description?: string) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canCreateRecord(currentUser, 'category');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Cannot create category.', 'error');
+      return;
+    }
     const newCat: ServiceCategory = {
       id: `cat-${Date.now()}`,
       businessId: currentBusiness.id,
@@ -2916,6 +2962,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addService = (data: Omit<Service, 'id' | 'businessId'>) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canCreateRecord(currentUser, 'service');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Cannot create service.', 'error');
+      return;
+    }
     const newSrv: Service = {
       ...data,
       id: `srv-${Date.now()}`,
@@ -2927,6 +2978,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateService = (id: string, updates: Partial<Service>) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canUpdateRecord(currentUser, 'service');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Only Business Owners can edit service offerings.', 'error');
+      return;
+    }
     const target = services.find((s) => s.id === id);
     if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
       showToast('Unauthorized: Cannot modify service belonging to another tenant business.', 'error');
@@ -2938,6 +2994,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteService = (id: string) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canDeleteRecord(currentUser, 'service');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Only Business Owners can delete service offerings.', 'error');
+      return;
+    }
     const target = services.find((s) => s.id === id);
     if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
       showToast('Unauthorized: Cannot delete service belonging to another tenant business.', 'error');
@@ -2950,6 +3011,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Job Actions
   const addJob = (data: Omit<Job, 'id' | 'businessId' | 'jobId' | 'createdAt'>) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canCreateRecord(currentUser, 'job');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Cannot create jobs.', 'error');
+      return;
+    }
 
     if (currentBusiness.id !== 'all' && currentUser?.role !== 'super_admin') {
       const currentMonthPrefix = new Date().toISOString().substring(0, 7);
@@ -3031,6 +3097,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateJob = (id: string, updates: Partial<Job>) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canUpdateRecord(currentUser, 'job');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Only Business Owners can modify core job details and assignments.', 'error');
+      return;
+    }
     const target = jobs.find((j) => j.id === id);
     if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
       showToast('Unauthorized: Cannot modify job belonging to another tenant business.', 'error');
@@ -3138,6 +3209,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteJob = (id: string) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canDeleteRecord(currentUser, 'job');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Only Business Owners can delete jobs.', 'error');
+      return;
+    }
     const target = jobs.find((j) => j.id === id);
     if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
       showToast('Unauthorized: Cannot delete job belonging to another tenant business.', 'error');
@@ -3289,6 +3365,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Inventory Actions
   const addInventoryItem = (data: Omit<InventoryItem, 'id' | 'businessId'>) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canCreateRecord(currentUser, 'inventory');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Cannot create inventory items.', 'error');
+      return;
+    }
     const newItem: InventoryItem = {
       ...data,
       id: `inv-${Date.now()}`,
@@ -3332,6 +3413,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Quotation Actions
   const addQuotation = (data: Omit<Quotation, 'id' | 'businessId' | 'quotationNumber'>) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canCreateRecord(currentUser, 'quotation');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Cannot create quotations.', 'error');
+      return;
+    }
     const num = `QT-${new Date().getFullYear()}-${filteredQuotations.length + 101}`;
     const newQt: Quotation = {
       ...data,
@@ -3347,6 +3433,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateQuotationStatus = (id: string, status: Quotation['status']) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canUpdateRecord(currentUser, 'quotation');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Only Business Owners can edit quotations.', 'error');
+      return;
+    }
     const target = quotations.find((q) => q.id === id);
     if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
       showToast('Unauthorized: Cannot modify quotation belonging to another tenant business.', 'error');
@@ -3358,6 +3449,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const convertQuotationToInvoice = (quotationId: string) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canCreateRecord(currentUser, 'invoice');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Cannot generate invoices.', 'error');
+      return;
+    }
     const qt = quotations.find((q) => q.id === quotationId);
     if (!qt) throw new Error('Quotation not found');
     if (qt.businessId !== currentBusiness.id && !isSuperAdminUser) {
@@ -3395,6 +3491,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Invoice Actions
   const addInvoice = (data: Omit<Invoice, 'id' | 'businessId' | 'invoiceNumber'>) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canCreateRecord(currentUser, 'invoice');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Cannot create invoices.', 'error');
+      return;
+    }
     const num = `INV-${new Date().getFullYear()}-${filteredInvoices.length + 101}`;
     const id = `invc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newInv: Invoice = {
@@ -3411,6 +3512,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteInvoice = (id: string) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canDeleteRecord(currentUser, 'invoice');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Only Business Owners can delete invoices.', 'error');
+      return;
+    }
     const target = invoices.find((i) => i.id === id);
     if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
       showToast('Unauthorized: Cannot delete invoice belonging to another tenant business.', 'error');
@@ -3423,6 +3529,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const recordPayment = (data: Omit<Payment, 'id' | 'businessId'>) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canCreateRecord(currentUser, 'payment');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Cannot record payment.', 'error');
+      return;
+    }
     const newPmt: Payment = {
       ...data,
       id: `pmt-${Date.now()}`,
@@ -3456,6 +3567,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Contract Actions
   const addContract = (data: Omit<RecurringContract, 'id' | 'businessId' | 'contractNumber'>) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canCreateRecord(currentUser, 'contract');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Cannot create service contracts.', 'error');
+      return;
+    }
     const num = `AMC-${new Date().getFullYear()}-${filteredContracts.length + 101}`;
     const newContract: RecurringContract = {
       ...data,
@@ -3472,6 +3588,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Expense Actions
   const addExpense = (data: Omit<Expense, 'id' | 'businessId'>) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canCreateRecord(currentUser, 'expense');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Cannot record expenses.', 'error');
+      return;
+    }
     const newExp: Expense = {
       ...data,
       id: `exp-${Date.now()}`,
@@ -3484,6 +3605,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Staff & User Auth Actions
   const addStaff = async (data: Omit<User, 'id' | 'businessId'>): Promise<User | undefined> => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canManageStaffMembers(currentUser);
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Only Business Owners can add staff members.', 'error');
+      throw new Error(perm.reason || 'Permission Denied: Only Business Owners can add staff members.');
+    }
 
     const normalizedEmail = (data.email || '').trim().toLowerCase();
     const cleanPhoneDigits = (data.phone || '').replace(/[^0-9]/g, '');
@@ -3560,6 +3686,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteStaff = async (userId: string) => {
     if (checkReadOnlySupportGuard()) return;
+    const perm = canManageStaffMembers(currentUser);
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Only Business Owners can delete staff members.', 'error');
+      return;
+    }
     const target = users.find((u) => u.id === userId);
     if (!target) return;
     if (target.businessId !== currentBusiness.id && !isSuperAdminUser) {
@@ -3661,6 +3792,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     userId: string,
     newApprovalStatus: 'active' | 'pending' | 'rejected' | 'blocked' | 'suspended'
   ) => {
+    const perm = canManageStaffMembers(currentUser);
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Only Business Owners can approve or change staff status.', 'error');
+      return;
+    }
     const target = users.find((u) => u.id === userId);
     if (!target) return;
 
@@ -4177,6 +4313,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateBusinessSettings = (updates: Partial<Business>) => {
+    const perm = canManageBusinessSettings(currentUser);
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Only Business Owners can modify business settings.', 'error');
+      return;
+    }
     const updated = { ...currentBusiness, ...updates };
     setCurrentBusiness(updated);
     saveCache('serviflow_current_biz_cache', updated);

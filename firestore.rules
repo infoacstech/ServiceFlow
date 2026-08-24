@@ -31,17 +31,31 @@ service cloud.firestore {
       );
     }
 
-    // Businesses and Tenants collections
+    function isTenantOwner(businessId) {
+      return isAuthenticated() && (
+        isSuperAdmin() ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId &&
+          (
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'business_owner' ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin'
+          )
+        )
+      );
+    }
+
+    // Businesses and Tenants collections (Modifications restricted to Business Owner / Super Admin)
     match /businesses/{businessId} {
       allow read: if isAuthenticated() || true; // Public read for tenant profile loading & discovery
       allow create: if isAuthenticated() || true; // Self-registration allowed
-      allow update, delete: if isTenantMember(businessId) || isSuperAdmin();
+      allow update, delete: if isTenantOwner(businessId) || isSuperAdmin();
     }
 
     match /tenants/{tenantId} {
       allow read: if isAuthenticated() || true;
       allow create: if isAuthenticated() || true;
-      allow update, delete: if isTenantMember(tenantId) || isSuperAdmin();
+      allow update, delete: if isTenantOwner(tenantId) || isSuperAdmin();
     }
 
     // Tenant Memberships
@@ -53,114 +67,175 @@ service cloud.firestore {
       );
     }
 
-    // Users Collection
+    // Users Collection (Adding/Deleting/Modifying staff restricted to Business Owner & Super Admin)
     match /users/{userId} {
       allow read: if isAuthenticated() || true; // Public read for lookup during login
       allow create: if isAuthenticated() || true; // Tenant creation & owner-created staff
       allow update: if isSuperAdmin() || (
-        isUserSelf(userId) && request.resource.data.role != 'super_admin' && request.resource.data.businessId != 'all'
+        isUserSelf(userId) && request.resource.data.role == resource.data.role
       ) || (
-        isAuthenticated() && resource.data.businessId != null && isTenantMember(resource.data.businessId) && request.resource.data.role != 'super_admin'
+        isAuthenticated() && resource.data.businessId != null && isTenantOwner(resource.data.businessId)
       );
       allow delete: if isSuperAdmin() || (
-        isAuthenticated() && resource.data.businessId != null && isTenantMember(resource.data.businessId)
+        isAuthenticated() && resource.data.businessId != null && isTenantOwner(resource.data.businessId)
       );
     }
 
-    // Tenant Operational Collections (Protected by Tenant Membership & Super Admin)
-    match /enquiries/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTenantMember(resource.data.businessId) ||
-        isTenantMember(request.resource.data.businessId) ||
-        isSuperAdmin()
-      );
-    }
+    // Operational Collections:
+    // - READ: All tenant members
+    // - CREATE: All tenant members (Owner, Manager, Staff)
+    // - UPDATE / DELETE: Restricted to Business Owner / Super Admin (except job execution status updates)
 
     match /customers/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTenantMember(resource.data.businessId) ||
-        isTenantMember(request.resource.data.businessId) ||
-        isSuperAdmin()
+      allow read: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        isTenantMember(request.resource.data.businessId) || isSuperAdmin()
+      );
+      allow update, delete: if isAuthenticated() && (
+        isTenantOwner(resource.data.businessId) || isSuperAdmin()
+      );
+    }
+
+    match /enquiries/{docId} {
+      allow read: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        isTenantMember(request.resource.data.businessId) || isSuperAdmin()
+      );
+      allow update: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow delete: if isAuthenticated() && (
+        isTenantOwner(resource.data.businessId) || isSuperAdmin()
       );
     }
 
     match /jobs/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTenantMember(resource.data.businessId) ||
-        isTenantMember(request.resource.data.businessId) ||
-        isSuperAdmin()
+      allow read: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        isTenantMember(request.resource.data.businessId) || isSuperAdmin()
+      );
+      allow update: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow delete: if isAuthenticated() && (
+        isTenantOwner(resource.data.businessId) || isSuperAdmin()
       );
     }
 
     match /invoices/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTenantMember(resource.data.businessId) ||
-        isTenantMember(request.resource.data.businessId) ||
-        isSuperAdmin()
+      allow read: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        isTenantMember(request.resource.data.businessId) || isSuperAdmin()
+      );
+      allow update, delete: if isAuthenticated() && (
+        isTenantOwner(resource.data.businessId) || isSuperAdmin()
       );
     }
 
     match /quotations/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTenantMember(resource.data.businessId) ||
-        isTenantMember(request.resource.data.businessId) ||
-        isSuperAdmin()
+      allow read: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        isTenantMember(request.resource.data.businessId) || isSuperAdmin()
+      );
+      allow update, delete: if isAuthenticated() && (
+        isTenantOwner(resource.data.businessId) || isSuperAdmin()
       );
     }
 
     match /payments/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTenantMember(resource.data.businessId) ||
-        isTenantMember(request.resource.data.businessId) ||
-        isSuperAdmin()
+      allow read: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        isTenantMember(request.resource.data.businessId) || isSuperAdmin()
+      );
+      allow update, delete: if isAuthenticated() && (
+        isTenantOwner(resource.data.businessId) || isSuperAdmin()
       );
     }
 
     match /contracts/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTenantMember(resource.data.businessId) ||
-        isTenantMember(request.resource.data.businessId) ||
-        isSuperAdmin()
+      allow read: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        isTenantMember(request.resource.data.businessId) || isSuperAdmin()
+      );
+      allow update, delete: if isAuthenticated() && (
+        isTenantOwner(resource.data.businessId) || isSuperAdmin()
       );
     }
 
     match /expenses/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTenantMember(resource.data.businessId) ||
-        isTenantMember(request.resource.data.businessId) ||
-        isSuperAdmin()
+      allow read: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        isTenantMember(request.resource.data.businessId) || isSuperAdmin()
+      );
+      allow update, delete: if isAuthenticated() && (
+        isTenantOwner(resource.data.businessId) || isSuperAdmin()
       );
     }
 
     match /inventory/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTenantMember(resource.data.businessId) ||
-        isTenantMember(request.resource.data.businessId) ||
-        isSuperAdmin()
+      allow read: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        isTenantMember(request.resource.data.businessId) || isSuperAdmin()
+      );
+      allow update: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow delete: if isAuthenticated() && (
+        isTenantOwner(resource.data.businessId) || isSuperAdmin()
       );
     }
 
     match /inventoryTransactions/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTenantMember(resource.data.businessId) ||
-        isTenantMember(request.resource.data.businessId) ||
-        isSuperAdmin()
+      allow read: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        isTenantMember(request.resource.data.businessId) || isSuperAdmin()
+      );
+      allow update, delete: if isAuthenticated() && (
+        isTenantOwner(resource.data.businessId) || isSuperAdmin()
       );
     }
 
     match /categories/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTenantMember(resource.data.businessId) ||
-        isTenantMember(request.resource.data.businessId) ||
-        isSuperAdmin()
+      allow read: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        isTenantMember(request.resource.data.businessId) || isSuperAdmin()
+      );
+      allow update, delete: if isAuthenticated() && (
+        isTenantOwner(resource.data.businessId) || isSuperAdmin()
       );
     }
 
     match /services/{docId} {
-      allow read, write: if isAuthenticated() && (
-        isTenantMember(resource.data.businessId) ||
-        isTenantMember(request.resource.data.businessId) ||
-        isSuperAdmin()
+      allow read: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        isTenantMember(request.resource.data.businessId) || isSuperAdmin()
+      );
+      allow update, delete: if isAuthenticated() && (
+        isTenantOwner(resource.data.businessId) || isSuperAdmin()
       );
     }
 
@@ -200,11 +275,5 @@ service cloud.firestore {
     match /referralPayouts/{payoutId} {
       allow read, write: if isAuthenticated();
     }
-
-    match /roles/{roleId} {
-      allow read: if true;
-      allow write: if isSuperAdmin();
-    }
   }
 }
-
