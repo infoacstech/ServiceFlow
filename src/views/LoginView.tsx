@@ -57,10 +57,27 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     discountPercent: number;
   } | null>(null);
 
-  // Auto-detect referral code from URL parameter (e.g. ?ref=SF-APEX10)
+  // Auto-detect referral code or Super Admin portal from URL parameters
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
+      const hash = window.location.hash.toLowerCase();
+
+      // Check for Super Admin secret direct link: ?admin=portal, ?admin=true, ?superadmin=true, ?portal=admin, #superadmin, etc.
+      const isSuperAdminLink =
+        urlParams.get('admin') === 'portal' ||
+        urlParams.get('admin') === 'true' ||
+        urlParams.get('superadmin') === 'true' ||
+        urlParams.get('mode') === 'super_admin' ||
+        urlParams.get('portal') === 'admin' ||
+        hash === '#superadmin' ||
+        hash === '#admin';
+
+      if (isSuperAdminLink) {
+        setAuthTab('super_admin');
+        return;
+      }
+
       const refParam = urlParams.get('ref') || urlParams.get('referral');
       if (refParam) {
         const cleanRef = refParam.trim().toUpperCase();
@@ -75,6 +92,39 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       }
     }
   }, [businesses]);
+
+  // Secret keyboard shortcut for Super Admin (Ctrl + Shift + S or Alt + Shift + A)
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 's') ||
+        (e.altKey && e.shiftKey && e.key.toLowerCase() === 'a')
+      ) {
+        e.preventDefault();
+        setAuthTab((prev) => (prev === 'super_admin' ? 'login' : 'super_admin'));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Secret Logo Multi-Click Trigger (5 clicks within 3 seconds)
+  const secretClickCountRef = React.useRef(0);
+  const secretClickTimerRef = React.useRef<any>(null);
+
+  const handleSecretLogoClick = () => {
+    secretClickCountRef.current += 1;
+    if (secretClickTimerRef.current) clearTimeout(secretClickTimerRef.current);
+    secretClickTimerRef.current = setTimeout(() => {
+      secretClickCountRef.current = 0;
+    }, 3000);
+
+    if (secretClickCountRef.current >= 5) {
+      secretClickCountRef.current = 0;
+      setAuthTab('super_admin');
+      showToast('Master Admin Console unlocked', 'info');
+    }
+  };
 
   const handleReferralCodeInput = (code: string) => {
     const clean = code.toUpperCase().replace(/[^A-Z0-9-]/g, '');
@@ -329,20 +379,29 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         {/* Brand Header */}
         <div className="text-center space-y-2">
           {activeBusiness?.logo ? (
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border-2 border-indigo-500/30 p-1.5 shadow-lg shadow-indigo-500/10 mb-1 overflow-hidden transition-all">
+            <div
+              onClick={handleSecretLogoClick}
+              className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border-2 border-indigo-500/30 p-1.5 shadow-lg shadow-indigo-500/10 mb-1 overflow-hidden transition-all select-none cursor-default"
+            >
               <img
                 src={activeBusiness.logo}
                 alt={activeBusiness.name}
-                className="w-full h-full object-contain rounded-xl"
+                className="w-full h-full object-contain rounded-xl pointer-events-none"
               />
             </div>
           ) : (
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 mb-1">
+            <div
+              onClick={handleSecretLogoClick}
+              className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 mb-1 select-none cursor-default"
+            >
               <ShieldCheck className="w-8 h-8" />
             </div>
           )}
 
-          <h1 className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+          <h1
+            onClick={handleSecretLogoClick}
+            className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight select-none cursor-default"
+          >
             {activeBusiness?.name || 'ServiFlow'}
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium max-w-xs mx-auto">
@@ -736,26 +795,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </div>
 
         {/* Bottom Footer Links */}
-        <div className="text-center pt-1">
-          <div>
-            {authTab !== 'super_admin' ? (
-              <button
-                onClick={() => setAuthTab('super_admin')}
-                className="text-xs text-slate-400 hover:text-purple-600 font-semibold transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-purple-500" />
-                <span>Platform Super Admin Access</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => setAuthTab('login')}
-                className="text-xs text-slate-400 hover:text-indigo-600 font-semibold transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer"
-              >
-                <span>← Back to Business Sign In</span>
-              </button>
-            )}
+        {authTab === 'super_admin' && (
+          <div className="text-center pt-1 animate-in fade-in">
+            <button
+              onClick={() => setAuthTab('login')}
+              className="text-xs text-slate-400 hover:text-indigo-600 font-semibold transition-colors flex items-center justify-center gap-1 mx-auto cursor-pointer"
+            >
+              <span>← Back to Business Sign In</span>
+            </button>
           </div>
-        </div>
+        )}
       </div>
 
       {/* FORGOT PASSWORD MODAL */}

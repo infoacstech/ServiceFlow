@@ -225,17 +225,41 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  // Secret click handler for modal header
+  const secretModalClicksRef = React.useRef(0);
+  const secretModalTimerRef = React.useRef<any>(null);
+
+  const handleSecretModalHeaderClick = () => {
+    secretModalClicksRef.current += 1;
+    if (secretModalTimerRef.current) clearTimeout(secretModalTimerRef.current);
+    secretModalTimerRef.current = setTimeout(() => {
+      secretModalClicksRef.current = 0;
+    }, 3000);
+
+    if (secretModalClicksRef.current >= 5) {
+      secretModalClicksRef.current = 0;
+      setAuthMode('super_admin');
+      showToast('Master Admin Console unlocked', 'info');
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
+            <div
+              onClick={handleSecretModalHeaderClick}
+              className="w-9 h-9 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md select-none cursor-default"
+            >
               <KeyRound className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+              <h3
+                onClick={handleSecretModalHeaderClick}
+                className="text-base font-bold text-slate-900 dark:text-slate-100 select-none cursor-default"
+              >
                 User Sign In & Registration
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -252,7 +276,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Tab Switcher */}
-        <div className="grid grid-cols-3 p-1.5 bg-slate-100 dark:bg-slate-800/80 m-3 rounded-2xl text-xs font-medium">
+        <div
+          className={`grid ${
+            authMode === 'super_admin' ? 'grid-cols-3' : 'grid-cols-2'
+          } p-1.5 bg-slate-100 dark:bg-slate-800/80 m-3 rounded-2xl text-xs font-medium`}
+        >
           <button
             onClick={() => {
               setAuthMode('login');
@@ -281,20 +309,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             <UserPlus className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">Register</span>
           </button>
-          <button
-            onClick={() => {
-              setAuthMode('super_admin');
-              setPendingRegistrationSuccess(null);
-            }}
-            className={`py-2 px-1 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-              authMode === 'super_admin'
-                ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 font-semibold shadow-xs'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-purple-500" />
-            <span className="truncate">Super Admin</span>
-          </button>
+          {authMode === 'super_admin' && (
+            <button
+              onClick={() => {
+                setAuthMode('super_admin');
+                setPendingRegistrationSuccess(null);
+              }}
+              className="py-2 px-1 rounded-xl transition-all flex items-center justify-center gap-1.5 bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 font-semibold shadow-xs"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-purple-500" />
+              <span className="truncate">Super Admin</span>
+            </button>
+          )}
         </div>
 
         {/* Content Body */}

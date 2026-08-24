@@ -39,10 +39,29 @@ export const StaffView: React.FC = () => {
   const [skills, setSkills] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Filter staff & pending users for current business
-  const businessUsers = (users || staff).filter(
-    (u) => u.businessId === currentBusiness.id || currentBusiness.id === 'all'
-  );
+  // Filter staff & pending users for current business with strict deduplication
+  const businessUsers = React.useMemo(() => {
+    const raw = (users || staff || []).filter(
+      (u) => (u.businessId === currentBusiness.id || currentBusiness.id === 'all') && u.role !== 'super_admin'
+    );
+    const seen = new Set<string>();
+    const result: User[] = [];
+    for (const u of raw) {
+      const emailKey = u.email ? `email:${u.email.trim().toLowerCase()}` : '';
+      const phoneDigits = (u.phone || '').replace(/[^0-9]/g, '').slice(-10);
+      const phoneKey = phoneDigits ? `phone:${phoneDigits}` : '';
+      const idKey = `id:${u.id}`;
+
+      if (seen.has(idKey) || (emailKey && seen.has(emailKey)) || (phoneKey && seen.has(phoneKey))) {
+        continue;
+      }
+      if (idKey) seen.add(idKey);
+      if (emailKey) seen.add(emailKey);
+      if (phoneKey) seen.add(phoneKey);
+      result.push(u);
+    }
+    return result;
+  }, [users, staff, currentBusiness.id]);
 
   const activeStaffCount = businessUsers.filter(
     (u) => (u.status === 'active' || !u.status) && u.role !== 'super_admin'

@@ -731,6 +731,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const map = new Map<string, User>();
         map.set(SUPER_ADMIN_USER.id, canonicalSuperAdmin);
 
+        // Group non-superadmin users by business tenant identity to eliminate duplicate owner/staff records
+        const tenantUserGroups = new Map<string, User[]>();
+
         cloudItems.forEach((u) => {
           const uEmail = (u.email || '').trim().toLowerCase();
           const isSuper =
@@ -744,7 +747,70 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return;
           }
 
-          map.set(u.id, u);
+          const bizId = u.businessId || 'default';
+          const cleanPhone = (u.phone || '').replace(/[^0-9]/g, '').slice(-10);
+
+          // Identity grouping key per tenant
+          let groupKey = '';
+          if (uEmail) {
+            groupKey = `${bizId}__email__${uEmail}`;
+          } else if (cleanPhone) {
+            groupKey = `${bizId}__phone__${cleanPhone}`;
+          } else if (u.role === 'business_owner') {
+            groupKey = `${bizId}__owner`;
+          } else {
+            groupKey = `${bizId}__id__${u.id}`;
+          }
+
+          if (!tenantUserGroups.has(groupKey)) {
+            tenantUserGroups.set(groupKey, []);
+          }
+          tenantUserGroups.get(groupKey)!.push(u);
+        });
+
+        // Current active UID to prevent deleting current logged-in user doc
+        const activeSessionUid = localStorage.getItem('serviflow_logged_in_uid') || auth.currentUser?.uid;
+
+        tenantUserGroups.forEach((groupUsers) => {
+          if (groupUsers.length === 1) {
+            const single = groupUsers[0];
+            map.set(single.id, single);
+            return;
+          }
+
+          // More than 1 record found for the same identity in the same tenant!
+          // Rank records to pick the single canonical user record:
+          // 1. Matches active logged-in UID
+          // 2. Is not a temporary prefix (e.g. valid Firebase UID vs 'usr-owner-')
+          // 3. Has more populated fields / latest joiningDate
+          const sorted = [...groupUsers].sort((a, b) => {
+            const aIsActive = activeSessionUid && a.id === activeSessionUid ? 1 : 0;
+            const bIsActive = activeSessionUid && b.id === activeSessionUid ? 1 : 0;
+            if (aIsActive !== bIsActive) return bIsActive - aIsActive;
+
+            const aIsTemp = a.id.startsWith('usr-owner-') ? 1 : 0;
+            const bIsTemp = b.id.startsWith('usr-owner-') ? 1 : 0;
+            if (aIsTemp !== bIsTemp) return aIsTemp - bIsTemp;
+
+            const aDate = new Date(a.joiningDate || a.requestedDate || 0).getTime();
+            const bDate = new Date(b.joiningDate || b.requestedDate || 0).getTime();
+            return bDate - aDate;
+          });
+
+          const canonical = sorted[0];
+          map.set(canonical.id, canonical);
+
+          // Safe auto-repair: Remove obsolete duplicate documents from Firestore
+          const duplicates = sorted.slice(1);
+          duplicates.forEach((dup) => {
+            console.log(
+              `[Deduplication] Removing duplicate user document (${dup.id}) for ${dup.email || dup.name} in business (${dup.businessId})`
+            );
+            deleteFromFirestore('users', dup.id);
+            if (dup.businessId) {
+              deleteFromFirestore('tenantMembers', `${dup.businessId}_${dup.id}`);
+            }
+          });
         });
 
         const allUsers = Array.from(map.values());
@@ -1216,9 +1282,24 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               const q = query(collection(db, 'users'), where('email', '==', targetEmail.toLowerCase()));
               const qSnap = await getDocs(q);
               if (!qSnap.empty) {
-                userRecord = { ...(qSnap.docs[0].data() as User), id: firebaseUser.uid };
+                const oldDoc = qSnap.docs[0];
+                const oldDocId = oldDoc.id;
+                userRecord = { ...(oldDoc.data() as User), id: firebaseUser.uid };
                 // Ensure document is keyed by UID
                 await setDoc(doc(db, 'users', firebaseUser.uid), userRecord, { merge: true });
+
+                // Safe cleanup of obsolete pre-auth document
+                if (oldDocId && oldDocId !== firebaseUser.uid) {
+                  try {
+                    await deleteDoc(doc(db, 'users', oldDocId));
+                    await deleteDoc(doc(db, 'tenantMembers', `${userRecord.businessId}_${oldDocId}`));
+                    if (userRecord.role === 'business_owner' && userRecord.businessId && userRecord.businessId !== 'all') {
+                      await setDoc(doc(db, 'tenants', userRecord.businessId), { ownerId: firebaseUser.uid }, { merge: true });
+                    }
+                  } catch (e) {
+                    console.warn('Cleanup old user doc notice in onAuthStateChanged:', e);
+                  }
+                }
               }
             }
           }
@@ -2075,6 +2156,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: isPending ? 'pending' : 'active',
     };
 
+    const existingUser = users.find(
+      (u) => (u.email || '').trim().toLowerCase() === cleanEmail && u.role !== 'super_admin'
+    );
+
     const ownerName = ownerData?.name || (cleanEmail ? cleanEmail.split('@')[0] : `${newBiz.name} Admin`);
     const ownerEmail = cleanEmail;
     const rawPhone = ownerData?.phone || cleanMobile;
@@ -2082,7 +2167,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const ownerPassword = ownerData?.password || '1234';
 
     const ownerUser: User = {
-      id: `usr-owner-${newBizId}`,
+      id: existingUser ? existingUser.id : `usr-owner-${newBizId}`,
       name: ownerName,
       email: ownerEmail,
       phone: ownerPhone,
@@ -2134,7 +2219,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return updated;
     });
     setUsers((prev) => {
-      const updated = [...prev.filter((u) => u.id !== ownerUser.id), ownerUser];
+      const updated = [
+        ...prev.filter(
+          (u) =>
+            u.id !== ownerUser.id &&
+            (u.email || '').trim().toLowerCase() !== cleanEmail
+        ),
+        ownerUser,
+      ];
       saveCache('serviflow_users_cache', updated);
       return updated;
     });
@@ -2221,7 +2313,23 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 10);
   const filteredActivityLogs = isSuperAdminUser ? activityLogs : activityLogs.filter((a) => a.businessId === currBizId);
-  const filteredStaff = isSuperAdminUser ? users : users.filter((u) => u.businessId === currBizId && u.role !== 'super_admin');
+  const filteredStaff = isSuperAdminUser
+    ? users
+    : users
+        .filter((u) => u.businessId === currBizId && u.role !== 'super_admin')
+        .filter((u, index, self) => {
+          const uEmail = (u.email || '').trim().toLowerCase();
+          const uPhone = (u.phone || '').replace(/[^0-9]/g, '').slice(-10);
+          return (
+            index ===
+            self.findIndex(
+              (o) =>
+                o.id === u.id ||
+                (uEmail && (o.email || '').trim().toLowerCase() === uEmail) ||
+                (uPhone && (o.phone || '').replace(/[^0-9]/g, '').slice(-10) === uPhone)
+            )
+          );
+        });
   const filteredReferralRecords = isSuperAdminUser
     ? referralRecords
     : referralRecords.filter(

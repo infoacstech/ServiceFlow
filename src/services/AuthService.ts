@@ -459,12 +459,14 @@ export class AuthService {
 
     // 1. Check if user document exists in Firestore first
     let user: User | null = null;
+    let originalDocId: string | null = null;
     try {
       const q = query(collection(db, 'users'), where('email', '==', targetEmail));
       const qSnap = await getDocs(q);
       if (!qSnap.empty) {
         user = qSnap.docs[0].data() as User;
         user.id = qSnap.docs[0].id;
+        originalDocId = qSnap.docs[0].id;
       } else {
         // Search by phone or case-insensitive match
         const allUsersSnap = await getDocs(collection(db, 'users'));
@@ -478,6 +480,7 @@ export class AuthService {
             (targetCleanPhone.length >= 10 && docPhone.length >= 10 && docPhone.slice(-10) === targetCleanPhone.slice(-10))
           ) {
             user = { ...u, id: uDoc.id };
+            originalDocId = uDoc.id;
             break;
           }
         }
@@ -553,8 +556,22 @@ export class AuthService {
       };
       await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user));
     } else if (user) {
+      const oldDocId = originalDocId;
       user.id = authUser.uid;
       await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user), { merge: true });
+
+      // Safe migration: Clean up obsolete placeholder/pre-auth doc so no duplicate owner record exists in Firestore
+      if (oldDocId && oldDocId !== authUser.uid) {
+        try {
+          await deleteDoc(doc(db, 'users', oldDocId));
+          await deleteDoc(doc(db, 'tenantMembers', `${user.businessId}_${oldDocId}`));
+          if (user.role === 'business_owner' && user.businessId && user.businessId !== 'all') {
+            await setDoc(doc(db, 'tenants', user.businessId), { ownerId: authUser.uid }, { merge: true });
+          }
+        } catch (cleanupErr) {
+          console.warn('Old user doc cleanup notice:', cleanupErr);
+        }
+      }
     }
 
     if (!user) {

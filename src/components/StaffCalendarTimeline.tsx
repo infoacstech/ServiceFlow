@@ -20,6 +20,27 @@ import {
 export const StaffCalendarTimeline: React.FC = () => {
   const { staff, jobs, customers, updateJob, showToast, logActivity } = useApp();
 
+  const uniqueStaff = React.useMemo(() => {
+    const raw = staff || [];
+    const seen = new Set<string>();
+    const result: User[] = [];
+    for (const tech of raw) {
+      const emailKey = tech.email ? `email:${tech.email.trim().toLowerCase()}` : '';
+      const phoneDigits = (tech.phone || '').replace(/[^0-9]/g, '').slice(-10);
+      const phoneKey = phoneDigits ? `phone:${phoneDigits}` : '';
+      const idKey = `id:${tech.id}`;
+
+      if (seen.has(idKey) || (emailKey && seen.has(emailKey)) || (phoneKey && seen.has(phoneKey))) {
+        continue;
+      }
+      if (idKey) seen.add(idKey);
+      if (emailKey) seen.add(emailKey);
+      if (phoneKey) seen.add(phoneKey);
+      result.push(tech);
+    }
+    return result;
+  }, [staff]);
+
   // Current anchor date (defaults to today)
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -247,7 +268,7 @@ export const StaffCalendarTimeline: React.FC = () => {
 
             {/* Body: Each Staff Member Row */}
             <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
-              {(staff || []).map((tech) => {
+              {uniqueStaff.map((tech) => {
                 // Get all jobs for this technician across the week
                 const techWeekJobs = (jobs || []).filter((j) => j.assignedStaffId === tech.id);
                 const techName = tech?.name || tech?.email || 'Technician';
