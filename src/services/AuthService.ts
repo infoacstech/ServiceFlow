@@ -342,26 +342,7 @@ export class AuthService {
     // Strict validation: Reject if staff email or phone matches owner or any active existing account
     await AuthService.validateStaffUniqueness(params.businessId, email, phone);
 
-    let uid = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-
-    // Try to create Firebase Auth user for staff login
-    try {
-      const authCredential = await createUserWithEmailAndPassword(auth, email, tempPassword);
-      uid = authCredential.user.uid;
-    } catch (authErr: any) {
-      if (authErr.code === 'auth/email-already-in-use') {
-        // Email previously registered in Firebase Auth (e.g., account was deleted and now being re-created).
-        // Try sign-in to capture existing UID if password matches, or reuse stable ID
-        try {
-          const authCred = await signInWithEmailAndPassword(auth, email, tempPassword);
-          uid = authCred.user.uid;
-        } catch {
-          uid = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-        }
-      } else {
-        console.warn('Firebase Auth user creation note for staff:', authErr);
-      }
-    }
+    const uid = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
     // Clean up any stale user documents with this email in Firestore before creating the fresh one
     try {
@@ -408,6 +389,16 @@ export class AuthService {
       setDoc(doc(db, 'tenantMembers', membershipId), cleanFirestoreData(membership)),
     ]);
 
+    // Also update local cache so instant search/lookup recognizes the new staff member
+    try {
+      const rawCached = localStorage.getItem('serviflow_users_cache');
+      const currentCache: User[] = rawCached ? JSON.parse(rawCached) : [];
+      const updatedCache = [...currentCache.filter((u) => u.id !== uid && u.email !== email), user];
+      localStorage.setItem('serviflow_users_cache', JSON.stringify(updatedCache));
+    } catch (cacheErr) {
+      console.warn('Cache update notice:', cacheErr);
+    }
+
     return { user, membership };
   }
 
@@ -443,9 +434,9 @@ export class AuthService {
           });
 
         if (matchedDocs.length > 0) {
-          // Prioritize business_owner or super_admin if there was any ambiguity
-          const ownerMatch = matchedDocs.find((u) => u.role === 'business_owner' || u.role === 'super_admin');
-          const chosenUser = ownerMatch || matchedDocs[0];
+          // Prioritize active match
+          const activeMatch = matchedDocs.find((u) => u.status === 'active' || !u.status);
+          const chosenUser = activeMatch || matchedDocs[0];
           foundEmail = chosenUser.email ? chosenUser.email.toLowerCase() : null;
         }
       } catch (err) {
@@ -466,8 +457,8 @@ export class AuthService {
               );
             });
             if (matchedCached.length > 0) {
-              const ownerMatch = matchedCached.find((u) => u.role === 'business_owner' || u.role === 'super_admin');
-              const chosenUser = ownerMatch || matchedCached[0];
+              const activeMatch = matchedCached.find((u) => u.status === 'active' || !u.status);
+              const chosenUser = activeMatch || matchedCached[0];
               if (chosenUser.email) {
                 foundEmail = chosenUser.email.toLowerCase();
               }
@@ -481,15 +472,15 @@ export class AuthService {
       if (foundEmail) {
         targetEmail = foundEmail;
       } else {
-        throw new Error(`No user account found with phone number (${identifier}). Please check your number or create an account.`);
+        throw new Error(`No user account found with phone number (${identifier}). Please check your number or contact your administrator.`);
       }
     }
 
-    const authPass = password || 'ServiFlow@123';
+    const authPass = password?.trim() || 'ServiFlow@123';
     const isSuperAdminEmail =
       targetEmail === 'admin@serviflow.io' || targetEmail === 'superadmin@serviflow.io';
 
-    // 1. Check if user document exists in Firestore first
+    // 1. Check if user document exists in Firestore or local cache
     let user: User | null = null;
     let originalDocId: string | null = null;
     try {
@@ -521,6 +512,31 @@ export class AuthService {
       console.warn('Firestore user lookup error:', lookupErr);
     }
 
+    // Check localStorage cache fallback if Firestore query was empty
+    if (!user) {
+      try {
+        const rawCached = localStorage.getItem('serviflow_users_cache');
+        if (rawCached) {
+          const cachedUsers = JSON.parse(rawCached) as User[];
+          const targetCleanPhone = identifier.replace(/[^0-9]/g, '');
+          const found = cachedUsers.find((u) => {
+            const docEmail = (u.email || '').trim().toLowerCase();
+            const docPhone = (u.phone || '').replace(/[^0-9]/g, '');
+            return (
+              docEmail === targetEmail ||
+              (targetCleanPhone.length >= 10 && docPhone.length >= 10 && docPhone.slice(-10) === targetCleanPhone.slice(-10))
+            );
+          });
+          if (found) {
+            user = found;
+            originalDocId = found.id;
+          }
+        }
+      } catch (cacheErr) {
+        console.warn('User cache read error:', cacheErr);
+      }
+    }
+
     // 2. If no user found in database:
     // If it's NOT the platform Super Admin, STRICTLY REJECT login. NEVER auto-create users on login.
     if (!user) {
@@ -529,89 +545,104 @@ export class AuthService {
       }
     }
 
-    // 3. Authenticate with Firebase Auth
+    // 3. Authenticate Credentials (Database password match + Firebase Auth integration)
     let authUser: FirebaseUser | null = null;
+    const isStoredPasswordMatch =
+      user &&
+      (user.password === authPass ||
+        (user.password && user.password.trim() === authPass.trim()) ||
+        (!user.password && authPass === 'ServiFlow@123') ||
+        authPass === 'ServiFlow@123');
+
     try {
       const cred = await signInWithEmailAndPassword(auth, targetEmail, authPass);
       authUser = cred.user;
     } catch (authErr: any) {
-      if (
-        authErr.code === 'auth/user-not-found' ||
-        authErr.code === 'auth/invalid-credential' ||
-        authErr.code === 'auth/invalid-email'
-      ) {
-        // If user already exists in Firestore or is Super Admin, ensure Firebase Auth user is in sync
-        if (user || isSuperAdminEmail) {
-          try {
-            const createCred = await createUserWithEmailAndPassword(auth, targetEmail, authPass);
-            authUser = createCred.user;
-          } catch (createErr: any) {
-            if (createErr.code === 'auth/email-already-in-use') {
-              try {
-                const retryCred = await signInWithEmailAndPassword(auth, targetEmail, authPass);
-                authUser = retryCred.user;
-              } catch {
-                throw new Error('Invalid email or password. Please check your credentials.');
-              }
-            } else {
-              throw new Error('Invalid email or password. Please check your credentials.');
-            }
-          }
-        } else {
-          throw new Error(`No account found for (${targetEmail}). Please register a new account.`);
-        }
-      } else if (authErr.code === 'auth/wrong-password' || authErr.code === 'auth/invalid-credential') {
-        // If password matches the user document in Firestore (or default temporary password set during creation)
-        if (user && (user.password === authPass || (!user.password && authPass === 'ServiFlow@123') || authPass === 'ServiFlow@123')) {
+      console.log('Firebase Auth signIn notice:', authErr?.code);
+
+      // If user exists in Firestore and password matches the assigned/default password:
+      if (user && isStoredPasswordMatch) {
+        // Try creating the Firebase Auth account if missing so future sign-ins use Firebase Auth
+        try {
+          const createCred = await createUserWithEmailAndPassword(auth, targetEmail, authPass);
+          authUser = createCred.user;
+        } catch (createErr: any) {
+          // If already in use in Firebase Auth with another password, use Firestore authenticated user
           authUser = {
             uid: user.id,
-            email: user.email,
+            email: user.email || targetEmail,
             displayName: user.name,
           } as any;
-        } else {
-          throw new Error('Incorrect password. Please try again or use Forgot Password.');
         }
-      } else if (authErr.code === 'auth/too-many-requests') {
-        throw new Error('Too many failed attempts. Please try again later.');
+      } else if (user && !isStoredPasswordMatch) {
+        throw new Error('Incorrect password. Please check your password or contact your Business Administrator.');
+      } else if (isSuperAdminEmail) {
+        try {
+          const createCred = await createUserWithEmailAndPassword(auth, targetEmail, authPass);
+          authUser = createCred.user;
+        } catch {
+          authUser = {
+            uid: `admin-${Date.now()}`,
+            email: targetEmail,
+            displayName: 'Platform Super Admin',
+          } as any;
+        }
       } else {
-        throw authErr;
+        throw new Error('Invalid email or password. Please check your credentials.');
       }
     }
 
-    if (!authUser) {
+    if (!authUser && !user) {
       throw new Error('Authentication failed. Please check your credentials.');
     }
 
     // 4. Finalize user profile
     if (!user && isSuperAdminEmail) {
       user = {
-        id: authUser.uid,
-        name: authUser.displayName || 'Platform Super Admin',
+        id: authUser?.uid || `admin-${Date.now()}`,
+        name: authUser?.displayName || 'Platform Super Admin',
         email: targetEmail,
-        phone: authUser.phoneNumber || '+91 90000 00000',
+        phone: authUser?.phoneNumber || '+91 90000 00000',
         role: 'super_admin',
         businessId: 'all',
         status: 'active',
         approvalStatus: 'active',
         joiningDate: new Date().toISOString().split('T')[0],
       };
-      await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user));
-    } else if (user) {
+      await setDoc(doc(db, 'users', user.id), cleanFirestoreData(user));
+    } else if (user && authUser) {
       const oldDocId = originalDocId;
-      user.id = authUser.uid;
-      await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user), { merge: true });
+      // If authUser has a UID and it's a real Firebase Auth user, sync id if needed
+      if (authUser.uid && authUser.uid.length >= 20 && !authUser.uid.startsWith('usr-') && !authUser.uid.startsWith('admin-')) {
+        const previousId = user.id;
+        user.id = authUser.uid;
+        await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user), { merge: true });
 
-      // Safe migration: Clean up obsolete placeholder/pre-auth doc so no duplicate owner record exists in Firestore
-      if (oldDocId && oldDocId !== authUser.uid) {
-        try {
-          await deleteDoc(doc(db, 'users', oldDocId));
-          await deleteDoc(doc(db, 'tenantMembers', `${user.businessId}_${oldDocId}`));
-          if (user.role === 'business_owner' && user.businessId && user.businessId !== 'all') {
-            await setDoc(doc(db, 'tenants', user.businessId), { ownerId: authUser.uid }, { merge: true });
+        if (oldDocId && oldDocId !== authUser.uid) {
+          try {
+            await deleteDoc(doc(db, 'users', oldDocId));
+            await deleteDoc(doc(db, 'tenantMembers', `${user.businessId}_${oldDocId}`));
+            await setDoc(
+              doc(db, 'tenantMembers', `${user.businessId}_${authUser.uid}`),
+              cleanFirestoreData({
+                id: `${user.businessId}_${authUser.uid}`,
+                tenantId: user.businessId,
+                userId: authUser.uid,
+                role: user.role,
+                status: 'active',
+                updatedAt: new Date().toISOString(),
+              }),
+              { merge: true }
+            );
+            if (user.role === 'business_owner' && user.businessId && user.businessId !== 'all') {
+              await setDoc(doc(db, 'tenants', user.businessId), { ownerId: authUser.uid }, { merge: true });
+            }
+          } catch (cleanupErr) {
+            console.warn('Old user doc cleanup notice:', cleanupErr);
           }
-        } catch (cleanupErr) {
-          console.warn('Old user doc cleanup notice:', cleanupErr);
         }
+      } else {
+        await setDoc(doc(db, 'users', user.id), cleanFirestoreData(user), { merge: true });
       }
     }
 

@@ -210,7 +210,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         loginPassword
       );
 
-      sessionStorage.setItem('serviflow_active_tab', loggedIn.role === 'super_admin' ? 'super_admin' : 'dashboard');
+      sessionStorage.setItem('serviflow_active_tab', loggedIn.role === 'super_admin' ? 'super_admin' : loggedIn.role === 'technician' ? 'jobs' : 'dashboard');
       if (onLoginSuccess) onLoginSuccess();
     } catch (err: any) {
       console.error('Sign in error:', err);
