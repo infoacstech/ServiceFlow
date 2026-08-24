@@ -91,12 +91,18 @@ export const StaffView: React.FC = () => {
   );
 
   const existingUserWithEmail = cleanEnteredEmail
-    ? users.find((u) => (u.email || '').trim().toLowerCase() === cleanEnteredEmail)
+    ? users.find(
+        (u) =>
+          u.businessId === currentBusiness.id &&
+          u.status === 'active' &&
+          (u.email || '').trim().toLowerCase() === cleanEnteredEmail
+      )
     : null;
 
   const existingUserWithPhone =
     cleanEnteredPhoneDigits.length >= 10
       ? users.find((u) => {
+          if (u.businessId !== currentBusiness.id || u.status !== 'active') return false;
           const uDigits = (u.phone || '').replace(/[^0-9]/g, '');
           return uDigits.length >= 10 && uDigits.slice(-10) === cleanEnteredPhoneDigits.slice(-10);
         })
@@ -131,23 +137,6 @@ export const StaffView: React.FC = () => {
     if (isOwnerPhoneCollision) {
       showToast(
         "Cannot use Business Owner's phone number for a staff member. Please enter the staff member's unique mobile number.",
-        'error'
-      );
-      return;
-    }
-
-    // 2. Existing User Collision Check
-    if (existingUserWithEmail) {
-      showToast(
-        `Email address (${email.trim()}) is already registered with an existing account (${existingUserWithEmail.name || existingUserWithEmail.email}).`,
-        'error'
-      );
-      return;
-    }
-
-    if (existingUserWithPhone) {
-      showToast(
-        `Mobile phone (${phone.trim()}) is already registered with an existing account (${existingUserWithPhone.name || existingUserWithPhone.email}).`,
         'error'
       );
       return;

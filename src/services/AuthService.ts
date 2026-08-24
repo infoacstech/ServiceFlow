@@ -280,16 +280,6 @@ export class AuthService {
               `This email address (${email}) is reserved for SaaS Administration.`
             );
           }
-          if (u.businessId === businessId && u.status === 'active') {
-            throw new Error(
-              `A staff member with email address (${email}) already exists and is active in your team.`
-            );
-          }
-          if (u.businessId !== businessId && u.status === 'active') {
-            throw new Error(
-              `Email address (${email}) is already in use by an active staff account in another organization.`
-            );
-          }
         }
 
         if (isPhoneMatch) {
@@ -301,11 +291,6 @@ export class AuthService {
           if (u.role === 'business_owner') {
             throw new Error(
               `This phone number (${phone}) is already registered to a Business Owner on the platform.`
-            );
-          }
-          if (u.businessId === businessId && u.status === 'active') {
-            throw new Error(
-              `A staff member with phone number (${phone}) is already active in your team.`
             );
           }
         }
@@ -491,16 +476,40 @@ export class AuthService {
         user.id = qSnap.docs[0].id;
         originalDocId = qSnap.docs[0].id;
       } else {
-        // Search by phone or case-insensitive match
+        // Robust fallback: search all users by email, normalized phone, or username
         const allUsersSnap = await getDocs(collection(db, 'users'));
         const targetCleanPhone = identifier.replace(/[^0-9]/g, '');
+        const targetUsername = targetEmail.split('@')[0].trim().toLowerCase();
+
         for (const uDoc of allUsersSnap.docs) {
           const u = uDoc.data() as User;
           const docEmail = (u.email || '').trim().toLowerCase();
           const docPhone = (u.phone || '').replace(/[^0-9]/g, '');
+          const docUsername = docEmail.split('@')[0].trim().toLowerCase();
+
+          // A. Exact or whitespace-insensitive email match
+          if (docEmail === targetEmail || docEmail.replace(/\s+/g, '') === targetEmail.replace(/\s+/g, '')) {
+            user = { ...u, id: uDoc.id };
+            originalDocId = uDoc.id;
+            break;
+          }
+
+          // B. Phone match
           if (
-            docEmail === targetEmail ||
-            (targetCleanPhone.length >= 10 && docPhone.length >= 10 && docPhone.slice(-10) === targetCleanPhone.slice(-10))
+            targetCleanPhone.length >= 10 &&
+            docPhone.length >= 10 &&
+            docPhone.slice(-10) === targetCleanPhone.slice(-10)
+          ) {
+            user = { ...u, id: uDoc.id };
+            originalDocId = uDoc.id;
+            break;
+          }
+
+          // C. Typo-tolerant match for identical username prefix on similar domains
+          if (
+            targetUsername.length >= 3 &&
+            docUsername === targetUsername &&
+            (targetEmail.includes('expert') || docEmail.includes('expert') || docEmail.endsWith('.in') || targetEmail.endsWith('.in'))
           ) {
             user = { ...u, id: uDoc.id };
             originalDocId = uDoc.id;
@@ -519,12 +528,17 @@ export class AuthService {
         if (rawCached) {
           const cachedUsers = JSON.parse(rawCached) as User[];
           const targetCleanPhone = identifier.replace(/[^0-9]/g, '');
+          const targetUsername = targetEmail.split('@')[0].trim().toLowerCase();
+
           const found = cachedUsers.find((u) => {
             const docEmail = (u.email || '').trim().toLowerCase();
             const docPhone = (u.phone || '').replace(/[^0-9]/g, '');
+            const docUsername = docEmail.split('@')[0].trim().toLowerCase();
+
             return (
               docEmail === targetEmail ||
-              (targetCleanPhone.length >= 10 && docPhone.length >= 10 && docPhone.slice(-10) === targetCleanPhone.slice(-10))
+              (targetCleanPhone.length >= 10 && docPhone.length >= 10 && docPhone.slice(-10) === targetCleanPhone.slice(-10)) ||
+              (targetUsername.length >= 3 && docUsername === targetUsername)
             );
           });
           if (found) {

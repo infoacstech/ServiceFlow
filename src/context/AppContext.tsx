@@ -3418,35 +3418,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error(msg);
     }
 
-    // 2. Check against all loaded user profiles in memory
-    const existingConflict = users.find((u) => {
-      const uEmail = (u.email || '').trim().toLowerCase();
-      const uPhoneDigits = (u.phone || '').replace(/[^0-9]/g, '');
-      const emailMatches = uEmail && normalizedEmail && uEmail === normalizedEmail;
-      const phoneMatches =
-        cleanPhoneDigits.length >= 10 &&
-        uPhoneDigits.length >= 10 &&
-        uPhoneDigits.slice(-10) === cleanPhoneDigits.slice(-10);
-
-      return emailMatches || phoneMatches;
-    });
-
-    if (existingConflict) {
-      if (existingConflict.role === 'business_owner') {
-        const msg = `Cannot use Business Owner's credentials (${
-          existingConflict.email.toLowerCase() === normalizedEmail ? data.email : data.phone
-        }) for a staff member. Staff accounts must have distinct credentials.`;
-        showToast(msg, 'error');
-        throw new Error(msg);
-      } else {
-        const msg = `An account with this ${
-          existingConflict.email.toLowerCase() === normalizedEmail ? 'email address' : 'phone number'
-        } is already registered (${existingConflict.name || existingConflict.email}).`;
-        showToast(msg, 'error');
-        throw new Error(msg);
-      }
-    }
-
     if (currentBusiness.id !== 'all' && currentUser?.role !== 'super_admin') {
       const activeTenantStaff = (users || []).filter(
         (u) =>
