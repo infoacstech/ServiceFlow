@@ -63,8 +63,9 @@ export const StaffView: React.FC = () => {
     return result;
   }, [users, staff, currentBusiness.id]);
 
+  // Exclude super_admin and business_owner from staff count so the plan quota strictly applies to staff / technicians
   const activeStaffCount = businessUsers.filter(
-    (u) => (u.status === 'active' || !u.status) && u.role !== 'super_admin'
+    (u) => (u.status === 'active' || !u.status) && u.role !== 'super_admin' && u.role !== 'business_owner'
   ).length;
 
   const capacity = checkStaffCapacity(activeStaffCount, currentBusiness.planId || currentBusiness.plan);

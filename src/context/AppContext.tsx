@@ -3449,7 +3449,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (currentBusiness.id !== 'all' && currentUser?.role !== 'super_admin') {
       const activeTenantStaff = (users || []).filter(
-        (u) => u.businessId === currentBusiness.id && (u.status === 'active' || !u.status) && u.role !== 'super_admin'
+        (u) =>
+          u.businessId === currentBusiness.id &&
+          (u.status === 'active' || !u.status) &&
+          u.role !== 'super_admin' &&
+          u.role !== 'business_owner'
       );
       const capacity = checkStaffCapacity(activeTenantStaff.length, currentBusiness.planId || currentBusiness.plan);
       if (!capacity.allowed) {
