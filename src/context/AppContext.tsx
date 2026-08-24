@@ -3497,7 +3497,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const deleteStaff = (userId: string) => {
+  const deleteStaff = async (userId: string) => {
     if (checkReadOnlySupportGuard()) return;
     const target = users.find((u) => u.id === userId);
     if (!target) return;
@@ -3505,7 +3505,38 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast('Unauthorized: Cannot delete staff account belonging to another tenant business.', 'error');
       return;
     }
+    
+    // Update local state immediately so UI and limits reflect deletion without delay
+    setUsers((prev) => {
+      const updated = prev.filter((u) => u.id !== userId);
+      saveCache('serviflow_users_cache', updated);
+      return updated;
+    });
+
+    // Delete user and membership docs from Firestore
     deleteFromFirestore('users', userId);
+    deleteFromFirestore('tenantMembers', `${target.businessId}_${userId}`);
+
+    // If any legacy docs match target email for this tenant, clean them up as well
+    if (target.email) {
+      try {
+        const q = query(
+          collection(db, 'users'),
+          where('email', '==', target.email.toLowerCase()),
+          where('businessId', '==', target.businessId)
+        );
+        const snap = await getDocs(q);
+        snap.docs.forEach((d) => {
+          if (d.id !== userId) {
+            deleteFromFirestore('users', d.id);
+            deleteFromFirestore('tenantMembers', `${target.businessId}_${d.id}`);
+          }
+        });
+      } catch (cleanErr) {
+        console.warn('Staff cleanup note:', cleanErr);
+      }
+    }
+
     logActivity('Staff Deleted', 'staff', userId, `Deleted staff member ${target.name || target.email}`);
     showToast(`Deleted staff account "${target.name || target.email}"`, 'info');
   };
