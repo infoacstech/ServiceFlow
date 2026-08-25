@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Globe, Briefcase, Receipt, Repeat, Plus, CheckCircle2, Clock, MapPin } from 'lucide-react';
+import { CustomerSearchSelect } from '../components/CustomerSearchSelect';
 
 export const CustomerPortalView: React.FC = () => {
   const { customers, jobs, invoices, contracts, addJob, currentBusiness } = useApp();
@@ -47,22 +48,20 @@ export const CustomerPortalView: React.FC = () => {
           <p className="text-xs text-slate-500">Service Portal powered by {currentBusiness.name}</p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <select
-            value={selectedCustomerId}
-            onChange={(e) => setSelectedCustomerId(e.target.value)}
-            className="px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs font-bold border"
-          >
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                Simulate Portal as: {c.name} ({c.companyName || 'Individual'})
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 min-w-[280px] sm:min-w-[340px]">
+          <div className="flex-1">
+            <CustomerSearchSelect
+              id="customer-portal-switcher"
+              customers={customers}
+              value={selectedCustomerId || customer?.id || ''}
+              onChange={(id) => setSelectedCustomerId(id)}
+              placeholder="Switch customer view..."
+            />
+          </div>
 
           <button
             onClick={() => setIsBookModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md flex items-center gap-1.5 whitespace-nowrap"
+            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 h-10"
           >
             <Plus className="w-4 h-4" /> Request Service Call
           </button>

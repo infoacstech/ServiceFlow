@@ -4,6 +4,7 @@ import { Job, JobPriority, JobStatus } from '../types';
 import { DateRangePicker, DateRange, getPresetDates } from '../components/DateRangePicker';
 import { VoiceNotesRecorder } from '../components/VoiceNotesRecorder';
 import { JobServiceProgressBar } from '../components/JobServiceProgressBar';
+import { CustomerSearchSelect } from '../components/CustomerSearchSelect';
 import {
   Briefcase,
   Plus,
@@ -890,31 +891,22 @@ export const JobsView: React.FC<JobsViewProps> = ({
 
                 {!isQuickAddCustomer ? (
                   <div>
-                    {customers.length === 0 ? (
-                      <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-amber-800 dark:text-amber-300 text-xs">
-                        No registered customers found. Click <strong>"+ New Customer"</strong> to add one directly.
-                      </div>
-                    ) : (
-                      <select
-                        value={newJobData.customerId}
-                        onChange={(e) => {
-                          const c = (customers || []).find((cust) => cust.id === e.target.value);
-                          setNewJobData({
-                            ...newJobData,
-                            customerId: e.target.value,
-                            location: c ? `${c.address || ''}, ${c.city || ''}`.trim() : newJobData.location,
-                          });
-                        }}
-                        className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        <option value="" disabled>-- Select a Customer ({customers.length} available) --</option>
-                        {customers.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name} {c.companyName ? `(${c.companyName})` : ''} - {c.mobile}
-                          </option>
-                        ))}
-                      </select>
-                    )}
+                    <CustomerSearchSelect
+                      id="job-customer-search-select"
+                      customers={customers}
+                      value={newJobData.customerId}
+                      onAddNewCustomer={() => setIsQuickAddCustomer(true)}
+                      onChange={(custId, cust) => {
+                        setNewJobData({
+                          ...newJobData,
+                          customerId: custId,
+                          location: cust
+                            ? `${cust.address || ''}, ${cust.city || ''}`.trim()
+                            : newJobData.location,
+                        });
+                      }}
+                      placeholder="Search 100+ customers by name, phone (e.g. 987...), company..."
+                    />
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">

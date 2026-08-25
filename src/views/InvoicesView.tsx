@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Invoice, InvoiceStatus, PaymentMethod } from '../types';
+import { CustomerSearchSelect } from '../components/CustomerSearchSelect';
 import {
   Receipt,
   Plus,
@@ -417,18 +418,15 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="col-span-2">
-                <label className="font-semibold block mb-1">Select Customer *</label>
-                <select
+                <CustomerSearchSelect
+                  id="invoice-customer-search-select"
+                  customers={customers}
                   value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border bg-slate-50"
-                >
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.companyName || c.mobile})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(id) => setCustomerId(id)}
+                  label="Select Customer"
+                  required
+                  placeholder="Search customer by name, mobile, company..."
+                />
               </div>
 
               <div>

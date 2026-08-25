@@ -221,6 +221,7 @@ interface AppContextType {
   setIsInstallModalOpen: (v: boolean) => void;
   toasts: ToastMessage[];
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  dismissToast: (id: string) => void;
   resetDemoData: () => void;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
@@ -259,7 +260,7 @@ interface AppContextType {
 
   addServiceCategory: (name: string, description?: string) => ServiceCategory;
 
-  addJob: (j: Omit<Job, 'id' | 'businessId' | 'jobId' | 'createdAt'>) => Job;
+  addJob: (j: Omit<Job, 'id' | 'businessId' | 'jobId' | 'createdAt'>, options?: { silentToast?: boolean }) => Job;
   updateJob: (id: string, updates: Partial<Job>) => void;
   updateJobStatus: (id: string, status: JobStatus) => void;
   deleteJob: (id: string) => void;
@@ -286,7 +287,7 @@ interface AppContextType {
     notes?: string
   ) => void;
 
-  addQuotation: (q: Omit<Quotation, 'id' | 'businessId' | 'quotationNumber'>) => Quotation;
+  addQuotation: (q: Omit<Quotation, 'id' | 'businessId' | 'quotationNumber'>, options?: { silentToast?: boolean }) => Quotation;
   updateQuotationStatus: (id: string, status: Quotation['status']) => void;
   convertQuotationToInvoice: (quotationId: string) => Invoice;
 
@@ -1664,17 +1665,22 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    const id = Date.now().toString() + Math.random();
+    const id = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     setToasts((prev) => {
       // Prevent identical duplicate toast popups if the message is already active
       if (prev.some((t) => t.message === message)) {
         return prev;
       }
-      return [...prev, { id, message, type }];
+      // Replace existing toasts so only 1 clear, non-overlapping toast popup is shown at a time
+      return [{ id, message, type }];
     });
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
+    }, 3800);
+  };
+
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
   const resetDemoData = () => {
@@ -2791,20 +2797,23 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const validUntil = quoteData.validUntil || new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0];
 
     // 2. Create quotation
-    const newQuotation = addQuotation({
-      customerId: custId || '',
-      enquiryId: enq.id,
-      date: new Date().toISOString().split('T')[0],
-      validUntil,
-      status: 'sent',
-      items: quoteData.items,
-      subtotal,
-      taxTotal,
-      discountTotal: 0,
-      grandTotal,
-      notes: quoteData.notes || `Generated from Enquiry ${enq.enquiryId} for ${enq.serviceRequired}`,
-      terms: quoteData.terms || 'Standard service terms apply. Validity: 15 days.',
-    });
+    const newQuotation = addQuotation(
+      {
+        customerId: custId || '',
+        enquiryId: enq.id,
+        date: new Date().toISOString().split('T')[0],
+        validUntil,
+        status: 'sent',
+        items: quoteData.items,
+        subtotal,
+        taxTotal,
+        discountTotal: 0,
+        grandTotal,
+        notes: quoteData.notes || `Generated from Enquiry ${enq.enquiryId} for ${enq.serviceRequired}`,
+        terms: quoteData.terms || 'Standard service terms apply. Validity: 15 days.',
+      },
+      { silentToast: true }
+    );
 
     // 3. Mark Enquiry as Quoted
     const quoteActivity: EnquiryActivity = {
@@ -2863,39 +2872,42 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // 2. Create the Job
-    const newJob = addJob({
-      customerId: custId || '',
-      assignedStaffId: jobOverrides?.assignedStaffId || enq.assignedStaffId || '',
-      serviceId: jobOverrides?.serviceId || enq.serviceId || '',
-      status: jobOverrides?.status || 'assigned',
-      priority:
-        jobOverrides?.priority ||
-        (enq.priority === 'urgent'
-          ? 'urgent'
-          : enq.priority === 'high'
-          ? 'high'
-          : enq.priority === 'low'
-          ? 'low'
-          : 'medium'),
-      scheduledDate: jobOverrides?.scheduledDate || enq.preferredDate || enq.followUpDate || new Date().toISOString().split('T')[0],
-      scheduledTime: jobOverrides?.scheduledTime || enq.preferredTimeSlot || enq.followUpTime || '09:00 AM - 11:00 AM',
-      scheduledTimeSlot: jobOverrides?.scheduledTimeSlot || enq.preferredTimeSlot || enq.followUpTime || '09:00 AM - 11:00 AM',
-      location: jobOverrides?.location || enq.location || enq.address || currentBusiness.address || '',
-      description: jobOverrides?.description || enq.serviceRequired || 'Field Service Job',
-      estimatedAmount: jobOverrides?.estimatedAmount ?? (enq.estimatedValue || 0),
-      notes: `Converted from Enquiry ${enq.enquiryId}. ${enq.notes || ''}\n${jobOverrides?.notes || ''}`.trim(),
-      relatedEnquiryId: enq.id,
-      activityHistory: [
-        {
-          id: `act-${Date.now()}`,
-          timestamp: new Date().toISOString(),
-          action: 'Converted from Enquiry',
-          actorName: currentUser?.name || 'System',
-          details: `Job created from Enquiry ${enq.enquiryId}`,
-          status: 'assigned',
-        },
-      ],
-    });
+    const newJob = addJob(
+      {
+        customerId: custId || '',
+        assignedStaffId: jobOverrides?.assignedStaffId || enq.assignedStaffId || '',
+        serviceId: jobOverrides?.serviceId || enq.serviceId || '',
+        status: jobOverrides?.status || 'assigned',
+        priority:
+          jobOverrides?.priority ||
+          (enq.priority === 'urgent'
+            ? 'urgent'
+            : enq.priority === 'high'
+            ? 'high'
+            : enq.priority === 'low'
+            ? 'low'
+            : 'medium'),
+        scheduledDate: jobOverrides?.scheduledDate || enq.preferredDate || enq.followUpDate || new Date().toISOString().split('T')[0],
+        scheduledTime: jobOverrides?.scheduledTime || enq.preferredTimeSlot || enq.followUpTime || '09:00 AM - 11:00 AM',
+        scheduledTimeSlot: jobOverrides?.scheduledTimeSlot || enq.preferredTimeSlot || enq.followUpTime || '09:00 AM - 11:00 AM',
+        location: jobOverrides?.location || enq.location || enq.address || currentBusiness.address || '',
+        description: jobOverrides?.description || enq.serviceRequired || 'Field Service Job',
+        estimatedAmount: jobOverrides?.estimatedAmount ?? (enq.estimatedValue || 0),
+        notes: `Converted from Enquiry ${enq.enquiryId}. ${enq.notes || ''}\n${jobOverrides?.notes || ''}`.trim(),
+        relatedEnquiryId: enq.id,
+        activityHistory: [
+          {
+            id: `act-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            action: 'Converted from Enquiry',
+            actorName: currentUser?.name || 'System',
+            details: `Job created from Enquiry ${enq.enquiryId}`,
+            status: 'assigned',
+          },
+        ],
+      },
+      { silentToast: true }
+    );
 
     // 3. Mark Enquiry as converted
     const conversionActivity = {
@@ -3041,7 +3053,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Job Actions
-  const addJob = (data: Omit<Job, 'id' | 'businessId' | 'jobId' | 'createdAt'>) => {
+  const addJob = (
+    data: Omit<Job, 'id' | 'businessId' | 'jobId' | 'createdAt'>,
+    options?: { silentToast?: boolean }
+  ) => {
     if (checkReadOnlySupportGuard()) return;
     const perm = canCreateRecord(currentUser, 'job');
     if (!perm.allowed) {
@@ -3125,7 +3140,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActiveJobPopup(newNotif);
     }
 
-    showToast(`Job ${jobId} issued & assigned${assignedStaff ? ' to ' + assignedStaff.name : ''}!`, 'success');
+    if (!options?.silentToast) {
+      showToast(`Job ${jobId} issued & assigned${assignedStaff ? ' to ' + assignedStaff.name : ''}!`, 'success');
+    }
     return newJob;
   };
 
@@ -3475,7 +3492,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Quotation Actions
-  const addQuotation = (data: Omit<Quotation, 'id' | 'businessId' | 'quotationNumber'>) => {
+  const addQuotation = (
+    data: Omit<Quotation, 'id' | 'businessId' | 'quotationNumber'>,
+    options?: { silentToast?: boolean }
+  ) => {
     if (checkReadOnlySupportGuard()) return;
     const perm = canCreateRecord(currentUser, 'quotation');
     if (!perm.allowed) {
@@ -3491,7 +3511,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     firestoreService.saveDocument<Quotation>('quotations', newQt.id, newQt);
     logActivity('Quotation Created', 'quotation', newQt.id, `Created quotation ${num}`);
-    showToast(`Quotation ${num} created`, 'success');
+    if (!options?.silentToast) {
+      showToast(`Quotation ${num} created`, 'success');
+    }
     return newQt;
   };
 
@@ -4530,6 +4552,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsInstallModalOpen,
         toasts,
         showToast,
+        dismissToast,
         resetDemoData,
         theme,
         toggleTheme,

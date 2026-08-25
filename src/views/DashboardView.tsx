@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { speakText } from '../utils/audioNotification';
 import { EnquiryFormModal } from '../components/enquiries/EnquiryFormModal';
+import { CustomerSearchSelect } from '../components/CustomerSearchSelect';
 import {
   Briefcase,
   Users,
@@ -1201,22 +1202,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <form onSubmit={handleQuickQuoteSubmit} className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Select Customer *
-                </label>
-                <select
-                  required
+                <CustomerSearchSelect
+                  id="quick-quote-customer-select"
+                  customers={customers}
                   value={quoteCustomerId}
-                  onChange={(e) => setQuoteCustomerId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-slate-100"
-                >
-                  <option value="">-- Choose Customer --</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.companyName || c.mobile})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(id) => setQuoteCustomerId(id)}
+                  label="Select Customer"
+                  required
+                  placeholder="Type to search customers by name, phone, company..."
+                />
               </div>
 
               <div>

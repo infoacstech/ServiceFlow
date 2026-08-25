@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Quotation, LineItem } from '../types';
+import { CustomerSearchSelect } from '../components/CustomerSearchSelect';
 import {
   FileText,
   Plus,
@@ -278,18 +279,15 @@ export const QuotationsView: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="col-span-2 sm:col-span-1">
-                <label className="font-semibold block mb-1">Select Customer *</label>
-                <select
+                <CustomerSearchSelect
+                  id="quotation-customer-search-select"
+                  customers={customers}
                   value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border bg-slate-50"
-                >
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.companyName || c.mobile})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(id) => setCustomerId(id)}
+                  label="Select Customer"
+                  required
+                  placeholder="Search customer by name or phone..."
+                />
               </div>
 
               <div className="col-span-2 sm:col-span-1">

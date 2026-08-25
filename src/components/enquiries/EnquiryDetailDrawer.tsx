@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CustomerSearchSelect } from '../CustomerSearchSelect';
 import {
   X,
   Phone,
@@ -470,26 +471,32 @@ export const EnquiryDetailDrawer: React.FC<EnquiryDetailDrawerProps> = ({
                     </div>
 
                     {isLinkingOpen && (
-                      <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 flex gap-2 animate-in fade-in">
-                        <select
+                      <div className="p-3.5 bg-slate-50 dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2.5 animate-in fade-in">
+                        <CustomerSearchSelect
+                          id="enquiry-link-customer-select"
+                          customers={customers}
                           value={selectedCustomerIdToLink}
-                          onChange={(e) => setSelectedCustomerIdToLink(e.target.value)}
-                          className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs"
-                        >
-                          <option value="">-- Choose Customer from CRM --</option>
-                          {customers.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name} ({c.mobile}) {c.companyName ? `- ${c.companyName}` : ''}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          disabled={!selectedCustomerIdToLink}
-                          onClick={() => handleLinkCustomer(selectedCustomerIdToLink)}
-                          className="px-4 py-1.5 bg-blue-600 disabled:opacity-50 text-white rounded-lg text-xs font-bold"
-                        >
-                          Link
-                        </button>
+                          onChange={(id) => setSelectedCustomerIdToLink(id)}
+                          label="Choose Customer to Link"
+                          placeholder="Search customer by name, phone, company..."
+                        />
+                        <div className="flex justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setIsLinkingOpen(false)}
+                            className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!selectedCustomerIdToLink}
+                            onClick={() => handleLinkCustomer(selectedCustomerIdToLink)}
+                            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+                          >
+                            Link to Enquiry
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

@@ -43,7 +43,7 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
     }
 
     try {
-      const quotation = await convertEnquiryToQuote(enquiry.id, {
+      await convertEnquiryToQuote(enquiry.id, {
         items: [
           {
             id: `item-${Date.now()}`,
@@ -57,7 +57,6 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
         notes: notes.trim(),
       });
 
-      showToast(`Quotation #${quotation?.quotationNumber || ''} generated and linked to Enquiry!`, 'success');
       onClose();
       if (onSuccess) onSuccess();
     } catch (err) {
