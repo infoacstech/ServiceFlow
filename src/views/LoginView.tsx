@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { User } from '../types';
+import { BrandLogo } from '../components/BrandLogo';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import {
@@ -392,9 +393,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           ) : (
             <div
               onClick={handleSecretLogoClick}
-              className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 mb-1 select-none cursor-default"
+              className="inline-flex items-center justify-center mb-1 select-none cursor-default transition-transform hover:scale-105"
             >
-              <ShieldCheck className="w-8 h-8" />
+              <BrandLogo size={64} />
             </div>
           )}
 

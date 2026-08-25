@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGradFull" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B132B" />
+      <stop offset="50%" stop-color="#070C1E" />
+      <stop offset="100%" stop-color="#030611" />
+    </linearGradient>
+
+    <!-- Ambient Blue Glow -->
+    <radialGradient id="centerAuraFull" cx="50%" cy="38%" r="42%">
+      <stop offset="0%" stop-color="#00D2FF" stop-opacity="0.38" />
+      <stop offset="55%" stop-color="#0066FF" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Shield Border Gradient -->
+    <linearGradient id="shieldBorderGradFull" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="35%" stop-color="#00E5FF" />
+      <stop offset="70%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+
+    <linearGradient id="shieldInnerGradFull" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0E2356" />
+      <stop offset="60%" stop-color="#0A183D" />
+      <stop offset="100%" stop-color="#060F26" />
+    </linearGradient>
+
+    <linearGradient id="arrowGradFull" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="70%" stop-color="#F0F9FF" />
+      <stop offset="100%" stop-color="#BAE6FD" />
+    </linearGradient>
+
+    <radialGradient id="orbGradFull" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#A5F3FC" />
+      <stop offset="35%" stop-color="#00D2FF" />
+      <stop offset="75%" stop-color="#0284C7" />
+      <stop offset="100%" stop-color="#0369A1" />
+    </radialGradient>
+
+    <linearGradient id="flowTextGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#0EA5E9" />
+    </linearGradient>
+
+    <filter id="neonGlowFull" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <filter id="shieldShadowFull" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#00B4D8" flood-opacity="0.32" />
+    </filter>
+  </defs>
+
+  <!-- Squircle App Background -->
+  <rect width="512" height="512" rx="115" fill="url(#bgGradFull)" />
+  <rect width="512" height="512" rx="115" fill="none" stroke="#1E293B" stroke-width="2" />
+
+  <!-- Ambient Light Center -->
+  <circle cx="256" cy="190" r="180" fill="url(#centerAuraFull)" />
+
+  <!-- Outer Shield Emblem -->
+  <g transform="translate(0, -25)" filter="url(#shieldShadowFull)">
+    <path 
+      d="M 256 70 
+         L 370 125 C 377 129 380 136 380 144 
+         L 380 250 
+         C 380 305 328 355 260 392 
+         C 257.5 393.4 254.5 393.4 252 392 
+         C 184 355 132 305 132 250 
+         L 132 144 
+         C 132 136 135 129 142 125 
+         Z" 
+      fill="url(#shieldInnerGradFull)" 
+      stroke="url(#shieldBorderGradFull)" 
+      stroke-width="16" 
+      stroke-linejoin="round"
+    />
+
+    <path 
+      d="M 256 92 
+         L 355 140 
+         L 355 244 
+         C 355 288 310 330 256 364 
+         C 202 330 157 288 157 244 
+         L 157 140 
+         Z" 
+      fill="none" 
+      stroke="#00D2FF" 
+      stroke-width="2.5" 
+      stroke-opacity="0.35" 
+      stroke-linejoin="round"
+    />
+
+    <!-- Chevron Arrow -->
+    <path 
+      d="M 220 155 
+         C 228 147 241 147 249 155 
+         L 305 211 
+         C 314 220 314 234 305 243 
+         L 249 299 
+         C 241 307 228 307 220 299 
+         C 212 291 212 278 220 270 
+         L 262 227 
+         L 220 184 
+         C 212 176 212 163 220 155 
+         Z" 
+      fill="url(#arrowGradFull)" 
+      filter="url(#neonGlowFull)"
+    />
+
+    <!-- Center Orb -->
+    <circle cx="256" cy="227" r="26" fill="url(#orbGradFull)" filter="url(#neonGlowFull)" />
+    <ellipse cx="249" cy="218" rx="7" ry="5" fill="#FFFFFF" fill-opacity="0.85" transform="rotate(-30 249 218)" />
+    <circle cx="256" cy="227" r="27" fill="none" stroke="#E0F2FE" stroke-width="1.5" stroke-opacity="0.7" />
+  </g>
+
+  <!-- Typography Brand: ServiFlow -->
+  <g id="brand-text">
+    <text x="256" y="424" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif" font-weight="900" font-size="52" letter-spacing="-1">
+      <tspan fill="#FFFFFF">Servi</tspan><tspan fill="url(#flowTextGrad)">Flow</tspan>
+    </text>
+    <text x="256" y="458" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif" font-weight="600" font-size="16" letter-spacing="4" fill="#94A3B8">
+      <tspan fill="#CBD5E1">MANAGE</tspan>
+      <tspan fill="#38BDF8" font-size="20"> • </tspan>
+      <tspan fill="#CBD5E1">TRACK</tspan>
+      <tspan fill="#38BDF8" font-size="20"> • </tspan>
+      <tspan fill="#CBD5E1">GROW</tspan>
+    </text>
+  </g>
+</svg>

@@ -37,6 +37,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { PricingModal } from './PricingModal';
+import { BrandLogo } from './BrandLogo';
 
 interface SidebarProps {
   activeTab: string;
@@ -346,15 +347,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
       {/* Brand Header */}
       <div className="px-3 py-3 mb-2 flex items-center justify-between border-b border-slate-800/80 pb-3">
         <div className="flex items-center gap-2.5">
-          <div
-            className={`w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-base shadow-md ${
-              isSuperAdmin
-                ? 'bg-gradient-to-br from-purple-600 to-indigo-700 shadow-purple-600/30'
-                : 'bg-indigo-600 shadow-indigo-600/30'
-            }`}
-          >
-            S
-          </div>
+          <BrandLogo size={32} />
           <div className="min-w-0">
             <div className="font-black text-sm text-white tracking-tight flex items-center gap-1.5">
               <span>{isSuperAdmin ? 'SERVIFLOW' : 'ServiFlow'}</span>

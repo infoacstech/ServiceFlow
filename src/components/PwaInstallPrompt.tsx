@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Download, Smartphone, X, Laptop, Monitor, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { InstallAppModal } from './InstallAppModal';
+import { BrandLogo } from './BrandLogo';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -88,11 +89,11 @@ export const PwaInstallPrompt: React.FC = () => {
         <div className="fixed bottom-20 left-4 right-4 md:bottom-6 md:left-auto md:right-6 md:max-w-md z-50 animate-in slide-in-from-bottom duration-300">
           <div className="bg-slate-900/95 text-white p-3.5 sm:p-4 rounded-2xl shadow-2xl border border-indigo-500/40 backdrop-blur-xl flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center shrink-0 shadow-md overflow-hidden p-0.5">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md overflow-hidden">
                 {currentBusiness?.logo ? (
                   <img src={currentBusiness.logo} alt="App Icon" className="w-full h-full object-cover rounded-lg" />
                 ) : (
-                  <Laptop className="w-5 h-5 text-white" />
+                  <BrandLogo size={40} />
                 )}
               </div>
               <div>

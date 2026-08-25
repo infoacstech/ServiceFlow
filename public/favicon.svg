@@ -1,16 +1,127 @@
-<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512' viewBox='0 0 512 512'>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id='bg' x1='0%' y1='0%' x2='100%' y2='100%'>
-      <stop offset='0%' stop-color='#4F46E5'/>
-      <stop offset='100%' stop-color='#1E1B4B'/>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B132B" />
+      <stop offset="50%" stop-color="#070C1E" />
+      <stop offset="100%" stop-color="#030611" />
     </linearGradient>
-    <linearGradient id='accent' x1='0%' y1='0%' x2='100%' y2='100%'>
-      <stop offset='0%' stop-color='#38BDF8'/>
-      <stop offset='100%' stop-color='#818CF8'/>
+
+    <!-- Ambient Blue Glow -->
+    <radialGradient id="centerAura" cx="50%" cy="48%" r="45%">
+      <stop offset="0%" stop-color="#00D2FF" stop-opacity="0.35" />
+      <stop offset="50%" stop-color="#0066FF" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Shield Border Gradient -->
+    <linearGradient id="shieldBorderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="35%" stop-color="#00E5FF" />
+      <stop offset="70%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#1D4ED8" />
     </linearGradient>
+
+    <!-- Shield Inner Fill Gradient -->
+    <linearGradient id="shieldInnerGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0E2356" />
+      <stop offset="60%" stop-color="#0A183D" />
+      <stop offset="100%" stop-color="#060F26" />
+    </linearGradient>
+
+    <!-- Arrow Gradient -->
+    <linearGradient id="arrowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="70%" stop-color="#F0F9FF" />
+      <stop offset="100%" stop-color="#BAE6FD" />
+    </linearGradient>
+
+    <!-- Center Orb 3D Gradient -->
+    <radialGradient id="orbGrad" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#A5F3FC" />
+      <stop offset="35%" stop-color="#00D2FF" />
+      <stop offset="75%" stop-color="#0284C7" />
+      <stop offset="100%" stop-color="#0369A1" />
+    </radialGradient>
+
+    <!-- Glow Filter -->
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Drop Shadow Filter for Shield -->
+    <filter id="shieldShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#00B4D8" flood-opacity="0.3" />
+    </filter>
   </defs>
-  <rect width='512' height='512' rx='112' fill='url(#bg)'/>
-  <path d='M256 96 L384 160 V288 C384 360 256 416 256 416 C256 416 128 360 128 288 V160 Z' fill='none' stroke='url(#accent)' stroke-width='24' stroke-linejoin='round'/>
-  <path d='M224 210 L288 256 L224 302' fill='none' stroke='#FFFFFF' stroke-width='28' stroke-linecap='round' stroke-linejoin='round'/>
-  <circle cx='256' cy='256' r='32' fill='#38BDF8'/>
+
+  <!-- Squircle App Background -->
+  <rect width="512" height="512" rx="115" fill="url(#bgGrad)" />
+  <rect width="512" height="512" rx="115" fill="none" stroke="#1E293B" stroke-width="2" />
+
+  <!-- Ambient Light Center -->
+  <circle cx="256" cy="256" r="230" fill="url(#centerAura)" />
+
+  <!-- Outer Shield Emblem -->
+  <g filter="url(#shieldShadow)">
+    <!-- Shield Border Path (Thick Neon Stroke) -->
+    <path 
+      d="M 256 68 
+         L 394 134 C 402 138 406 146 406 155 
+         L 406 280 
+         C 406 345 342 405 260 450 
+         C 257.5 451.4 254.5 451.4 252 450 
+         C 170 405 106 345 106 280 
+         L 106 155 
+         C 106 146 110 138 118 134 
+         Z" 
+      fill="url(#shieldInnerGrad)" 
+      stroke="url(#shieldBorderGrad)" 
+      stroke-width="20" 
+      stroke-linejoin="round"
+    />
+
+    <!-- Inner Shield Accent Line -->
+    <path 
+      d="M 256 94 
+         L 376 151 
+         L 376 272 
+         C 376 325 320 376 256 416 
+         C 192 376 136 325 136 272 
+         L 136 151 
+         Z" 
+      fill="none" 
+      stroke="#00D2FF" 
+      stroke-width="3" 
+      stroke-opacity="0.35" 
+      stroke-linejoin="round"
+    />
+  </g>
+
+  <!-- Futuristic Chevron Arrow (Right Pointer) -->
+  <g filter="url(#neonGlow)">
+    <path 
+      d="M 212 168 
+         C 222 158 238 158 248 168 
+         L 316 236 
+         C 327 247 327 265 316 276 
+         L 248 344 
+         C 238 354 222 354 212 344 
+         C 202 334 202 318 212 308 
+         L 264 256 
+         L 212 204 
+         C 202 194 202 178 212 168 
+         Z" 
+      fill="url(#arrowGrad)" 
+    />
+  </g>
+
+  <!-- Glowing Cyan Dot / Orb in Center of Chevron -->
+  <g filter="url(#neonGlow)">
+    <circle cx="256" cy="256" r="32" fill="url(#orbGrad)" />
+    <!-- White Specular Light Reflection -->
+    <ellipse cx="247" cy="245" rx="9" ry="6" fill="#FFFFFF" fill-opacity="0.85" transform="rotate(-30 247 245)" />
+    <circle cx="256" cy="256" r="33" fill="none" stroke="#E0F2FE" stroke-width="2" stroke-opacity="0.7" />
+  </g>
 </svg>

@@ -20,6 +20,7 @@ import {
   Maximize,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { BrandLogo } from './BrandLogo';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -191,13 +192,11 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
         {/* Modal Header */}
         <div className="p-4 sm:p-6 bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-900 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md p-1 border border-white/20 flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shrink-0">
               {currentBusiness?.logo ? (
                 <img src={currentBusiness.logo} alt="Company Logo" className="w-full h-full object-cover rounded-xl" />
               ) : (
-                <div className="w-full h-full rounded-xl bg-white text-indigo-600 font-black text-xl flex items-center justify-center">
-                  S
-                </div>
+                <BrandLogo size={48} />
               )}
             </div>
             <div>
