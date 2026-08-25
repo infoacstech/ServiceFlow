@@ -104,6 +104,8 @@ export interface Customer {
   gstNumber?: string;
   notes?: string;
   customerType: 'individual' | 'commercial';
+  isArchived?: boolean;
+  archivedAt?: string;
   createdAt: string;
 }
 

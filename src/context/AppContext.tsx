@@ -252,7 +252,9 @@ interface AppContextType {
 
   addCustomer: (c: Omit<Customer, 'id' | 'businessId' | 'createdAt'>) => Customer;
   updateCustomer: (id: string, updates: Partial<Customer>) => void;
-  deleteCustomer: (id: string) => void;
+  deleteCustomer: (id: string) => Promise<{ success: boolean; message: string; blockedByRecords?: boolean }>;
+  archiveCustomer: (id: string) => Promise<{ success: boolean; message: string }>;
+  unarchiveCustomer: (id: string) => Promise<{ success: boolean; message: string }>;
 
   addService: (s: Omit<Service, 'id' | 'businessId'>) => void;
   updateService: (id: string, updates: Partial<Service>) => void;
@@ -2969,20 +2971,138 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Customer information updated & synced to Firestore', 'success');
   };
 
-  const deleteCustomer = (id: string) => {
-    if (checkReadOnlySupportGuard()) return;
+  const deleteCustomer = async (id: string): Promise<{ success: boolean; message: string; blockedByRecords?: boolean }> => {
+    if (checkReadOnlySupportGuard()) return { success: false, message: 'App is in read-only mode.' };
     const perm = canDeleteRecord(currentUser, 'customer');
     if (!perm.allowed) {
-      showToast(perm.reason || 'Permission Denied: Only Business Owners can delete customer records.', 'error');
-      return;
+      const msg = perm.reason || 'Permission Denied: Only Business Owners can delete customer records.';
+      showToast(msg, 'error');
+      return { success: false, message: msg };
     }
     const target = customers.find((c) => c.id === id);
-    if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
-      showToast('Unauthorized: Cannot delete customer belonging to another tenant business.', 'error');
-      return;
+    if (!target) {
+      const msg = 'Customer record not found.';
+      showToast(msg, 'error');
+      return { success: false, message: msg };
     }
-    firestoreService.deleteCustomer(id);
-    showToast('Customer deleted from Firestore', 'info');
+    if (target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      const msg = 'Unauthorized: Cannot delete customer belonging to another tenant business.';
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
+
+    // Comprehensive relational audit: check all transactional and operational collections
+    const linkedJobs = (jobs || []).filter((j) => j.customerId === id);
+    const linkedInvoices = (invoices || []).filter((inv) => inv.customerId === id);
+    const linkedPayments = (payments || []).filter((p) => p.customerId === id);
+    const linkedContracts = (contracts || []).filter((c) => c.customerId === id);
+    const linkedQuotations = (quotations || []).filter((q) => q.customerId === id);
+    const linkedEnquiries = (enquiries || []).filter((e) => e.customerId === id);
+
+    const totalRelated =
+      linkedJobs.length +
+      linkedInvoices.length +
+      linkedPayments.length +
+      linkedContracts.length +
+      linkedQuotations.length +
+      linkedEnquiries.length;
+
+    if (totalRelated > 0) {
+      const recordTypes: string[] = [];
+      if (linkedJobs.length > 0) recordTypes.push(`${linkedJobs.length} job(s)`);
+      if (linkedInvoices.length > 0) recordTypes.push(`${linkedInvoices.length} invoice(s)`);
+      if (linkedPayments.length > 0) recordTypes.push(`${linkedPayments.length} payment(s)`);
+      if (linkedContracts.length > 0) recordTypes.push(`${linkedContracts.length} contract(s)`);
+      if (linkedQuotations.length > 0) recordTypes.push(`${linkedQuotations.length} quote(s)`);
+      if (linkedEnquiries.length > 0) recordTypes.push(`${linkedEnquiries.length} enquiry(s)`);
+
+      const msg = `Customer Cannot Be Deleted: This customer has ${totalRelated} existing business record(s) (${recordTypes.join(', ')}). Deleting this customer could break historical accounting and service audit data. Please use "Archive Customer" instead.`;
+      showToast('Customer cannot be deleted because related business records exist.', 'error');
+      return { success: false, message: msg, blockedByRecords: true };
+    }
+
+    try {
+      await firestoreService.deleteCustomer(id);
+      logActivity(
+        'Customer Deleted',
+        'customer',
+        id,
+        `Permanently deleted customer "${target.name}" after verifying 0 linked transactional records.`
+      );
+      showToast('Customer deleted successfully.', 'success');
+      return { success: true, message: 'Customer deleted successfully.' };
+    } catch (err: any) {
+      const errStr = err?.message || 'Failed to delete customer.';
+      showToast(errStr, 'error');
+      return { success: false, message: errStr };
+    }
+  };
+
+  const archiveCustomer = async (id: string): Promise<{ success: boolean; message: string }> => {
+    if (checkReadOnlySupportGuard()) return { success: false, message: 'App is in read-only mode.' };
+    const perm = canUpdateRecord(currentUser, 'customer');
+    if (!perm.allowed) {
+      const msg = perm.reason || 'Permission Denied: Only Business Owners can archive customer records.';
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
+    const target = customers.find((c) => c.id === id);
+    if (!target) {
+      const msg = 'Customer record not found.';
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
+    if (target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      const msg = 'Unauthorized: Cannot modify customer belonging to another tenant business.';
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
+
+    try {
+      await firestoreService.updateCustomer(id, {
+        isArchived: true,
+        archivedAt: new Date().toISOString(),
+      });
+      logActivity(
+        'Customer Archived',
+        'customer',
+        id,
+        `Archived customer "${target.name}" to preserve audit history and deactivate active operations.`
+      );
+      showToast(`Customer "${target.name}" archived successfully. Historical records preserved.`, 'success');
+      return { success: true, message: `Customer "${target.name}" archived successfully.` };
+    } catch (err: any) {
+      const errStr = err?.message || 'Failed to archive customer.';
+      showToast(errStr, 'error');
+      return { success: false, message: errStr };
+    }
+  };
+
+  const unarchiveCustomer = async (id: string): Promise<{ success: boolean; message: string }> => {
+    if (checkReadOnlySupportGuard()) return { success: false, message: 'App is in read-only mode.' };
+    const perm = canUpdateRecord(currentUser, 'customer');
+    if (!perm.allowed) {
+      const msg = perm.reason || 'Permission Denied.';
+      showToast(msg, 'error');
+      return { success: false, message: msg };
+    }
+    const target = customers.find((c) => c.id === id);
+    if (!target) {
+      return { success: false, message: 'Customer not found.' };
+    }
+    try {
+      await firestoreService.updateCustomer(id, {
+        isArchived: false,
+        archivedAt: undefined,
+      });
+      logActivity('Customer Restored', 'customer', id, `Restored customer "${target.name}" to active status.`);
+      showToast(`Customer "${target.name}" restored to active status.`, 'success');
+      return { success: true, message: `Customer "${target.name}" restored to active.` };
+    } catch (err: any) {
+      const errStr = err?.message || 'Failed to restore customer.';
+      showToast(errStr, 'error');
+      return { success: false, message: errStr };
+    }
   };
 
   // Services Actions
@@ -4575,6 +4695,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addCustomer,
         updateCustomer,
         deleteCustomer,
+        archiveCustomer,
+        unarchiveCustomer,
 
         addServiceCategory,
         addService,

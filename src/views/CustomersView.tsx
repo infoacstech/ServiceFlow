@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Customer } from '../types';
 import { CsvImportModal, CsvColumnMapping } from '../components/CsvImportModal';
 import { CustomerServiceSummary } from '../components/CustomerServiceSummary';
+import { DeleteCustomerModal } from '../components/DeleteCustomerModal';
 import {
   Users,
   Plus,
@@ -24,6 +25,10 @@ import {
   Check,
   Upload,
   Wrench,
+  Archive,
+  RotateCcw,
+  ShieldAlert,
+  AlertTriangle,
 } from 'lucide-react';
 
 export const CustomersView: React.FC = () => {
@@ -32,6 +37,8 @@ export const CustomersView: React.FC = () => {
     addCustomer,
     updateCustomer,
     deleteCustomer,
+    archiveCustomer,
+    unarchiveCustomer,
     jobs,
     quotations,
     invoices,
@@ -47,8 +54,9 @@ export const CustomersView: React.FC = () => {
   const isOwnerOrAdmin = currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin';
 
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'commercial' | 'individual'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'commercial' | 'individual' | 'archived'>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [activeProfileTab, setActiveProfileTab] = useState<
     'service_summary' | 'overview' | 'jobs' | 'quotations' | 'invoices' | 'payments' | 'contracts' | 'timeline'
   >('service_summary');
@@ -126,9 +134,15 @@ export const CustomersView: React.FC = () => {
       (c.name || '').toLowerCase().includes(s) ||
       (c.mobile || '').includes(search || '') ||
       Boolean(c.companyName && c.companyName.toLowerCase().includes(s));
+    
+    if (filterType === 'archived') {
+      return matchesSearch && Boolean(c.isArchived);
+    }
     const matchesType = filterType === 'all' || c.customerType === filterType;
-    return matchesSearch && matchesType;
+    return matchesSearch && matchesType && !c.isArchived;
   });
+
+  const archivedCount = (customers || []).filter((c) => c.isArchived).length;
 
   const handleSaveCustomer = (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,20 +204,32 @@ export const CustomersView: React.FC = () => {
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
           {(['all', 'commercial', 'individual'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setFilterType(t)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize whitespace-nowrap transition-all cursor-pointer ${
                 filterType === t
                   ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 hover:bg-slate-200'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
               }`}
             >
               {t}
             </button>
           ))}
+          {archivedCount > 0 && (
+            <button
+              onClick={() => setFilterType('archived')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                filterType === 'archived'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-900/60 hover:bg-amber-100'
+              }`}
+            >
+              <Archive className="w-3.5 h-3.5" /> Archived ({archivedCount})
+            </button>
+          )}
         </div>
       </div>
 
@@ -218,7 +244,11 @@ export const CustomersView: React.FC = () => {
             <div
               key={customer.id}
               onClick={() => setSelectedCustomer(customer)}
-              className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+              className={`p-5 rounded-3xl bg-white dark:bg-slate-900 border shadow-xs hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group ${
+                customer.isArchived
+                  ? 'border-amber-200/80 dark:border-amber-900/60 bg-amber-50/20'
+                  : 'border-slate-200/80 dark:border-slate-800'
+              }`}
             >
               <div>
                 <div className="flex items-start justify-between gap-2 mb-2">
@@ -232,15 +262,22 @@ export const CustomersView: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  <span
-                    className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
-                      customer.customerType === 'commercial'
-                        ? 'bg-purple-100 text-purple-700'
-                        : 'bg-emerald-100 text-emerald-700'
-                    }`}
-                  >
-                    {customer.customerType}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {customer.isArchived && (
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <Archive className="w-2.5 h-2.5" /> Archived
+                      </span>
+                    )}
+                    <span
+                      className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                        customer.customerType === 'commercial'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-emerald-100 text-emerald-700'
+                      }`}
+                    >
+                      {customer.customerType}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400 my-3">
@@ -284,17 +321,25 @@ export const CustomersView: React.FC = () => {
               {/* Profile Header */}
               <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-4">
                 <div>
-                  <span className="text-[10px] font-bold uppercase bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full">
-                    {selectedCustomer.customerType} Client
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 px-2.5 py-1 rounded-full">
+                      {selectedCustomer.customerType} Client
+                    </span>
+                    {selectedCustomer.isArchived && (
+                      <span className="text-[10px] font-bold uppercase bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 px-2.5 py-1 rounded-full flex items-center gap-1">
+                        <Archive className="w-2.5 h-2.5" /> Archived Customer
+                      </span>
+                    )}
+                  </div>
                   <h2 className="text-xl font-black text-slate-900 dark:text-slate-100 mt-1">{selectedCustomer.name}</h2>
                   {selectedCustomer.companyName && (
-                    <p className="text-xs text-indigo-600 font-semibold">{selectedCustomer.companyName}</p>
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold">{selectedCustomer.companyName}</p>
                   )}
                 </div>
                 <button
+                  type="button"
                   onClick={() => setSelectedCustomer(null)}
-                  className="p-2 rounded-full hover:bg-slate-100 text-slate-400"
+                  className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -317,11 +362,12 @@ export const CustomersView: React.FC = () => {
                   return (
                     <button
                       key={tab.id}
+                      type="button"
                       onClick={() => setActiveProfileTab(tab.id as any)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                         isActive
                           ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 hover:bg-slate-200'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5" /> {tab.label}
@@ -371,12 +417,12 @@ export const CustomersView: React.FC = () => {
                     jobs
                       .filter((j) => j.customerId === selectedCustomer.id)
                       .map((job) => (
-                        <div key={job.id} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border text-xs flex items-center justify-between">
+                        <div key={job.id} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs flex items-center justify-between">
                           <div>
                             <div className="font-bold text-slate-900 dark:text-slate-100">{job.jobId} - {job.description}</div>
                             <div className="text-[10px] text-slate-500">Scheduled: {job.scheduledDate}</div>
                           </div>
-                          <span className="font-bold text-indigo-600 uppercase text-[10px] bg-indigo-50 px-2 py-0.5 rounded">{job.status}</span>
+                          <span className="font-bold text-indigo-600 dark:text-indigo-400 uppercase text-[10px] bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded">{job.status}</span>
                         </div>
                       ))
                   )}
@@ -385,29 +431,73 @@ export const CustomersView: React.FC = () => {
 
               {activeProfileTab === 'quotations' && (
                 <div className="space-y-2">
-                  {quotations.filter((q) => q.customerId === selectedCustomer.id).map((qt) => (
-                    <div key={qt.id} className="p-3 rounded-2xl bg-slate-50 border text-xs flex items-center justify-between">
-                      <div>
-                        <div className="font-bold">{qt.quotationNumber}</div>
-                        <div className="text-[10px] text-slate-500">{qt.date}</div>
+                  {quotations.filter((q) => q.customerId === selectedCustomer.id).length === 0 ? (
+                    <div className="text-center py-8 text-xs text-slate-400">No quotations recorded</div>
+                  ) : (
+                    quotations.filter((q) => q.customerId === selectedCustomer.id).map((qt) => (
+                      <div key={qt.id} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-slate-900 dark:text-slate-100">{qt.quotationNumber}</div>
+                          <div className="text-[10px] text-slate-500">{qt.date}</div>
+                        </div>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{currentBusiness.currency}{qt.grandTotal}</span>
                       </div>
-                      <span className="font-bold text-emerald-600">{currentBusiness.currency}{qt.grandTotal}</span>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               )}
 
               {activeProfileTab === 'invoices' && (
                 <div className="space-y-2">
-                  {invoices.filter((i) => i.customerId === selectedCustomer.id).map((inv) => (
-                    <div key={inv.id} className="p-3 rounded-2xl bg-slate-50 border text-xs flex items-center justify-between">
-                      <div>
-                        <div className="font-bold">{inv.invoiceNumber}</div>
-                        <div className="text-[10px] text-slate-500">Due: {inv.dueDate}</div>
+                  {invoices.filter((i) => i.customerId === selectedCustomer.id).length === 0 ? (
+                    <div className="text-center py-8 text-xs text-slate-400">No invoices recorded</div>
+                  ) : (
+                    invoices.filter((i) => i.customerId === selectedCustomer.id).map((inv) => (
+                      <div key={inv.id} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-slate-900 dark:text-slate-100">{inv.invoiceNumber}</div>
+                          <div className="text-[10px] text-slate-500">Due: {inv.dueDate}</div>
+                        </div>
+                        <span className="font-bold text-indigo-600 dark:text-indigo-400">{currentBusiness.currency}{inv.grandTotal} ({inv.status})</span>
                       </div>
-                      <span className="font-bold text-indigo-600">{currentBusiness.currency}{inv.grandTotal} ({inv.status})</span>
-                    </div>
-                  ))}
+                    ))
+                  )}
+                </div>
+              )}
+
+              {activeProfileTab === 'payments' && (
+                <div className="space-y-2">
+                  {payments.filter((p) => p.customerId === selectedCustomer.id).length === 0 ? (
+                    <div className="text-center py-8 text-xs text-slate-400">No payment receipts recorded</div>
+                  ) : (
+                    payments.filter((p) => p.customerId === selectedCustomer.id).map((p) => (
+                      <div key={p.id} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-slate-900 dark:text-slate-100">{p.referenceNumber || `Payment #${p.id.slice(-6)}`}</div>
+                          <div className="text-[10px] text-slate-500">{p.date} • {p.method.toUpperCase()}</div>
+                        </div>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{currentBusiness.currency}{p.amount}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {activeProfileTab === 'contracts' && (
+                <div className="space-y-2">
+                  {contracts.filter((c) => c.customerId === selectedCustomer.id).length === 0 ? (
+                    <div className="text-center py-8 text-xs text-slate-400">No active contracts or AMCs</div>
+                  ) : (
+                    contracts.filter((c) => c.customerId === selectedCustomer.id).map((c) => (
+                      <div key={c.id} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-slate-900 dark:text-slate-100">{c.contractNumber} - {c.name}</div>
+                          <div className="text-[10px] text-slate-500">{c.startDate} to {c.endDate}</div>
+                        </div>
+                        <span className="font-bold text-indigo-600 dark:text-indigo-400 uppercase text-[10px] bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded">{c.status}</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
 
@@ -453,25 +543,58 @@ export const CustomersView: React.FC = () => {
                   </div>
                 </div>
               )}
+
+              {/* Danger Zone */}
+              <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800">
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5" /> Danger Zone
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      {selectedCustomer.isArchived
+                        ? 'This customer is currently archived. Historical records are preserved.'
+                        : 'Safely delete or archive this customer and protect historical business data.'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {selectedCustomer.isArchived && (
+                      <button
+                        type="button"
+                        id="btn-restore-customer"
+                        onClick={async () => {
+                          await unarchiveCustomer(selectedCustomer.id);
+                          setSelectedCustomer((prev) => prev ? { ...prev, isArchived: false } : null);
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" /> Restore Customer
+                      </button>
+                    )}
+                    {isOwnerOrAdmin ? (
+                      <button
+                        type="button"
+                        id="btn-open-delete-customer"
+                        onClick={() => setIsDeleteModalOpen(true)}
+                        className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Delete Customer
+                      </button>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 italic">Deletion restricted to Business Owner</span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              {isOwnerOrAdmin ? (
-                <button
-                  onClick={() => {
-                    deleteCustomer(selectedCustomer.id);
-                    setSelectedCustomer(null);
-                  }}
-                  className="text-xs text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> Delete Customer
-                </button>
-              ) : (
-                <span className="text-[11px] text-slate-400 italic">Deletion restricted to Business Owner</span>
-              )}
+            {/* Drawer Footer */}
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end">
               <button
+                type="button"
+                id="btn-close-customer-drawer"
                 onClick={() => setSelectedCustomer(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold text-xs"
+                className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 font-bold text-xs shadow-sm transition-all cursor-pointer"
               >
                 Close Drawer
               </button>
@@ -640,6 +763,17 @@ export const CustomersView: React.FC = () => {
           'commercial',
         ]}
         onImport={handleBatchImportCustomers}
+      />
+
+      {/* Delete Customer Confirmation Modal */}
+      <DeleteCustomerModal
+        customer={selectedCustomer}
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onCustomerDeleted={() => {
+          setIsDeleteModalOpen(false);
+          setSelectedCustomer(null);
+        }}
       />
     </div>
   );
