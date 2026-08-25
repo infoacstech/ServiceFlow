@@ -6,6 +6,7 @@ import { CustomerSearchSelect } from '../components/CustomerSearchSelect';
 import {
   Briefcase,
   Users,
+  User,
   CheckCircle2,
   Clock,
   DollarSign,
@@ -968,79 +969,123 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
 
-      <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+      <div className="p-4 sm:p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
+        <div className="flex items-center justify-between mb-3.5">
           <div>
             <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-100">Today's Dispatch Schedule</h2>
             <p className="text-xs text-slate-500">Live technician assignments and appointment timeline</p>
           </div>
           <button
             onClick={() => setActiveTab('jobs')}
-            className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+            className="flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 cursor-pointer"
           >
             View All Jobs <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        <div className="space-y-3">
-          {(jobs || []).slice(0, 4).map((job) => {
-            const customer = (customers || []).find((c) => c.id === job.customerId);
-            const assignedTech = (staff || []).find((s) => s.id === job.assignedStaffId);
+        <div className="space-y-2.5">
+          {(jobs || []).length === 0 ? (
+            <div className="p-6 text-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
+              No dispatch jobs scheduled for today.
+            </div>
+          ) : (
+            (jobs || []).slice(0, 4).map((job) => {
+              const customer = (customers || []).find((c) => c.id === job.customerId);
+              const assignedTech = (staff || []).find((s) => s.id === job.assignedStaffId);
 
-            return (
-              <div
-                key={job.id}
-                onClick={() => setActiveTab('jobs')}
-                className="p-4 rounded-2xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/70 hover:border-indigo-300 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="p-2.5 rounded-xl bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-bold text-xs shrink-0 flex flex-col items-center justify-center w-16">
-                    <Calendar className="w-3.5 h-3.5 mb-0.5" />
-                    <span>{job.scheduledTime || '09:30 AM'}</span>
+              // Parse scheduled time and slot name cleanly
+              const rawTime = (job.scheduledTime || job.scheduledTimeSlot || '09:00 AM – 11:00 AM').trim();
+              const parenMatch = rawTime.match(/^(.*?)(?:\s*\((.*?)\))?$/);
+              const displayTime = parenMatch
+                ? parenMatch[1].trim().replace(/\s*-\s*/, ' – ')
+                : rawTime.replace(/\s*-\s*/, ' – ');
+              const displaySlot = parenMatch && parenMatch[2]
+                ? parenMatch[2].trim()
+                : (job.scheduledTimeSlot && job.scheduledTimeSlot !== displayTime && !displayTime.includes(job.scheduledTimeSlot)
+                  ? job.scheduledTimeSlot
+                  : undefined);
+
+              // Clean leading commas / whitespace from location
+              const cleanLocation = (job.location || 'On-site address, Local').replace(/^[\s,]+/, '').trim() || 'On-site address';
+
+              return (
+                <div
+                  key={job.id}
+                  id={`dispatch-job-${job.id}`}
+                  onClick={() => setActiveTab('jobs')}
+                  className="p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700 shadow-xs hover:shadow-sm transition-all cursor-pointer"
+                >
+                  {/* TOP SECTION: Horizontal Time Box + Job Details */}
+                  <div className="flex items-center gap-2.5 sm:gap-3">
+                    {/* LEFT: Compact Time Box */}
+                    <div className="w-[100px] sm:w-[115px] shrink-0 px-2 py-1.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/70 border border-indigo-100 dark:border-indigo-900/60 flex flex-col items-center justify-center text-center self-stretch">
+                      <div className="text-[10px] sm:text-[10.5px] font-bold text-indigo-900 dark:text-indigo-200 leading-tight text-center">
+                        {displayTime}
+                      </div>
+                      {displaySlot ? (
+                        <div className="text-[9px] sm:text-[9.5px] font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5 text-center leading-tight">
+                          {displaySlot}
+                        </div>
+                      ) : (
+                        <div className="text-[8.5px] font-medium text-indigo-500/80 dark:text-indigo-400/80 mt-0.5 text-center leading-tight">
+                          Scheduled
+                        </div>
+                      )}
+                    </div>
+
+                    {/* RIGHT: Job ID, Status, Customer, Location */}
+                    <div className="flex-1 min-w-0 flex flex-col justify-center">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-slate-100 tracking-tight truncate">
+                          {job.jobId}
+                        </span>
+                        <span
+                          className={`text-[9px] sm:text-[9.5px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 ${
+                            job.status === 'completed'
+                              ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                              : job.status === 'in_progress'
+                              ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 animate-pulse'
+                              : job.status === 'cancelled'
+                              ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
+                              : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
+                          }`}
+                        >
+                          {job.status.replace('_', ' ')}
+                        </span>
+                      </div>
+
+                      <div className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate mt-0.5">
+                        {customer?.name || 'Customer'}
+                        <span className="text-[10.5px] font-normal text-slate-500 dark:text-slate-400 ml-1">
+                          ({customer?.companyName || (customer?.customerType === 'commercial' ? 'Commercial' : 'Individual')})
+                        </span>
+                      </div>
+
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5 truncate">
+                        <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate">{cleanLocation}</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100">{job.jobId}</span>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                          job.status === 'completed'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : job.status === 'in_progress'
-                            ? 'bg-blue-100 text-blue-700 animate-pulse'
-                            : 'bg-amber-100 text-amber-700'
-                        }`}
-                      >
-                        {job.status.replace('_', ' ')}
+                  {/* BOTTOM SECTION: Single Compact Row (Technician + Amount) */}
+                  <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 min-w-0">
+                      <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="text-[11px] text-slate-400 font-medium shrink-0">Technician:</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                        {assignedTech ? assignedTech.name : 'Unassigned'}
                       </span>
                     </div>
 
-                    <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                      {customer?.name || 'Customer'} ({customer?.companyName || 'Individual'})
-                    </div>
-
-                    <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                      <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span className="truncate max-w-sm">{job.location}</span>
-                    </div>
+                    <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-0.5 sm:py-1 rounded-lg border border-indigo-200/50 dark:border-indigo-800/60 shrink-0">
+                      {curr}{job.estimatedAmount}
+                    </span>
                   </div>
                 </div>
-
-                <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-0 border-slate-200/60 dark:border-slate-700/60">
-                  <div className="text-left sm:text-right">
-                    <div className="text-[11px] text-slate-400 font-medium">Technician</div>
-                    <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                      {assignedTech ? assignedTech.name : 'Unassigned'}
-                    </div>
-                  </div>
-
-                  <span className="text-xs font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 px-3 py-1.5 rounded-xl border border-indigo-200/50">
-                    {curr}{job.estimatedAmount}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
 
