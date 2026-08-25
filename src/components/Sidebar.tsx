@@ -296,7 +296,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
           id: 'expenses',
           label: 'Expense Tracker',
           icon: DollarSign,
-          visible: permissions.canViewFinancials,
+          visible: true,
         },
       ],
     },

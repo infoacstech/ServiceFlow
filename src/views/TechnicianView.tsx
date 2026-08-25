@@ -18,7 +18,6 @@ import {
   UserCheck,
   Calendar,
   X,
-  Mic,
   MessageSquare,
   Share2,
   Send,
@@ -29,11 +28,6 @@ import {
   sendJobCompletionSummaryToCustomer,
   sendGoogleReviewRequest,
 } from '../utils/whatsappHelper';
-import {
-  VoiceAudioMonitor,
-  removeOverlappingBoundary,
-  formatCompleteSentence,
-} from '../utils/audioVoiceProcessor';
 
 export const TechnicianView: React.FC = () => {
   const {
@@ -123,69 +117,6 @@ export const TechnicianView: React.FC = () => {
   // Form State for Completing Job
   const [problemFound, setProblemFound] = useState('');
   const [solutionProvided, setSolutionProvided] = useState('');
-
-  // Dictation states for completion modal
-  const [activeDictationField, setActiveDictationField] = useState<'problem' | 'solution' | null>(null);
-
-  const startModalDictation = async (field: 'problem' | 'solution') => {
-    const SpeechRecognitionAPI =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognitionAPI) {
-      showToast('Speech recognition not supported in this browser. Please type.', 'info');
-      return;
-    }
-
-    try {
-      // Request audio stream with hardware noise suppression & echo cancellation
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        });
-        stream.getTracks().forEach((track) => track.stop());
-      }
-
-      const rec = new SpeechRecognitionAPI();
-      rec.continuous = false;
-      rec.interimResults = true;
-      rec.lang = 'en-IN';
-
-      setActiveDictationField(field);
-      showToast(`Listening with Noise Suppression for ${field === 'problem' ? 'problem diagnosis' : 'work solution'}... Speak now.`, 'info');
-
-      rec.onresult = (event: any) => {
-        let resultText = '';
-        for (let i = 0; i < event.results.length; ++i) {
-          resultText += event.results[i][0].transcript;
-        }
-        if (resultText) {
-          if (field === 'problem') {
-            setProblemFound((prev) => {
-              const combined = removeOverlappingBoundary(prev, resultText);
-              return formatCompleteSentence(combined, 'en-IN');
-            });
-          } else {
-            setSolutionProvided((prev) => {
-              const combined = removeOverlappingBoundary(prev, resultText);
-              return formatCompleteSentence(combined, 'en-IN');
-            });
-          }
-        }
-      };
-
-      rec.onerror = () => {
-        setActiveDictationField(null);
-      };
-
-      rec.onend = () => {
-        setActiveDictationField(null);
-      };
-
-      rec.start();
-    } catch (e) {
-      setActiveDictationField(null);
-    }
-  };
   const [rating, setRating] = useState(5);
   const [signature, setSignature] = useState('');
   const [selectedMaterials, setSelectedMaterials] = useState<{ inventoryId: string; quantity: number }[]>([]);
@@ -716,23 +647,9 @@ export const TechnicianView: React.FC = () => {
               {completionStep === 1 && (
                 <div className="space-y-3.5 text-xs">
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="font-bold text-slate-900 dark:text-slate-100 block">
-                        Problem Diagnosed on Site *
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => startModalDictation('problem')}
-                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1 border transition-all cursor-pointer ${
-                          activeDictationField === 'problem'
-                            ? 'bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950 dark:text-rose-300 animate-pulse'
-                            : 'bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-slate-200 dark:border-slate-700 hover:bg-indigo-50'
-                        }`}
-                      >
-                        <Mic className="w-3 h-3" />
-                        <span>{activeDictationField === 'problem' ? 'Listening...' : 'Dictate'}</span>
-                      </button>
-                    </div>
+                    <label className="font-bold text-slate-900 dark:text-slate-100 block mb-1">
+                      Problem Diagnosed on Site *
+                    </label>
                     <textarea
                       value={problemFound}
                       onChange={(e) => setProblemFound(e.target.value)}
@@ -743,23 +660,9 @@ export const TechnicianView: React.FC = () => {
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="font-bold text-slate-900 dark:text-slate-100 block">
-                        Solution & Work Carried Out *
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => startModalDictation('solution')}
-                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1 border transition-all cursor-pointer ${
-                          activeDictationField === 'solution'
-                            ? 'bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950 dark:text-rose-300 animate-pulse'
-                            : 'bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-slate-200 dark:border-slate-700 hover:bg-indigo-50'
-                        }`}
-                      >
-                        <Mic className="w-3 h-3" />
-                        <span>{activeDictationField === 'solution' ? 'Listening...' : 'Dictate'}</span>
-                      </button>
-                    </div>
+                    <label className="font-bold text-slate-900 dark:text-slate-100 block mb-1">
+                      Solution & Work Carried Out *
+                    </label>
                     <textarea
                       value={solutionProvided}
                       onChange={(e) => setSolutionProvided(e.target.value)}

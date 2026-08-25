@@ -170,9 +170,10 @@ const MainContent: React.FC = () => {
       case 'quotations':
       case 'invoices':
       case 'payments':
-      case 'expenses':
       case 'reports':
         return { allowed: permissions.canViewFinancials, label: 'Admin or Manager' };
+      case 'expenses':
+        return { allowed: true, label: '' };
       case 'contracts':
         return { allowed: permissions.canManageContracts, label: 'Admin or Manager' };
       case 'ai_assistant':

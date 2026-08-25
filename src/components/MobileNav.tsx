@@ -108,7 +108,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
     { id: 'invoices', label: 'Invoices', icon: Receipt, visible: permissions.canViewFinancials },
     { id: 'payments', label: 'Payment Ledger', icon: CreditCard, visible: permissions.canViewFinancials },
     { id: 'contracts', label: 'Recurring Contracts', icon: Repeat, visible: permissions.canManageContracts },
-    { id: 'expenses', label: 'Expenses', icon: DollarSign, visible: permissions.canViewFinancials },
+    { id: 'expenses', label: 'Expenses', icon: DollarSign, visible: true },
   ].filter((m) => m.visible);
 
   const managementModules = [

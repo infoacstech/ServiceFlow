@@ -936,20 +936,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (snapshot) => {
         const loadedJobs = snapshot.docs.map((d) => d.data() as Job);
 
-        if (!isInitialJobsLoadRef.current) {
-          snapshot.docChanges().forEach((change) => {
-            if (change.type === 'added') {
-              const newJ = change.doc.data() as Job;
-              const assignedStaffName = (users || []).find((u) => u.id === newJ.assignedStaffId)?.name;
-              playJobVoiceNotification(
-                newJ.jobId,
-                newJ.description || 'New Service Task',
-                newJ.location,
-                assignedStaffName
-              );
-            }
-          });
-        } else {
+        if (isInitialJobsLoadRef.current) {
           isInitialJobsLoadRef.current = false;
         }
 
@@ -1062,24 +1049,38 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 notif.title?.toLowerCase().includes('job issued');
 
               if (isJobAssignment) {
-                // Business Owner, Manager & Super Admin NEVER receive audio alerts or popups when assigning jobs
+                // Business Owner, Manager & Super Admin NEVER receive audio alerts or popups when assigning jobs unless they are the assigned technician
                 if (currentUser.role !== 'technician') {
                   isTargetedToMe = false;
                 } else {
                   // Only the specifically assigned technician receives the voice alert and popup
                   if (notif.targetUserId) {
-                    if (notif.targetUserId === currentUser.id || notif.targetUserId === currentUser.email) {
+                    const curId = (currentUser.id || '').trim().toLowerCase();
+                    const curEmail = (currentUser.email || '').trim().toLowerCase();
+                    const curPhone = (currentUser.phone || '').replace(/\D/g, '');
+                    const curName = (currentUser.name || '').trim().toLowerCase();
+                    const targetId = (notif.targetUserId || '').trim().toLowerCase();
+
+                    if (curId === targetId || curEmail === targetId) {
                       isTargetedToMe = true;
                     } else {
                       const matchedUser = (users || []).find((u) => u.id === notif.targetUserId);
                       if (matchedUser) {
-                        if (currentUser.email && matchedUser.email && currentUser.email.toLowerCase() === matchedUser.email.toLowerCase()) {
+                        const mEmail = (matchedUser.email || '').trim().toLowerCase();
+                        const mPhone = (matchedUser.phone || '').replace(/\D/g, '');
+                        const mName = (matchedUser.name || '').trim().toLowerCase();
+
+                        if (curEmail && mEmail && curEmail === mEmail) {
                           isTargetedToMe = true;
-                        } else if (currentUser.name && matchedUser.name && currentUser.name.toLowerCase() === matchedUser.name.toLowerCase()) {
+                        } else if (curPhone && mPhone && curPhone === mPhone) {
+                          isTargetedToMe = true;
+                        } else if (curName && mName && curName === mName) {
                           isTargetedToMe = true;
                         }
                       }
                     }
+                  } else if (notif.targetRoleId === 'technician') {
+                    isTargetedToMe = true;
                   }
                 }
               } else if (notif.actionType === 'accepted' || notif.actionType === 'started' || notif.actionType === 'completed') {
