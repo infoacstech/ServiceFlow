@@ -411,6 +411,8 @@ export interface Notification {
   type: 'job' | 'payment' | 'inventory' | 'contract' | 'system' | 'broadcast';
   read: boolean;
   createdAt: string;
+  senderUserId?: string;
+  senderRoleId?: UserRole;
   targetRoleId?: UserRole;
   targetUserId?: string;
   jobId?: string;

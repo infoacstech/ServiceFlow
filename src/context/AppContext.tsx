@@ -1040,23 +1040,39 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               if (!currentUser) return;
               if (notif.businessId !== currentBusiness?.id && currentUser.role !== 'super_admin') return;
 
+              // SELF-NOTIFICATION SUPPRESSION:
+              // The user who performed this action should NEVER receive a banner popup or voice alert for their own action
+              const curId = (currentUser.id || '').trim().toLowerCase();
+              const curEmail = (currentUser.email || '').trim().toLowerCase();
+              const senderId = (notif.senderUserId || '').trim().toLowerCase();
+
+              if (senderId && (senderId === curId || senderId === curEmail)) {
+                return;
+              }
+
               // Check if notification is targeted to the current active user
               let isTargetedToMe = false;
 
               const isJobAssignment =
                 notif.actionType === 'assigned' ||
                 notif.title?.toLowerCase().includes('assigned') ||
-                notif.title?.toLowerCase().includes('job issued');
+                notif.title?.toLowerCase().includes('job issued') ||
+                notif.title?.toLowerCase().includes('job reassigned');
+
+              const isJobStatusUpdate =
+                notif.actionType === 'accepted' ||
+                notif.actionType === 'started' ||
+                notif.actionType === 'completed' ||
+                notif.title?.toLowerCase().includes('job accepted') ||
+                notif.title?.toLowerCase().includes('job on the way') ||
+                notif.title?.toLowerCase().includes('job started') ||
+                notif.title?.toLowerCase().includes('job work started') ||
+                notif.title?.toLowerCase().includes('job completed');
 
               if (isJobAssignment) {
-                // Business Owner, Manager & Super Admin NEVER receive audio alerts or popups when assigning jobs unless they are the assigned technician
-                if (currentUser.role !== 'technician') {
-                  isTargetedToMe = false;
-                } else {
-                  // Only the specifically assigned technician receives the voice alert and popup
+                // Only the assigned technician receives the voice alert and popup
+                if (currentUser.role === 'technician') {
                   if (notif.targetUserId) {
-                    const curId = (currentUser.id || '').trim().toLowerCase();
-                    const curEmail = (currentUser.email || '').trim().toLowerCase();
                     const curPhone = (currentUser.phone || '').replace(/\D/g, '');
                     const curName = (currentUser.name || '').trim().toLowerCase();
                     const targetId = (notif.targetUserId || '').trim().toLowerCase();
@@ -1083,8 +1099,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     isTargetedToMe = true;
                   }
                 }
-              } else if (notif.actionType === 'accepted' || notif.actionType === 'started' || notif.actionType === 'completed') {
-                // Owner & Manager receive updates when technician accepts, starts, or finishes jobs
+              } else if (isJobStatusUpdate) {
+                // Owner & Manager (and Super Admin) receive updates when field technician accepts, starts, or finishes jobs
+                // Technicians / Staff NEVER receive this notification popup or sound
                 if (currentUser.role === 'business_owner' || currentUser.role === 'manager' || currentUser.role === 'super_admin') {
                   isTargetedToMe = true;
                 }
@@ -1126,7 +1143,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   playJobStatusVoiceNotification(
                     notif.actionType,
                     notif.jobId || '',
-                    currentUser?.name,
+                    notif.authorName || 'Staff Technician',
                     notif.jobTitle
                   );
                 }
@@ -2389,6 +2406,19 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
         if (currentUser.role === 'technician') {
+          // Technicians do not need to see status updates in their alert list (e.g. accepted, started, completed)
+          const isStatusUpdate =
+            n.actionType === 'accepted' ||
+            n.actionType === 'started' ||
+            n.actionType === 'completed' ||
+            n.title?.toLowerCase().includes('job accepted') ||
+            n.title?.toLowerCase().includes('job on the way') ||
+            n.title?.toLowerCase().includes('job started') ||
+            n.title?.toLowerCase().includes('job work started') ||
+            n.title?.toLowerCase().includes('job completed');
+          if (isStatusUpdate) return false;
+          if (n.senderUserId === currentUser.id) return false;
+
           if (n.targetUserId) {
             if (n.targetUserId === currentUser.id || n.targetUserId === currentUser.email) return true;
             const matchedStaff = (users || []).find((u) => u.id === n.targetUserId);
@@ -3062,6 +3092,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       type: 'job',
       read: false,
       createdAt: new Date().toISOString(),
+      senderUserId: currentUser?.id,
+      senderRoleId: currentUser?.role,
       targetRoleId: 'technician',
       targetUserId: data.assignedStaffId,
       jobId: jobId,
@@ -3127,6 +3159,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           type: 'job',
           read: false,
           createdAt: new Date().toISOString(),
+          senderUserId: currentUser?.id,
+          senderRoleId: currentUser?.role,
           targetRoleId: 'technician',
           targetUserId: updates.assignedStaffId,
           jobId: existingJ.jobId,
@@ -3148,6 +3182,37 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const getJobStatusSuccessMsg = (st: JobStatus): string => {
+    switch (st) {
+      case 'accepted':
+        return 'Job accepted successfully';
+      case 'on_the_way':
+        return 'Status updated: On the way to customer site';
+      case 'started':
+        return 'Job started successfully';
+      case 'in_progress':
+        return 'Job marked as in progress';
+      case 'completed':
+        return 'Job completed successfully';
+      case 'closed':
+        return 'Job marked as closed';
+      case 'cancelled':
+        return 'Job marked as cancelled';
+      case 'new':
+        return 'Job marked as new';
+      case 'scheduled':
+        return 'Job scheduled successfully';
+      case 'on_hold':
+        return 'Job put on hold';
+      case 'verified':
+        return 'Job verified successfully';
+      case 'assigned':
+        return 'Job assigned successfully';
+      default:
+        return `Job status updated to ${(st as string).replace('_', ' ').toUpperCase()}`;
+    }
+  };
+
   const updateJobStatus = (id: string, status: JobStatus) => {
     if (checkReadOnlySupportGuard()) return;
     const target = jobs.find((j) => j.id === id);
@@ -3157,15 +3222,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const techUser = (users || []).find((u) => u.id === target?.assignedStaffId) || currentUser;
-    const techName = techUser?.name || 'Staff Technician';
+    const techName = techUser?.name || currentUser?.name || 'Staff Technician';
 
     if (isActuallyOffline) {
       addToSyncQueue('update_job_status', id, { status }, `Job status changed to ${status.replace('_', ' ')}`);
-      showToast(`Offline Mode: Status updated to ${status.replace('_', ' ')} (queued)`, 'info');
+      showToast(`Offline: ${getJobStatusSuccessMsg(status)} (queued for sync)`, 'info');
     } else {
       firestoreService.updateJob(id, { status });
 
-      // If status changed to accepted, on_the_way, or started, notify Business Owner
+      // If status changed to accepted, on_the_way, or started, notify Business Owner & Managers
       if (status === 'accepted' || status === 'on_the_way' || status === 'started') {
         const customer = (customers || []).find((c) => c.id === target?.customerId);
         const statusLabel =
@@ -3183,6 +3248,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           type: 'job',
           read: false,
           createdAt: new Date().toISOString(),
+          senderUserId: currentUser?.id,
+          senderRoleId: currentUser?.role,
+          authorName: techName,
           targetRoleId: 'business_owner',
           jobId: target?.jobId || id,
           jobTitle: target?.description,
@@ -3195,16 +3263,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           actionType: status === 'accepted' ? 'accepted' : status === 'started' ? 'started' : 'general',
         };
         saveToFirestore('notifications', statusNotif.id, statusNotif);
-
-        // If current user is Business Owner, speak alert
-        if (currentUser?.role === 'business_owner' || isSuperAdminUser) {
-          playJobStatusVoiceNotification(status, target?.jobId || id, techName, target?.description);
-          setActiveJobPopup(statusNotif);
-        }
+        seenNotifIdsRef.current.add(statusNotif.id);
       }
 
       logActivity('Job Status Updated', 'job', id, `Changed job status to ${status.replace('_', ' ').toUpperCase()}`);
-      showToast(`Job status updated to ${status.replace('_', ' ')}`, 'info');
+      showToast(getJobStatusSuccessMsg(status), 'success');
     }
   };
 
@@ -3258,6 +3321,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         type: 'job',
         read: false,
         createdAt: new Date().toISOString(),
+        senderUserId: currentUser?.id,
+        senderRoleId: currentUser?.role,
+        authorName: techName,
         targetRoleId: 'business_owner',
         jobId: existingJob?.jobId || id,
         jobTitle: existingJob?.description,
@@ -3270,9 +3336,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         actionType: 'started',
       };
       saveToFirestore('notifications', startNotif.id, startNotif);
+      seenNotifIdsRef.current.add(startNotif.id);
 
       logActivity('Job Work Started', 'job', id, 'Technician initiated work on site');
-      showToast('Job work started & synced!', 'success');
+      showToast('Job started successfully', 'success');
     }
   };
 
@@ -3320,7 +3387,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const techName = assignedTech?.name || currentUser?.name || 'Staff Member';
     const customer = (customers || []).find((c) => c.id === existingJob?.customerId);
 
-    // Create Notification doc in Firestore for Business Owner
+    // Create Notification doc in Firestore for Business Owner & Managers
     const completeNotif: Notification = {
       id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
       businessId: currentBusiness.id,
@@ -3329,6 +3396,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       type: 'job',
       read: false,
       createdAt: new Date().toISOString(),
+      senderUserId: currentUser?.id,
+      senderRoleId: currentUser?.role,
+      authorName: techName,
       targetRoleId: 'business_owner',
       jobId: existingJob?.jobId || id,
       jobTitle: existingJob?.description,
@@ -3341,6 +3411,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       actionType: 'completed',
     };
     saveToFirestore('notifications', completeNotif.id, completeNotif);
+    seenNotifIdsRef.current.add(completeNotif.id);
 
     if (isActuallyOffline) {
       addToSyncQueue('complete_job', id, data, 'Technician completed job & recorded customer report/signature');
@@ -3348,18 +3419,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
       firestoreService.saveDocument<Job>('jobs', id, completionData);
       logActivity('Job Completed', 'job', id, `Technician ${techName} completed job work & obtained customer signature`);
-      showToast('Job marked as completed & synced to Firestore!', 'success');
-    }
-
-    // Trigger multi-language voice alert and popup for Business Owner
-    if (currentUser?.role === 'business_owner' || isSuperAdminUser) {
-      playJobCompletedVoiceNotification(
-        existingJob?.jobId || id,
-        techName,
-        existingJob?.description,
-        data.customerRating || 5
-      );
-      setActiveJobPopup(completeNotif);
+      showToast('Job completed successfully', 'success');
     }
   };
 

@@ -135,7 +135,6 @@ export const TechnicianView: React.FC = () => {
 
   const handleStatusChange = (jobId: string, newStatus: JobStatus) => {
     updateJobStatus(jobId, newStatus);
-    showToast(`Job status changed to ${newStatus.replace('_', ' ').toUpperCase()}`, 'info');
   };
 
   const handleOpenCompletionWorkflow = (job: Job) => {
