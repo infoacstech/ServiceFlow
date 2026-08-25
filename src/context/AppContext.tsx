@@ -269,6 +269,7 @@ interface AppContextType {
     data: {
       problemFound: string;
       solutionProvided: string;
+      beforePhotos?: string[];
       afterPhotos: string[];
       customerSignature?: string;
       customerRating?: number;
@@ -3348,6 +3349,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     data: {
       problemFound: string;
       solutionProvided: string;
+      beforePhotos?: string[];
       afterPhotos: string[];
       customerSignature?: string;
       customerRating?: number;
@@ -3376,6 +3378,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       completionTime: new Date().toISOString(),
       problemFound: data.problemFound,
       solutionProvided: data.solutionProvided,
+      beforePhotos: data.beforePhotos || existingJob?.beforePhotos || [],
       afterPhotos: data.afterPhotos,
       customerSignature: data.customerSignature || '',
       customerRating: data.customerRating || 5,

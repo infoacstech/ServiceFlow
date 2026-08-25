@@ -3,6 +3,8 @@ import { useApp } from '../context/AppContext';
 import { Job, JobStatus, JobPriority } from '../types';
 import { DigitalSignatureCanvas } from '../components/DigitalSignatureCanvas';
 import { VoiceNotesRecorder } from '../components/VoiceNotesRecorder';
+import { JobServiceProgressBar } from '../components/JobServiceProgressBar';
+import { PhotoEvidenceUploader } from '../components/PhotoEvidenceUploader';
 import {
   Briefcase,
   Navigation,
@@ -139,8 +141,16 @@ export const TechnicianView: React.FC = () => {
 
   const handleOpenCompletionWorkflow = (job: Job) => {
     setSelectedJobId(job.id);
-    setProblemFound(job.notes || '');
-    setSolutionProvided('');
+    setProblemFound(job.problemFound || job.notes || '');
+    setSolutionProvided(job.solutionProvided || '');
+    setBeforePhoto(
+      job.beforePhotos?.[0] ||
+        'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=500&auto=format&fit=crop&q=80'
+    );
+    setAfterPhoto(
+      job.afterPhotos?.[0] ||
+        'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=500&auto=format&fit=crop&q=80'
+    );
     setCompletionStep(1);
     setIsCompletionModalOpen(true);
   };
@@ -161,7 +171,8 @@ export const TechnicianView: React.FC = () => {
           unitPrice: invItem?.sellingPrice || 0,
         };
       }),
-      afterPhotos: [afterPhoto],
+      beforePhotos: beforePhoto ? [beforePhoto] : (activeSelectedJob.beforePhotos || []),
+      afterPhotos: afterPhoto ? [afterPhoto] : [],
     });
     setIsCompletionModalOpen(false);
   };
@@ -391,6 +402,9 @@ export const TechnicianView: React.FC = () => {
 
                 {/* Card Body */}
                 <div className="p-4 sm:p-5 space-y-4">
+                  {/* Service Progress Tracker */}
+                  <JobServiceProgressBar status={job.status} isInteractive={false} />
+
                   {/* Customer and Contact Details */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
@@ -756,36 +770,31 @@ export const TechnicianView: React.FC = () => {
 
               {/* Step 3: Photos */}
               {completionStep === 3 && (
-                <div className="space-y-3.5 text-xs">
-                  <div>
-                    <label className="font-bold block mb-1 text-slate-900 dark:text-slate-100">
-                      Before Work Photo URL / Evidence
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <img src={beforePhoto} alt="Before" className="w-14 h-14 rounded-xl object-cover border" />
-                      <input
-                        type="text"
-                        value={beforePhoto}
-                        onChange={(e) => setBeforePhoto(e.target.value)}
-                        className="flex-1 p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[11px]"
-                      />
-                    </div>
+                <div className="space-y-4 text-xs">
+                  <div className="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/60 text-indigo-900 dark:text-indigo-200">
+                    <p className="font-bold text-xs">Photo Evidence & Job Audit Trail</p>
+                    <p className="text-[11px] text-indigo-700 dark:text-indigo-300 mt-0.5">
+                      Capture high-resolution photos using your device camera or upload from gallery to document on-site equipment conditions.
+                    </p>
                   </div>
 
-                  <div>
-                    <label className="font-bold block mb-1 text-slate-900 dark:text-slate-100">
-                      After Work Photo URL / Evidence
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <img src={afterPhoto} alt="After" className="w-14 h-14 rounded-xl object-cover border" />
-                      <input
-                        type="text"
-                        value={afterPhoto}
-                        onChange={(e) => setAfterPhoto(e.target.value)}
-                        className="flex-1 p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[11px]"
-                      />
-                    </div>
-                  </div>
+                  <PhotoEvidenceUploader
+                    id="before-photo-uploader"
+                    label="Before Work Photo"
+                    badge="Initial Condition"
+                    subLabel="Initial site/fault photo"
+                    value={beforePhoto}
+                    onChange={(val) => setBeforePhoto(val)}
+                  />
+
+                  <PhotoEvidenceUploader
+                    id="after-photo-uploader"
+                    label="After Work Photo"
+                    badge="Finished Service"
+                    subLabel="Completed installation/repair photo"
+                    value={afterPhoto}
+                    onChange={(val) => setAfterPhoto(val)}
+                  />
 
                   <div className="flex gap-2 pt-2">
                     <button

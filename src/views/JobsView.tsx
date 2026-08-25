@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Job, JobPriority, JobStatus } from '../types';
 import { DateRangePicker, DateRange, getPresetDates } from '../components/DateRangePicker';
 import { VoiceNotesRecorder } from '../components/VoiceNotesRecorder';
+import { JobServiceProgressBar } from '../components/JobServiceProgressBar';
 import {
   Briefcase,
   Plus,
@@ -556,54 +557,14 @@ export const JobsView: React.FC<JobsViewProps> = ({
             </div>
 
             <div className="space-y-3 text-xs">
-              {/* Visual Progress Stepper Component */}
-              <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700 space-y-2">
-                <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  <span>Job Lifecycle Stage</span>
-                  <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">
-                    {selectedJob.status.replace('_', ' ').toUpperCase()}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-4 gap-1.5 pt-1">
-                  {[
-                    { key: 'new', label: 'New', icon: Briefcase },
-                    { key: 'assigned', label: 'Assigned', icon: UserCheck },
-                    { key: 'in_progress', label: 'In Progress', icon: Clock },
-                    { key: 'completed', label: 'Completed', icon: CheckCircle2 },
-                  ].map((step) => {
-                    const stepOrder = ['new', 'assigned', 'on_the_way', 'started', 'in_progress', 'completed', 'verified', 'closed'];
-                    const currentIdx = stepOrder.indexOf(selectedJob.status);
-                    const targetIdx = stepOrder.indexOf(step.key);
-                    const isPastOrCurrent = currentIdx >= targetIdx;
-                    const isCurrent = selectedJob.status === step.key;
-
-                    const IconComp = step.icon;
-
-                    return (
-                      <button
-                        key={step.key}
-                        type="button"
-                        onClick={() => {
-                          updateJobStatus(selectedJob.id, step.key as JobStatus);
-                          setSelectedJob({ ...selectedJob, status: step.key as JobStatus });
-                        }}
-                        className={`p-2 rounded-xl text-center flex flex-col items-center justify-center transition-all cursor-pointer border ${
-                          isCurrent
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm font-black scale-102'
-                            : isPastOrCurrent
-                            ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 font-bold'
-                            : 'bg-white dark:bg-slate-900 text-slate-400 border-slate-200 dark:border-slate-800 font-medium hover:border-slate-300'
-                        }`}
-                        title={`Click to set status to ${step.label}`}
-                      >
-                        <IconComp className={`w-3.5 h-3.5 mb-1 ${isCurrent ? 'animate-bounce' : ''}`} />
-                        <span className="text-[10px] leading-tight truncate">{step.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* Visual Horizontal Progress Stepper Component */}
+              <JobServiceProgressBar
+                status={selectedJob.status}
+                onStatusChange={(newStatus) => {
+                  updateJobStatus(selectedJob.id, newStatus);
+                  setSelectedJob({ ...selectedJob, status: newStatus });
+                }}
+              />
 
               <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl space-y-1">
                 <div className="font-bold text-slate-900 dark:text-slate-100">Service Description</div>
@@ -770,12 +731,107 @@ export const JobsView: React.FC<JobsViewProps> = ({
                 />
               </div>
 
+              {/* Service Completion Summary */}
               {selectedJob.problemFound && (
-                <div className="p-3 bg-emerald-50 text-emerald-900 rounded-2xl border border-emerald-200">
-                  <div className="font-bold mb-1">Service Completion Summary</div>
-                  <div><strong>Problem:</strong> {selectedJob.problemFound}</div>
-                  <div><strong>Solution:</strong> {selectedJob.solutionProvided}</div>
-                  {selectedJob.customerRating && <div><strong>Rating:</strong> ⭐ {selectedJob.customerRating}/5</div>}
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 rounded-2xl border border-emerald-200 dark:border-emerald-900 space-y-1">
+                  <div className="font-bold mb-1 flex items-center justify-between">
+                    <span>Service Completion Summary</span>
+                    {selectedJob.customerRating && (
+                      <span className="text-amber-600 dark:text-amber-400 font-black">
+                        ⭐ {selectedJob.customerRating}/5 Rating
+                      </span>
+                    )}
+                  </div>
+                  <div><strong>Problem Diagnosed:</strong> {selectedJob.problemFound}</div>
+                  <div><strong>Solution Provided:</strong> {selectedJob.solutionProvided}</div>
+                </div>
+              )}
+
+              {/* Photo Evidence & Digital Audit Gallery */}
+              {((selectedJob.beforePhotos && selectedJob.beforePhotos.length > 0) ||
+                (selectedJob.afterPhotos && selectedJob.afterPhotos.length > 0) ||
+                selectedJob.customerSignature) && (
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2.5">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                    <span>Field Photo Evidence & Signature</span>
+                    <span className="text-[10px] text-slate-400 font-normal">On-Site Verification</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Before Photo */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Before Work Photo
+                      </span>
+                      {selectedJob.beforePhotos && selectedJob.beforePhotos.length > 0 ? (
+                        <a
+                          href={selectedJob.beforePhotos[0]}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 aspect-video group relative bg-black/5"
+                        >
+                          <img
+                            src={selectedJob.beforePhotos[0]}
+                            alt="Before Work"
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition-opacity">
+                            View Full Photo
+                          </div>
+                        </a>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 aspect-video flex items-center justify-center text-slate-400 text-[10px]">
+                          No initial photo
+                        </div>
+                      )}
+                    </div>
+
+                    {/* After Photo */}
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        After Work Photo
+                      </span>
+                      {selectedJob.afterPhotos && selectedJob.afterPhotos.length > 0 ? (
+                        <a
+                          href={selectedJob.afterPhotos[0]}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 aspect-video group relative bg-black/5"
+                        >
+                          <img
+                            src={selectedJob.afterPhotos[0]}
+                            alt="After Work"
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition-opacity">
+                            View Full Photo
+                          </div>
+                        </a>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 aspect-video flex items-center justify-center text-slate-400 text-[10px]">
+                          No completion photo
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Customer Signature */}
+                  {selectedJob.customerSignature && (
+                    <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 space-y-1">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Customer Signoff Signature
+                      </span>
+                      <div className="p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center max-h-24 overflow-hidden">
+                        <img
+                          src={selectedJob.customerSignature}
+                          alt="Customer Signature"
+                          className="max-h-16 object-contain dark:invert"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
