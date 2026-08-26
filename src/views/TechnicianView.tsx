@@ -403,7 +403,7 @@ export const TechnicianView: React.FC = () => {
                 {/* Card Body */}
                 <div className="p-4 sm:p-5 space-y-4">
                   {/* Service Progress Tracker */}
-                  <JobServiceProgressBar status={job.status} isInteractive={false} />
+                  <JobServiceProgressBar job={job} status={job.status} isInteractive={false} />
 
                   {/* Customer and Contact Details */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

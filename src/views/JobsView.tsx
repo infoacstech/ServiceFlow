@@ -560,10 +560,11 @@ export const JobsView: React.FC<JobsViewProps> = ({
             <div className="space-y-3 text-xs">
               {/* Visual Horizontal Progress Stepper Component */}
               <JobServiceProgressBar
+                job={selectedJob}
                 status={selectedJob.status}
-                onStatusChange={(newStatus) => {
-                  updateJobStatus(selectedJob.id, newStatus);
-                  setSelectedJob({ ...selectedJob, status: newStatus });
+                onStatusChange={(newStatus, reason) => {
+                  updateJobStatus(selectedJob.id, newStatus, reason);
+                  setSelectedJob((prev) => (prev ? { ...prev, status: newStatus } : null));
                 }}
               />
 

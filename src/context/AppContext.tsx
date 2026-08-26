@@ -26,6 +26,7 @@ import type {
   ActivityLog,
   Plan,
   JobMaterialUsed,
+  JobActivityItem,
   OfflineSyncItem,
   ManualSyncLog,
   SupportSession,
@@ -67,6 +68,7 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth';
 import { FirestoreService, firestoreService } from '../services/FirestoreService';
+import { validateJobStatusTransition, getJobStatusLabel } from '../utils/jobWorkflow';
 import {
   playJobVoiceNotification,
   playJobCompletedVoiceNotification,
@@ -264,7 +266,7 @@ interface AppContextType {
 
   addJob: (j: Omit<Job, 'id' | 'businessId' | 'jobId' | 'createdAt'>, options?: { silentToast?: boolean }) => Job;
   updateJob: (id: string, updates: Partial<Job>) => void;
-  updateJobStatus: (id: string, status: JobStatus) => void;
+  updateJobStatus: (id: string, status: JobStatus, reason?: string) => void;
   deleteJob: (id: string) => void;
   startJob: (id: string, beforePhotos: string[], notes?: string) => void;
   completeJob: (
@@ -3351,22 +3353,57 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const updateJobStatus = (id: string, status: JobStatus) => {
+  const updateJobStatus = (id: string, status: JobStatus, reason?: string) => {
     if (checkReadOnlySupportGuard()) return;
     const target = jobs.find((j) => j.id === id);
-    if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+    if (!target) {
+      showToast('Job record not found.', 'error');
+      return;
+    }
+    if (target.businessId !== currentBusiness.id && !isSuperAdminUser) {
       showToast('Unauthorized: Cannot update job belonging to another tenant business.', 'error');
+      return;
+    }
+
+    // Central Transition Rule Validation
+    const validation = validateJobStatusTransition(target.status, status, currentUser?.role);
+    if (!validation.allowed) {
+      showToast(validation.reason || 'Unauthorized status transition.', 'error');
       return;
     }
 
     const techUser = (users || []).find((u) => u.id === target?.assignedStaffId) || currentUser;
     const techName = techUser?.name || currentUser?.name || 'Staff Technician';
+    const actorName = currentUser?.name || 'Staff User';
+    const actorRole = currentUser?.role || 'staff';
+
+    // Construct immutable audit activity entry
+    const newActivityItem: JobActivityItem = {
+      id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      action: `Status Changed: ${target.status} → ${status}`,
+      actorName,
+      actorRole,
+      fromStatus: target.status,
+      toStatus: status,
+      reason: reason || undefined,
+      details: `Status changed from ${target.status.toUpperCase()} to ${status.toUpperCase()}${
+        reason ? ` (Reason: ${reason})` : ''
+      }`,
+    };
+
+    const updatedHistory = [...(target.activityHistory || []), newActivityItem];
 
     if (isActuallyOffline) {
-      addToSyncQueue('update_job_status', id, { status }, `Job status changed to ${status.replace('_', ' ')}`);
+      addToSyncQueue(
+        'update_job_status',
+        id,
+        { status, activityHistory: updatedHistory },
+        `Job status changed to ${status.replace('_', ' ')}`
+      );
       showToast(`Offline: ${getJobStatusSuccessMsg(status)} (queued for sync)`, 'info');
     } else {
-      firestoreService.updateJob(id, { status });
+      firestoreService.updateJob(id, { status, activityHistory: updatedHistory });
 
       // If status changed to accepted, on_the_way, or started, notify Business Owner & Managers
       if (status === 'accepted' || status === 'on_the_way' || status === 'started') {
@@ -3404,7 +3441,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         seenNotifIdsRef.current.add(statusNotif.id);
       }
 
-      logActivity('Job Status Updated', 'job', id, `Changed job status to ${status.replace('_', ' ').toUpperCase()}`);
+      logActivity(
+        'Job Status Updated',
+        'job',
+        id,
+        `Changed job status to ${status.replace('_', ' ').toUpperCase()}${reason ? ` | Reason: ${reason}` : ''}`
+      );
       showToast(getJobStatusSuccessMsg(status), 'success');
     }
   };

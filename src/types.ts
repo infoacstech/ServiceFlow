@@ -230,8 +230,12 @@ export interface JobActivityItem {
   timestamp: string;
   action: string;
   actorName: string;
+  actorRole?: string;
   details: string;
   status?: JobStatus;
+  fromStatus?: JobStatus;
+  toStatus?: JobStatus;
+  reason?: string;
 }
 
 export interface JobMaterialUsed {
