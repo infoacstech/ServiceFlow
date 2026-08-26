@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 interface DeleteCustomerModalProps {
-  customer: Customer;
+  customer: Customer | null;
   isOpen: boolean;
   onClose: () => void;
   onCustomerDeleted: () => void;
@@ -51,6 +51,20 @@ export const DeleteCustomerModal: React.FC<DeleteCustomerModalProps> = ({
 
   // Compute all related records independently
   const relatedRecords = useMemo(() => {
+    if (!customer) {
+      return {
+        hasRecords: false,
+        totalCount: 0,
+        customerJobs: [],
+        customerInvoices: [],
+        customerPayments: [],
+        customerContracts: [],
+        customerQuotations: [],
+        customerEnquiries: [],
+        breakdownItems: [],
+      };
+    }
+
     const customerJobs = (jobs || []).filter((j: Job) => j.customerId === customer.id);
     const activeJobs = customerJobs.filter((j: Job) => j.status !== 'completed' && j.status !== 'cancelled' && j.status !== 'closed');
     const completedJobs = customerJobs.filter((j: Job) => j.status === 'completed' || j.status === 'closed' || j.status === 'verified');
@@ -124,9 +138,9 @@ export const DeleteCustomerModal: React.FC<DeleteCustomerModalProps> = ({
       customerEnquiries,
       breakdownItems,
     };
-  }, [customer.id, jobs, invoices, payments, contracts, quotations, enquiries]);
+  }, [customer, jobs, invoices, payments, contracts, quotations, enquiries]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !customer) return null;
 
   const isDeleteKeywordMatched = confirmationInput.trim().toUpperCase() === 'DELETE';
 
@@ -139,7 +153,7 @@ export const DeleteCustomerModal: React.FC<DeleteCustomerModalProps> = ({
 
   // Safe Archive Action for customers with history
   const handleArchive = async () => {
-    if (isArchiving || isSubmitting) return;
+    if (!customer || isArchiving || isSubmitting) return;
     setIsArchiving(true);
     try {
       const res = await archiveCustomer(customer.id);
@@ -156,7 +170,7 @@ export const DeleteCustomerModal: React.FC<DeleteCustomerModalProps> = ({
 
   // Permanent Delete Action for clean customers
   const handlePermanentDelete = async () => {
-    if (!isDeleteKeywordMatched || isSubmitting || isArchiving) return;
+    if (!customer || !isDeleteKeywordMatched || isSubmitting || isArchiving) return;
     setIsSubmitting(true);
     try {
       const res = await deleteCustomer(customer.id);

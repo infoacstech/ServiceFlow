@@ -299,14 +299,33 @@ export const CustomersView: React.FC = () => {
               </div>
 
               <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 font-medium">
-                <div>
-                  <span>Jobs: </span>
-                  <span className="font-bold text-slate-900 dark:text-slate-100">{customerJobs.length}</span>
+                <div className="flex items-center gap-3">
+                  <div>
+                    <span>Jobs: </span>
+                    <span className="font-bold text-slate-900 dark:text-slate-100">{customerJobs.length}</span>
+                  </div>
+                  <div>
+                    <span>Spent: </span>
+                    <span className="font-bold text-emerald-600">{currentBusiness.currency}{totalSpent}</span>
+                  </div>
                 </div>
-                <div>
-                  <span>Spent: </span>
-                  <span className="font-bold text-emerald-600">{currentBusiness.currency}{totalSpent}</span>
-                </div>
+
+                {isOwnerOrAdmin && (
+                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      title="Delete or Archive Customer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCustomer(customer);
+                        setIsDeleteModalOpen(true);
+                      }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           );
