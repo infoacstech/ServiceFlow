@@ -34,7 +34,22 @@ import type {
   SecurityAuditLog,
   ReferralRecord,
   ReferralPayoutRequest,
+  AttendanceRecord,
+  AttendanceLocation,
+  AttendanceWorkingRules,
+  AttendanceAuditItem,
+  AttendanceStatus,
+  AttendanceLocationType,
+  AttendanceVerificationStatus,
 } from '../types';
+import {
+  getCurrentGpsPosition,
+  verifyLocationAgainstRules,
+  evaluatePunctuality,
+  formatWorkingDuration,
+  formatDistance,
+  DEFAULT_ATTENDANCE_RULES,
+} from '../utils/geolocation';
 import {
   DEMO_BUSINESSES,
   DEMO_USERS,
@@ -366,6 +381,50 @@ interface AppContextType {
   // Tenant and User Deletion
   deleteBusinessTenant: (businessId: string) => Promise<void>;
   deleteUserAccount: (userId: string) => Promise<void>;
+
+  // Attendance & GPS Verification Module
+  attendanceRecords: AttendanceRecord[];
+  attendanceLocations: AttendanceLocation[];
+  attendanceWorkingRules: AttendanceWorkingRules;
+  attendanceAuditLogs: AttendanceAuditItem[];
+  checkInAttendance: (params: {
+    staffId?: string;
+    targetType: AttendanceLocationType;
+    targetLocationIdOrJobId?: string;
+    notes?: string;
+    bypassGps?: boolean;
+    overrideCoords?: { lat: number; lng: number };
+  }) => Promise<{ success: boolean; message: string; record?: AttendanceRecord; errorType?: string }>;
+  checkOutAttendance: (params: {
+    staffId?: string;
+    recordId?: string;
+    targetType?: AttendanceLocationType;
+    targetLocationIdOrJobId?: string;
+    notes?: string;
+    bypassGps?: boolean;
+    overrideCoords?: { lat: number; lng: number };
+  }) => Promise<{ success: boolean; message: string; record?: AttendanceRecord; errorType?: string }>;
+  manualCorrectAttendance: (
+    recordId: string,
+    corrections: {
+      status?: AttendanceStatus;
+      checkInTime?: string;
+      checkOutTime?: string;
+      workingDurationMinutes?: number;
+      notes?: string;
+    },
+    reason: string
+  ) => Promise<{ success: boolean; message: string }>;
+  markStaffLeaveOrHoliday: (
+    staffId: string,
+    date: string,
+    type: 'leave' | 'holiday' | 'weekly_off',
+    notes?: string
+  ) => Promise<{ success: boolean; message: string }>;
+  addAttendanceLocation: (loc: Omit<AttendanceLocation, 'id' | 'businessId'>) => Promise<AttendanceLocation>;
+  updateAttendanceLocation: (id: string, updates: Partial<AttendanceLocation>) => Promise<void>;
+  deleteAttendanceLocation: (id: string) => Promise<void>;
+  updateAttendanceWorkingRules: (rules: Partial<AttendanceWorkingRules>) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -598,6 +657,17 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
   const [roles, setRoles] = useState<Role[]>(() =>
     loadCache('serviflow_roles_cache', DEMO_ROLES)
+  );
+
+  // Attendance & GPS Verification States
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() =>
+    loadCache('serviflow_attendance_cache', [])
+  );
+  const [attendanceLocations, setAttendanceLocations] = useState<AttendanceLocation[]>(() =>
+    loadCache('serviflow_attendance_locations_cache', [])
+  );
+  const [attendanceAuditLogs, setAttendanceAuditLogs] = useState<AttendanceAuditItem[]>(() =>
+    loadCache('serviflow_attendance_audit_cache', [])
   );
 
   // Referral Bonus States
@@ -1267,6 +1337,39 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (error) => handleFirestoreError(error, OperationType.GET, 'referralPayouts')
     );
 
+    // 23. Attendance Records
+    const unsubAttendance = onSnapshot(
+      collection(db, 'attendance'),
+      (snapshot) => {
+        const cloudItems = snapshot.docs.map((d) => d.data() as AttendanceRecord);
+        setAttendanceRecords(cloudItems);
+        saveCache('serviflow_attendance_cache', cloudItems);
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'attendance')
+    );
+
+    // 24. Attendance Locations
+    const unsubAttendanceLocations = onSnapshot(
+      collection(db, 'attendanceLocations'),
+      (snapshot) => {
+        const cloudItems = snapshot.docs.map((d) => d.data() as AttendanceLocation);
+        setAttendanceLocations(cloudItems);
+        saveCache('serviflow_attendance_locations_cache', cloudItems);
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'attendanceLocations')
+    );
+
+    // 25. Attendance Audit Logs
+    const unsubAttendanceAuditLogs = onSnapshot(
+      collection(db, 'attendanceAuditLogs'),
+      (snapshot) => {
+        const cloudItems = snapshot.docs.map((d) => d.data() as AttendanceAuditItem);
+        setAttendanceAuditLogs(cloudItems);
+        saveCache('serviflow_attendance_audit_cache', cloudItems);
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'attendanceAuditLogs')
+    );
+
     return () => {
       unsubBiz();
       unsubUsers();
@@ -1291,6 +1394,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubSecurityLogs();
       unsubReferrals();
       unsubReferralPayouts();
+      unsubAttendance();
+      unsubAttendanceLocations();
+      unsubAttendanceAuditLogs();
     };
   }, []);
 
@@ -1932,6 +2038,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setNotifications([]);
       setActivityLogs([]);
       setManualSyncLogs([]);
+      setAttendanceRecords([]);
+      setAttendanceLocations([]);
+      setAttendanceAuditLogs([]);
 
       showToast(`Clean State Active: Purged ${res.totalDocsDeleted} dummy records. Database is now in clean state for real testing.`, 'success');
       return res;
@@ -1954,6 +2063,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         businessId,
         currentBusiness.name
       );
+      if (businessId === currentBusiness.id) {
+        setAttendanceRecords((prev) => prev.filter((a) => a.businessId !== businessId));
+        setAttendanceLocations((prev) => prev.filter((l) => l.businessId !== businessId));
+        setAttendanceAuditLogs((prev) => prev.filter((l) => l.businessId !== businessId));
+      }
       showToast(`Clean State Active: Purged ${res.totalDocsDeleted} records for ${currentBusiness.name}.`, 'success');
       return res;
     } catch (err) {
@@ -2004,6 +2118,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setNotifications([]);
       setActivityLogs([]);
       setManualSyncLogs([]);
+      setAttendanceRecords([]);
+      setAttendanceLocations([]);
+      setAttendanceAuditLogs([]);
 
       showToast(`Global Clean State Active: Database wiped to 0. 0 businesses, 0 tenant users. Only Super Admin preserved.`, 'success');
       return res;
@@ -2483,6 +2600,18 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const filteredReferralPayouts = isSuperAdminUser
     ? referralPayoutRequests
     : referralPayoutRequests.filter((p) => p.businessId === currBizId);
+
+  const filteredAttendanceRecords = isSuperAdminUser
+    ? attendanceRecords
+    : attendanceRecords.filter((a) => a.businessId === currBizId);
+  const filteredAttendanceLocations = isSuperAdminUser
+    ? attendanceLocations
+    : attendanceLocations.filter((l) => l.businessId === currBizId);
+  const filteredAttendanceAuditLogs = isSuperAdminUser
+    ? attendanceAuditLogs
+    : attendanceAuditLogs.filter((l) => l.businessId === currBizId);
+  const attendanceWorkingRules: AttendanceWorkingRules =
+    currentBusiness?.attendanceWorkingRules || DEFAULT_ATTENDANCE_RULES;
 
   // Enquiry Actions
   const addEnquiry = (data: Omit<Enquiry, 'id' | 'businessId' | 'enquiryId' | 'createdAt'>) => {
@@ -4594,6 +4723,600 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveToFirestore('notifications', id, { read: true });
   };
 
+  // -------------------------------------------------------------
+  // ATTENDANCE & GPS VERIFICATION ENGINE
+  // -------------------------------------------------------------
+  const checkInAttendance = async (params: {
+    staffId?: string;
+    targetType: AttendanceLocationType;
+    targetLocationIdOrJobId?: string;
+    notes?: string;
+    bypassGps?: boolean;
+    overrideCoords?: { lat: number; lng: number };
+  }): Promise<{ success: boolean; message: string; record?: AttendanceRecord; errorType?: string }> => {
+    try {
+      const activeStaffId = params.staffId || currentUser?.id;
+      if (!activeStaffId) {
+        return { success: false, message: 'No staff user specified for attendance check-in.', errorType: 'NO_STAFF' };
+      }
+      const staffUser = users.find((u) => u.id === activeStaffId) || (currentUser?.id === activeStaffId ? currentUser : null);
+      if (!staffUser) {
+        return { success: false, message: 'Staff member record not found.', errorType: 'STAFF_NOT_FOUND' };
+      }
+
+      const tenantId = staffUser.businessId || currentBusiness?.id || 'biz-default';
+      const todayDate = new Date().toISOString().split('T')[0];
+
+      // Check if already checked in today and workingState is 'working'
+      const existingToday = attendanceRecords.find(
+        (a) => a.staffId === activeStaffId && a.date === todayDate && a.workingState === 'working'
+      );
+      if (existingToday) {
+        return {
+          success: false,
+          message: `Already checked in today at ${existingToday.checkInTime || 'work'}.`,
+          record: existingToday,
+          errorType: 'ALREADY_CHECKED_IN',
+        };
+      }
+
+      const rules: AttendanceWorkingRules = currentBusiness?.attendanceWorkingRules || DEFAULT_ATTENDANCE_RULES;
+
+      // 1. Acquire GPS position
+      let lat = 0;
+      let lng = 0;
+      let accuracy = 10;
+
+      if (params.overrideCoords) {
+        lat = params.overrideCoords.lat;
+        lng = params.overrideCoords.lng;
+        accuracy = 10;
+      } else if (params.bypassGps && (currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin')) {
+        lat = 0;
+        lng = 0;
+        accuracy = 0;
+      } else {
+        try {
+          const gpsRes = await getCurrentGpsPosition();
+          lat = gpsRes.latitude;
+          lng = gpsRes.longitude;
+          accuracy = gpsRes.accuracy;
+        } catch (gpsErr: any) {
+          const errMsg = gpsErr?.userFriendlyMessage || gpsErr?.message || 'Unable to capture GPS location. Please ensure Location services are enabled.';
+          return {
+            success: false,
+            message: errMsg,
+            errorType: gpsErr?.code || 'GPS_FAILED',
+          };
+        }
+      }
+
+      // 2. Perform Geofence and Location verification
+      let verification = verifyLocationAgainstRules(
+        lat,
+        lng,
+        accuracy,
+        attendanceLocations.filter((l) => l.businessId === tenantId && l.isActive),
+        params.targetType,
+        params.targetLocationIdOrJobId,
+        jobs.filter((j) => j.businessId === tenantId),
+        rules
+      );
+
+      // If bypassing GPS as admin
+      if (params.bypassGps && (currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin')) {
+        verification = {
+          isValid: true,
+          verificationStatus: 'verified',
+          matchedLocationName: 'Administrative Manual Check-In',
+          matchedLocationType: params.targetType,
+          distanceMeters: 0,
+          allowedRadiusMeters: 500,
+          accuracyMeters: 0,
+          reason: 'Verified via Administrative Override',
+        };
+      }
+
+      // If requireGPSVerification is enabled and verification failed -> Block action
+      if (rules.requireGPSVerification && !verification.isValid) {
+        return {
+          success: false,
+          message: `Location Verification Failed: You are ${formatDistance(verification.distanceMeters)} away from ${verification.matchedLocationName || 'the assigned work area'} (Max allowed: ${verification.allowedRadiusMeters}m).`,
+          errorType: 'OUT_OF_GEOFENCE',
+        };
+      }
+
+      // 3. Evaluate punctuality
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const punctuality = evaluatePunctuality(now, rules);
+
+      const recordId = `att-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const newRecord: AttendanceRecord = {
+        id: recordId,
+        businessId: tenantId,
+        staffId: activeStaffId,
+        staffName: staffUser.name,
+        staffRole: staffUser.role,
+        staffEmail: staffUser.email,
+        staffPhone: staffUser.phone,
+        date: todayDate,
+        status: punctuality.isLate ? 'late' : 'present',
+        workingState: 'working',
+        checkInTime: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        checkInTimestamp: now.getTime(),
+        checkInLat: lat,
+        checkInLng: lng,
+        checkInAccuracy: accuracy,
+        checkInVerificationStatus: verification.verificationStatus,
+        checkInType: verification.matchedLocationType,
+        checkInLocationName: verification.matchedLocationName,
+        checkInDistance: verification.distanceMeters,
+        checkInNotes: params.notes,
+        isLate: punctuality.isLate,
+        lateMinutes: punctuality.lateMinutes,
+        overallVerificationStatus: verification.verificationStatus,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        auditTrail: [
+          {
+            id: `audit-${Date.now()}`,
+            attendanceId: recordId,
+            businessId: tenantId,
+            eventType: 'check_in',
+            timestamp: nowIso,
+            userId: currentUser?.id || activeStaffId,
+            userName: currentUser?.name || staffUser.name,
+            userRole: currentUser?.role || staffUser.role,
+            details: `Checked in at ${verification.matchedLocationName || 'Location'} (Status: ${verification.verificationStatus}, Distance: ${formatDistance(verification.distanceMeters)}${punctuality.isLate ? `, Late by ${punctuality.lateMinutes}m` : ''})`,
+            coordinates: {
+              lat,
+              lng,
+              accuracy,
+              distance: verification.distanceMeters,
+              targetLocationName: verification.matchedLocationName,
+            },
+          },
+        ],
+      };
+
+      // Save to state and Firestore
+      setAttendanceRecords((prev) => [newRecord, ...prev.filter((r) => r.id !== recordId)]);
+      await saveToFirestore('attendance', recordId, newRecord);
+
+      // Save audit log
+      const auditEntry: AttendanceAuditItem = {
+        id: `aud-att-${Date.now()}`,
+        attendanceId: recordId,
+        businessId: tenantId,
+        eventType: 'check_in',
+        timestamp: nowIso,
+        userId: currentUser?.id || activeStaffId,
+        userName: currentUser?.name || staffUser.name,
+        userRole: currentUser?.role || staffUser.role,
+        details: `Staff ${staffUser.name} checked in at ${verification.matchedLocationName || 'Location'} (${punctuality.isLate ? 'Late Arrival' : 'On-Time'})`,
+        coordinates: {
+          lat,
+          lng,
+          accuracy,
+          distance: verification.distanceMeters,
+          targetLocationName: verification.matchedLocationName,
+        },
+      };
+      setAttendanceAuditLogs((prev) => [auditEntry, ...prev]);
+      await saveToFirestore('attendanceAuditLogs', auditEntry.id, auditEntry);
+
+      logActivity(
+        'Attendance Checked In',
+        'staff',
+        recordId,
+        `${staffUser.name} checked in (${punctuality.isLate ? 'Late' : 'On-time'}) at ${verification.matchedLocationName || 'Office'}`
+      );
+
+      showToast(
+        `Check-In Recorded! Status: ${punctuality.isLate ? `Late by ${punctuality.lateMinutes} mins` : 'On Time'} (${verification.matchedLocationName})`,
+        punctuality.isLate ? 'info' : 'success'
+      );
+
+      return { success: true, message: 'Check-in successful', record: newRecord };
+    } catch (err: any) {
+      console.error('Check-in error:', err);
+      showToast(err.message || 'Check-in failed due to an unexpected error.', 'error');
+      return { success: false, message: err.message || 'Check-in failed', errorType: 'INTERNAL_ERROR' };
+    }
+  };
+
+  const checkOutAttendance = async (params: {
+    staffId?: string;
+    recordId?: string;
+    targetType?: AttendanceLocationType;
+    targetLocationIdOrJobId?: string;
+    notes?: string;
+    bypassGps?: boolean;
+    overrideCoords?: { lat: number; lng: number };
+  }): Promise<{ success: boolean; message: string; record?: AttendanceRecord; errorType?: string }> => {
+    try {
+      const activeStaffId = params.staffId || currentUser?.id;
+      if (!activeStaffId) {
+        return { success: false, message: 'No staff user specified for check-out.', errorType: 'NO_STAFF' };
+      }
+
+      const staffUser = users.find((u) => u.id === activeStaffId) || (currentUser?.id === activeStaffId ? currentUser : null);
+      const tenantId = staffUser?.businessId || currentBusiness?.id || 'biz-default';
+      const todayDate = new Date().toISOString().split('T')[0];
+
+      let targetRecord: AttendanceRecord | undefined;
+      if (params.recordId) {
+        targetRecord = attendanceRecords.find((a) => a.id === params.recordId);
+      } else {
+        targetRecord = attendanceRecords.find(
+          (a) => a.staffId === activeStaffId && a.date === todayDate && a.workingState === 'working'
+        );
+        if (!targetRecord) {
+          targetRecord = attendanceRecords.find(
+            (a) => a.staffId === activeStaffId && a.workingState === 'working'
+          );
+        }
+      }
+
+      if (!targetRecord) {
+        return {
+          success: false,
+          message: 'No active check-in session found for today. Please check in first.',
+          errorType: 'NO_ACTIVE_SESSION',
+        };
+      }
+
+      const rules: AttendanceWorkingRules = currentBusiness?.attendanceWorkingRules || DEFAULT_ATTENDANCE_RULES;
+
+      let lat = 0;
+      let lng = 0;
+      let accuracy = 10;
+
+      if (params.overrideCoords) {
+        lat = params.overrideCoords.lat;
+        lng = params.overrideCoords.lng;
+        accuracy = 10;
+      } else if (params.bypassGps && (currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin')) {
+        lat = 0;
+        lng = 0;
+        accuracy = 0;
+      } else {
+        try {
+          const gpsRes = await getCurrentGpsPosition();
+          lat = gpsRes.latitude;
+          lng = gpsRes.longitude;
+          accuracy = gpsRes.accuracy;
+        } catch (gpsErr: any) {
+          const errMsg = gpsErr?.userFriendlyMessage || gpsErr?.message || 'Unable to capture GPS location for check-out.';
+          return {
+            success: false,
+            message: errMsg,
+            errorType: gpsErr?.code || 'GPS_FAILED',
+          };
+        }
+      }
+
+      const verification = verifyLocationAgainstRules(
+        lat,
+        lng,
+        accuracy,
+        attendanceLocations.filter((l) => l.businessId === tenantId && l.isActive),
+        params.targetType || targetRecord.checkInType || 'office',
+        params.targetLocationIdOrJobId,
+        jobs.filter((j) => j.businessId === tenantId),
+        rules
+      );
+
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const checkInMs = targetRecord.checkInTimestamp || (targetRecord.checkInTime ? new Date(`${targetRecord.date}T${targetRecord.checkInTime}`).getTime() : now.getTime());
+      const checkOutMs = now.getTime();
+      const durationMins = Math.max(1, Math.round((checkOutMs - checkInMs) / (1000 * 60)));
+      const durationFormatted = formatWorkingDuration(durationMins);
+
+      // Check if half day threshold violated
+      let status = targetRecord.status;
+      if (rules.halfDayThresholdMinutes && durationMins < rules.halfDayThresholdMinutes) {
+        status = 'half_day';
+      }
+
+      const updatedRecord: AttendanceRecord = {
+        ...targetRecord,
+        status,
+        workingState: 'completed',
+        checkOutTime: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        checkOutTimestamp: checkOutMs,
+        checkOutLat: lat,
+        checkOutLng: lng,
+        checkOutAccuracy: accuracy,
+        checkOutVerificationStatus: verification.verificationStatus,
+        checkOutType: verification.matchedLocationType,
+        checkOutLocationName: verification.matchedLocationName,
+        checkOutDistance: verification.distanceMeters,
+        checkOutNotes: params.notes,
+        workingDurationMinutes: durationMins,
+        workingDurationFormatted: durationFormatted,
+        updatedAt: nowIso,
+        auditTrail: [
+          ...(targetRecord.auditTrail || []),
+          {
+            id: `audit-${Date.now()}`,
+            attendanceId: targetRecord.id,
+            businessId: tenantId,
+            eventType: 'check_out',
+            timestamp: nowIso,
+            userId: currentUser?.id || activeStaffId,
+            userName: currentUser?.name || staffUser?.name || 'Staff',
+            userRole: currentUser?.role || staffUser?.role,
+            details: `Checked out after ${durationFormatted} at ${verification.matchedLocationName || 'Location'} (Status: ${verification.verificationStatus})`,
+            coordinates: {
+              lat,
+              lng,
+              accuracy,
+              distance: verification.distanceMeters,
+              targetLocationName: verification.matchedLocationName,
+            },
+          },
+        ],
+      };
+
+      setAttendanceRecords((prev) =>
+        prev.map((r) => (r.id === targetRecord!.id ? updatedRecord : r))
+      );
+      await saveToFirestore('attendance', targetRecord.id, updatedRecord);
+
+      const auditEntry: AttendanceAuditItem = {
+        id: `aud-att-${Date.now()}`,
+        attendanceId: targetRecord.id,
+        businessId: tenantId,
+        eventType: 'check_out',
+        timestamp: nowIso,
+        userId: currentUser?.id || activeStaffId,
+        userName: currentUser?.name || staffUser?.name || 'Staff',
+        userRole: currentUser?.role || staffUser?.role,
+        details: `Staff ${staffUser?.name || 'Staff'} completed shift. Working duration: ${durationFormatted}.`,
+        coordinates: {
+          lat,
+          lng,
+          accuracy,
+          distance: verification.distanceMeters,
+          targetLocationName: verification.matchedLocationName,
+        },
+      };
+      setAttendanceAuditLogs((prev) => [auditEntry, ...prev]);
+      await saveToFirestore('attendanceAuditLogs', auditEntry.id, auditEntry);
+
+      logActivity(
+        'Attendance Checked Out',
+        'staff',
+        targetRecord.id,
+        `${staffUser?.name || 'Staff'} checked out. Total duration: ${durationFormatted}`
+      );
+
+      showToast(`Checked out successfully! Total duration: ${durationFormatted}`, 'success');
+      return { success: true, message: 'Check-out successful', record: updatedRecord };
+    } catch (err: any) {
+      console.error('Check-out error:', err);
+      showToast(err.message || 'Check-out failed.', 'error');
+      return { success: false, message: err.message || 'Check-out failed', errorType: 'INTERNAL_ERROR' };
+    }
+  };
+
+  const manualCorrectAttendance = async (
+    recordId: string,
+    corrections: {
+      status?: AttendanceStatus;
+      checkInTime?: string;
+      checkOutTime?: string;
+      workingDurationMinutes?: number;
+      notes?: string;
+    },
+    reason: string
+  ): Promise<{ success: boolean; message: string }> => {
+    if (currentUser?.role !== 'business_owner' && currentUser?.role !== 'manager' && currentUser?.role !== 'super_admin') {
+      showToast('Unauthorized: Only Managers and Business Owners can modify attendance records.', 'error');
+      return { success: false, message: 'Unauthorized' };
+    }
+
+    if (!reason || reason.trim().length < 5) {
+      showToast('Please provide a descriptive reason for the manual attendance adjustment.', 'error');
+      return { success: false, message: 'Reason required' };
+    }
+
+    const target = attendanceRecords.find((a) => a.id === recordId);
+    if (!target) {
+      showToast('Attendance record not found.', 'error');
+      return { success: false, message: 'Record not found' };
+    }
+
+    const nowIso = new Date().toISOString();
+    let durationMins = corrections.workingDurationMinutes !== undefined ? corrections.workingDurationMinutes : target.workingDurationMinutes;
+
+    if (corrections.checkInTime && corrections.checkOutTime) {
+      const inMs = new Date(`${target.date}T${corrections.checkInTime}`).getTime();
+      const outMs = new Date(`${target.date}T${corrections.checkOutTime}`).getTime();
+      if (outMs > inMs) {
+        durationMins = Math.round((outMs - inMs) / (1000 * 60));
+      }
+    }
+
+    const updated: AttendanceRecord = {
+      ...target,
+      status: corrections.status || target.status,
+      checkInTime: corrections.checkInTime || target.checkInTime,
+      checkOutTime: corrections.checkOutTime !== undefined ? corrections.checkOutTime : target.checkOutTime,
+      workingDurationMinutes: durationMins,
+      workingDurationFormatted: durationMins ? formatWorkingDuration(durationMins) : target.workingDurationFormatted,
+      manualCorrection: {
+        correctedBy: currentUser.id,
+        correctedByName: currentUser.name,
+        correctedAt: nowIso,
+        reason: reason.trim(),
+        previousRecord: {
+          status: target.status,
+          checkInTime: target.checkInTime,
+          checkOutTime: target.checkOutTime,
+          workingDurationMinutes: target.workingDurationMinutes,
+        },
+        changesDescription: `Status: ${corrections.status || target.status}, In: ${corrections.checkInTime || target.checkInTime}, Out: ${corrections.checkOutTime || target.checkOutTime}`,
+      },
+      auditTrail: [
+        ...(target.auditTrail || []),
+        {
+          id: `audit-${Date.now()}`,
+          attendanceId: recordId,
+          businessId: target.businessId,
+          eventType: 'manual_correction',
+          timestamp: nowIso,
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userRole: currentUser.role,
+          details: `Manual adjustment by ${currentUser.name}: ${reason.trim()} (Status: ${corrections.status || target.status})`,
+        },
+      ],
+    };
+
+    setAttendanceRecords((prev) => prev.map((r) => (r.id === recordId ? updated : r)));
+    await saveToFirestore('attendance', recordId, updated);
+
+    const auditEntry: AttendanceAuditItem = {
+      id: `aud-att-${Date.now()}`,
+      attendanceId: recordId,
+      businessId: target.businessId,
+      eventType: 'manual_correction',
+      timestamp: nowIso,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      userRole: currentUser.role,
+      details: `Manual correction applied to ${target.staffName}'s attendance for ${target.date}. Reason: ${reason.trim()}`,
+    };
+    setAttendanceAuditLogs((prev) => [auditEntry, ...prev]);
+    await saveToFirestore('attendanceAuditLogs', auditEntry.id, auditEntry);
+
+    showToast('Attendance record updated with permanent audit log entry.', 'success');
+    logActivity('Attendance Record Corrected', 'staff', recordId, `Adjusted by ${currentUser.name}: ${reason}`);
+    return { success: true, message: 'Record updated' };
+  };
+
+  const markStaffLeaveOrHoliday = async (
+    staffId: string,
+    date: string,
+    type: 'leave' | 'holiday' | 'weekly_off',
+    notes?: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const staffUser = users.find((u) => u.id === staffId);
+    if (!staffUser) {
+      showToast('Staff member not found.', 'error');
+      return { success: false, message: 'Staff not found' };
+    }
+
+    const tenantId = staffUser.businessId || currentBusiness.id;
+    const recordId = `att-${staffId}-${date}`;
+    const nowIso = new Date().toISOString();
+
+    const record: AttendanceRecord = {
+      id: recordId,
+      businessId: tenantId,
+      staffId: staffId,
+      staffName: staffUser.name,
+      staffRole: staffUser.role,
+      staffEmail: staffUser.email,
+      staffPhone: staffUser.phone,
+      date: date,
+      status: type,
+      workingState: 'completed',
+      checkInTime: '00:00',
+      checkInVerificationStatus: 'verified',
+      checkInLocationName: type === 'leave' ? 'Approved Leave' : type === 'holiday' ? 'Public Holiday' : 'Weekly Off',
+      checkInDistance: 0,
+      checkInNotes: notes,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      auditTrail: [
+        {
+          id: `audit-${Date.now()}`,
+          attendanceId: recordId,
+          businessId: tenantId,
+          eventType: 'status_override',
+          timestamp: nowIso,
+          userId: currentUser?.id || staffId,
+          userName: currentUser?.name || staffUser.name,
+          userRole: currentUser?.role || staffUser.role,
+          details: `Marked as ${type.toUpperCase()}${notes ? `: ${notes}` : ''}`,
+        },
+      ],
+    };
+
+    setAttendanceRecords((prev) => [record, ...prev.filter((r) => r.id !== recordId)]);
+    await saveToFirestore('attendance', recordId, record);
+    showToast(`Marked ${staffUser.name} as ${type} for ${date}.`, 'success');
+    return { success: true, message: 'Saved' };
+  };
+
+  const addAttendanceLocation = async (
+    loc: Omit<AttendanceLocation, 'id' | 'businessId'>
+  ): Promise<AttendanceLocation> => {
+    const perm = canManageBusinessSettings(currentUser);
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Unauthorized: Only Business Owners can add attendance locations.', 'error');
+      throw new Error('Unauthorized');
+    }
+
+    const tenantId = currentBusiness?.id || 'biz-default';
+    const newLoc: AttendanceLocation = {
+      ...loc,
+      id: `loc-${Date.now()}`,
+      businessId: tenantId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setAttendanceLocations((prev) => [newLoc, ...prev.filter((l) => l.id !== newLoc.id)]);
+    await saveToFirestore('attendanceLocations', newLoc.id, newLoc);
+    showToast(`Permitted location "${newLoc.name}" saved and active for GPS verification.`, 'success');
+    return newLoc;
+  };
+
+  const updateAttendanceLocation = async (id: string, updates: Partial<AttendanceLocation>): Promise<void> => {
+    const perm = canManageBusinessSettings(currentUser);
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Unauthorized: Only Business Owners can update locations.', 'error');
+      return;
+    }
+
+    const updated = { ...updates, updatedAt: new Date().toISOString() };
+    setAttendanceLocations((prev) => prev.map((l) => (l.id === id ? { ...l, ...updated } : l)));
+    await saveToFirestore('attendanceLocations', id, updated);
+    showToast('Permitted location updated.', 'success');
+  };
+
+  const deleteAttendanceLocation = async (id: string): Promise<void> => {
+    const perm = canManageBusinessSettings(currentUser);
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Unauthorized: Only Business Owners can delete locations.', 'error');
+      return;
+    }
+
+    setAttendanceLocations((prev) => prev.filter((l) => l.id !== id));
+    await deleteFromFirestore('attendanceLocations', id);
+    showToast('Permitted location removed.', 'info');
+  };
+
+  const updateAttendanceWorkingRules = async (rules: Partial<AttendanceWorkingRules>): Promise<void> => {
+    const perm = canManageBusinessSettings(currentUser);
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Unauthorized: Only Business Owners can update working rules.', 'error');
+      return;
+    }
+
+    const currentRules = currentBusiness?.attendanceWorkingRules || DEFAULT_ATTENDANCE_RULES;
+    const mergedRules: AttendanceWorkingRules = { ...currentRules, ...rules };
+
+    updateBusinessSettings({ attendanceWorkingRules: mergedRules });
+    showToast('Attendance & shift working rules updated successfully.', 'success');
+  };
+
   const getRolePermissions = (roleCode?: UserRole): RolePermission => {
     if (!roleCode) {
       return {
@@ -4815,6 +5538,20 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createManualReferralLink,
         deleteReferralRecord,
         settleReferralBonusDirectly,
+
+        // Attendance & GPS Verification Module
+        attendanceRecords: filteredAttendanceRecords,
+        attendanceLocations: filteredAttendanceLocations,
+        attendanceWorkingRules,
+        attendanceAuditLogs: filteredAttendanceAuditLogs,
+        checkInAttendance,
+        checkOutAttendance,
+        manualCorrectAttendance,
+        markStaffLeaveOrHoliday,
+        addAttendanceLocation,
+        updateAttendanceLocation,
+        deleteAttendanceLocation,
+        updateAttendanceWorkingRules,
       }}
     >
       {children}

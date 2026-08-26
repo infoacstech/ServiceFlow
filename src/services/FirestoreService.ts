@@ -32,6 +32,9 @@ import {
   ManualSyncLog,
   ReferralRecord,
   ReferralPayoutRequest,
+  AttendanceRecord,
+  AttendanceLocation,
+  AttendanceAuditItem,
 } from '../types';
 
 /**
@@ -108,6 +111,9 @@ export class FirestoreService {
       'notifications',
       'activities',
       'manualSyncLogs',
+      'attendance',
+      'attendanceLocations',
+      'attendanceAuditLogs',
     ];
 
     let totalDeleted = 0;
@@ -746,6 +752,29 @@ export class FirestoreService {
 
   static async saveReferralPayout(payout: ReferralPayoutRequest): Promise<void> {
     await this.saveDocument<ReferralPayoutRequest>('referralPayouts', payout.id, payout);
+  }
+
+  // =========================================================================
+  // ATTENDANCE & GPS VERIFICATION
+  // =========================================================================
+  static async saveAttendanceRecord(record: AttendanceRecord): Promise<void> {
+    await this.saveDocument<AttendanceRecord>('attendance', record.id, record);
+  }
+
+  static async deleteAttendanceRecord(recordId: string): Promise<void> {
+    await this.deleteDocument('attendance', recordId);
+  }
+
+  static async saveAttendanceLocation(location: AttendanceLocation): Promise<void> {
+    await this.saveDocument<AttendanceLocation>('attendanceLocations', location.id, location);
+  }
+
+  static async deleteAttendanceLocation(locationId: string): Promise<void> {
+    await this.deleteDocument('attendanceLocations', locationId);
+  }
+
+  static async logAttendanceAudit(auditItem: AttendanceAuditItem): Promise<void> {
+    await this.saveDocument<AttendanceAuditItem>('attendanceAuditLogs', auditItem.id, auditItem);
   }
 }
 

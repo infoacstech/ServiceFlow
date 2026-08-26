@@ -99,6 +99,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
     { id: 'jobs', label: 'Jobs & Field Work', icon: Briefcase, visible: permissions.canManageJobs },
     { id: 'customers', label: 'Customers CRM', icon: Users, visible: permissions.canManageJobs || permissions.canManageStaff },
     { id: 'staff', label: 'Staff & Techs', icon: UserCheck, visible: permissions.canManageStaff },
+    { id: 'attendance', label: 'Attendance & GPS', icon: Clock, visible: permissions.canManageStaff },
   ].filter((m) => m.visible);
 
   const businessFinanceModules = [

@@ -255,6 +255,66 @@
         "details": { "type": "string" },
         "networkLatencyMs": { "type": "number" }
       }
+    },
+    "attendance": {
+      "title": "Attendance Record",
+      "description": "Staff and technician daily attendance and GPS check-in/out records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "staffId": { "type": "string" },
+        "staffName": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string" },
+        "workingState": { "type": "string" },
+        "checkInTime": { "type": "string" },
+        "checkInLat": { "type": "number" },
+        "checkInLng": { "type": "number" },
+        "checkInAccuracy": { "type": "number" },
+        "checkInVerificationStatus": { "type": "string" },
+        "checkInLocationName": { "type": "string" },
+        "checkInDistance": { "type": "number" },
+        "checkOutTime": { "type": "string" },
+        "checkOutLat": { "type": "number" },
+        "checkOutLng": { "type": "number" },
+        "checkOutVerificationStatus": { "type": "string" },
+        "workingDurationMinutes": { "type": "number" },
+        "workingDurationFormatted": { "type": "string" },
+        "isLate": { "type": "boolean" },
+        "lateMinutes": { "type": "number" }
+      }
+    },
+    "attendanceLocations": {
+      "title": "Attendance Permitted Location",
+      "description": "Configured office, branch, and warehouse geofence locations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "businessId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "address": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "radiusMeters": { "type": "number" },
+        "isActive": { "type": "boolean" }
+      }
+    },
+    "attendanceAuditLogs": {
+      "title": "Attendance Audit Log",
+      "description": "Tamper-resistant audit log of check-ins, check-outs, and manual corrections",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "attendanceId": { "type": "string" },
+        "businessId": { "type": "string" },
+        "eventType": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "details": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -317,6 +377,18 @@
     "manualSyncLogs/{logId}": {
       "schema": "manualSyncLogs",
       "description": "Manual sync log documents"
+    },
+    "attendance/{attendanceId}": {
+      "schema": "attendance",
+      "description": "Daily staff attendance and GPS verification records"
+    },
+    "attendanceLocations/{locationId}": {
+      "schema": "attendanceLocations",
+      "description": "Permitted office and branch geofence boundary configurations"
+    },
+    "attendanceAuditLogs/{logId}": {
+      "schema": "attendanceAuditLogs",
+      "description": "Immutable attendance and verification audit trail records"
     }
   }
 }

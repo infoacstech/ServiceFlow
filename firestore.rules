@@ -267,6 +267,41 @@ service cloud.firestore {
       allow update, delete: if false; // Immutable audit trail
     }
 
+    // Attendance & GPS Verification Rules
+    match /attendance/{docId} {
+      allow read: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        isTenantMember(request.resource.data.businessId) || isSuperAdmin()
+      );
+      allow update: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow delete: if isAuthenticated() && (
+        isTenantOwner(resource.data.businessId) || isSuperAdmin()
+      );
+    }
+
+    match /attendanceLocations/{docId} {
+      allow read: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow create, update, delete: if isAuthenticated() && (
+        isTenantOwner(resource.data.businessId) || isSuperAdmin()
+      );
+    }
+
+    match /attendanceAuditLogs/{docId} {
+      allow read: if isAuthenticated() && (
+        isTenantMember(resource.data.businessId) || isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        isTenantMember(request.resource.data.businessId) || isSuperAdmin()
+      );
+      allow update, delete: if false; // Immutable attendance audit trail
+    }
+
     // Referral System Collections
     match /referrals/{referralId} {
       allow read, write: if isAuthenticated();

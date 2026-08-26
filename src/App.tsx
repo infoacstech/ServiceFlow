@@ -38,6 +38,7 @@ import { CustomerPortalView } from './views/CustomerPortalView';
 import { SuperAdminView } from './views/SuperAdminView';
 import { SettingsView } from './views/SettingsView';
 import { NotificationsView } from './views/NotificationsView';
+import { AttendanceView } from './views/AttendanceView';
 import { LoginView } from './views/LoginView';
 
 const MainContent: React.FC = () => {
@@ -164,6 +165,7 @@ const MainContent: React.FC = () => {
       case 'services':
         return { allowed: permissions.canManageServices, label: 'Admin or Manager' };
       case 'staff':
+      case 'attendance':
         return { allowed: permissions.canManageStaff, label: 'Admin or Manager' };
       case 'inventory':
         return { allowed: permissions.canManageInventory, label: 'Admin or Manager' };
@@ -267,6 +269,8 @@ const MainContent: React.FC = () => {
                     ))}
 
                   {activeTab === 'staff' && <StaffView />}
+
+                  {activeTab === 'attendance' && <AttendanceView />}
 
                   {activeTab === 'inventory' && <InventoryView />}
 

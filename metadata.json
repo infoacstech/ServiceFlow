@@ -3,7 +3,8 @@
   "description": "Multi-tenant, mobile-first Field Service Management SaaS platform for CCTV, Solar, HVAC, Electrical, Plumbing, and repair businesses.",
   "requestFramePermissions": [
     "microphone",
-    "camera"
+    "camera",
+    "geolocation"
   ],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

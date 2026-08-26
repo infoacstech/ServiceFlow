@@ -4,6 +4,7 @@ import { Job, JobStatus, JobPriority } from '../types';
 import { DigitalSignatureCanvas } from '../components/DigitalSignatureCanvas';
 import { VoiceNotesRecorder } from '../components/VoiceNotesRecorder';
 import { PhotoEvidenceUploader } from '../components/PhotoEvidenceUploader';
+import { AttendanceCard } from '../components/AttendanceCard';
 import {
   Briefcase,
   Navigation,
@@ -290,6 +291,9 @@ export const TechnicianView: React.FC = () => {
 
   return (
     <div className="max-w-xl mx-auto space-y-3.5 pb-24 animate-in fade-in" id="technician-view-container">
+      {/* 0. GPS & Shift Attendance Card */}
+      <AttendanceCard />
+
       {/* 1. Simplified Top Header & 3 Compact Counters */}
       <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-md border border-slate-800">
         <div className="flex items-center justify-between gap-2 mb-3">

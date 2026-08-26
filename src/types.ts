@@ -62,6 +62,8 @@ export interface Business {
   referralDiscountApplied?: boolean; // True if got 10% discount on registration
   referralEarnings?: number; // Total ₹ bonus earned from referring others (10% per referee)
   referralBalance?: number; // Available ₹ balance to redeem or use for renewals
+  attendanceWorkingRules?: AttendanceWorkingRules;
+  attendanceLocations?: AttendanceLocation[];
 }
 
 export interface Plan {
@@ -567,3 +569,163 @@ export interface ReferralPayoutRequest {
   processedAt?: string;
   notes?: string;
 }
+
+// ==========================================
+// ATTENDANCE & GPS VERIFICATION DATA TYPES
+// ==========================================
+
+export type AttendanceStatus =
+  | 'present'
+  | 'late'
+  | 'half_day'
+  | 'absent'
+  | 'leave'
+  | 'holiday'
+  | 'weekly_off';
+
+export type AttendanceWorkingState = 'not_checked_in' | 'working' | 'completed';
+
+export type AttendanceVerificationStatus =
+  | 'verified'
+  | 'failed'
+  | 'accuracy_issue'
+  | 'permission_denied'
+  | 'manual_correction';
+
+export type AttendanceLocationType = 'office' | 'branch' | 'field_job' | 'remote' | 'warehouse';
+
+export interface AttendanceLocation {
+  id: string;
+  businessId: string;
+  name: string;
+  type: AttendanceLocationType;
+  address: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number; // e.g. 150m (allowed radius)
+  isDefault?: boolean;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AttendanceWorkingRules {
+  workStartTime: string; // "09:30"
+  workEndTime: string; // "18:30"
+  gracePeriodMinutes: number; // 15
+  lateThresholdMinutes: number; // 15 (after grace period)
+  halfDayThresholdMinutes: number; // 240 (4 hours)
+  minimumWorkingHours: number; // 8
+  allowFieldJobCheckIn: boolean; // Field technician can check in at assigned customer job site
+  requireGPSVerification: boolean; // Enforce GPS verification
+  maxAllowedGpsAccuracyMeters: number; // 100
+  weeklyOffDays: number[]; // [0] = Sunday
+}
+
+export interface AttendanceAuditItem {
+  id: string;
+  attendanceId: string;
+  businessId: string;
+  eventType:
+    | 'check_in'
+    | 'check_out'
+    | 'manual_correction'
+    | 'location_verified'
+    | 'location_failed'
+    | 'status_override'
+    | 'leave_marked'
+    | 'location_config_changed';
+  timestamp: string;
+  userId: string;
+  userName: string;
+  userRole?: string;
+  details: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+    accuracy?: number;
+    distance?: number;
+    targetLocationName?: string;
+  };
+  ipOrDevice?: string;
+}
+
+export interface AttendanceRecord {
+  id: string;
+  businessId: string;
+  staffId: string;
+  staffName: string;
+  staffRole?: UserRole;
+  staffAvatar?: string;
+  staffEmail?: string;
+  staffPhone?: string;
+  date: string; // YYYY-MM-DD
+  status: AttendanceStatus;
+  workingState: AttendanceWorkingState;
+
+  // Check-In Details
+  checkInTime?: string; // HH:mm or formatted
+  checkInTimestamp?: number; // Epoch ms
+  checkInLat?: number;
+  checkInLng?: number;
+  checkInAccuracy?: number; // in meters
+  checkInVerificationStatus?: AttendanceVerificationStatus;
+  checkInLocationName?: string;
+  checkInDistance?: number; // in meters from permitted site
+  checkInType?: AttendanceLocationType;
+  checkInJobId?: string;
+  checkInJobCode?: string;
+  checkInNotes?: string;
+  checkInAddress?: string;
+
+  // Check-Out Details
+  checkOutTime?: string;
+  checkOutTimestamp?: number;
+  checkOutLat?: number;
+  checkOutLng?: number;
+  checkOutAccuracy?: number;
+  checkOutVerificationStatus?: AttendanceVerificationStatus;
+  checkOutLocationName?: string;
+  checkOutDistance?: number;
+  checkOutType?: AttendanceLocationType;
+  checkOutJobId?: string;
+  checkOutJobCode?: string;
+  checkOutNotes?: string;
+  checkOutAddress?: string;
+
+  // Working Time & Metric Calculations
+  workingDurationMinutes?: number;
+  workingDurationFormatted?: string;
+  isLate?: boolean;
+  lateMinutes?: number;
+  isEarlyDeparture?: boolean;
+  isHalfDay?: boolean;
+
+  // Verification Summary
+  overallVerificationStatus?: AttendanceVerificationStatus;
+
+  // Manual Corrections & History
+  manualCorrection?: {
+    correctedBy: string;
+    correctedByName: string;
+    correctedAt: string;
+    reason: string;
+    previousRecord: {
+      status?: AttendanceStatus;
+      checkInTime?: string;
+      checkOutTime?: string;
+      workingDurationMinutes?: number;
+    };
+    changesDescription: string;
+  };
+
+  // Immutable Audit Trail
+  auditTrail: AttendanceAuditItem[];
+
+  createdAt: string;
+  updatedAt: string;
+}
+
