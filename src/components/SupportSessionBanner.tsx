@@ -37,8 +37,8 @@ export const SupportSessionBanner: React.FC = () => {
   const isReadOnly = activeSupportSession.accessMode === 'read_only';
 
   return (
-    <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white px-4 py-2.5 shadow-lg border-b border-purple-500/30 sticky top-0 z-50 animate-in slide-in-from-top duration-300">
-      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+    <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white px-3 sm:px-5 lg:px-6 py-2 sm:py-2.5 shadow-lg border-b border-purple-500/30 sticky top-0 z-50 animate-in slide-in-from-top duration-300">
+      <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-3 flex-wrap justify-center sm:justify-start">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 font-extrabold border border-amber-500/40 uppercase text-[10px] tracking-wider animate-pulse">
             <ShieldAlert className="w-3.5 h-3.5" />

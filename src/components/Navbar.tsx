@@ -154,7 +154,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full max-w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-2 sm:px-4 py-2 sm:py-2.5 transition-all">
+    <header className="sticky top-0 z-40 w-full max-w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-3 sm:px-5 lg:px-6 py-2 sm:py-2.5 transition-all">
       {/* Click-outside backdrop overlay to close open menus */}
       {activeMenu !== null && (
         <div
@@ -163,7 +163,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         />
       )}
 
-      <div className="flex items-center justify-between gap-2 sm:gap-3 max-w-7xl mx-auto w-full relative z-50">
+      <div className="flex items-center justify-between gap-2 sm:gap-4 w-full relative z-50">
         {/* Left: Brand / Company Name Display (Full Visibility without restrictive truncation) */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink min-w-0 flex-1 sm:flex-initial">
           {currentUser?.role === 'super_admin' ? (

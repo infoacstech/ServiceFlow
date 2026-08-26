@@ -27,8 +27,8 @@ export const OfflineSyncBanner: React.FC = () => {
   };
 
   return (
-    <div className="bg-amber-500 text-stone-900 border-b border-amber-600/30 px-4 py-2.5 text-xs shadow-md transition-all">
-      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+    <div className="bg-amber-500 text-stone-900 border-b border-amber-600/30 px-3 sm:px-5 lg:px-6 py-2 sm:py-2.5 text-xs shadow-md transition-all">
+      <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 font-medium">
           <div className="p-1 bg-stone-900/10 rounded-lg shrink-0">
             {isOffline || isSimulatedOffline ? (
@@ -88,7 +88,7 @@ export const OfflineSyncBanner: React.FC = () => {
 
       {/* Queue Details Drawer */}
       {isExpanded && pendingSyncQueue.length > 0 && (
-        <div className="max-w-7xl mx-auto mt-2.5 pt-2.5 border-t border-amber-600/20 text-stone-900 space-y-1.5">
+        <div className="w-full mt-2.5 pt-2.5 border-t border-amber-600/20 text-stone-900 space-y-1.5">
           <div className="font-bold text-[11px] uppercase tracking-wider text-stone-950 flex items-center justify-between">
             <span>Offline Sync Queue Log</span>
             <span>Local Storage Active</span>

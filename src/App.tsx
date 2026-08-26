@@ -226,13 +226,13 @@ const MainContent: React.FC = () => {
       />
 
       {/* Main Workspace Layout */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
+      <div className="flex-1 flex w-full">
         {/* Desktop Sidebar */}
         <Sidebar activeTab={activeTab} setActiveTab={handleTabChange} />
 
         {/* View Content Area with Natural Scroll & Pull-To-Refresh */}
-        <main className="flex-1 min-w-0 flex flex-col">
-          <PullToRefresh className="p-4 sm:p-6 lg:p-8 pb-28 sm:pb-8">
+        <main className="flex-1 min-w-0 flex flex-col w-full">
+          <PullToRefresh className="p-3 sm:p-4 lg:p-5 pb-24 sm:pb-8 w-full max-w-full">
             <div key={activeTab} className="animate-in fade-in duration-200">
               {!currentTabAccess.allowed ? (
                 <AccessDeniedView

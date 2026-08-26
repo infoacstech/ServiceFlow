@@ -83,9 +83,9 @@ export const GlobalBroadcastBanner: React.FC = () => {
     <aside
       id="global-platform-broadcast-banner"
       aria-label="Platform Announcement"
-      className={`relative z-40 px-3 sm:px-4 py-2 sm:py-2.5 transition-all duration-300 ${style.container}`}
+      className={`relative z-40 px-3 sm:px-5 lg:px-6 py-2 sm:py-2.5 transition-all duration-300 ${style.container}`}
     >
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 text-xs">
+      <div className="w-full flex items-center justify-between gap-3 text-xs">
         {/* Left: Badge & Live Indicator */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           <span className="flex h-2 w-2 relative">
