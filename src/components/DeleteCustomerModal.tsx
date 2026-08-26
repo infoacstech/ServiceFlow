@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 interface DeleteCustomerModalProps {
-  customer: Customer;
+  customer: Customer | null;
   isOpen: boolean;
   onClose: () => void;
   onCustomerDeleted: () => void;
@@ -51,6 +51,23 @@ export const DeleteCustomerModal: React.FC<DeleteCustomerModalProps> = ({
 
   // Compute all related records independently
   const relatedRecords = useMemo(() => {
+    if (!customer?.id) {
+      return {
+        hasRecords: false,
+        totalCount: 0,
+        customerJobs: [],
+        activeJobs: [],
+        completedJobs: [],
+        customerInvoices: [],
+        unpaidInvoices: [],
+        customerPayments: [],
+        customerContracts: [],
+        customerQuotations: [],
+        customerEnquiries: [],
+        breakdownItems: [],
+      };
+    }
+
     const customerJobs = (jobs || []).filter((j: Job) => j.customerId === customer.id);
     const activeJobs = customerJobs.filter((j: Job) => j.status !== 'completed' && j.status !== 'cancelled' && j.status !== 'closed');
     const completedJobs = customerJobs.filter((j: Job) => j.status === 'completed' || j.status === 'closed' || j.status === 'verified');
@@ -117,16 +134,19 @@ export const DeleteCustomerModal: React.FC<DeleteCustomerModalProps> = ({
       hasRecords: totalCount > 0,
       totalCount,
       customerJobs,
+      activeJobs,
+      completedJobs,
       customerInvoices,
+      unpaidInvoices,
       customerPayments,
       customerContracts,
       customerQuotations,
       customerEnquiries,
       breakdownItems,
     };
-  }, [customer.id, jobs, invoices, payments, contracts, quotations, enquiries]);
+  }, [customer?.id, jobs, invoices, payments, contracts, quotations, enquiries]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !customer) return null;
 
   const isDeleteKeywordMatched = confirmationInput.trim().toUpperCase() === 'DELETE';
 

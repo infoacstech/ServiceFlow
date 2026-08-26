@@ -51,6 +51,8 @@ export const CustomersView: React.FC = () => {
     logActivity,
   } = useApp();
 
+  const currencySymbol = currentBusiness?.currency || '₹';
+
   const isOwnerOrAdmin = currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin';
 
   const [search, setSearch] = useState('');
@@ -94,9 +96,9 @@ export const CustomersView: React.FC = () => {
         whatsapp: row.whatsapp || row.mobile,
         email: row.email || '',
         address: row.address || '',
-        city: row.city || currentBusiness.city || 'Noida',
-        state: row.state || currentBusiness.state || 'Uttar Pradesh',
-        pin: row.pin || currentBusiness.pin || '201301',
+        city: row.city || currentBusiness?.city || 'Noida',
+        state: row.state || currentBusiness?.state || 'Uttar Pradesh',
+        pin: row.pin || currentBusiness?.pin || '201301',
         gstNumber: row.gstNumber || '',
         notes: row.notes || 'Imported via CSV batch upload',
         customerType: typeVal,
@@ -120,15 +122,16 @@ export const CustomersView: React.FC = () => {
     whatsapp: '',
     email: '',
     address: '',
-    city: currentBusiness.city || 'Noida',
-    state: currentBusiness.state || 'Uttar Pradesh',
-    pin: currentBusiness.pin || '201301',
+    city: currentBusiness?.city || 'Noida',
+    state: currentBusiness?.state || 'Uttar Pradesh',
+    pin: currentBusiness?.pin || '201301',
     gstNumber: '',
     notes: '',
     customerType: 'commercial',
   });
 
   const filtered = (customers || []).filter((c) => {
+    if (!c) return false;
     const s = (search || '').toLowerCase();
     const matchesSearch =
       (c.name || '').toLowerCase().includes(s) ||
@@ -142,7 +145,7 @@ export const CustomersView: React.FC = () => {
     return matchesSearch && matchesType && !c.isArchived;
   });
 
-  const archivedCount = (customers || []).filter((c) => c.isArchived).length;
+  const archivedCount = (customers || []).filter((c) => c?.isArchived).length;
 
   const handleSaveCustomer = (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,9 +158,9 @@ export const CustomersView: React.FC = () => {
       whatsapp: '',
       email: '',
       address: '',
-      city: currentBusiness.city || 'Noida',
-      state: currentBusiness.state || 'Uttar Pradesh',
-      pin: currentBusiness.pin || '201301',
+      city: currentBusiness?.city || 'Noida',
+      state: currentBusiness?.state || 'Uttar Pradesh',
+      pin: currentBusiness?.pin || '201301',
       gstNumber: '',
       notes: '',
       customerType: 'commercial',
@@ -305,7 +308,7 @@ export const CustomersView: React.FC = () => {
                 </div>
                 <div>
                   <span>Spent: </span>
-                  <span className="font-bold text-emerald-600">{currentBusiness.currency}{totalSpent}</span>
+                  <span className="font-bold text-emerald-600">{(currentBusiness?.currency || '₹')}{totalSpent}</span>
                 </div>
               </div>
             </div>
@@ -440,7 +443,7 @@ export const CustomersView: React.FC = () => {
                           <div className="font-bold text-slate-900 dark:text-slate-100">{qt.quotationNumber}</div>
                           <div className="text-[10px] text-slate-500">{qt.date}</div>
                         </div>
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{currentBusiness.currency}{qt.grandTotal}</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{currencySymbol}{qt.grandTotal}</span>
                       </div>
                     ))
                   )}
@@ -458,7 +461,7 @@ export const CustomersView: React.FC = () => {
                           <div className="font-bold text-slate-900 dark:text-slate-100">{inv.invoiceNumber}</div>
                           <div className="text-[10px] text-slate-500">Due: {inv.dueDate}</div>
                         </div>
-                        <span className="font-bold text-indigo-600 dark:text-indigo-400">{currentBusiness.currency}{inv.grandTotal} ({inv.status})</span>
+                        <span className="font-bold text-indigo-600 dark:text-indigo-400">{currencySymbol}{inv.grandTotal} ({inv.status})</span>
                       </div>
                     ))
                   )}
@@ -476,7 +479,7 @@ export const CustomersView: React.FC = () => {
                           <div className="font-bold text-slate-900 dark:text-slate-100">{p.referenceNumber || `Payment #${p.id.slice(-6)}`}</div>
                           <div className="text-[10px] text-slate-500">{p.date} • {p.method.toUpperCase()}</div>
                         </div>
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{currentBusiness.currency}{p.amount}</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{currencySymbol}{p.amount}</span>
                       </div>
                     ))
                   )}

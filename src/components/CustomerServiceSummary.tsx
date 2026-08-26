@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 
 interface CustomerServiceSummaryProps {
-  customer: Customer;
+  customer?: Customer | null;
   onClose?: () => void;
 }
 
@@ -38,6 +38,8 @@ export const CustomerServiceSummary: React.FC<CustomerServiceSummaryProps> = ({ 
     addJob,
     showToast,
   } = useApp();
+
+  const currencySymbol = currentBusiness?.currency || '₹';
 
   const [activeTab, setActiveTab] = useState<'all' | 'maintenance' | 'history' | 'invoices'>('all');
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
@@ -54,27 +56,35 @@ export const CustomerServiceSummary: React.FC<CustomerServiceSummaryProps> = ({ 
 
   const todayStr = new Date().toISOString().slice(0, 10);
 
+  if (!customer) {
+    return (
+      <div className="p-8 text-center text-xs text-slate-400">
+        Select a customer to view service history and maintenance records.
+      </div>
+    );
+  }
+
   // Customer specific data
-  const customerJobs = jobs.filter((j) => j.customerId === customer.id);
-  const customerInvoices = invoices.filter((i) => i.customerId === customer.id);
-  const customerContracts = contracts.filter((c) => c.customerId === customer.id);
+  const customerJobs = (jobs || []).filter((j) => j.customerId === customer.id);
+  const customerInvoices = (invoices || []).filter((i) => i.customerId === customer.id);
+  const customerContracts = (contracts || []).filter((c) => c.customerId === customer.id);
 
   // Categorize jobs
   const upcomingJobs = customerJobs.filter((j) => {
     const isFutureOrToday = j.scheduledDate >= todayStr;
     const isActiveStatus = ['new', 'assigned', 'accepted', 'on_the_way', 'started', 'in_progress'].includes(j.status);
     return isFutureOrToday || isActiveStatus;
-  }).sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
+  }).sort((a, b) => (a.scheduledDate || '').localeCompare(b.scheduledDate || ''));
 
   const historyJobs = customerJobs.filter((j) => {
     const isCompleted = ['completed', 'verified', 'closed', 'cancelled'].includes(j.status);
     return isCompleted;
-  }).sort((a, b) => b.scheduledDate.localeCompare(a.scheduledDate));
+  }).sort((a, b) => (b.scheduledDate || '').localeCompare(a.scheduledDate || ''));
 
   // Financial stats
-  const totalInvoiced = customerInvoices.reduce((sum, inv) => sum + inv.grandTotal, 0);
-  const totalPaid = customerInvoices.reduce((sum, inv) => sum + inv.paidAmount, 0);
-  const totalBalance = customerInvoices.reduce((sum, inv) => sum + inv.balanceAmount, 0);
+  const totalInvoiced = customerInvoices.reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
+  const totalPaid = customerInvoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
+  const totalBalance = customerInvoices.reduce((sum, inv) => sum + (inv.balanceAmount || 0), 0);
 
   const handleCreateMaintenanceJob = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +98,7 @@ export const CustomerServiceSummary: React.FC<CustomerServiceSummaryProps> = ({ 
       assignedStaffId: newJobStaffId || undefined,
       scheduledDate: newJobDate,
       scheduledTime: newJobTime,
-      location: `${customer.address}, ${customer.city}`,
+      location: `${customer.address || ''}, ${customer.city || ''}`,
       estimatedAmount: selectedSvc ? selectedSvc.price : 1500,
       status: newJobStaffId ? 'assigned' : 'new',
     });
@@ -163,7 +173,7 @@ export const CustomerServiceSummary: React.FC<CustomerServiceSummaryProps> = ({ 
           <div>
             <div className="text-[11px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Outstanding Balance</div>
             <div className="text-xl font-black text-amber-950 dark:text-amber-100 mt-0.5">
-              {currentBusiness.currency}{totalBalance.toLocaleString()}
+              {currencySymbol}{totalBalance.toLocaleString()}
             </div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold shrink-0">
@@ -307,7 +317,7 @@ export const CustomerServiceSummary: React.FC<CustomerServiceSummaryProps> = ({ 
                         )}
                       </div>
                       <span className="font-extrabold text-slate-900 dark:text-slate-100">
-                        Estimated: {currentBusiness.currency}{job.estimatedAmount}
+                        Estimated: {currencySymbol}{job.estimatedAmount}
                       </span>
                     </div>
                   </div>
@@ -365,7 +375,7 @@ export const CustomerServiceSummary: React.FC<CustomerServiceSummaryProps> = ({ 
                     <div className="flex items-center justify-between text-[11px] text-slate-500">
                       <span>Date: <strong className="text-slate-800 dark:text-slate-200">{job.scheduledDate}</strong></span>
                       {assignedStaff && <span>Technician: <strong className="text-slate-800 dark:text-slate-200">{assignedStaff.name}</strong></span>}
-                      <span className="font-bold text-emerald-600">{currentBusiness.currency}{job.estimatedAmount}</span>
+                      <span className="font-bold text-emerald-600">{currencySymbol}{job.estimatedAmount}</span>
                     </div>
 
                     {/* Detailed expandable history section */}
@@ -387,7 +397,7 @@ export const CustomerServiceSummary: React.FC<CustomerServiceSummaryProps> = ({ 
                             <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-slate-600 dark:text-slate-400">
                               {job.materialsUsed.map((mat, idx) => (
                                 <li key={idx}>
-                                  {mat.name} x {mat.quantity} ({currentBusiness.currency}{mat.unitPrice} each)
+                                  {mat.name} x {mat.quantity} ({currencySymbol}{mat.unitPrice} each)
                                 </li>
                               ))}
                             </ul>
@@ -418,7 +428,7 @@ export const CustomerServiceSummary: React.FC<CustomerServiceSummaryProps> = ({ 
               Associated Invoices ({customerInvoices.length})
             </h3>
             <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
-              Total Invoiced: <strong className="text-slate-900 dark:text-slate-100">{currentBusiness.currency}{totalInvoiced.toLocaleString()}</strong>
+              Total Invoiced: <strong className="text-slate-900 dark:text-slate-100">{currencySymbol}{totalInvoiced.toLocaleString()}</strong>
             </span>
           </div>
 
@@ -458,15 +468,15 @@ export const CustomerServiceSummary: React.FC<CustomerServiceSummaryProps> = ({ 
 
                     <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
                       <div>
-                        Paid: <strong className="text-emerald-600">{currentBusiness.currency}{inv.paidAmount}</strong>
+                        Paid: <strong className="text-emerald-600">{currencySymbol}{inv.paidAmount}</strong>
                         {inv.balanceAmount > 0 && (
                           <span className="ml-2 text-rose-600 font-semibold">
-                            (Due: {currentBusiness.currency}{inv.balanceAmount})
+                            (Due: {currencySymbol}{inv.balanceAmount})
                           </span>
                         )}
                       </div>
                       <div className="font-black text-sm text-slate-900 dark:text-slate-100">
-                        {currentBusiness.currency}{inv.grandTotal}
+                        {currencySymbol}{inv.grandTotal}
                       </div>
                     </div>
 
@@ -477,8 +487,8 @@ export const CustomerServiceSummary: React.FC<CustomerServiceSummaryProps> = ({ 
                         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-2.5 space-y-1">
                           {inv.items.map((item, idx) => (
                             <div key={idx} className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-300">
-                              <span>{item.description} ({item.quantity} x {currentBusiness.currency}{item.rate})</span>
-                              <span className="font-semibold">{currentBusiness.currency}{item.amount}</span>
+                              <span>{item.description} ({item.quantity} x {currencySymbol}{item.rate})</span>
+                              <span className="font-semibold">{currencySymbol}{item.amount}</span>
                             </div>
                           ))}
                         </div>
@@ -535,7 +545,7 @@ export const CustomerServiceSummary: React.FC<CustomerServiceSummaryProps> = ({ 
                 >
                   {services.map((svc) => (
                     <option key={svc.id} value={svc.id}>
-                      {svc.name} ({currentBusiness.currency}{svc.price})
+                      {svc.name} ({currencySymbol}{svc.price})
                     </option>
                   ))}
                 </select>
