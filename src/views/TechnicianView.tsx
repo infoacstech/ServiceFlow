@@ -3,7 +3,6 @@ import { useApp } from '../context/AppContext';
 import { Job, JobStatus, JobPriority } from '../types';
 import { DigitalSignatureCanvas } from '../components/DigitalSignatureCanvas';
 import { VoiceNotesRecorder } from '../components/VoiceNotesRecorder';
-import { JobServiceProgressBar } from '../components/JobServiceProgressBar';
 import { PhotoEvidenceUploader } from '../components/PhotoEvidenceUploader';
 import {
   Briefcase,
@@ -17,19 +16,66 @@ import {
   Play,
   Check,
   Search,
-  UserCheck,
   Calendar,
   X,
   MessageSquare,
   Share2,
-  Send,
   Sparkles,
+  ChevronRight,
+  User,
+  AlertCircle,
 } from 'lucide-react';
 import {
   sendTechnicianOnTheWayAlert,
   sendJobCompletionSummaryToCustomer,
   sendGoogleReviewRequest,
 } from '../utils/whatsappHelper';
+
+// Single reliable status categorization helpers
+export const isJobPending = (status: JobStatus): boolean => {
+  return status === 'new' || status === 'scheduled' || status === 'assigned' || status === 'accepted';
+};
+
+export const isJobInProgress = (status: JobStatus): boolean => {
+  return status === 'on_the_way' || status === 'started' || status === 'in_progress' || status === 'on_hold';
+};
+
+export const isJobCompleted = (status: JobStatus): boolean => {
+  return status === 'completed' || status === 'verified' || status === 'closed';
+};
+
+export function formatJobSchedule(scheduledDate?: string, scheduledTimeSlot?: string): string {
+  let dateStr = '';
+  if (scheduledDate) {
+    try {
+      const parts = scheduledDate.split('-');
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        const d = new Date(year, month, day);
+        dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      } else {
+        dateStr = scheduledDate;
+      }
+    } catch {
+      dateStr = scheduledDate;
+    }
+  } else {
+    dateStr = 'Today';
+  }
+
+  if (scheduledTimeSlot) {
+    return `${dateStr} • ${scheduledTimeSlot}`;
+  }
+  return dateStr;
+}
+
+export function formatPriorityLabel(priority?: JobPriority): string {
+  if (!priority) return 'Medium priority';
+  const cap = priority.charAt(0).toUpperCase() + priority.slice(1).toLowerCase();
+  return `${cap} priority`;
+}
 
 export const TechnicianView: React.FC = () => {
   const {
@@ -44,7 +90,7 @@ export const TechnicianView: React.FC = () => {
     showToast,
   } = useApp();
 
-  // Filter jobs assigned to this technician with comprehensive matching (ID, email, name)
+  // Filter jobs assigned to this technician
   const techJobs = useMemo(() => {
     return (jobs || []).filter((j) => {
       // If previewing as admin / owner / manager, show all business jobs
@@ -75,22 +121,26 @@ export const TechnicianView: React.FC = () => {
   }, [jobs, staff, currentUser]);
 
   // Tab & Filter States
-  const [filterTab, setFilterTab] = useState<'active' | 'in_progress' | 'all' | 'completed'>('active');
+  const [filterTab, setFilterTab] = useState<'all' | 'in_progress' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [detailsJobId, setDetailsJobId] = useState<string | null>(null);
   const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
   const [completionStep, setCompletionStep] = useState<1 | 2 | 3 | 4>(1);
+
+  // Single reliable status counts
+  const totalAssigned = techJobs.length;
+  const pendingCount = useMemo(() => techJobs.filter((j) => isJobPending(j.status)).length, [techJobs]);
+  const inProgressCount = useMemo(() => techJobs.filter((j) => isJobInProgress(j.status)).length, [techJobs]);
+  const completedCount = useMemo(() => techJobs.filter((j) => isJobCompleted(j.status)).length, [techJobs]);
 
   // Filtered jobs according to tab and search
   const displayedJobs = useMemo(() => {
     return techJobs.filter((job) => {
       // Tab filter
-      if (filterTab === 'active') {
-        if (job.status === 'completed' || job.status === 'closed') return false;
-      } else if (filterTab === 'in_progress') {
-        if (job.status !== 'on_the_way' && job.status !== 'started' && job.status !== 'in_progress') return false;
+      if (filterTab === 'in_progress') {
+        if (!isJobInProgress(job.status)) return false;
       } else if (filterTab === 'completed') {
-        if (job.status !== 'completed' && job.status !== 'closed') return false;
+        if (!isJobCompleted(job.status)) return false;
       }
 
       // Search query filter
@@ -108,13 +158,13 @@ export const TechnicianView: React.FC = () => {
     });
   }, [techJobs, filterTab, searchQuery, customers]);
 
-  // Selected job for detail / execution
+  // Selected job for detail modal or completion workflow
   const activeSelectedJob = useMemo(() => {
-    if (selectedJobId) {
-      return (jobs || []).find((j) => j.id === selectedJobId) || techJobs[0] || null;
+    if (detailsJobId) {
+      return (jobs || []).find((j) => j.id === detailsJobId) || null;
     }
-    return techJobs.find((j) => j.status !== 'completed' && j.status !== 'closed') || techJobs[0] || null;
-  }, [selectedJobId, jobs, techJobs]);
+    return null;
+  }, [detailsJobId, jobs]);
 
   // Form State for Completing Job
   const [problemFound, setProblemFound] = useState('');
@@ -129,18 +179,12 @@ export const TechnicianView: React.FC = () => {
     'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=500&auto=format&fit=crop&q=80'
   );
 
-  // Statistics calculation
-  const totalAssigned = techJobs.length;
-  const activeCount = techJobs.filter((j) => j.status !== 'completed' && j.status !== 'closed').length;
-  const inProgressCount = techJobs.filter((j) => j.status === 'on_the_way' || j.status === 'started' || j.status === 'in_progress').length;
-  const completedCount = techJobs.filter((j) => j.status === 'completed' || j.status === 'closed').length;
-
   const handleStatusChange = (jobId: string, newStatus: JobStatus) => {
     updateJobStatus(jobId, newStatus);
   };
 
   const handleOpenCompletionWorkflow = (job: Job) => {
-    setSelectedJobId(job.id);
+    setDetailsJobId(job.id);
     setProblemFound(job.problemFound || job.notes || '');
     setSolutionProvided(job.solutionProvided || '');
     setBeforePhoto(
@@ -191,100 +235,132 @@ export const TechnicianView: React.FC = () => {
     setSelectedMaterials((prev) => prev.filter((m) => m.inventoryId !== inventoryId));
   };
 
-  const getPriorityBadge = (priority?: JobPriority) => {
-    switch (priority) {
-      case 'urgent':
-        return 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30';
-      case 'high':
-        return 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30';
-      case 'medium':
-        return 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30';
-      default:
-        return 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30';
-    }
-  };
-
-  const getStatusBadge = (status: JobStatus) => {
+  // Render single prominent status badge
+  const renderStatusBadge = (status: JobStatus) => {
     switch (status) {
+      case 'verified':
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-purple-100 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+            VERIFIED
+          </span>
+        );
       case 'completed':
       case 'closed':
-        return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30';
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+            COMPLETED
+          </span>
+        );
       case 'started':
       case 'in_progress':
-        return 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30 animate-pulse';
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-800 animate-pulse">
+            IN PROGRESS
+          </span>
+        );
       case 'on_the_way':
-        return 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30';
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-blue-100 text-blue-700 dark:bg-blue-950/80 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+            ON THE WAY
+          </span>
+        );
       case 'accepted':
-        return 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30';
+      case 'assigned':
+      case 'scheduled':
+      case 'new':
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+            ASSIGNED
+          </span>
+        );
+      case 'cancelled':
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+            CANCELLED
+          </span>
+        );
       default:
-        return 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30';
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+            {String(status).replace('_', ' ').toUpperCase()}
+          </span>
+        );
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5 pb-24 animate-in fade-in" id="technician-view-container">
-      {/* Top Field Technician Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 sm:p-6 rounded-3xl shadow-xl relative overflow-hidden border border-slate-800">
-        <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="max-w-xl mx-auto space-y-3.5 pb-24 animate-in fade-in" id="technician-view-container">
+      {/* 1. Simplified Top Header & 3 Compact Counters */}
+      <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-md border border-slate-800">
+        <div className="flex items-center justify-between gap-2 mb-3">
           <div>
-            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 px-3 py-0.5 rounded-full border border-indigo-500/30 flex items-center gap-1.5">
-                <UserCheck className="w-3.5 h-3.5" />
-                {currentUser?.name || 'Field Technician'} ({currentUser?.role?.toUpperCase() || 'TECH'})
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                Live Dispatch Ready
-              </span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+            <h1 className="text-base sm:text-lg font-black text-white tracking-tight">
               My Assigned Field Jobs
             </h1>
-            <p className="text-xs text-slate-300 mt-0.5">
-              {currentBusiness?.name || 'ServiFlow'} • {totalAssigned} assigned tasks in schedule
+            <p className="text-[11px] text-slate-400">
+              {currentBusiness?.name || 'ServiFlow'} • {totalAssigned} assigned {totalAssigned === 1 ? 'task' : 'tasks'}
             </p>
           </div>
+          {currentUser?.name && (
+            <span className="text-[10px] font-bold text-indigo-300 bg-indigo-950/80 border border-indigo-800/80 px-2 py-0.5 rounded-full truncate max-w-[130px]">
+              {currentUser.name}
+            </span>
+          )}
+        </div>
 
-          {/* Quick Stats Grid */}
-          <div className="grid grid-cols-3 gap-2 w-full sm:w-auto">
-            <div className="bg-white/10 backdrop-blur-xs px-3 py-2 rounded-2xl border border-white/10 text-center">
-              <div className="text-lg font-black text-amber-300">{activeCount}</div>
-              <div className="text-[10px] text-slate-300 font-semibold uppercase">Pending</div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-xs px-3 py-2 rounded-2xl border border-white/10 text-center">
-              <div className="text-lg font-black text-blue-300">{inProgressCount}</div>
-              <div className="text-[10px] text-slate-300 font-semibold uppercase">In Field</div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-xs px-3 py-2 rounded-2xl border border-white/10 text-center">
-              <div className="text-lg font-black text-emerald-300">{completedCount}</div>
-              <div className="text-[10px] text-slate-300 font-semibold uppercase">Done</div>
-            </div>
-          </div>
+        {/* 3 Compact Counters: Pending | In Progress | Completed */}
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <button
+            type="button"
+            onClick={() => setFilterTab('all')}
+            className="bg-white/5 hover:bg-white/10 p-2 rounded-xl border border-white/10 transition-all cursor-pointer"
+          >
+            <div className="text-base font-black text-amber-300">{pendingCount}</div>
+            <div className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">Pending</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterTab('in_progress')}
+            className="bg-white/5 hover:bg-white/10 p-2 rounded-xl border border-white/10 transition-all cursor-pointer"
+          >
+            <div className="text-base font-black text-blue-300">{inProgressCount}</div>
+            <div className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">In Progress</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterTab('completed')}
+            className="bg-white/5 hover:bg-white/10 p-2 rounded-xl border border-white/10 transition-all cursor-pointer"
+          >
+            <div className="text-base font-black text-emerald-300">{completedCount}</div>
+            <div className="text-[10px] text-slate-300 font-bold uppercase tracking-wider">Completed</div>
+          </button>
         </div>
       </div>
 
-      {/* Filter Tabs & Search Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+      {/* 2. Simplified Tabs & Search */}
+      <div className="space-y-2">
+        {/* Tabs: All Jobs (X) | In Progress (Y) | Completed (Z) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
           <button
-            onClick={() => setFilterTab('active')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
-              filterTab === 'active'
+            type="button"
+            onClick={() => setFilterTab('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+              filterTab === 'all'
                 ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50'
             }`}
           >
-            <Clock className="w-3.5 h-3.5" />
-            Active / Pending ({activeCount})
+            <Briefcase className="w-3.5 h-3.5" />
+            All Jobs ({totalAssigned})
           </button>
 
           <button
+            type="button"
             onClick={() => setFilterTab('in_progress')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
               filterTab === 'in_progress'
                 ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50'
             }`}
           >
             <Play className="w-3.5 h-3.5" />
@@ -292,23 +368,12 @@ export const TechnicianView: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setFilterTab('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
-              filterTab === 'all'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Briefcase className="w-3.5 h-3.5" />
-            All Assigned ({totalAssigned})
-          </button>
-
-          <button
+            type="button"
             onClick={() => setFilterTab('completed')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
               filterTab === 'completed'
                 ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50'
             }`}
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -316,20 +381,21 @@ export const TechnicianView: React.FC = () => {
           </button>
         </div>
 
-        {/* Search Field */}
-        <div className="relative min-w-[200px]">
+        {/* Search Bar */}
+        <div className="relative">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Search job, client, address..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+            className="w-full pl-8 pr-8 py-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-2xs"
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
             >
               <X className="w-3 h-3" />
             </button>
@@ -337,258 +403,103 @@ export const TechnicianView: React.FC = () => {
         </div>
       </div>
 
-      {/* Jobs List */}
+      {/* 3. Compact Mobile Job Cards List */}
       {displayedJobs.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 p-10 rounded-3xl border border-slate-200 dark:border-slate-800 text-center space-y-3">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 mx-auto flex items-center justify-center">
-            <CheckCircle2 className="w-8 h-8" />
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-2">
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 mx-auto flex items-center justify-center">
+            <CheckCircle2 className="w-5 h-5" />
           </div>
-          <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
-            {filterTab === 'active'
-              ? 'No Active Pending Jobs'
+          <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+            {filterTab === 'in_progress'
+              ? 'No Jobs In Progress'
               : filterTab === 'completed'
-              ? 'No Completed Jobs Yet'
+              ? 'No Completed Jobs'
               : 'No Jobs Found'}
           </h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+          <p className="text-xs text-slate-500 max-w-xs mx-auto">
             {totalAssigned > 0
-              ? `You have ${totalAssigned} total jobs assigned across all tabs. Switch filter tabs above to view them.`
-              : 'No tasks currently assigned to your technician account. New jobs assigned by dispatch will appear here immediately.'}
+              ? `You have ${totalAssigned} total assigned jobs. Tap another tab above to view them.`
+              : 'No field tasks currently assigned to your account.'}
           </p>
-          {totalAssigned > 0 && filterTab !== 'all' && (
-            <button
-              onClick={() => setFilterTab('all')}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all cursor-pointer inline-flex items-center gap-1.5"
-            >
-              <Briefcase className="w-3.5 h-3.5" /> View All {totalAssigned} Assigned Jobs
-            </button>
-          )}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {displayedJobs.map((job) => {
             const customer = (customers || []).find((c) => c.id === job.customerId);
-            const isCompleted = job.status === 'completed' || job.status === 'closed';
 
             return (
               <div
                 key={job.id}
                 id={`tech-job-card-${job.id}`}
-                className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-indigo-300 dark:hover:border-indigo-800/80 transition-all overflow-hidden"
+                className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-4 shadow-xs hover:border-indigo-300 dark:hover:border-indigo-800 transition-all space-y-2.5"
               >
-                {/* Job Card Header */}
-                <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800/60 flex flex-wrap items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-black text-xs text-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 rounded-xl border border-indigo-200 dark:border-indigo-800">
-                      {job.jobId}
-                    </span>
-                    <span className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${getPriorityBadge(job.priority)}`}>
-                      {job.priority || 'NORMAL'}
-                    </span>
-                    {job.scheduledTimeSlot && (
-                      <span className="text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 px-2.5 py-0.5 rounded-full border border-purple-200 dark:border-purple-800 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {job.scheduledTimeSlot}
+                {/* Header Row: Job ID & Single Prominent Status Badge */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono font-black text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 rounded-lg border border-indigo-200/80 dark:border-indigo-800/80">
+                    {job.jobId}
+                  </span>
+                  {renderStatusBadge(job.status)}
+                </div>
+
+                {/* Customer, Schedule & Priority */}
+                <div className="space-y-0.5 text-left">
+                  <div className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                    <span>{customer?.name || 'Client'}</span>
+                    {customer?.companyName && (
+                      <span className="text-xs font-normal text-slate-400">
+                        • {customer.companyName}
                       </span>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-black uppercase px-2.5 py-1 rounded-xl border ${getStatusBadge(job.status)}`}>
-                      {job.status.replace('_', ' ')}
-                    </span>
+                  <div className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>{formatJobSchedule(job.scheduledDate, job.scheduledTimeSlot)}</span>
+                  </div>
+
+                  <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 pt-0.5">
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 ${
+                        job.priority === 'urgent'
+                          ? 'bg-rose-500'
+                          : job.priority === 'high'
+                          ? 'bg-amber-500'
+                          : 'bg-blue-500'
+                      }`}
+                    />
+                    <span>{formatPriorityLabel(job.priority)}</span>
                   </div>
                 </div>
 
-                {/* Card Body */}
-                <div className="p-4 sm:p-5 space-y-4">
-                  {/* Service Progress Tracker */}
-                  <JobServiceProgressBar job={job} status={job.status} isInteractive={false} />
-
-                  {/* Customer and Contact Details */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-black text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                        {customer?.name || 'Customer'}
-                        {customer?.companyName && (
-                          <span className="text-xs font-semibold text-slate-500">
-                            • {customer.companyName}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-1 flex-wrap">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-                          Date: {job.scheduledDate || 'Today'}
-                        </span>
-                        {job.scheduledTimeSlot && (
-                          <span className="flex items-center gap-1 font-semibold text-purple-600 dark:text-purple-400">
-                            <Clock className="w-3.5 h-3.5" />
-                            Slot: {job.scheduledTimeSlot}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Quick Call Button */}
-                    {customer?.mobile && (
-                      <a
-                        href={`tel:${customer.mobile}`}
-                        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all active:scale-95 shrink-0"
-                      >
-                        <Phone className="w-3.5 h-3.5" /> Call Client ({customer.mobile})
-                      </a>
-                    )}
-                  </div>
-
-                  {/* Site Address with Map Navigation Trigger */}
-                  <div className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                    <div className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300 min-w-0 flex-1">
-                      <MapPin className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                      <div className="min-w-0">
-                        <span className="font-bold text-slate-900 dark:text-slate-100 block text-[11px]">Site Address:</span>
-                        <span className="truncate block">{job.location || customer?.address || 'On-site address provided'}</span>
-                      </div>
-                    </div>
-                    {(job.location || customer?.address) && (
-                      <a
-                        href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.location || customer?.address || '')}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shrink-0 shadow-2xs transition-all active:scale-95"
-                        title="Start GPS Turn-by-Turn Navigation"
-                      >
-                        <Navigation className="w-3.5 h-3.5" /> Start GPS Route
-                      </a>
-                    )}
-                  </div>
-
-                  {/* Smart WhatsApp Actions for Field Tech */}
-                  <div className="flex items-center gap-2">
+                {/* Primary & Secondary Action Buttons: [ Call Client ] [ View Details ] */}
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                  {customer?.mobile ? (
+                    <a
+                      href={`tel:${customer.mobile}`}
+                      className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer text-center"
+                    >
+                      <Phone className="w-3.5 h-3.5" />
+                      <span>Call Client</span>
+                    </a>
+                  ) : (
                     <button
                       type="button"
-                      onClick={() => {
-                        sendTechnicianOnTheWayAlert(job, customer, currentUser, currentBusiness);
-                      }}
-                      className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      disabled
+                      className="py-2.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 font-bold text-xs flex items-center justify-center gap-1.5 cursor-not-allowed"
                     >
-                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                      WhatsApp: I'm On The Way
+                      <Phone className="w-3.5 h-3.5" />
+                      <span>No Phone</span>
                     </button>
+                  )}
 
-                    {customer?.mobile && (
-                      <a
-                        href={`tel:${customer.mobile}`}
-                        className="py-1.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-bold text-[11px] flex items-center justify-center gap-1.5 shrink-0"
-                      >
-                        <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                        Call
-                      </a>
-                    )}
-                  </div>
-
-                  {/* Service Task Description / Instructions */}
-                  <div className="text-xs p-3 rounded-2xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/60 text-slate-700 dark:text-slate-300">
-                    <span className="font-bold text-amber-900 dark:text-amber-200 block mb-0.5">
-                      Work Description & Instructions:
-                    </span>
-                    {job.description || 'General Service & Equipment Maintenance'}
-                  </div>
-
-                  {/* Audio Notes Recorder for this job */}
-                  <VoiceNotesRecorder
-                    job={job}
-                    onNotesSaved={() => {
-                      showToast('Field audio notes saved for job ' + job.jobId, 'success');
-                    }}
-                  />
-
-                  {/* Workflow Execution Action Bar */}
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
-                    {/* Status 1: Assigned */}
-                    {job.status === 'assigned' && (
-                      <button
-                        onClick={() => handleStatusChange(job.id, 'accepted')}
-                        className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all active:scale-98 cursor-pointer"
-                      >
-                        <Check className="w-4 h-4" /> Accept Assigned Job
-                      </button>
-                    )}
-
-                    {/* Status 2: Accepted */}
-                    {job.status === 'accepted' && (
-                      <button
-                        onClick={() => handleStatusChange(job.id, 'on_the_way')}
-                        className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all active:scale-98 cursor-pointer"
-                      >
-                        <Navigation className="w-4 h-4" /> Start Navigation (On The Way to Site)
-                      </button>
-                    )}
-
-                    {/* Status 3: On The Way */}
-                    {job.status === 'on_the_way' && (
-                      <button
-                        onClick={() => handleStatusChange(job.id, 'started')}
-                        className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all active:scale-98 cursor-pointer"
-                      >
-                        <Play className="w-4 h-4" /> Arrived at Site & Begin Diagnostic
-                      </button>
-                    )}
-
-                    {/* Status 4: Started / In Progress */}
-                    {(job.status === 'started' || job.status === 'in_progress') && (
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <button
-                          onClick={() => handleOpenCompletionWorkflow(job)}
-                          className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-98 cursor-pointer"
-                        >
-                          <FileCheck2 className="w-4 h-4" /> Complete Job & Obtain Signoff →
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Status 5: Completed */}
-                    {isCompleted && (
-                      <div className="space-y-2">
-                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-2xl flex items-center justify-between text-xs text-emerald-900 dark:text-emerald-200">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                            <span className="font-bold">Job Completed & Signed Off</span>
-                            {job.customerRating && (
-                              <span>• ⭐ {job.customerRating}/5</span>
-                            )}
-                          </div>
-                          {job.solutionProvided && (
-                            <span className="text-[11px] text-emerald-700 dark:text-emerald-300 max-w-[200px] truncate">
-                              {job.solutionProvided}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Customer 5-Star Review & Summary Booster */}
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              sendGoogleReviewRequest(customer, currentBusiness);
-                            }}
-                            className="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[11px] flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
-                          >
-                            <Sparkles className="w-3.5 h-3.5 fill-current" /> Request 5⭐ Google Review on WhatsApp
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              sendJobCompletionSummaryToCustomer(job, customer, currentUser, currentBusiness);
-                            }}
-                            className="py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 dark:text-slate-200 font-bold text-[11px] flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-all active:scale-95 cursor-pointer"
-                          >
-                            <Share2 className="w-3.5 h-3.5 text-emerald-600" /> Share Report
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDetailsJobId(job.id)}
+                    className="py-2.5 px-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center gap-1.5 border border-indigo-200/80 dark:border-indigo-800/80 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <span>View Details</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             );
@@ -596,21 +507,237 @@ export const TechnicianView: React.FC = () => {
         </div>
       )}
 
-      {/* Complete Job Modal Workflow */}
+      {/* 4. Full Job Details Modal */}
+      {detailsJobId && activeSelectedJob && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 z-50 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-lg overflow-hidden max-h-[92vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-black text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800">
+                  {activeSelectedJob.jobId}
+                </span>
+                {renderStatusBadge(activeSelectedJob.status)}
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailsJobId(null)}
+                className="p-1.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 text-xs">
+              {/* Customer Info */}
+              {(() => {
+                const customer = (customers || []).find((c) => c.id === activeSelectedJob.customerId);
+                const isCompleted = isJobCompleted(activeSelectedJob.status);
+
+                return (
+                  <>
+                    <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                            Client Details
+                          </span>
+                          <div className="text-sm font-black text-slate-900 dark:text-slate-100">
+                            {customer?.name || 'Customer'}
+                          </div>
+                          {customer?.companyName && (
+                            <div className="text-[11px] text-slate-500">{customer.companyName}</div>
+                          )}
+                        </div>
+
+                        {customer?.mobile && (
+                          <a
+                            href={`tel:${customer.mobile}`}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-xs"
+                          >
+                            <Phone className="w-3.5 h-3.5" /> Call ({customer.mobile})
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between gap-2 text-slate-600 dark:text-slate-300">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>Schedule: <strong>{formatJobSchedule(activeSelectedJob.scheduledDate, activeSelectedJob.scheduledTimeSlot)}</strong></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Site Location & GPS */}
+                    <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between gap-2">
+                      <div className="flex items-start gap-2 text-slate-700 dark:text-slate-300 min-w-0 flex-1">
+                        <MapPin className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <span className="font-bold text-slate-900 dark:text-slate-100 block text-[11px]">
+                            Site Address:
+                          </span>
+                          <span className="truncate block">
+                            {activeSelectedJob.location || customer?.address || 'Site address provided'}
+                          </span>
+                        </div>
+                      </div>
+                      {(activeSelectedJob.location || customer?.address) && (
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                            activeSelectedJob.location || customer?.address || ''
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shrink-0 shadow-2xs transition-all"
+                        >
+                          <Navigation className="w-3.5 h-3.5" /> Start GPS
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Work Description & Instructions */}
+                    <div className="p-3.5 rounded-2xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/60 text-slate-700 dark:text-slate-300 space-y-1">
+                      <span className="font-bold text-amber-900 dark:text-amber-200 block text-xs">
+                        Work Description & Instructions:
+                      </span>
+                      <p className="leading-relaxed text-xs">
+                        {activeSelectedJob.description || 'General Service & Equipment Maintenance'}
+                      </p>
+                    </div>
+
+                    {/* Quick WhatsApp Alert Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sendTechnicianOnTheWayAlert(activeSelectedJob, customer, currentUser, currentBusiness);
+                      }}
+                      className="w-full py-2 px-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                      WhatsApp: Send "I'm On The Way" Alert
+                    </button>
+
+                    {/* Field Audio Notes Recorder */}
+                    <VoiceNotesRecorder
+                      job={activeSelectedJob}
+                      onNotesSaved={() => {
+                        showToast('Field audio notes saved for job ' + activeSelectedJob.jobId, 'success');
+                      }}
+                    />
+
+                    {/* Primary Workflow Execution Buttons */}
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                      {activeSelectedJob.status === 'assigned' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleStatusChange(activeSelectedJob.id, 'accepted');
+                            setDetailsJobId(null);
+                          }}
+                          className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+                        >
+                          <Check className="w-4 h-4" /> Accept Assigned Job
+                        </button>
+                      )}
+
+                      {activeSelectedJob.status === 'accepted' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleStatusChange(activeSelectedJob.id, 'on_the_way');
+                            setDetailsJobId(null);
+                          }}
+                          className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+                        >
+                          <Navigation className="w-4 h-4" /> Start Navigation (On The Way to Site)
+                        </button>
+                      )}
+
+                      {activeSelectedJob.status === 'on_the_way' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleStatusChange(activeSelectedJob.id, 'started');
+                            setDetailsJobId(null);
+                          }}
+                          className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+                        >
+                          <Play className="w-4 h-4" /> Arrived at Site & Begin Work
+                        </button>
+                      )}
+
+                      {(activeSelectedJob.status === 'started' || activeSelectedJob.status === 'in_progress') && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCompletionWorkflow(activeSelectedJob)}
+                          className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                        >
+                          <FileCheck2 className="w-4 h-4" /> Complete Job & Obtain Signoff →
+                        </button>
+                      )}
+
+                      {isCompleted && (
+                        <div className="space-y-2">
+                          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-2xl flex items-center justify-between text-xs text-emerald-900 dark:text-emerald-200">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              <span className="font-bold">
+                                {activeSelectedJob.status === 'verified' ? 'Verified by QA / Admin' : 'Job Completed & Signed Off'}
+                              </span>
+                            </div>
+                            {activeSelectedJob.customerRating && (
+                              <span className="font-bold">⭐ {activeSelectedJob.customerRating}/5</span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                sendGoogleReviewRequest(customer, currentBusiness);
+                              }}
+                              className="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 fill-current" /> Request 5⭐ Google Review
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                sendJobCompletionSummaryToCustomer(activeSelectedJob, customer, currentUser, currentBusiness);
+                              }}
+                              className="py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
+                            >
+                              <Share2 className="w-3.5 h-3.5 text-emerald-600" /> Share Report
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Complete Job 4-Step Modal Workflow */}
       {isCompletionModalOpen && activeSelectedJob && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 z-50 animate-in fade-in">
           <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md">
                   Field Job Signoff
                 </span>
-                <h3 className="font-black text-slate-900 dark:text-slate-100 text-base mt-0.5">
+                <h3 className="font-black text-slate-900 dark:text-slate-100 text-sm sm:text-base mt-0.5">
                   Complete Job {activeSelectedJob.jobId}
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setIsCompletionModalOpen(false)}
                 className="p-1.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 cursor-pointer"
               >
@@ -621,6 +748,7 @@ export const TechnicianView: React.FC = () => {
             {/* Stepper Tabs */}
             <div className="grid grid-cols-4 text-center border-b border-slate-100 dark:border-slate-800 text-[11px] font-bold text-slate-500 bg-slate-50/50 dark:bg-slate-900/50">
               <button
+                type="button"
                 onClick={() => setCompletionStep(1)}
                 className={`py-2.5 border-b-2 transition-all cursor-pointer ${
                   completionStep === 1 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/30' : 'border-transparent'
@@ -629,6 +757,7 @@ export const TechnicianView: React.FC = () => {
                 1. Diagnosis
               </button>
               <button
+                type="button"
                 onClick={() => setCompletionStep(2)}
                 className={`py-2.5 border-b-2 transition-all cursor-pointer ${
                   completionStep === 2 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/30' : 'border-transparent'
@@ -637,6 +766,7 @@ export const TechnicianView: React.FC = () => {
                 2. Parts
               </button>
               <button
+                type="button"
                 onClick={() => setCompletionStep(3)}
                 className={`py-2.5 border-b-2 transition-all cursor-pointer ${
                   completionStep === 3 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/30' : 'border-transparent'
@@ -645,6 +775,7 @@ export const TechnicianView: React.FC = () => {
                 3. Photos
               </button>
               <button
+                type="button"
                 onClick={() => setCompletionStep(4)}
                 className={`py-2.5 border-b-2 transition-all cursor-pointer ${
                   completionStep === 4 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/30' : 'border-transparent'
@@ -686,6 +817,7 @@ export const TechnicianView: React.FC = () => {
                   </div>
 
                   <button
+                    type="button"
                     onClick={() => setCompletionStep(2)}
                     className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer shadow-xs transition-all"
                   >
@@ -739,6 +871,7 @@ export const TechnicianView: React.FC = () => {
                             <div className="flex items-center gap-2">
                               <span className="font-mono font-bold">x{m.quantity} {invItem?.unit}</span>
                               <button
+                                type="button"
                                 onClick={() => removeMaterialItem(m.inventoryId)}
                                 className="text-rose-500 hover:text-rose-700 text-xs font-bold cursor-pointer"
                               >
@@ -753,12 +886,14 @@ export const TechnicianView: React.FC = () => {
 
                   <div className="flex gap-2 pt-2">
                     <button
+                      type="button"
                       onClick={() => setCompletionStep(1)}
                       className="w-1/2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs cursor-pointer"
                     >
                       ← Back
                     </button>
                     <button
+                      type="button"
                       onClick={() => setCompletionStep(3)}
                       className="w-1/2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer shadow-xs"
                     >
@@ -798,12 +933,14 @@ export const TechnicianView: React.FC = () => {
 
                   <div className="flex gap-2 pt-2">
                     <button
+                      type="button"
                       onClick={() => setCompletionStep(2)}
                       className="w-1/2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs cursor-pointer"
                     >
                       ← Back
                     </button>
                     <button
+                      type="button"
                       onClick={() => setCompletionStep(4)}
                       className="w-1/2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer shadow-xs"
                     >
@@ -849,6 +986,7 @@ export const TechnicianView: React.FC = () => {
                   </div>
 
                   <button
+                    type="button"
                     onClick={handleFinalSubmit}
                     className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98"
                   >
