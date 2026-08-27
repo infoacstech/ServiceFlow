@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { User } from '../types';
+import { AuthService } from '../services/AuthService';
 import {
   Mail,
   Lock,
@@ -13,6 +14,7 @@ import {
   CheckCircle2,
   Sparkles,
   RefreshCw,
+  AlertCircle,
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -39,15 +41,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  // Forgot Password State
-  const [forgotIdentifier, setForgotIdentifier] = useState('');
-  const [forgotStep, setForgotStep] = useState<'identifier' | 'verify' | 'new_password' | 'success'>('identifier');
-  const [forgotUser, setForgotUser] = useState<User | null>(null);
-  const [forgotOtp, setForgotOtp] = useState('');
-  const [generatedOtp, setGeneratedOtp] = useState('');
-  const [forgotNewPassword, setForgotNewPassword] = useState('');
-  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
-  const [isResetting, setIsResetting] = useState(false);
+  // Forgot Password State (Firebase Auth Built-in Password Reset Email)
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [isResetSubmitted, setIsResetSubmitted] = useState(false);
+  const [isSendingReset, setIsSendingReset] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   // Super Admin States
   const [superAdminEmail, setSuperAdminEmail] = useState('admin@serviflow.io');
@@ -159,69 +157,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  // Forgot Password Handlers
-  const handleRequestResetOtp = (e: React.FormEvent) => {
+  // FORGOT PASSWORD / FIREBASE AUTH PASSWORD RESET EMAIL HANDLER
+  const handleSendPasswordResetEmail = async (e: React.FormEvent) => {
     e.preventDefault();
-    const clean = forgotIdentifier.trim().toLowerCase();
-    if (!clean) {
-      showToast('Please enter your registered email or mobile number.', 'error');
+    setResetError(null);
+
+    const cleanEmail = forgotEmail.trim().toLowerCase();
+    if (!cleanEmail) {
+      setResetError('Please enter a valid email address.');
+      showToast('Please enter a valid email address.', 'error');
       return;
     }
 
-    const cleanPhoneDigits = clean.replace(/[^0-9]/g, '');
-    const found = users.find((u) => {
-      const uEmail = (u.email || '').trim().toLowerCase();
-      const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
-      const isEmail = uEmail === clean;
-      const isPhone = cleanPhoneDigits.length >= 6 && uPhone.endsWith(cleanPhoneDigits.slice(-10));
-      return isEmail || isPhone;
-    });
-
-    if (!found) {
-      showToast('No account found with this email or mobile phone. Please check details.', 'error');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      setResetError('Please enter a valid email address.');
+      showToast('Please enter a valid email address.', 'error');
       return;
     }
 
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(otpCode);
-    setForgotUser(found);
-    setForgotStep('verify');
-    showToast(`Verification code generated for ${found.name}: ${otpCode}`, 'success');
-  };
-
-  const handleVerifyOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (forgotOtp.trim() !== generatedOtp.trim()) {
-      showToast('Invalid verification code. Please enter the correct 6-digit OTP.', 'error');
-      return;
-    }
-    setForgotStep('new_password');
-  };
-
-  const handleSaveNewPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!forgotUser) return;
-
-    if (forgotNewPassword.length < 6) {
-      showToast('Password must be at least 6 characters long.', 'error');
-      return;
-    }
-
-    if (forgotNewPassword !== forgotConfirmPassword) {
-      showToast('New passwords do not match.', 'error');
-      return;
-    }
-
-    setIsResetting(true);
+    setIsSendingReset(true);
     try {
-      await updateUserPassword(forgotUser.id, forgotNewPassword);
-      setForgotStep('success');
-      showToast('Password reset successfully! Please sign in with your new password.', 'success');
-    } catch (err) {
-      console.error('Password reset failed:', err);
-      showToast('Failed to reset password.', 'error');
+      await AuthService.sendPasswordReset(cleanEmail);
+      setIsResetSubmitted(true);
+      showToast('Password reset email sent. Please check your inbox.', 'success');
+    } catch (err: any) {
+      console.warn('Password reset error in modal:', err);
+      if (err?.code === 'auth/invalid-email') {
+        setResetError('Please enter a valid email address.');
+        showToast('Please enter a valid email address.', 'error');
+      } else if (err?.code === 'auth/too-many-requests') {
+        setResetError('Too many reset attempts. Please wait a few minutes before trying again.');
+        showToast('Too many reset attempts. Please wait a moment.', 'error');
+      } else {
+        // Prevent account enumeration: show success confirmation
+        setIsResetSubmitted(true);
+        showToast('If an account exists for this email address, a password reset email has been sent.', 'info');
+      }
     } finally {
-      setIsResetting(false);
+      setIsSendingReset(false);
     }
   };
 
@@ -354,11 +328,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     type="button"
                     onClick={() => {
                       setAuthMode('forgot_password');
-                      setForgotStep('identifier');
-                      setForgotIdentifier(loginIdentifier || '');
-                      setForgotOtp('');
-                      setForgotNewPassword('');
-                      setForgotConfirmPassword('');
+                      setIsResetSubmitted(false);
+                      setResetError(null);
+                      setForgotEmail(loginIdentifier && loginIdentifier.includes('@') ? loginIdentifier.trim() : '');
                     }}
                     className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-bold hover:underline cursor-pointer"
                   >
@@ -536,152 +508,119 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           {authMode === 'forgot_password' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-xs">
-                  <KeyRound className="w-4 h-4" />
-                  <span>Account Recovery & Password Reset</span>
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 rounded-lg">
+                    <KeyRound className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">Reset Password</h3>
+                    <p className="text-[11px] text-slate-500 font-normal">Recover your account securely</p>
+                  </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setAuthMode('login')}
-                  className="text-xs text-slate-500 hover:text-indigo-600 font-bold"
+                  onClick={() => {
+                    setAuthMode('login');
+                    setIsResetSubmitted(false);
+                    setResetError(null);
+                  }}
+                  className="text-xs text-slate-500 hover:text-indigo-600 font-bold cursor-pointer transition-colors"
                 >
                   ← Back to Login
                 </button>
               </div>
 
-              {/* Step 1: Identifier */}
-              {forgotStep === 'identifier' && (
-                <form onSubmit={handleRequestResetOtp} className="space-y-3 text-xs">
-                  <p className="text-slate-600 dark:text-slate-400">
-                    Enter your registered email or phone to get a 6-digit verification code.
-                  </p>
+              {!isResetSubmitted ? (
+                <form onSubmit={handleSendPasswordResetEmail} noValidate className="space-y-3.5 text-xs">
                   <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Email or Mobile Phone:
+                    <label htmlFor="modal-reset-email" className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Registered Email Address <span className="text-rose-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      required
-                      value={forgotIdentifier}
-                      onChange={(e) => setForgotIdentifier(e.target.value)}
-                      placeholder="e.g. name@cctv.com or 9876543210"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer"
-                  >
-                    <span>Send Verification Code</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </form>
-              )}
-
-              {/* Step 2: OTP */}
-              {forgotStep === 'verify' && forgotUser && (
-                <form onSubmit={handleVerifyOtp} className="space-y-3 text-xs">
-                  <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-900/60 text-[11px]">
-                    <div className="font-bold text-amber-800 dark:text-amber-300">Verification Code Generated</div>
-                    <div className="mt-1 font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                      Code: <span className="bg-indigo-100 dark:bg-indigo-900/60 px-2 py-0.5 rounded">{generatedOtp}</span>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      <input
+                        id="modal-reset-email"
+                        type="email"
+                        value={forgotEmail}
+                        onChange={(e) => {
+                          setForgotEmail(e.target.value);
+                          if (resetError) setResetError(null);
+                        }}
+                        placeholder="Enter your registered email"
+                        className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs font-semibold outline-hidden transition-all ${
+                          resetError
+                            ? 'border-rose-400 bg-rose-50/30 dark:bg-rose-950/20 focus:ring-2 focus:ring-rose-500'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-indigo-500'
+                        }`}
+                      />
                     </div>
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Enter 6-Digit OTP:
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      maxLength={6}
-                      value={forgotOtp}
-                      onChange={(e) => setForgotOtp(e.target.value)}
-                      placeholder="6-digit OTP"
-                      className="w-full p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-center font-mono font-bold text-base tracking-widest focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer"
-                  >
-                    <span>Verify Code</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </form>
-              )}
-
-              {/* Step 3: New Password */}
-              {forgotStep === 'new_password' && forgotUser && (
-                <form onSubmit={handleSaveNewPassword} className="space-y-3 text-xs">
-                  <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      New Password (min 6 chars):
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      minLength={6}
-                      value={forgotNewPassword}
-                      onChange={(e) => setForgotNewPassword(e.target.value)}
-                      placeholder="Enter new password"
-                      className="w-full p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Confirm New Password:
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      minLength={6}
-                      value={forgotConfirmPassword}
-                      onChange={(e) => setForgotConfirmPassword(e.target.value)}
-                      placeholder="Confirm new password"
-                      className="w-full p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={isResetting}
-                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-60"
-                  >
-                    {isResetting ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Saving...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Reset Password</span>
-                      </>
+                    {resetError && (
+                      <p className="text-xs text-rose-500 dark:text-rose-400 font-semibold mt-1.5 flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{resetError}</span>
+                      </p>
                     )}
-                  </button>
-                </form>
-              )}
+                  </div>
 
-              {/* Step 4: Success */}
-              {forgotStep === 'success' && (
-                <div className="space-y-3 text-center py-2">
-                  <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto">
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('login');
+                        setIsResetSubmitted(false);
+                        setResetError(null);
+                      }}
+                      className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSendingReset}
+                      className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-60 transition-all"
+                    >
+                      {isSendingReset ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Sending...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Send Password Reset Email</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-3.5 text-center py-2 animate-in fade-in">
+                  <div className="w-11 h-11 bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto shadow-xs">
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
-                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                    Password Reset Complete!
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthMode('login');
-                      if (forgotUser?.email) setLoginIdentifier(forgotUser.email);
-                      setLoginPassword('');
-                    }}
-                    className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs"
-                  >
-                    Sign In Now
-                  </button>
+                  <div className="space-y-1">
+                    <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                      Password Reset Email Sent
+                    </h4>
+                    <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
+                      If an account exists for this email address, a password reset email has been sent. Please check your inbox and follow the link to create a new password.
+                    </p>
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('login');
+                        setIsResetSubmitted(false);
+                        if (forgotEmail.trim()) {
+                          setLoginIdentifier(forgotEmail.trim());
+                        }
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer shadow-sm transition-all"
+                    >
+                      Back to Sign In
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

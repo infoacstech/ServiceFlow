@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { User } from '../types';
+import { AuthService } from '../services/AuthService';
 import { BrandLogo } from '../components/BrandLogo';
 import {
   PREDEFINED_SERVICE_DOMAINS,
@@ -155,16 +156,25 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [showSuperAdminPassword, setShowSuperAdminPassword] = useState(false);
   const [isSuperAdminSubmitting, setIsSuperAdminSubmitting] = useState(false);
 
-  // Forgot Password State
+  // Forgot Password State (Firebase Auth Built-in Password Reset Email)
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
-  const [forgotIdentifier, setForgotIdentifier] = useState('');
-  const [forgotStep, setForgotStep] = useState<'identifier' | 'verify' | 'new_password' | 'success'>('identifier');
-  const [forgotUser, setForgotUser] = useState<User | null>(null);
-  const [forgotOtp, setForgotOtp] = useState('');
-  const [generatedOtp, setGeneratedOtp] = useState('');
-  const [forgotNewPassword, setForgotNewPassword] = useState('');
-  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
-  const [isResetting, setIsResetting] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [isResetSubmitted, setIsResetSubmitted] = useState(false);
+  const [isSendingReset, setIsSendingReset] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+
+  const openForgotPasswordModal = (prefilledEmail?: string) => {
+    setIsForgotPasswordOpen(true);
+    setIsResetSubmitted(false);
+    setResetError(null);
+    if (prefilledEmail && prefilledEmail.includes('@')) {
+      setForgotEmail(prefilledEmail.trim());
+    } else if (loginIdentifier && loginIdentifier.includes('@')) {
+      setForgotEmail(loginIdentifier.trim());
+    } else {
+      setForgotEmail('');
+    }
+  };
 
   // Registration Form State
   const [regName, setRegName] = useState('');
@@ -463,70 +473,45 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  // FORGOT PASSWORD WORKFLOW HANDLERS
-  const handleRequestResetOtp = (e: React.FormEvent) => {
+  // FORGOT PASSWORD / FIREBASE AUTH PASSWORD RESET EMAIL HANDLER
+  const handleSendPasswordResetEmail = async (e: React.FormEvent) => {
     e.preventDefault();
-    const clean = forgotIdentifier.trim().toLowerCase();
-    if (!clean) {
-      showToast('Please enter your registered email or mobile number.', 'error');
+    setResetError(null);
+
+    const cleanEmail = forgotEmail.trim().toLowerCase();
+    if (!cleanEmail) {
+      setResetError('Please enter a valid email address.');
+      showToast('Please enter a valid email address.', 'error');
       return;
     }
 
-    const cleanPhoneDigits = clean.replace(/[^0-9]/g, '');
-    const found = users.find((u) => {
-      const uEmail = (u.email || '').trim().toLowerCase();
-      const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
-      const isEmail = uEmail === clean;
-      const isPhone = cleanPhoneDigits.length >= 6 && uPhone.endsWith(cleanPhoneDigits.slice(-10));
-      return isEmail || isPhone;
-    });
-
-    if (!found) {
-      showToast('No account found with this email or mobile phone. Please check details.', 'error');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      setResetError('Please enter a valid email address.');
+      showToast('Please enter a valid email address.', 'error');
       return;
     }
 
-    // Generate a secure 6-digit verification code
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(otpCode);
-    setForgotUser(found);
-    setForgotStep('verify');
-    showToast(`Verification code generated for ${found.name}: ${otpCode}`, 'success');
-  };
-
-  const handleVerifyOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (forgotOtp.trim() !== generatedOtp.trim()) {
-      showToast('Invalid verification code. Please check and enter the correct 6-digit OTP.', 'error');
-      return;
-    }
-    setForgotStep('new_password');
-  };
-
-  const handleSaveNewPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!forgotUser) return;
-
-    if (forgotNewPassword.length < 6) {
-      showToast('Password must be at least 6 characters long.', 'error');
-      return;
-    }
-
-    if (forgotNewPassword !== forgotConfirmPassword) {
-      showToast('New passwords do not match. Please re-enter.', 'error');
-      return;
-    }
-
-    setIsResetting(true);
+    setIsSendingReset(true);
     try {
-      await updateUserPassword(forgotUser.id, forgotNewPassword);
-      setForgotStep('success');
-      showToast('Password reset successfully! You can now sign in with your new password.', 'success');
-    } catch (err) {
-      console.error('Password reset failed:', err);
-      showToast('Failed to reset password. Please try again or contact support.', 'error');
+      await AuthService.sendPasswordReset(cleanEmail);
+      setIsResetSubmitted(true);
+      showToast('Password reset email sent. Please check your inbox.', 'success');
+    } catch (err: any) {
+      console.warn('Password reset error:', err);
+      if (err?.code === 'auth/invalid-email') {
+        setResetError('Please enter a valid email address.');
+        showToast('Please enter a valid email address.', 'error');
+      } else if (err?.code === 'auth/too-many-requests') {
+        setResetError('Too many reset attempts. Please wait a few minutes before trying again.');
+        showToast('Too many reset attempts. Please try again in a few minutes.', 'error');
+      } else {
+        // To avoid account enumeration, display the standard confirmation screen for other errors (such as user-not-found)
+        setIsResetSubmitted(true);
+        showToast('If an account exists for this email address, a password reset email has been sent.', 'info');
+      }
     } finally {
-      setIsResetting(false);
+      setIsSendingReset(false);
     }
   };
 
@@ -618,14 +603,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   </label>
                   <button
                     type="button"
-                    onClick={() => {
-                      setIsForgotPasswordOpen(true);
-                      setForgotStep('identifier');
-                      setForgotIdentifier(loginIdentifier || '');
-                      setForgotOtp('');
-                      setForgotNewPassword('');
-                      setForgotConfirmPassword('');
-                    }}
+                    onClick={() => openForgotPasswordModal(loginIdentifier)}
                     className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold hover:underline cursor-pointer"
                   >
                     Forgot Password?
@@ -722,14 +700,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         <button
                           type="button"
                           onClick={() => {
-                            setForgotIdentifier(duplicateAccountNotice.identifier);
-                            setIsForgotPasswordOpen(true);
-                            setForgotStep('identifier');
+                            const idToUse = duplicateAccountNotice.identifier;
                             setDuplicateAccountNotice(null);
+                            openForgotPasswordModal(idToUse);
                           }}
                           className="py-2 px-3 min-h-[40px] rounded-xl bg-amber-100 dark:bg-amber-900/60 hover:bg-amber-200 dark:hover:bg-amber-800 text-amber-900 dark:text-amber-200 font-bold text-xs transition-all cursor-pointer text-center flex items-center justify-center"
                         >
-                          Reset Password (OTP)
+                          Reset Password
                         </button>
                       </div>
                     </div>
@@ -1069,208 +1046,114 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     Reset Password
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Recover your account access in 3 simple steps
+                    Recover your account securely
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => setIsForgotPasswordOpen(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                type="button"
+                onClick={() => {
+                  setIsForgotPasswordOpen(false);
+                  setIsResetSubmitted(false);
+                  setResetError(null);
+                }}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Step 1: Identifier Entry */}
-            {forgotStep === 'identifier' && (
-              <form onSubmit={handleRequestResetOtp} className="space-y-4 text-xs">
-                <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Enter your registered <strong>Email Address</strong> or <strong>Mobile Phone Number</strong> to receive a 6-digit password reset verification code.
-                </p>
-
+            {!isResetSubmitted ? (
+              <form onSubmit={handleSendPasswordResetEmail} noValidate className="space-y-4 text-xs">
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Registered Email or Mobile:
+                  <label htmlFor="reset-email" className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Registered Email Address <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                    <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
                     <input
-                      type="text"
-                      required
-                      value={forgotIdentifier}
-                      onChange={(e) => setForgotIdentifier(e.target.value)}
-                      placeholder="e.g. rajesh@cctvservices.com or 9876543210"
-                      className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                      id="reset-email"
+                      type="email"
+                      value={forgotEmail}
+                      onChange={(e) => {
+                        setForgotEmail(e.target.value);
+                        if (resetError) setResetError(null);
+                      }}
+                      placeholder="Enter your registered email"
+                      className={`w-full h-11 pl-10 pr-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-hidden transition-all ${
+                        resetError
+                          ? 'border-rose-400 dark:border-rose-500 bg-rose-50/30 dark:bg-rose-950/20 focus:ring-2 focus:ring-rose-500'
+                          : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800'
+                      }`}
                     />
                   </div>
+                  {resetError && (
+                    <p className="text-xs text-rose-500 dark:text-rose-400 font-semibold mt-1.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{resetError}</span>
+                    </p>
+                  )}
                 </div>
 
-                <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-xl border border-indigo-100 dark:border-indigo-900/50 text-[11px] text-indigo-700 dark:text-indigo-300 space-y-1">
-                  <div className="font-bold flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5" /> Instant Self-Service Reset
-                  </div>
-                  <div>An instant 6-digit verification code will be sent to confirm your identity.</div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-200 dark:border-slate-800">
                   <button
                     type="button"
-                    onClick={() => setIsForgotPasswordOpen(false)}
-                    className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold cursor-pointer"
+                    onClick={() => {
+                      setIsForgotPasswordOpen(false);
+                      setIsResetSubmitted(false);
+                      setResetError(null);
+                    }}
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold cursor-pointer transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-2 shadow-md cursor-pointer"
+                    disabled={isSendingReset}
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-2 shadow-md shadow-indigo-600/20 cursor-pointer disabled:opacity-60 transition-all"
                   >
-                    <span>Send Verification Code</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Step 2: OTP Verification */}
-            {forgotStep === 'verify' && forgotUser && (
-              <form onSubmit={handleVerifyOtp} className="space-y-4 text-xs">
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-900/60 space-y-1 text-[11px]">
-                  <div className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5" /> Verification Code Sent
-                  </div>
-                  <p className="text-slate-600 dark:text-slate-400">
-                    Account: <strong>{forgotUser.name}</strong> ({forgotUser.email || forgotUser.phone})
-                  </p>
-                  <div className="pt-1 font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                    Verification OTP: <span className="bg-indigo-100 dark:bg-indigo-900/60 px-2 py-0.5 rounded-md text-xs">{generatedOtp}</span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Enter 6-Digit OTP Code:
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    value={forgotOtp}
-                    onChange={(e) => setForgotOtp(e.target.value)}
-                    placeholder="Enter 6-digit OTP"
-                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-center font-mono font-bold text-base tracking-widest focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setForgotStep('identifier')}
-                    className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
-                  >
-                    ← Change Email / Mobile
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center gap-2 shadow-md cursor-pointer"
-                  >
-                    <span>Verify Code</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Step 3: Set New Password */}
-            {forgotStep === 'new_password' && forgotUser && (
-              <form onSubmit={handleSaveNewPassword} className="space-y-4 text-xs">
-                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-900/60 text-[11px] text-emerald-800 dark:text-emerald-300">
-                  Identity verified! Set your new password for <strong>{forgotUser.name}</strong>.
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    New Password (min 6 characters):
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    value={forgotNewPassword}
-                    onChange={(e) => setForgotNewPassword(e.target.value)}
-                    placeholder="Enter new password"
-                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Confirm New Password:
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    value={forgotConfirmPassword}
-                    onChange={(e) => setForgotConfirmPassword(e.target.value)}
-                    placeholder="Re-enter new password"
-                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setIsForgotPasswordOpen(false)}
-                    className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isResetting}
-                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-2 shadow-md cursor-pointer disabled:opacity-60"
-                  >
-                    {isResetting ? (
+                    {isSendingReset ? (
                       <>
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Saving...</span>
+                        <span>Sending...</span>
                       </>
                     ) : (
                       <>
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Save & Reset Password</span>
+                        <span>Send Password Reset Email</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </>
                     )}
                   </button>
                 </div>
               </form>
-            )}
-
-            {/* Step 4: Success Confirmation */}
-            {forgotStep === 'success' && (
-              <div className="space-y-4 text-center py-2">
+            ) : (
+              <div className="space-y-4 text-center py-2 animate-in fade-in zoom-in-95">
                 <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto shadow-sm">
                   <CheckCircle2 className="w-7 h-7" />
                 </div>
-                <div>
-                  <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
-                    Password Reset Complete!
+                <div className="space-y-1.5">
+                  <h4 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+                    Password Reset Email Sent
                   </h4>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Your password has been securely updated. You can now log in to your account.
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed max-w-sm mx-auto">
+                    If an account exists for this email address, a password reset email has been sent. Please check your inbox and follow the link to create a new password.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsForgotPasswordOpen(false);
-                    if (forgotUser?.email) setLoginIdentifier(forgotUser.email);
-                    setLoginPassword('');
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md cursor-pointer"
-                >
-                  Proceed to Sign In
-                </button>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsForgotPasswordOpen(false);
+                      setIsResetSubmitted(false);
+                      if (forgotEmail.trim()) {
+                        setLoginIdentifier(forgotEmail.trim());
+                      }
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 cursor-pointer transition-all"
+                  >
+                    Back to Sign In
+                  </button>
+                </div>
               </div>
             )}
           </div>
