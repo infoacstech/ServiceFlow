@@ -11,7 +11,9 @@ interface BeforeInstallPromptEvent extends Event {
 
 export const PwaInstallPrompt: React.FC = () => {
   const { showToast, currentBusiness } = useApp();
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(
+    typeof window !== 'undefined' ? (window as any).deferredPwaPrompt || null : null
+  );
   const [isStandalone, setIsStandalone] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -31,10 +33,20 @@ export const PwaInstallPrompt: React.FC = () => {
     const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
     setIsIos(isIosDevice);
 
+    if ((window as any).deferredPwaPrompt) {
+      setDeferredPrompt((window as any).deferredPwaPrompt);
+      const dismissed = sessionStorage.getItem('pwa_prompt_dismissed');
+      if (!isStandaloneApp && !dismissed) {
+        setShowBanner(true);
+      }
+    }
+
     // Capture standard PWA install prompt event
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      const promptEvent = e as BeforeInstallPromptEvent;
+      setDeferredPrompt(promptEvent);
+      (window as any).deferredPwaPrompt = promptEvent;
       // Only show banner if not standalone and not dismissed recently
       const dismissed = sessionStorage.getItem('pwa_prompt_dismissed');
       if (!isStandaloneApp && !dismissed) {
@@ -42,7 +54,18 @@ export const PwaInstallPrompt: React.FC = () => {
       }
     };
 
+    const handlePromptReady = (e: any) => {
+      if (e.detail) {
+        setDeferredPrompt(e.detail);
+        const dismissed = sessionStorage.getItem('pwa_prompt_dismissed');
+        if (!isStandaloneApp && !dismissed) {
+          setShowBanner(true);
+        }
+      }
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('pwa-prompt-ready', handlePromptReady);
 
     // Show banner if iOS and not standalone
     if (isIosDevice && !isStandaloneApp) {
@@ -54,21 +77,24 @@ export const PwaInstallPrompt: React.FC = () => {
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('pwa-prompt-ready', handlePromptReady);
     };
   }, []);
 
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
+    const activePrompt = deferredPrompt || (window as any).deferredPwaPrompt;
+    if (activePrompt) {
       try {
-        await deferredPrompt.prompt();
-        const choiceResult = await deferredPrompt.userChoice;
+        await activePrompt.prompt();
+        const choiceResult = await activePrompt.userChoice;
         if (choiceResult.outcome === 'accepted') {
           showToast('ServiFlow App installed successfully!', 'success');
           setShowBanner(false);
+          (window as any).deferredPwaPrompt = null;
+          setDeferredPrompt(null);
         } else {
           showToast('App installation deferred', 'info');
         }
-        setDeferredPrompt(null);
       } catch {
         setIsModalOpen(true);
       }
@@ -89,7 +115,7 @@ export const PwaInstallPrompt: React.FC = () => {
         <div className="fixed bottom-20 left-4 right-4 md:bottom-6 md:left-auto md:right-6 md:max-w-md z-50 animate-in slide-in-from-bottom duration-300">
           <div className="bg-slate-900/95 text-white p-3.5 sm:p-4 rounded-2xl shadow-2xl border border-indigo-500/40 backdrop-blur-xl flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md overflow-hidden">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md overflow-hidden bg-white/10">
                 {currentBusiness?.logo ? (
                   <img src={currentBusiness.logo} alt="App Icon" className="w-full h-full object-cover rounded-lg" />
                 ) : (
@@ -112,14 +138,14 @@ export const PwaInstallPrompt: React.FC = () => {
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={handleInstallClick}
-                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold rounded-xl shadow-lg shadow-indigo-600/30 transition-all active:scale-95 flex items-center gap-1.5"
+                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold rounded-xl shadow-lg shadow-indigo-600/30 transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Install</span>
               </button>
               <button
                 onClick={handleDismiss}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
                 title="Dismiss"
               >
                 <X className="w-4 h-4" />
@@ -133,7 +159,7 @@ export const PwaInstallPrompt: React.FC = () => {
       <InstallAppModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        deferredPrompt={deferredPrompt}
+        deferredPrompt={deferredPrompt || (typeof window !== 'undefined' ? (window as any).deferredPwaPrompt : null)}
         onInstalled={() => {
           setShowBanner(false);
           setIsStandalone(true);

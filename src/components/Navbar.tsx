@@ -92,7 +92,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   type ActiveMenu = 'tenant' | 'notif' | null;
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
   const [isRefreshingPage, setIsRefreshingPage] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(
+    typeof window !== 'undefined' ? (window as any).deferredPwaPrompt || null : null
+  );
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
@@ -104,14 +106,28 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     setIsStandalone(isStandaloneMode);
 
+    if ((window as any).deferredPwaPrompt) {
+      setDeferredPrompt((window as any).deferredPwaPrompt);
+    }
+
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      const p = e as BeforeInstallPromptEvent;
+      setDeferredPrompt(p);
+      (window as any).deferredPwaPrompt = p;
+    };
+
+    const handlePromptReady = (e: any) => {
+      if (e.detail) {
+        setDeferredPrompt(e.detail);
+      }
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('pwa-prompt-ready', handlePromptReady);
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('pwa-prompt-ready', handlePromptReady);
     };
   }, []);
 

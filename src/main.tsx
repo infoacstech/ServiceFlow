@@ -10,7 +10,7 @@ import './index.css';
 let swRegistration: ServiceWorkerRegistration | null = null;
 let isRefreshing = false;
 
-if ('serviceWorker' in navigator && !import.meta.env.DEV) {
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/sw.js')
@@ -18,7 +18,7 @@ if ('serviceWorker' in navigator && !import.meta.env.DEV) {
         swRegistration = reg;
         console.log('[ServiFlow PWA] Service Worker registered in scope:', reg.scope);
 
-        // Check for updates immediately on startup
+        // Check for updates on startup
         reg.update().catch((e) => console.warn('[ServiFlow PWA] Initial update check notice:', e));
 
         // When a new update is found

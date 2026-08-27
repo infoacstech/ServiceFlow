@@ -16,8 +16,11 @@ import {
   Laptop,
   Check,
   Copy,
+  ArrowRight,
+  Info,
   Layers,
   Maximize,
+  HelpCircle
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BrandLogo } from './BrandLogo';
@@ -27,12 +30,23 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+// Declare window extension
+declare global {
+  interface Window {
+    deferredPwaPrompt?: BeforeInstallPromptEvent | null;
+  }
+}
+
 // Global cached prompt
 let globalDeferredPrompt: BeforeInstallPromptEvent | null = null;
 if (typeof window !== 'undefined') {
+  if (window.deferredPwaPrompt) {
+    globalDeferredPrompt = window.deferredPwaPrompt;
+  }
   window.addEventListener('beforeinstallprompt', (e: Event) => {
     e.preventDefault();
     globalDeferredPrompt = e as BeforeInstallPromptEvent;
+    window.deferredPwaPrompt = e as BeforeInstallPromptEvent;
   });
 }
 
@@ -54,27 +68,45 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
   const [isStandalone, setIsStandalone] = useState(false);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [localPrompt, setLocalPrompt] = useState<BeforeInstallPromptEvent | null>(deferredPrompt || globalDeferredPrompt);
+  const [localPrompt, setLocalPrompt] = useState<BeforeInstallPromptEvent | null>(
+    deferredPrompt || globalDeferredPrompt || (typeof window !== 'undefined' ? window.deferredPwaPrompt || null : null)
+  );
 
   const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
 
   useEffect(() => {
-    if (deferredPrompt) {
-      setLocalPrompt(deferredPrompt);
-    } else if (globalDeferredPrompt) {
-      setLocalPrompt(globalDeferredPrompt);
-    }
+    const checkPrompt = () => {
+      const active = deferredPrompt || globalDeferredPrompt || window.deferredPwaPrompt || null;
+      if (active) {
+        setLocalPrompt(active);
+      }
+    };
+
+    checkPrompt();
 
     const handlePrompt = (e: Event) => {
       e.preventDefault();
       const p = e as BeforeInstallPromptEvent;
       globalDeferredPrompt = p;
+      window.deferredPwaPrompt = p;
       setLocalPrompt(p);
     };
 
+    const handleCustomReady = (e: any) => {
+      if (e.detail) {
+        globalDeferredPrompt = e.detail;
+        setLocalPrompt(e.detail);
+      }
+    };
+
     window.addEventListener('beforeinstallprompt', handlePrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handlePrompt);
-  }, [deferredPrompt]);
+    window.addEventListener('pwa-prompt-ready', handleCustomReady);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handlePrompt);
+      window.removeEventListener('pwa-prompt-ready', handleCustomReady);
+    };
+  }, [deferredPrompt, isOpen]);
 
   useEffect(() => {
     // Detect Standalone execution
@@ -100,7 +132,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
 
   if (!isOpen) return null;
 
-  const activePrompt = deferredPrompt || localPrompt || globalDeferredPrompt;
+  const activePrompt = deferredPrompt || localPrompt || globalDeferredPrompt || window.deferredPwaPrompt;
 
   const handleInstallClick = async () => {
     if (activePrompt) {
@@ -110,29 +142,57 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
         if (choice.outcome === 'accepted') {
           showToast('ServiFlow App installed successfully on your device!', 'success');
           globalDeferredPrompt = null;
+          window.deferredPwaPrompt = null;
           setLocalPrompt(null);
           if (onInstalled) onInstalled();
+          setIsStandalone(true);
           onClose();
         } else {
-          showToast('Installation prompt closed', 'info');
+          showToast('Installation prompt was dismissed. You can install anytime from the browser menu.', 'info');
         }
       } catch (err) {
-        console.error('PWA install error:', err);
+        console.error('PWA install prompt error:', err);
+        handleFallbackInstall();
+      }
+    } else {
+      handleFallbackInstall();
+    }
+  };
+
+  const handleFallbackInstall = () => {
+    if (isInIframe) {
+      handleOpenInNewTab();
+    } else if (selectedPlatform === 'pc' || selectedPlatform === 'mac') {
+      showToast('On Desktop: Look at the top right of your URL address bar for the (⊕) Install button, or use ⋮ Menu -> Install ServiFlow', 'info');
+    } else if (selectedPlatform === 'android') {
+      showToast('On Android: Tap three dots menu (⋮) at top right -> "Install App" or "Add to Home screen"', 'info');
+    } else if (selectedPlatform === 'ios') {
+      showToast('On iPhone/iPad Safari: Tap Share (⎋) -> "Add to Home Screen"', 'info');
+    }
+  };
+
+  const handleLaunchStandaloneWindow = () => {
+    try {
+      const url = window.location.href;
+      const width = Math.min(window.screen.availWidth || 1400, 1400);
+      const height = Math.min(window.screen.availHeight || 900, 900);
+      const left = Math.max(0, (window.screen.availWidth - width) / 2);
+      const top = Math.max(0, (window.screen.availHeight - height) / 2);
+
+      const win = window.open(
+        url,
+        'ServiFlowStandalone',
+        `popup=yes,width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes`
+      );
+      if (win) {
+        win.focus();
+        showToast('Launched ServiFlow in clean Standalone Window!', 'success');
+        onClose();
+      } else {
         handleOpenInNewTab();
       }
-    } else if (isInIframe) {
+    } catch {
       handleOpenInNewTab();
-    } else {
-      // Fallback guidance based on current platform
-      if (selectedPlatform === 'ios') {
-        showToast('On iOS Safari: Tap Share button (⎋) at bottom, then choose "Add to Home Screen"', 'info');
-      } else if (selectedPlatform === 'android') {
-        showToast('On Android Chrome: Tap 3 dots (⋮) menu at top right -> "Install App" or "Add to Home screen"', 'info');
-      } else if (selectedPlatform === 'pc') {
-        showToast('Look for the "Install" (⊕) icon on the right side of your browser address bar', 'info');
-      } else {
-        showToast('On Mac Safari/Chrome: Click "Install" icon in address bar or File -> Add to Dock', 'info');
-      }
     }
   };
 
@@ -140,9 +200,9 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
     try {
       const url = window.location.href;
       window.open(url, '_blank');
-      showToast('Opening app in full browser window for 1-click installation...', 'info');
+      showToast('Opening ServiFlow in dedicated browser tab...', 'info');
     } catch {
-      showToast('Please open the app in a dedicated browser tab to install.', 'info');
+      showToast('Please open the app URL in a new browser tab to install.', 'info');
     }
   };
 
@@ -150,8 +210,8 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
     try {
       navigator.clipboard.writeText(window.location.href);
       setCopiedLink(true);
-      showToast('App link copied to clipboard! Paste it into Chrome or Safari.', 'success');
-      setTimeout(() => setCopiedLink(false), 2000);
+      showToast('App link copied to clipboard! Paste it into Chrome, Edge or Safari.', 'success');
+      setTimeout(() => setCopiedLink(false), 2500);
     } catch {
       showToast('Failed to copy link', 'error');
     }
@@ -161,9 +221,10 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
     try {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen?.();
-        showToast('Entered Fullscreen App Mode!', 'success');
+        showToast('Entered Fullscreen Mode!', 'success');
       } else {
         document.exitFullscreen?.();
+        showToast('Exited Fullscreen Mode', 'info');
       }
     } catch {
       showToast('Fullscreen mode toggled', 'info');
@@ -188,11 +249,11 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
         <div className="p-4 sm:p-6 bg-gradient-to-r from-indigo-600 via-indigo-700 to-indigo-900 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shrink-0">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shrink-0 overflow-hidden bg-white/10">
               {currentBusiness?.logo ? (
                 <img src={currentBusiness.logo} alt="Company Logo" className="w-full h-full object-cover rounded-xl" />
               ) : (
@@ -220,12 +281,12 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
           </button>
         </div>
 
-        {/* Standalone Status Alert or In-Iframe Alert */}
+        {/* Status Alert */}
         {isStandalone ? (
           <div className="bg-emerald-500/10 dark:bg-emerald-500/20 border-b border-emerald-500/20 px-4 sm:px-6 py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span>Running in Native Standalone App Mode (Browser Bar Removed)</span>
+              <span>Running in Standalone App Mode (Taskbar & Home Screen Active)</span>
             </div>
             <button
               onClick={handleCheckUpdate}
@@ -241,7 +302,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
               <span className="font-medium">
-                To install natively on your device, open the app in a full browser tab:
+                To install natively on your PC or phone, open the app in a dedicated browser tab:
               </span>
             </div>
             <button
@@ -252,11 +313,18 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
               <span>Open in Full Tab ↗</span>
             </button>
           </div>
+        ) : activePrompt ? (
+          <div className="bg-emerald-500/10 dark:bg-emerald-500/20 border-b border-emerald-500/20 px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300 font-semibold">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 animate-pulse" />
+              <span>Browser 1-Click Install is ready! Click "Install Now" below.</span>
+            </div>
+          </div>
         ) : (
           <div className="bg-amber-500/10 dark:bg-amber-500/20 border-b border-amber-500/20 px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs text-amber-800 dark:text-amber-300 font-medium">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Install to home screen or taskbar for 1-click fullscreen app launch!</span>
+              <Info className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Follow the quick step-by-step instructions below to install on your device.</span>
             </div>
           </div>
         )}
@@ -361,36 +429,73 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
           {/* Platform Instructions Box */}
           <div className="p-4 sm:p-5 rounded-3xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80">
             {selectedPlatform === 'pc' && (
-              <div className="space-y-3">
-                <h4 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <Laptop className="w-4 h-4 text-indigo-600" />
-                  Install on Windows PC (Chrome / Microsoft Edge)
-                </h4>
-                <div className="space-y-2.5 text-xs text-slate-700 dark:text-slate-300">
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 font-bold flex items-center justify-center shrink-0 text-[11px]">
+              <div className="space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <Laptop className="w-4 h-4 text-indigo-600" />
+                    Install on Windows PC (Chrome / Microsoft Edge)
+                  </h4>
+                  <span className="text-[10px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full">
+                    Recommended
+                  </span>
+                </div>
+
+                <div className="space-y-3 text-xs text-slate-700 dark:text-slate-300">
+                  {/* Step 1 */}
+                  <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60">
+                    <div className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center shrink-0 text-xs shadow-xs">
                       1
                     </div>
-                    <div>
-                      Click the <strong className="text-indigo-600">"Install Now"</strong> button below or look for the <strong className="text-indigo-600">Install icon (⊕)</strong> on the right side of the browser address bar.
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-900 dark:text-slate-100">
+                        Method A: Click the Install Icon in Browser Address Bar
+                      </div>
+                      <p className="text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
+                        In your browser (Chrome or Edge), look at the <strong className="text-indigo-600 dark:text-indigo-400">far right of the top address/URL bar</strong> (next to the Bookmark ★ icon). Click the <strong className="text-indigo-600 dark:text-indigo-400">Install icon (⊕ or ⤓)</strong>.
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 font-bold flex items-center justify-center shrink-0 text-[11px]">
+
+                  {/* Step 2 */}
+                  <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60">
+                    <div className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold flex items-center justify-center shrink-0 text-xs shadow-xs">
                       2
                     </div>
-                    <div>
-                      Click <strong>"Install"</strong> in the browser prompt window.
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-900 dark:text-slate-100">
+                        Method B: Chrome / Edge Menu (3 dots)
+                      </div>
+                      <p className="text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
+                        Click the <strong className="text-indigo-600 dark:text-indigo-400">three dots (⋮)</strong> menu at the top right of Chrome &rarr; click <strong className="text-indigo-600 dark:text-indigo-400">"Save and share"</strong> (or "Cast, save and share") &rarr; click <strong className="text-indigo-600 dark:text-indigo-400">"Install ServiFlow..."</strong>.
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 font-bold flex items-center justify-center shrink-0 text-[11px]">
+
+                  {/* Step 3 */}
+                  <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60">
+                    <div className="w-6 h-6 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0 text-xs shadow-xs">
                       3
                     </div>
-                    <div>
-                      ServiFlow will launch as an independent window with its own icon on your <strong>Windows Taskbar</strong> and <strong>Start Menu</strong>!
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-900 dark:text-slate-100">
+                        Instant Taskbar & Desktop Shortcut
+                      </div>
+                      <p className="text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
+                        Click <strong>"Install"</strong> in the browser prompt. ServiFlow will instantly launch as an independent window with its icon pinned to your <strong>Windows Taskbar</strong> and <strong>Start Menu</strong>!
+                      </p>
                     </div>
                   </div>
+                </div>
+
+                {/* Direct Standalone Launcher Button */}
+                <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <button
+                    onClick={handleLaunchStandaloneWindow}
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer active:scale-98"
+                  >
+                    <Monitor className="w-4 h-4 text-indigo-400" />
+                    <span>Launch Standalone App Window (No Tabs/URL Bar)</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -402,28 +507,28 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                   Install on Android Mobile / Tablet (Chrome / Edge / Samsung)
                 </h4>
                 <div className="space-y-2.5 text-xs text-slate-700 dark:text-slate-300">
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60">
                     <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 font-bold flex items-center justify-center shrink-0 text-[11px]">
                       1
                     </div>
                     <div>
-                      Tap the <strong>"Install Now"</strong> button below or tap the <strong>three dots (⋮)</strong> menu in Chrome.
+                      Tap the <strong>three dots (⋮)</strong> menu at the top right of Chrome on Android.
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60">
                     <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 font-bold flex items-center justify-center shrink-0 text-[11px]">
                       2
                     </div>
                     <div>
-                      Select <strong className="text-indigo-600">"Install app"</strong> or <strong className="text-indigo-600">"Add to Home screen"</strong>.
+                      Select <strong className="text-indigo-600 dark:text-indigo-400">"Install app"</strong> or <strong className="text-indigo-600 dark:text-indigo-400">"Add to Home screen"</strong>.
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 font-bold flex items-center justify-center shrink-0 text-[11px]">
+                  <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60">
+                    <div className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0 text-[11px]">
                       3
                     </div>
                     <div>
-                      The official ServiFlow app icon will be added to your home screen with pure fullscreen performance!
+                      The official ServiFlow app icon will be added to your Android home screen with pure fullscreen performance!
                     </div>
                   </div>
                 </div>
@@ -437,7 +542,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                   Install on iPhone / iPad (Safari Browser)
                 </h4>
                 <div className="space-y-2.5 text-xs text-slate-700 dark:text-slate-300">
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60">
                     <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 font-bold flex items-center justify-center shrink-0 text-[11px]">
                       1
                     </div>
@@ -445,7 +550,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                       Tap the <strong className="inline-flex items-center gap-1 text-indigo-600 font-bold"><Share className="w-3.5 h-3.5" /> Share</strong> button at the bottom of Safari.
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60">
                     <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 font-bold flex items-center justify-center shrink-0 text-[11px]">
                       2
                     </div>
@@ -453,12 +558,12 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                       Scroll down and tap <strong className="inline-flex items-center gap-1 text-indigo-600 font-bold"><PlusSquare className="w-3.5 h-3.5" /> Add to Home Screen</strong>.
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 font-bold flex items-center justify-center shrink-0 text-[11px]">
+                  <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60">
+                    <div className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0 text-[11px]">
                       3
                     </div>
                     <div>
-                      Tap <strong>Add</strong> on the top right. Launch ServiFlow from your iOS Home Screen for a dedicated app experience!
+                      Tap <strong>Add</strong> on the top right. Launch ServiFlow from your iOS Home Screen for a dedicated native app experience!
                     </div>
                   </div>
                 </div>
@@ -472,7 +577,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                   Install on Mac OS (Chrome / Safari / Edge)
                 </h4>
                 <div className="space-y-2.5 text-xs text-slate-700 dark:text-slate-300">
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60">
                     <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 font-bold flex items-center justify-center shrink-0 text-[11px]">
                       1
                     </div>
@@ -480,16 +585,16 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                       In <strong>Chrome / Edge</strong>: Click the <strong>Install icon (⊕)</strong> in the address bar.
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60">
                     <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 font-bold flex items-center justify-center shrink-0 text-[11px]">
                       2
                     </div>
                     <div>
-                      In <strong>Safari (macOS Sonoma+)</strong>: Click <strong>File → Add to Dock...</strong>.
+                      In <strong>Safari (macOS Sonoma+)</strong>: Click <strong>File &rarr; Add to Dock...</strong>.
                     </div>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 font-bold flex items-center justify-center shrink-0 text-[11px]">
+                  <div className="flex items-start gap-3 p-2.5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-700/60">
+                    <div className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0 text-[11px]">
                       3
                     </div>
                     <div>
@@ -546,10 +651,10 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
               Close
             </button>
 
-            {deferredPrompt ? (
+            {activePrompt ? (
               <button
                 onClick={handleInstallClick}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition-all active:scale-95 flex items-center justify-center gap-2 flex-1 sm:flex-none cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition-all active:scale-95 flex items-center justify-center gap-2 flex-1 sm:flex-none cursor-pointer animate-pulse"
               >
                 <Download className="w-4 h-4" />
                 <span>1-Click Install Now</span>
@@ -564,7 +669,7 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
               </button>
             ) : selectedPlatform === 'ios' ? (
               <button
-                onClick={() => showToast('In Safari, tap Share ⎋ -> "Add to Home Screen"', 'info')}
+                onClick={() => showToast('In Safari, tap Share ⎋ at bottom -> "Add to Home Screen"', 'info')}
                 className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 flex-1 sm:flex-none cursor-pointer"
               >
                 <Share className="w-4 h-4" />
@@ -572,11 +677,11 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
               </button>
             ) : (
               <button
-                onClick={handleInstallClick}
+                onClick={handleLaunchStandaloneWindow}
                 className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 flex-1 sm:flex-none cursor-pointer"
               >
-                <Download className="w-4 h-4" />
-                <span>Install Standalone App</span>
+                <Monitor className="w-4 h-4" />
+                <span>Open Standalone App Window</span>
               </button>
             )}
           </div>

@@ -29,6 +29,21 @@
     <meta name="msapplication-TileImage" content="/icon-192.png" />
     <meta name="msapplication-navbutton-color" content="#4f46e5" />
     <meta name="msapplication-starturl" content="/" />
+
+    <!-- Immediate PWA Prompt Capture -->
+    <script>
+      window.deferredPwaPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.deferredPwaPrompt = e;
+        window.dispatchEvent(new CustomEvent('pwa-prompt-ready', { detail: e }));
+        console.log('[ServiFlow PWA] Captured beforeinstallprompt event ready for install trigger');
+      });
+      window.addEventListener('appinstalled', function() {
+        window.deferredPwaPrompt = null;
+        console.log('[ServiFlow PWA] App installed successfully');
+      });
+    </script>
   </head>
   <body class="bg-slate-900">
     <div id="root"></div>
