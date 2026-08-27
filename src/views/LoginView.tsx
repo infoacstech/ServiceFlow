@@ -379,36 +379,21 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       <div className="w-full max-w-md space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          {activeBusiness?.logo ? (
-            <div
-              onClick={handleSecretLogoClick}
-              className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border-2 border-indigo-500/30 p-1.5 shadow-lg shadow-indigo-500/10 mb-1 overflow-hidden transition-all select-none cursor-default"
-            >
-              <img
-                src={activeBusiness.logo}
-                alt={activeBusiness.name}
-                className="w-full h-full object-contain rounded-xl pointer-events-none"
-              />
-            </div>
-          ) : (
-            <div
-              onClick={handleSecretLogoClick}
-              className="inline-flex items-center justify-center mb-1 select-none cursor-default transition-transform hover:scale-105"
-            >
-              <BrandLogo size={64} />
-            </div>
-          )}
+          <div
+            onClick={handleSecretLogoClick}
+            className="inline-flex items-center justify-center mb-1 select-none cursor-pointer transition-transform hover:scale-105"
+          >
+            <BrandLogo size={64} />
+          </div>
 
           <h1
             onClick={handleSecretLogoClick}
-            className="text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight select-none cursor-default"
+            className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight select-none cursor-pointer"
           >
-            {activeBusiness?.name || 'ServiFlow'}
+            ServiFlow
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium max-w-xs mx-auto">
-            {activeBusiness?.name
-              ? `${activeBusiness.name} Employee Portal`
-              : 'Field Operations & Service Management System'}
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium max-w-xs mx-auto">
+            Service Management & Operations Portal
           </p>
         </div>
 

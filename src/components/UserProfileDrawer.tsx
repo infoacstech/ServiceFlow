@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   X,
@@ -10,7 +10,6 @@ import {
   Sun,
   Moon,
   Volume2,
-  VolumeX,
   LogOut,
   Sliders,
   Sparkles,
@@ -18,18 +17,18 @@ import {
   Save,
   Download,
   History,
-  RotateCcw,
   Camera,
   CheckCircle2,
   Lock,
   KeyRound,
   Eye,
   EyeOff,
-  Settings as SettingsIcon,
   ChevronRight,
   RefreshCw,
+  Upload,
+  Trash2,
+  Info,
 } from 'lucide-react';
-import { UserRole } from '../types';
 import { clearAppCache } from '../utils/cacheUtils';
 import {
   isVoiceNotificationEnabled,
@@ -82,6 +81,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
   const [avatar, setAvatar] = useState(currentUser?.avatar || '');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Password Change States
   const [newPassword, setNewPassword] = useState('');
@@ -124,6 +124,60 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
   }, [currentUser]);
 
   if (!isOpen) return null;
+
+  // Native Image File Picker & Compression Handler
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select a valid image file (JPEG, PNG, WEBP)', 'error');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Image file size is too large (max 5MB)', 'error');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const rawDataUrl = event.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 256;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+          setAvatar(compressedBase64);
+          showToast('Profile photo loaded. Click "Save Profile Details" to apply.', 'info');
+        } else {
+          setAvatar(rawDataUrl);
+        }
+      };
+      img.src = rawDataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,15 +231,21 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
     }
   };
 
-  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const isSuperAdmin =
+    currentUser?.role === 'super_admin' &&
+    ((currentUser?.email || '').trim().toLowerCase() === 'admin@serviflow.io' ||
+      (currentUser?.email || '').trim().toLowerCase() === 'superadmin@serviflow.io' ||
+      currentUser?.id === 'usr-super-admin-001');
 
-  const rolesList: { id: UserRole; label: string; desc: string }[] = isSuperAdmin
-    ? [{ id: 'super_admin', label: 'Super Admin', desc: 'Multi-tenant cloud platform administrator' }]
-    : [
-        { id: 'business_owner', label: 'Business Owner', desc: 'Full administrative and financial access' },
-        { id: 'manager', label: 'Manager', desc: 'Dispatch, job management, invoices & inventory' },
-        { id: 'technician', label: 'Field Technician', desc: 'Assigned jobs, voice notes & field execution' },
-      ];
+  // Role permissions breakdown
+  const rolePermissionsList = [
+    { label: 'Dispatch & Manage Jobs', granted: true },
+    { label: 'View Invoices & Financials', granted: ['business_owner', 'manager', 'super_admin'].includes(currentUser?.role || '') },
+    { label: 'Manage Staff & Attendance Rules', granted: ['business_owner', 'super_admin'].includes(currentUser?.role || '') },
+    { label: 'Manage Inventory & Stock', granted: ['business_owner', 'manager', 'super_admin'].includes(currentUser?.role || '') },
+    { label: 'Business & Tax Configurations', granted: ['business_owner', 'super_admin'].includes(currentUser?.role || '') },
+    { label: 'Multi-Tenant Cloud Administration', granted: isSuperAdmin },
+  ];
 
   return (
     <div className="fixed inset-0 z-[99999] overflow-hidden animate-in fade-in duration-200">
@@ -282,36 +342,77 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
             {/* SECTION 1: PROFILE INFO */}
             {activeSection === 'profile' && (
               <div className="space-y-4 animate-in fade-in">
-                {/* Profile Overview Card */}
+                {/* Profile Photo & Quick Overview Card */}
                 <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/80 via-slate-50 to-indigo-50/40 dark:from-indigo-950/40 dark:via-slate-900 dark:to-indigo-950/20 border border-indigo-100 dark:border-indigo-900/60 shadow-xs">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-lg shadow-md overflow-hidden ring-2 ring-white dark:ring-slate-800 shrink-0">
-                      {avatar || currentUser?.avatar ? (
-                        <img src={avatar || currentUser?.avatar} alt={name} className="w-full h-full object-cover" />
-                      ) : (
-                        (name || currentUser?.email || 'US').substring(0, 2).toUpperCase()
-                      )}
+                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                    {/* Interactive Avatar Container */}
+                    <div className="relative group">
+                      <div className="w-18 h-18 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-md overflow-hidden ring-4 ring-white dark:ring-slate-800 shrink-0">
+                        {avatar || currentUser?.avatar ? (
+                          <img src={avatar || currentUser?.avatar} alt={name} className="w-full h-full object-cover" />
+                        ) : (
+                          (name || currentUser?.email || 'US').substring(0, 2).toUpperCase()
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="absolute -bottom-1 -right-1 p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md border-2 border-white dark:border-slate-800 cursor-pointer transition-transform group-hover:scale-110"
+                        title="Upload Photo"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                      </button>
                     </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-0.5">
+                    <div className="flex-1 min-w-0 text-center sm:text-left">
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 mb-1">
                         <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 truncate">
                           {currentUser?.name || 'Guest User'}
                         </h3>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                        <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
                           {currentUser?.role?.replace('_', ' ')}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate flex items-center justify-center sm:justify-start gap-1">
                         <Mail className="w-3 h-3 text-slate-400 shrink-0" />
                         {currentUser?.email || 'No email attached'}
                       </p>
                       {currentUser?.phone && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate flex items-center gap-1 mt-0.5">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate flex items-center justify-center sm:justify-start gap-1 mt-0.5">
                           <Phone className="w-3 h-3 text-slate-400 shrink-0" />
                           {currentUser.phone}
                         </p>
                       )}
+
+                      {/* Photo Upload Actions */}
+                      <div className="flex items-center justify-center sm:justify-start gap-2 mt-2.5">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageFileChange}
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-2.5 py-1 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-800 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <Upload className="w-3 h-3" /> Upload Photo
+                        </button>
+                        {(avatar || currentUser?.avatar) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAvatar('');
+                              showToast('Photo removed. Click Save Profile to apply.', 'info');
+                            }}
+                            className="px-2 py-1 text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" /> Remove
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -332,7 +433,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                       onChange={(e) => setName(e.target.value)}
                       required
                       placeholder="Enter your name"
-                      className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium"
+                      className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium focus:ring-2 focus:ring-indigo-500 outline-hidden"
                     />
                   </div>
 
@@ -345,20 +446,19 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="+91 98765 43210"
-                      className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium"
+                      className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium focus:ring-2 focus:ring-indigo-500 outline-hidden"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Avatar Image URL (Optional)
+                      Email Address (Sign-In Identifier)
                     </label>
                     <input
-                      type="url"
-                      value={avatar}
-                      onChange={(e) => setAvatar(e.target.value)}
-                      placeholder="https://images.unsplash.com/..."
-                      className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium"
+                      type="email"
+                      value={currentUser?.email || ''}
+                      disabled
+                      className="w-full text-xs p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/40 text-slate-500 font-medium cursor-not-allowed"
                     />
                   </div>
 
@@ -393,7 +493,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                         onNavigateToSettings();
                         onClose();
                       }}
-                      className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
+                      className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer"
                     >
                       Manage Company →
                     </button>
@@ -404,27 +504,6 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                     {currentBusiness?.mobile && <div><strong>Mobile:</strong> {currentBusiness.mobile}</div>}
                     {currentBusiness?.email && <div><strong>Email:</strong> {currentBusiness.email}</div>}
                   </div>
-                </div>
-
-                {/* Direct Log Out Button inside Profile Tab */}
-                <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 space-y-2">
-                  <div className="text-xs font-bold text-rose-900 dark:text-rose-200 flex items-center gap-1.5">
-                    <LogOut className="w-4 h-4 text-rose-600 dark:text-rose-400" /> Sign Out from Account
-                  </div>
-                  <p className="text-[11px] text-rose-700 dark:text-rose-300">
-                    Exit your active session on this device. You can log back in anytime.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await logoutUser();
-                      if (onSignOut) onSignOut();
-                      onClose();
-                    }}
-                    className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-98 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-rose-600/20"
-                  >
-                    <LogOut className="w-4 h-4" /> Log Out (लॉग आउट)
-                  </button>
                 </div>
               </div>
             )}
@@ -449,7 +528,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                         required
                         minLength={6}
                         placeholder="Enter new password"
-                        className="w-full text-xs p-2.5 pr-10 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium"
+                        className="w-full text-xs p-2.5 pr-10 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium focus:ring-2 focus:ring-indigo-500 outline-hidden"
                       />
                       <button
                         type="button"
@@ -472,7 +551,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                       required
                       minLength={6}
                       placeholder="Re-enter new password"
-                      className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium"
+                      className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium focus:ring-2 focus:ring-indigo-500 outline-hidden"
                     />
                   </div>
 
@@ -633,40 +712,59 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
             {/* SECTION 4: ROLE & BUSINESS */}
             {activeSection === 'role' && (
               <div className="space-y-4 animate-in fade-in">
-                {/* Role Switcher */}
+                {/* Role Overview & Status */}
                 <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-sm">
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
-                    <Shield className="w-4 h-4 text-purple-600" /> Active Workspace Role
-                  </span>
-                  <div className="space-y-1.5">
-                    {rolesList.map((r) => {
-                      const isCurRole = currentUser?.role === r.id;
-                      return (
-                        <button
-                          key={r.id}
-                          onClick={() => switchRole(r.id)}
-                          className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all cursor-pointer ${
-                            isCurRole
-                              ? 'bg-purple-50 dark:bg-purple-950/50 text-purple-900 dark:text-purple-200 border border-purple-300 dark:border-purple-800 font-bold'
-                              : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs'
+                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                      <Shield className="w-4 h-4 text-purple-600" /> Active Workspace Role
+                    </span>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 uppercase">
+                      {currentUser?.role?.replace('_', ' ')}
+                    </span>
+                  </div>
+
+                  {/* Permissions Checklist */}
+                  <div className="space-y-2 pt-1">
+                    <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Assigned Capabilities & Permissions:
+                    </div>
+                    <div className="grid grid-cols-1 gap-1.5 text-xs">
+                      {rolePermissionsList.map((perm, idx) => (
+                        <div
+                          key={idx}
+                          className={`flex items-center justify-between p-2 rounded-xl ${
+                            perm.granted
+                              ? 'bg-slate-50 dark:bg-slate-800/60 text-slate-800 dark:text-slate-200'
+                              : 'bg-slate-50/50 dark:bg-slate-800/20 text-slate-400 line-through'
                           }`}
                         >
-                          <div>
-                            <div className="text-xs font-semibold">{r.label}</div>
-                            <div className="text-[10px] text-slate-400">{r.desc}</div>
-                          </div>
-                          {isCurRole && <Check className="w-4 h-4 text-purple-600 shrink-0" />}
-                        </button>
-                      );
-                    })}
+                          <span className="text-[11.5px] font-medium">{perm.label}</span>
+                          {perm.granted ? (
+                            <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          ) : (
+                            <X className="w-4 h-4 text-slate-400 shrink-0" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* Security Notice for Non-Super Admins */}
+                  {!isSuperAdmin && (
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-start gap-2">
+                      <Info className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                      <span>
+                        Role assignments and operational privileges are strictly managed by your Business Administrator in Staff Settings.
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Multi-Tenant Switcher (Exclusively for Platform Super Admin) */}
-                {isSuperAdmin && businesses.length > 1 && (
+                {isSuperAdmin && (
                   <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-sm">
                     <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
-                      <Building2 className="w-4 h-4 text-indigo-600" /> Switch Business Organization
+                      <Building2 className="w-4 h-4 text-indigo-600" /> Switch Business Organization (Super Admin)
                     </span>
                     <div className="space-y-1.5 max-h-48 overflow-y-auto">
                       {businesses.map((b) => (
@@ -739,21 +837,27 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                 <ChevronRight className="w-4 h-4 text-emerald-500" />
               </button>
 
-              <button
-                type="button"
-                onClick={handleClearCache}
-                disabled={isClearingCache}
-                className="w-full flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-amber-50/80 to-orange-50/80 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200/80 dark:border-amber-800/60 hover:border-amber-400 text-amber-900 dark:text-amber-200 text-xs font-bold transition-all shadow-xs cursor-pointer group disabled:opacity-50"
-              >
-                <div className="flex items-center gap-2.5">
-                  <RefreshCw className={`w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 ${isClearingCache ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-                  <div className="text-left">
-                    <div>Clear App Cache & Reload (कैश साफ़ करें)</div>
-                    <div className="text-[10px] text-amber-700/80 dark:text-amber-400/80 font-normal">Unregister service workers & fetch latest assets</div>
-                  </div>
+              {/* Advanced / Troubleshooting Section */}
+              <div className="pt-2">
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1 pb-1.5">
+                  Advanced & Troubleshooting
                 </div>
-                <ChevronRight className="w-4 h-4 text-amber-500 shrink-0" />
-              </button>
+                <button
+                  type="button"
+                  onClick={handleClearCache}
+                  disabled={isClearingCache}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-600 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all shadow-xs cursor-pointer group disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <RefreshCw className={`w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 ${isClearingCache ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+                    <div className="text-left">
+                      <div>Clear App Cache & Reload (कैश साफ़ करें)</div>
+                      <div className="text-[10px] text-slate-500 font-normal">Unregister service workers & reload latest version</div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                </button>
+              </div>
             </div>
 
           </div>
