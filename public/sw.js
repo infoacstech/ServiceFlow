@@ -113,18 +113,21 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
-  // Exclude Firebase API and Google APIs from ServiceWorker cache to ensure 100% realtime sync
+  // Exclude Firebase API, Google APIs, Vite dev endpoints, and /api/ from ServiceWorker cache
   if (
     url.hostname.includes('firestore.googleapis.com') ||
     url.hostname.includes('identitytoolkit.googleapis.com') ||
     url.hostname.includes('firebaseinstallations.googleapis.com') ||
     url.hostname.includes('googleapis.com') ||
-    url.pathname.startsWith('/api/')
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/@') ||
+    url.pathname.startsWith('/src/') ||
+    url.pathname.includes('node_modules')
   ) {
     return;
   }
 
-  // For HTML page navigation and refresh requests: Network-First
+  // For HTML page navigation and refresh requests: Network-First with cached index.html fallback
   if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
       fetch(event.request)
@@ -143,7 +146,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-First with Cache Fallback for static assets, scripts and styles
+  // Network-First with Cache Fallback for static assets, scripts and styles (never fallback to index.html for JS/CSS)
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
@@ -153,14 +156,14 @@ self.addEventListener('fetch', (event) => {
         }
         return networkResponse;
       })
-      .catch(() => {
-        return caches.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) return cachedResponse;
-          if (event.request.destination === 'image') {
-            return caches.match('/favicon.svg');
-          }
-          return caches.match('/index.html');
-        });
+      .catch(async () => {
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) return cachedResponse;
+        if (event.request.destination === 'image') {
+          const fallbackIcon = await caches.match('/favicon.svg');
+          if (fallbackIcon) return fallbackIcon;
+        }
+        return new Response('Asset not found offline', { status: 404, statusText: 'Not Found' });
       })
   );
 });

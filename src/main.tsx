@@ -10,7 +10,7 @@ import './index.css';
 let swRegistration: ServiceWorkerRegistration | null = null;
 let isRefreshing = false;
 
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && !import.meta.env.DEV) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/sw.js')
