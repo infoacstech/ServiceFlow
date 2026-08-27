@@ -130,9 +130,9 @@ const MainContent: React.FC = () => {
   // 2. Unauthenticated State (Logged Out or No Active Session)
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased">
-        <main className="flex-1 max-w-7xl mx-auto w-full overflow-hidden">
-          <PullToRefresh className="p-4 sm:p-6 lg:p-8">
+      <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased overflow-x-hidden">
+        <main className="flex-1 max-w-7xl mx-auto w-full min-h-screen overflow-y-auto">
+          <PullToRefresh className="p-3 sm:p-6 lg:p-8">
             <LoginView onLoginSuccess={() => {}} />
           </PullToRefresh>
         </main>

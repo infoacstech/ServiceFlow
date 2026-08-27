@@ -24,6 +24,7 @@ import {
   Tag,
   Eye,
   EyeOff,
+  ChevronDown,
 } from 'lucide-react';
 
 interface LoginViewProps {
@@ -375,15 +376,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-[80vh] flex flex-col justify-center items-center py-6 px-4 animate-in fade-in">
-      <div className="w-full max-w-md space-y-6">
+    <div className="min-h-full w-full flex flex-col justify-center items-center pt-2 sm:pt-4 pb-28 sm:pb-36 px-3.5 sm:px-6 animate-in fade-in">
+      <div className="w-full max-w-[440px] sm:max-w-md space-y-4 sm:space-y-5 mx-auto">
         {/* Brand Header */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-1 sm:space-y-1.5">
           <div
             onClick={handleSecretLogoClick}
-            className="inline-flex items-center justify-center mb-1 select-none cursor-pointer transition-transform hover:scale-105"
+            className="inline-flex items-center justify-center select-none cursor-pointer transition-transform hover:scale-105 active:scale-95"
+            title="ServiFlow Logo"
           >
-            <BrandLogo size={64} />
+            <BrandLogo size={52} />
           </div>
 
           <h1
@@ -398,22 +400,22 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </div>
 
         {/* Main Clean Card */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xl p-6 sm:p-8 space-y-6">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xl p-5 sm:p-7 space-y-4 sm:space-y-5">
           {/* Top Auth Tab Selector */}
-          <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl text-xs font-bold">
+          <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 sm:p-1.5 rounded-2xl text-xs sm:text-sm font-bold gap-1">
             <button
               type="button"
               onClick={() => {
                 setAuthTab('login');
                 setPendingRegistrationSuccess(null);
               }}
-              className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-2.5 px-2.5 sm:px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[44px] cursor-pointer touch-manipulation select-none ${
                 authTab === 'login'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
                   : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              <KeyRound className="w-3.5 h-3.5" />
+              <KeyRound className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               <span>Sign In</span>
             </button>
 
@@ -423,13 +425,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 setAuthTab('register');
                 setPendingRegistrationSuccess(null);
               }}
-              className={`flex-1 py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-2.5 px-2.5 sm:px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 min-h-[44px] cursor-pointer touch-manipulation select-none ${
                 authTab === 'register'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
                   : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              <UserPlus className="w-3.5 h-3.5" />
+              <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               <span>Create Account</span>
             </button>
           </div>
@@ -442,14 +444,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   Email Address or Mobile Phone
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+                  <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
                     placeholder="e.g. rajesh@apexsecurity.com or 9876543210"
                     required
-                    className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
+                    className="w-full h-11 sm:h-12 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
                   />
                 </div>
               </div>
@@ -475,14 +477,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   </button>
                 </div>
                 <div className="relative">
-                  <Lock className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+                  <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="password"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="Enter password"
                     required
-                    className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
+                    className="w-full h-11 sm:h-12 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
                   />
                 </div>
               </div>
@@ -490,7 +492,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                className="w-full h-11 sm:h-12 min-h-[44px] rounded-xl sm:rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
               >
                 {isSubmitting ? (
                   <span>Signing in...</span>
@@ -528,13 +530,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       setPendingRegistrationSuccess(null);
                       setAuthTab('login');
                     }}
-                    className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs"
+                    className="w-full h-11 min-h-[44px] rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer flex items-center justify-center"
                   >
                     Back to Sign In
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleDirectRegistration} className="space-y-3.5">
+                <form onSubmit={handleDirectRegistration} className="space-y-3.5 sm:space-y-4">
                   {duplicateAccountNotice && (
                     <div className="p-3.5 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 rounded-2xl space-y-2.5 animate-in fade-in">
                       <div className="flex items-start gap-2.5">
@@ -557,7 +559,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                             }
                             setDuplicateAccountNotice(null);
                           }}
-                          className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all"
+                          className="flex-1 py-2 px-3 min-h-[40px] rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-all"
                         >
                           <span>Sign In Now</span>
                           <ArrowRight className="w-3.5 h-3.5" />
@@ -570,7 +572,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                             setForgotStep('identifier');
                             setDuplicateAccountNotice(null);
                           }}
-                          className="py-2 px-3 rounded-xl bg-amber-100 dark:bg-amber-900/60 hover:bg-amber-200 dark:hover:bg-amber-800 text-amber-900 dark:text-amber-200 font-bold text-xs transition-all cursor-pointer text-center"
+                          className="py-2 px-3 min-h-[40px] rounded-xl bg-amber-100 dark:bg-amber-900/60 hover:bg-amber-200 dark:hover:bg-amber-800 text-amber-900 dark:text-amber-200 font-bold text-xs transition-all cursor-pointer text-center flex items-center justify-center"
                         >
                           Reset Password (OTP)
                         </button>
@@ -581,7 +583,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   {/* Header Info */}
                   <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-2xl border border-indigo-100 dark:border-indigo-900/50 space-y-1">
                     <div className="font-extrabold text-xs text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
                       <span>Create Your Business Workspace</span>
                     </div>
                     <p className="text-[11px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
@@ -590,7 +592,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                       Business Owner Name *
                     </label>
                     <input
@@ -599,13 +601,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       onChange={(e) => setRegName(e.target.value)}
                       placeholder="e.g. Rahul Sharma"
                       required
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                      className="w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                         Email Address *
                       </label>
                       <input
@@ -614,12 +616,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         onChange={(e) => setRegEmail(e.target.value)}
                         placeholder="rahul@company.com"
                         required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                        className="w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                         Mobile Phone *
                       </label>
                       <input
@@ -628,14 +630,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         onChange={(e) => setRegPhone(e.target.value)}
                         placeholder="9876543210"
                         required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                        className="w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
                       />
                     </div>
                   </div>
 
-                  <div className="space-y-2.5">
+                  <div className="space-y-3.5 sm:space-y-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                         Business / Company Name *
                       </label>
                       <input
@@ -644,30 +646,33 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                         onChange={(e) => setRegBusinessName(e.target.value)}
                         placeholder="e.g. Apex Security Solutions"
                         required
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                        className="w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                         Industry / Service Domain *
                       </label>
-                      <select
-                        value={regBusinessType}
-                        onChange={(e) => setRegBusinessType(e.target.value)}
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
-                      >
-                        <option value="CCTV & Security">CCTV & Security Systems</option>
-                        <option value="Solar & Energy">Solar & Renewable Energy</option>
-                        <option value="AC Service & HVAC">AC Service & HVAC</option>
-                        <option value="Electrical Services">Electrical Services</option>
-                        <option value="Plumbing Services">Plumbing Services</option>
-                        <option value="Computer & IT Repair">Computer & IT Repair</option>
-                      </select>
+                      <div className="relative">
+                        <select
+                          value={regBusinessType}
+                          onChange={(e) => setRegBusinessType(e.target.value)}
+                          className="w-full h-11 sm:h-12 pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden appearance-none cursor-pointer transition-all"
+                        >
+                          <option value="CCTV & Security">CCTV & Security Systems</option>
+                          <option value="Solar & Energy">Solar & Renewable Energy</option>
+                          <option value="AC Service & HVAC">AC Service & HVAC</option>
+                          <option value="Electrical Services">Electrical Services</option>
+                          <option value="Plumbing Services">Plumbing Services</option>
+                          <option value="Computer & IT Repair">Computer & IT Repair</option>
+                        </select>
+                        <ChevronDown className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                      </div>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                       Set Master Account Password *
                     </label>
                     <input
@@ -677,27 +682,27 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                       placeholder="Password (min 6 characters)"
                       required
                       minLength={6}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                      className="w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                    className="w-full h-11 sm:h-12 min-h-[44px] rounded-xl sm:rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
                   >
                     <UserPlus className="w-4 h-4" />
                     <span>{isSubmitting ? 'Creating Business Workspace...' : 'Create Business Account'}</span>
                   </button>
 
                   {/* Staff Notice */}
-                  <div className="pt-2 text-center">
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
+                  <div className="pt-1.5 sm:pt-2 text-center">
+                    <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm mx-auto">
                       Are you a field technician or staff member? Your business owner will invite you and provide your credentials.{' '}
                       <button
                         type="button"
                         onClick={() => setAuthTab('login')}
-                        className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer"
+                        className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer inline-block sm:inline"
                       >
                         Sign in here
                       </button>
