@@ -527,7 +527,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                 </form>
 
                 {/* Company Information Overview */}
-                <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-2">
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-2.5">
                   <div className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between gap-2">
                     <span className="flex items-center gap-1.5 truncate">
                       <Building2 className="w-4 h-4 text-indigo-600 shrink-0" /> Business Profile
@@ -540,14 +540,25 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                       }}
                       className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer shrink-0"
                     >
-                      Manage Company →
+                      Manage Settings →
                     </button>
                   </div>
-                  <div className="text-xs text-slate-600 dark:text-slate-300 space-y-1 pt-1">
-                    <div><strong>Company:</strong> {currentBusiness?.name || 'ServiFlow'}</div>
-                    <div><strong>Industry:</strong> {currentBusiness?.type || 'Field Services'}</div>
-                    {currentBusiness?.mobile && <div><strong>Mobile:</strong> {currentBusiness.mobile}</div>}
-                    {currentBusiness?.email && <div><strong>Email:</strong> {currentBusiness.email}</div>}
+                  
+                  <div className="flex items-center gap-3 pt-1">
+                    {currentBusiness?.logo ? (
+                      <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+                        <img src={currentBusiness.logo} alt="Company Logo" className="w-full h-full object-contain" />
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900 flex items-center justify-center shrink-0 text-indigo-600 dark:text-indigo-400 font-bold text-base">
+                        {(currentBusiness?.name || 'S').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="text-xs text-slate-600 dark:text-slate-300 space-y-0.5 min-w-0 flex-1">
+                      <div className="font-bold text-slate-900 dark:text-slate-100 truncate">{currentBusiness?.name || 'ServiFlow'}</div>
+                      <div className="text-slate-500 text-[11px] truncate">{currentBusiness?.type || 'Field Services'}</div>
+                      {currentBusiness?.mobile && <div className="text-[11px] truncate">📞 {currentBusiness.mobile}</div>}
+                    </div>
                   </div>
                 </div>
               </div>

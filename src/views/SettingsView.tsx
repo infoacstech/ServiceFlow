@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   Settings,
@@ -57,6 +57,9 @@ import {
   LogOut,
   Smartphone,
   Download,
+  Upload,
+  Image as ImageIcon,
+  Loader2,
 } from 'lucide-react';
 import { InstallAppModal } from '../components/InstallAppModal';
 import { calculateAnnualPricing } from '../utils/planUtils';
@@ -298,32 +301,132 @@ export const SettingsView: React.FC = () => {
   };
 
   const [formData, setFormData] = useState({
-    name: currentBusiness.name,
-    type: currentBusiness.type,
+    name: currentBusiness.name || '',
+    type: currentBusiness.type || '',
     logo: currentBusiness.logo || '',
-    mobile: currentBusiness.mobile,
-    whatsapp: currentBusiness.whatsapp || currentBusiness.mobile,
-    email: currentBusiness.email,
-    address: currentBusiness.address,
-    city: currentBusiness.city,
-    state: currentBusiness.state,
-    pin: currentBusiness.pin,
+    mobile: currentBusiness.mobile || '',
+    whatsapp: currentBusiness.whatsapp || currentBusiness.mobile || '',
+    email: currentBusiness.email || '',
+    address: currentBusiness.address || '',
+    city: currentBusiness.city || '',
+    state: currentBusiness.state || '',
+    pin: currentBusiness.pin || '',
     gstNumber: currentBusiness.gstNumber || '',
-    currency: currentBusiness.currency,
+    currency: currentBusiness.currency || '₹',
   });
 
+  // Sync formData whenever currentBusiness is loaded or updated
+  useEffect(() => {
+    if (currentBusiness) {
+      setFormData({
+        name: currentBusiness.name || '',
+        type: currentBusiness.type || '',
+        logo: currentBusiness.logo || '',
+        mobile: currentBusiness.mobile || '',
+        whatsapp: currentBusiness.whatsapp || currentBusiness.mobile || '',
+        email: currentBusiness.email || '',
+        address: currentBusiness.address || '',
+        city: currentBusiness.city || '',
+        state: currentBusiness.state || '',
+        pin: currentBusiness.pin || '',
+        gstNumber: currentBusiness.gstNumber || '',
+        currency: currentBusiness.currency || '₹',
+      });
+    }
+  }, [currentBusiness]);
+
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isCompressingLogo, setIsCompressingLogo] = useState(false);
+  const [logoUploadStatus, setLogoUploadStatus] = useState<string | null>(null);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+
   const [isSyncing, setIsSyncing] = useState(false);
   const [logFilter, setLogFilter] = useState<'ALL' | 'SUCCESS' | 'NO_CHANGES' | 'OFFLINE_QUEUED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [syncLogLimit, setSyncLogLimit] = useState<number | 'all'>(10);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select a valid image file (PNG, JPG, WebP).', 'error');
+      return;
+    }
+
+    setIsCompressingLogo(true);
+    setLogoUploadStatus('Optimizing logo image...');
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const maxDimension = 400; // Optimal 400x400 for crisp logo and lightweight storage
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDimension) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            }
+          } else {
+            if (height > maxDimension) {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const isPng = file.type === 'image/png';
+            const compressedDataUrl = isPng
+              ? canvas.toDataURL('image/png')
+              : canvas.toDataURL('image/jpeg', 0.88);
+
+            const sizeKb = Math.round((compressedDataUrl.length * 3) / 4 / 1024);
+            setFormData((prev) => ({ ...prev, logo: compressedDataUrl }));
+            setLogoUploadStatus(`Image optimized (${sizeKb} KB) • Ready to save`);
+            showToast(`Logo image selected & optimized (${sizeKb} KB). Click "Save Profile Changes" to save.`, 'success');
+          }
+        } catch (err) {
+          console.error('Error compressing logo:', err);
+          showToast('Could not optimize image. Using original.', 'info');
+          setFormData((prev) => ({ ...prev, logo: event.target?.result as string }));
+        } finally {
+          setIsCompressingLogo(false);
+        }
+      };
+      img.onerror = () => {
+        setIsCompressingLogo(false);
+        setLogoUploadStatus(null);
+        showToast('Failed to process image file. Please try another image.', 'error');
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateBusinessProfile(formData);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 3000);
+    setIsSavingProfile(true);
+    try {
+      await updateBusinessProfile(formData);
+      setSavedSuccess(true);
+      setLogoUploadStatus(null);
+      setTimeout(() => setSavedSuccess(false), 3500);
+    } catch (err: any) {
+      console.error('Failed to update business profile:', err);
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   const handleManualSyncClick = () => {
@@ -813,63 +916,93 @@ export const SettingsView: React.FC = () => {
               />
             </div>
 
-            <div className="col-span-2 p-4 bg-slate-50/80 dark:bg-slate-800/50 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">
+            <div className="col-span-2 p-4 sm:p-5 bg-gradient-to-br from-slate-50 via-indigo-50/20 to-slate-50 dark:from-slate-800/80 dark:via-indigo-950/20 dark:to-slate-800/80 rounded-2xl border border-indigo-100 dark:border-indigo-900/60 space-y-3.5 shadow-xs">
               <div>
-                <label className="font-bold text-slate-800 dark:text-slate-200 block mb-0.5">
+                <label className="font-bold text-slate-800 dark:text-slate-200 block mb-0.5 text-xs sm:text-sm">
                   Company Branding Logo *
                 </label>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Upload a company logo image. Displayed on Invoices, Quotations, and the Technician Login screen.
+                  Upload your business logo. It will automatically appear on Invoices, Quotations, Header bar, and the Staff Login screen.
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center p-1 shadow-xs shrink-0 overflow-hidden relative group">
-                  {formData.logo ? (
-                    <img src={formData.logo} alt="Company Logo" className="w-full h-full object-contain rounded-xl" />
-                  ) : (
-                    <div className="text-center text-slate-400 text-[10px] font-bold">No Logo</div>
-                  )}
+                {/* Logo Preview Square */}
+                <div className="relative group shrink-0">
+                  <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl bg-white dark:bg-slate-900 border-2 border-indigo-200/80 dark:border-indigo-800/80 flex items-center justify-center p-1.5 shadow-md overflow-hidden shrink-0">
+                    {formData.logo ? (
+                      <img src={formData.logo} alt="Company Logo" className="w-full h-full object-contain rounded-xl" />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-slate-400 text-center p-1">
+                        <ImageIcon className="w-6 h-6 mb-1 text-slate-300 dark:text-slate-600" />
+                        <span className="text-[9px] font-bold uppercase tracking-wider">No Logo</span>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => logoFileInputRef.current?.click()}
+                    disabled={isCompressingLogo}
+                    className="absolute -bottom-1 -right-1 p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md border-2 border-white dark:border-slate-800 cursor-pointer transition-transform group-hover:scale-110 flex items-center justify-center disabled:opacity-50"
+                    title="Change Logo"
+                    aria-label="Change Logo"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                  </button>
                 </div>
 
-                <div className="flex-1 space-y-2 w-full">
+                <div className="flex-1 space-y-2.5 w-full">
+                  <input
+                    ref={logoFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoFileChange}
+                    className="hidden"
+                    aria-label="Upload logo image file"
+                  />
+
                   <div className="flex flex-wrap items-center gap-2">
-                    <label className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer shadow-xs transition-colors inline-flex items-center gap-1.5">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            if (file.size > 3 * 1024 * 1024) {
-                              alert('Image file is too large. Please select an image under 3MB.');
-                              return;
-                            }
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              const result = event.target?.result as string;
-                              if (result) {
-                                setFormData((prev) => ({ ...prev, logo: result }));
-                              }
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                      <span>Upload Logo Image</span>
-                    </label>
+                    <button
+                      type="button"
+                      onClick={() => logoFileInputRef.current?.click()}
+                      disabled={isCompressingLogo}
+                      className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer shadow-xs transition-colors inline-flex items-center gap-1.5 disabled:opacity-60 min-h-[36px]"
+                    >
+                      {isCompressingLogo ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Optimizing Image...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload Logo Image</span>
+                        </>
+                      )}
+                    </button>
 
                     {formData.logo && (
                       <button
                         type="button"
-                        onClick={() => setFormData({ ...formData, logo: '' })}
-                        className="px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 hover:bg-rose-100 font-semibold text-xs transition-colors"
+                        onClick={() => {
+                          setFormData({ ...formData, logo: '' });
+                          setLogoUploadStatus('Logo removed. Click Save Profile Changes to apply.');
+                          showToast('Logo removed. Click Save Profile Changes to apply.', 'info');
+                        }}
+                        className="px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60 font-semibold text-xs transition-colors flex items-center gap-1 cursor-pointer min-h-[36px]"
                       >
-                        Remove Logo
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Remove Logo</span>
                       </button>
                     )}
                   </div>
+
+                  {logoUploadStatus && (
+                    <div className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 animate-in fade-in">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                      <span>{logoUploadStatus}</span>
+                    </div>
+                  )}
 
                   <div>
                     <input
@@ -877,7 +1010,7 @@ export const SettingsView: React.FC = () => {
                       value={formData.logo}
                       onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
                       placeholder="Or paste image URL (e.g., https://example.com/logo.png)"
-                      className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono focus:ring-2 focus:ring-indigo-500 outline-hidden"
                     />
                   </div>
                 </div>
@@ -948,8 +1081,27 @@ export const SettingsView: React.FC = () => {
           </div>
 
           <div className="pt-3 border-t dark:border-slate-800 flex justify-end">
-            <button type="submit" className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md flex items-center gap-2 cursor-pointer">
-              <Save className="w-4 h-4" /> Save Profile Changes
+            <button
+              type="submit"
+              disabled={isSavingProfile || isCompressingLogo}
+              className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md flex items-center gap-2 cursor-pointer transition-all disabled:opacity-60 min-h-[42px]"
+            >
+              {isSavingProfile ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Saving Profile Changes...</span>
+                </>
+              ) : savedSuccess ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                  <span>Saved Successfully!</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>Save Profile Changes</span>
+                </>
+              )}
             </button>
           </div>
         </form>

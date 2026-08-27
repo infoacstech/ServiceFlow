@@ -4689,34 +4689,38 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return payoutReq;
   };
 
-  const updateBusinessSettings = (updates: Partial<Business>) => {
+  const updateBusinessSettings = async (updates: Partial<Business>): Promise<void> => {
     const perm = canManageBusinessSettings(currentUser);
     if (!perm.allowed) {
       showToast(perm.reason || 'Permission Denied: Only Business Owners can modify business settings.', 'error');
+      throw new Error(perm.reason || 'Permission Denied: Only Business Owners can modify business settings.');
+    }
+
+    const targetBizId = currentBusiness?.id;
+    if (!targetBizId || targetBizId === 'all') {
+      showToast('No active business selected.', 'error');
       return;
     }
-    const updated = { ...currentBusiness, ...updates };
+
+    const updated: Business = { ...currentBusiness, ...updates };
     setCurrentBusiness(updated);
     saveCache('serviflow_current_biz_cache', updated);
-
-    // Guard: Platform Super Admin or placeholder instances do not persist into tenant business collection
-    if (
-      currentUser?.role === 'super_admin' ||
-      !currentBusiness?.id ||
-      currentBusiness.id === 'all' ||
-      currentBusiness.id === 'biz-default'
-    ) {
-      showToast('Settings saved successfully', 'success');
-      return;
-    }
 
     setBusinesses((prev) => {
       const updatedList = prev.map((b) => (b.id === updated.id ? updated : b));
       saveCache('serviflow_businesses_cache', updatedList);
       return updatedList;
     });
-    saveToFirestore('businesses', currentBusiness.id, updates);
-    showToast('Business profile & settings updated and synced to Firestore', 'success');
+
+    try {
+      await saveToFirestore('businesses', targetBizId, updates);
+      await saveToFirestore('tenants', targetBizId, updates);
+      logActivity('Business Settings Updated', 'staff', targetBizId, `Updated business profile for ${updated.name}`);
+      showToast('Business profile & settings updated successfully!', 'success');
+    } catch (err: any) {
+      console.error('Error persisting business profile update to Firestore:', err);
+      showToast('Business profile updated locally. Sync warning: ' + (err?.message || 'Check network'), 'info');
+    }
   };
 
   const markNotificationRead = (id: string) => {
