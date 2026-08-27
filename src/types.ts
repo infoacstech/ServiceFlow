@@ -42,7 +42,9 @@ export interface User {
 export interface Business {
   id: string;
   name: string;
-  type: string; // e.g. "CCTV & Security", "Solar", "AC Service", "Electrical", "Plumbing", "Computer Repair", "Cleaning", etc.
+  type: string; // e.g. "CCTV & Security Systems", "Other / Custom Service", or custom category
+  serviceDomain?: string; // e.g. "Other / Custom Service" or "CCTV & Security Systems"
+  customServiceName?: string | null; // e.g. "Home Appliance Repair" or null for predefined
   logo?: string;
   mobile: string;
   whatsapp: string;

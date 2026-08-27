@@ -2,6 +2,12 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { User } from '../types';
 import { BrandLogo } from '../components/BrandLogo';
+import {
+  PREDEFINED_SERVICE_DOMAINS,
+  OTHER_CUSTOM_SERVICE_DOMAIN,
+  ALL_SERVICE_DOMAINS,
+  isOtherCustomService,
+} from '../data/serviceDomains';
 import { db } from '../lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import {
@@ -166,7 +172,100 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [regPhone, setRegPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regBusinessName, setRegBusinessName] = useState('');
-  const [regBusinessType, setRegBusinessType] = useState('CCTV & Security');
+  const [regServiceDomain, setRegServiceDomain] = useState<string>(PREDEFINED_SERVICE_DOMAINS[0]);
+  const [regCustomServiceName, setRegCustomServiceName] = useState('');
+
+  // Inline Validation State
+  const [regTouched, setRegTouched] = useState<{ [key: string]: boolean }>({});
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+
+  // Helper validation function
+  const validateRegistrationFields = (data: {
+    name: string;
+    email: string;
+    phone: string;
+    businessName: string;
+    serviceDomain: string;
+    customServiceName: string;
+    password: string;
+  }) => {
+    const errors: Record<string, string> = {};
+
+    // 1. Business Owner Name *
+    if (!data.name.trim()) {
+      errors.name = 'Business owner name is required';
+    }
+
+    // 2. Email Address *
+    const cleanEmail = data.email.trim();
+    if (!cleanEmail) {
+      errors.email = 'Email address is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      errors.email = 'Please enter a valid email address';
+    }
+
+    // 3. Mobile Phone *
+    const cleanPhone = data.phone.trim();
+    const phoneDigits = cleanPhone.replace(/[^0-9]/g, '');
+    if (!cleanPhone) {
+      errors.phone = 'Mobile phone number is required';
+    } else if (phoneDigits.length < 10) {
+      errors.phone = 'Please enter a valid mobile number';
+    }
+
+    // 4. Business / Company Name *
+    if (!data.businessName.trim()) {
+      errors.businessName = 'Business / Company Name is required';
+    }
+
+    // 5. Industry / Service Domain *
+    if (!data.serviceDomain || !data.serviceDomain.trim()) {
+      errors.serviceDomain = 'Please select your service domain';
+    }
+
+    // 6. Custom Service Name * (Conditional)
+    if (isOtherCustomService(data.serviceDomain)) {
+      if (!data.customServiceName.trim()) {
+        errors.customServiceName = 'Service / Industry Name is required';
+      }
+    }
+
+    // 7. Master Account Password *
+    if (!data.password) {
+      errors.password = 'Password is required';
+    } else if (data.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
+    }
+
+    return errors;
+  };
+
+  const regErrors = validateRegistrationFields({
+    name: regName,
+    email: regEmail,
+    phone: regPhone,
+    businessName: regBusinessName,
+    serviceDomain: regServiceDomain,
+    customServiceName: regCustomServiceName,
+    password: regPassword,
+  });
+
+  const markFieldTouched = (field: string) => {
+    setRegTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
+  const handleDomainSelectChange = (newDomain: string) => {
+    setRegServiceDomain(newDomain);
+    markFieldTouched('serviceDomain');
+    if (!isOtherCustomService(newDomain)) {
+      setRegCustomServiceName('');
+      setRegTouched((prev) => {
+        const next = { ...prev };
+        delete next.customServiceName;
+        return next;
+      });
+    }
+  };
 
   // Registration Success Alert State
   const [pendingRegistrationSuccess, setPendingRegistrationSuccess] = useState<User | null>(null);
@@ -224,19 +323,69 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   // Handle Business Owner Account Registration
   const handleDirectRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regName.trim() || !regEmail.trim() || !regPhone.trim() || !regPassword.trim() || !regBusinessName.trim()) {
-      showToast('Please complete all required fields including Business Name and Password', 'error');
-      return;
-    }
+    setHasAttemptedSubmit(true);
 
-    if (regPassword.length < 6) {
-      showToast('Password must be at least 6 characters long for secure Firebase Authentication', 'error');
+    const allTouched = {
+      name: true,
+      email: true,
+      phone: true,
+      businessName: true,
+      serviceDomain: true,
+      customServiceName: true,
+      password: true,
+    };
+    setRegTouched(allTouched);
+
+    const validationErrors = validateRegistrationFields({
+      name: regName,
+      email: regEmail,
+      phone: regPhone,
+      businessName: regBusinessName,
+      serviceDomain: regServiceDomain,
+      customServiceName: regCustomServiceName,
+      password: regPassword,
+    });
+
+    const errorKeys = Object.keys(validationErrors);
+    if (errorKeys.length > 0) {
+      const priorityOrder = [
+        'name',
+        'email',
+        'phone',
+        'businessName',
+        'serviceDomain',
+        'customServiceName',
+        'password',
+      ];
+      const firstInvalid = priorityOrder.find((k) => validationErrors[k]);
+      if (firstInvalid) {
+        const idMap: Record<string, string> = {
+          name: 'reg-owner-name',
+          email: 'reg-email',
+          phone: 'reg-phone',
+          businessName: 'reg-business-name',
+          serviceDomain: 'reg-service-domain',
+          customServiceName: 'reg-custom-service-name',
+          password: 'reg-password',
+        };
+        const targetId = idMap[firstInvalid];
+        const el = document.getElementById(targetId);
+        if (el) {
+          el.focus();
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        showToast(validationErrors[firstInvalid], 'error');
+      }
       return;
     }
 
     setIsSubmitting(true);
 
     try {
+      const isCustom = isOtherCustomService(regServiceDomain);
+      const customName = isCustom ? regCustomServiceName.trim() : null;
+      const effectiveType = isCustom ? (customName || 'Other / Custom Service') : regServiceDomain;
+
       const result = await registerUser({
         name: regName.trim(),
         email: regEmail.trim(),
@@ -244,7 +393,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         password: regPassword,
         role: 'business_owner',
         businessName: regBusinessName.trim() || `${regName.trim()}'s Services`,
-        businessType: regBusinessType || 'CCTV & Security',
+        businessType: effectiveType,
+        serviceDomain: regServiceDomain,
+        customServiceName: customName,
       });
 
       if (result.isPending) {
@@ -255,6 +406,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         setRegPhone('');
         setRegPassword('');
         setRegBusinessName('');
+        setRegServiceDomain(PREDEFINED_SERVICE_DOMAINS[0]);
+        setRegCustomServiceName('');
+        setRegTouched({});
+        setHasAttemptedSubmit(false);
       } else {
         sessionStorage.setItem('serviflow_active_tab', 'dashboard');
         if (onLoginSuccess) onLoginSuccess();
@@ -536,7 +691,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleDirectRegistration} className="space-y-3.5 sm:space-y-4">
+                <form onSubmit={handleDirectRegistration} noValidate className="space-y-3.5 sm:space-y-4">
                   {duplicateAccountNotice && (
                     <div className="p-3.5 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 rounded-2xl space-y-2.5 animate-in fade-in">
                       <div className="flex items-start gap-2.5">
@@ -591,99 +746,201 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     </p>
                   </div>
 
+                  {/* Business Owner Name */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Business Owner Name *
+                    <label htmlFor="reg-owner-name" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Business Owner Name <span className="text-rose-500">*</span>
                     </label>
                     <input
+                      id="reg-owner-name"
                       type="text"
                       value={regName}
                       onChange={(e) => setRegName(e.target.value)}
+                      onBlur={() => markFieldTouched('name')}
                       placeholder="e.g. Rahul Sharma"
-                      required
-                      className="w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
+                      className={`w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-hidden transition-all ${
+                        (regTouched.name || hasAttemptedSubmit) && regErrors.name
+                          ? 'border-rose-400 dark:border-rose-500 bg-rose-50/30 dark:bg-rose-950/20 focus:ring-2 focus:ring-rose-500'
+                          : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800'
+                      }`}
                     />
+                    {(regTouched.name || hasAttemptedSubmit) && regErrors.name && (
+                      <p className="text-xs text-rose-500 dark:text-rose-400 font-semibold mt-1.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{regErrors.name}</span>
+                      </p>
+                    )}
                   </div>
 
+                  {/* Email & Mobile Phone */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                        Email Address *
+                      <label htmlFor="reg-email" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Email Address <span className="text-rose-500">*</span>
                       </label>
                       <input
+                        id="reg-email"
                         type="email"
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
+                        onBlur={() => markFieldTouched('email')}
                         placeholder="rahul@company.com"
-                        required
-                        className="w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
+                        className={`w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-hidden transition-all ${
+                          (regTouched.email || hasAttemptedSubmit) && regErrors.email
+                            ? 'border-rose-400 dark:border-rose-500 bg-rose-50/30 dark:bg-rose-950/20 focus:ring-2 focus:ring-rose-500'
+                            : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800'
+                        }`}
                       />
+                      {(regTouched.email || hasAttemptedSubmit) && regErrors.email && (
+                        <p className="text-xs text-rose-500 dark:text-rose-400 font-semibold mt-1.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{regErrors.email}</span>
+                        </p>
+                      )}
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                        Mobile Phone *
+                      <label htmlFor="reg-phone" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Mobile Phone <span className="text-rose-500">*</span>
                       </label>
                       <input
+                        id="reg-phone"
                         type="tel"
                         value={regPhone}
                         onChange={(e) => setRegPhone(e.target.value)}
+                        onBlur={() => markFieldTouched('phone')}
                         placeholder="9876543210"
-                        required
-                        className="w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
+                        className={`w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-hidden transition-all ${
+                          (regTouched.phone || hasAttemptedSubmit) && regErrors.phone
+                            ? 'border-rose-400 dark:border-rose-500 bg-rose-50/30 dark:bg-rose-950/20 focus:ring-2 focus:ring-rose-500'
+                            : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800'
+                        }`}
                       />
+                      {(regTouched.phone || hasAttemptedSubmit) && regErrors.phone && (
+                        <p className="text-xs text-rose-500 dark:text-rose-400 font-semibold mt-1.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{regErrors.phone}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
 
+                  {/* Business Name & Industry / Service Domain */}
                   <div className="space-y-3.5 sm:space-y-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                        Business / Company Name *
+                      <label htmlFor="reg-business-name" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Business / Company Name <span className="text-rose-500">*</span>
                       </label>
                       <input
+                        id="reg-business-name"
                         type="text"
                         value={regBusinessName}
                         onChange={(e) => setRegBusinessName(e.target.value)}
+                        onBlur={() => markFieldTouched('businessName')}
                         placeholder="e.g. Apex Security Solutions"
-                        required
-                        className="w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
+                        className={`w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-hidden transition-all ${
+                          (regTouched.businessName || hasAttemptedSubmit) && regErrors.businessName
+                            ? 'border-rose-400 dark:border-rose-500 bg-rose-50/30 dark:bg-rose-950/20 focus:ring-2 focus:ring-rose-500'
+                            : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800'
+                        }`}
                       />
+                      {(regTouched.businessName || hasAttemptedSubmit) && regErrors.businessName && (
+                        <p className="text-xs text-rose-500 dark:text-rose-400 font-semibold mt-1.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{regErrors.businessName}</span>
+                        </p>
+                      )}
                     </div>
+
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                        Industry / Service Domain *
+                      <label htmlFor="reg-service-domain" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Industry / Service Domain <span className="text-rose-500">*</span>
                       </label>
                       <div className="relative">
                         <select
-                          value={regBusinessType}
-                          onChange={(e) => setRegBusinessType(e.target.value)}
-                          className="w-full h-11 sm:h-12 pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden appearance-none cursor-pointer transition-all"
+                          id="reg-service-domain"
+                          value={regServiceDomain}
+                          onChange={(e) => handleDomainSelectChange(e.target.value)}
+                          onBlur={() => markFieldTouched('serviceDomain')}
+                          className={`w-full h-11 sm:h-12 pl-3.5 pr-10 py-2.5 rounded-xl border text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 outline-hidden appearance-none cursor-pointer transition-all ${
+                            (regTouched.serviceDomain || hasAttemptedSubmit) && regErrors.serviceDomain
+                              ? 'border-rose-400 dark:border-rose-500 bg-rose-50/30 dark:bg-rose-950/20 focus:ring-2 focus:ring-rose-500'
+                              : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800'
+                          }`}
                         >
-                          <option value="CCTV & Security">CCTV & Security Systems</option>
-                          <option value="Solar & Energy">Solar & Renewable Energy</option>
-                          <option value="AC Service & HVAC">AC Service & HVAC</option>
-                          <option value="Electrical Services">Electrical Services</option>
-                          <option value="Plumbing Services">Plumbing Services</option>
-                          <option value="Computer & IT Repair">Computer & IT Repair</option>
+                          {PREDEFINED_SERVICE_DOMAINS.map((domain) => (
+                            <option key={domain} value={domain}>
+                              {domain}
+                            </option>
+                          ))}
+                          <option key={OTHER_CUSTOM_SERVICE_DOMAIN} value={OTHER_CUSTOM_SERVICE_DOMAIN}>
+                            {OTHER_CUSTOM_SERVICE_DOMAIN}
+                          </option>
                         </select>
                         <ChevronDown className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none" />
                       </div>
+                      {(regTouched.serviceDomain || hasAttemptedSubmit) && regErrors.serviceDomain && (
+                        <p className="text-xs text-rose-500 dark:text-rose-400 font-semibold mt-1.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{regErrors.serviceDomain}</span>
+                        </p>
+                      )}
                     </div>
+
+                    {/* Conditional Custom Service Field */}
+                    {isOtherCustomService(regServiceDomain) && (
+                      <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                        <label htmlFor="reg-custom-service-name" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                          Service / Industry Name <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          id="reg-custom-service-name"
+                          type="text"
+                          value={regCustomServiceName}
+                          onChange={(e) => setRegCustomServiceName(e.target.value)}
+                          onBlur={() => markFieldTouched('customServiceName')}
+                          placeholder="e.g. Home Appliance Repair"
+                          className={`w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-hidden transition-all ${
+                            (regTouched.customServiceName || hasAttemptedSubmit) && regErrors.customServiceName
+                              ? 'border-rose-400 dark:border-rose-500 bg-rose-50/30 dark:bg-rose-950/20 focus:ring-2 focus:ring-rose-500'
+                              : 'border-indigo-200 dark:border-indigo-800 bg-indigo-50/30 dark:bg-indigo-950/20 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800'
+                          }`}
+                        />
+                        {(regTouched.customServiceName || hasAttemptedSubmit) && regErrors.customServiceName && (
+                          <p className="text-xs text-rose-500 dark:text-rose-400 font-semibold mt-1.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>{regErrors.customServiceName}</span>
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
+                  {/* Password */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Set Master Account Password *
+                    <label htmlFor="reg-password" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Set Master Account Password <span className="text-rose-500">*</span>
                     </label>
                     <input
+                      id="reg-password"
                       type="password"
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
+                      onBlur={() => markFieldTouched('password')}
                       placeholder="Password (min 6 characters)"
-                      required
                       minLength={6}
-                      className="w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
+                      className={`w-full h-11 sm:h-12 px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-hidden transition-all ${
+                        (regTouched.password || hasAttemptedSubmit) && regErrors.password
+                          ? 'border-rose-400 dark:border-rose-500 bg-rose-50/30 dark:bg-rose-950/20 focus:ring-2 focus:ring-rose-500'
+                          : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800'
+                      }`}
                     />
+                    {(regTouched.password || hasAttemptedSubmit) && regErrors.password && (
+                      <p className="text-xs text-rose-500 dark:text-rose-400 font-semibold mt-1.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{regErrors.password}</span>
+                      </p>
+                    )}
                   </div>
 
                   <button

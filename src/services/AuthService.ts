@@ -38,6 +38,8 @@ export interface SignUpOwnerParams {
   password: string;
   businessName: string;
   businessType: string;
+  serviceDomain?: string;
+  customServiceName?: string | null;
   city?: string;
   state?: string;
   currency?: string;
@@ -129,11 +131,18 @@ export class AuthService {
     const uniqueReferralSuffix = Math.floor(100 + Math.random() * 900);
     const newReferralCode = `SF-${cleanBizPrefix || 'BIZ'}${uniqueReferralSuffix}`;
 
+    const effectiveServiceDomain = params.serviceDomain || params.businessType || 'CCTV & Security Systems';
+    const isCustom = effectiveServiceDomain === 'Other / Custom Service';
+    const customName = isCustom ? (params.customServiceName?.trim() || null) : null;
+    const effectiveType = isCustom ? (customName || 'Other / Custom Service') : effectiveServiceDomain;
+
     // 2. Create Tenant (Business) Record
     const tenant: Business = {
       id: tenantId,
       name: params.businessName.trim() || `${name}'s Services`,
-      type: params.businessType || 'CCTV & Security',
+      type: effectiveType,
+      serviceDomain: effectiveServiceDomain,
+      customServiceName: customName,
       logo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&auto=format&fit=crop&q=80',
       mobile: phone || '+91 98765 00000',
       whatsapp: phone || '+91 98765 00000',

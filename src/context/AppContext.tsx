@@ -153,6 +153,8 @@ interface AppContextType {
     businessId?: string;
     businessName?: string;
     businessType?: string;
+    serviceDomain?: string;
+    customServiceName?: string | null;
     referralCode?: string;
   }) => Promise<{ user: User; isPending: boolean }>;
 
@@ -4258,6 +4260,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     businessId?: string;
     businessName?: string;
     businessType?: string;
+    serviceDomain?: string;
+    customServiceName?: string | null;
     referralCode?: string;
   }): Promise<{ user: User; isPending: boolean }> => {
     const normalizedEmail = (data.email || '').trim().toLowerCase();
@@ -4307,7 +4311,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           phone: data.phone,
           password: data.password,
           businessName: data.businessName || `${data.name}'s Business`,
-          businessType: data.businessType || 'CCTV & Security',
+          businessType: data.businessType || 'CCTV & Security Systems',
+          serviceDomain: data.serviceDomain || data.businessType || 'CCTV & Security Systems',
+          customServiceName: data.customServiceName || null,
           referredBy: cleanRefCode || undefined,
         });
 
