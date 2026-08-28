@@ -73,6 +73,24 @@ export const AttendanceView: React.FC = () => {
   const isOwnerOrAdmin =
     currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin';
 
+  // Helper for India-friendly readable date (e.g., "28 Aug 2026")
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-').map(Number);
+    if (!y || !m || !d) return dateStr;
+    const dt = new Date(y, m - 1, d);
+    return dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  // Helper for readable date with weekday (e.g., "Fri, 28 Aug 2026")
+  const formatDisplayDateWithWeekday = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-').map(Number);
+    if (!y || !m || !d) return dateStr;
+    const dt = new Date(y, m - 1, d);
+    return dt.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
   // Navigation tab within Attendance Dashboard
   const [activeTab, setActiveTab] = useState<'roster' | 'history' | 'locations' | 'rules' | 'audit'>('roster');
 
@@ -824,25 +842,28 @@ export const AttendanceView: React.FC = () => {
           </div>
 
           {/* Filter Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800">
-            <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800">
+            <div className="flex flex-wrap items-center gap-2">
               {/* Date Selector */}
-              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-                <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-                <span className="font-bold text-slate-500">Date:</span>
+              <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+                <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                <span className="font-bold text-slate-500 shrink-0">Date:</span>
                 <input
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-transparent font-bold text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer"
+                  className="bg-transparent font-bold text-slate-900 dark:text-slate-100 focus:outline-none cursor-pointer text-xs"
                 />
+                <span className="hidden xs:inline-block text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 pl-1 border-l border-slate-200 dark:border-slate-700">
+                  {formatDisplayDate(selectedDate)}
+                </span>
               </div>
 
               {/* Status Filter */}
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200"
+                className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200"
               >
                 <option value="all">All Statuses</option>
                 <option value="working">Currently Working</option>
@@ -854,7 +875,7 @@ export const AttendanceView: React.FC = () => {
               </select>
 
               {/* Staff Member Searchable Filter */}
-              <div className="w-full sm:w-64 min-w-[200px]">
+              <div className="w-full sm:w-56 min-w-[180px]">
                 <SearchableStaffSelect
                   value={filterStaffId}
                   onChange={(id) => setFilterStaffId(id)}
@@ -868,14 +889,14 @@ export const AttendanceView: React.FC = () => {
             </div>
 
             {/* Search Input */}
-            <div className="relative w-full sm:w-64">
+            <div className="relative w-full sm:w-56">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search name, code (EMP-...), phone, site..."
-                className="w-full pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
+                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
               />
             </div>
           </div>
@@ -1136,41 +1157,7 @@ export const AttendanceView: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* 2. Attendance Status Badge */}
-                      <div className="pt-0.5">
-                        {isUnmarked ? (
-                          <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                            NOT CHECKED IN
-                          </span>
-                        ) : record.workingState === 'working' ? (
-                          <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            WORKING
-                          </span>
-                        ) : record.status === 'present' ? (
-                          <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                            PRESENT
-                          </span>
-                        ) : record.status === 'late' ? (
-                          <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300">
-                            LATE {record.lateMinutes ? `(${record.lateMinutes}m)` : ''}
-                          </span>
-                        ) : record.status === 'half_day' ? (
-                          <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300">
-                            HALF DAY
-                          </span>
-                        ) : record.status === 'leave' || record.status === 'holiday' ? (
-                          <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
-                            {record.status.toUpperCase()}
-                          </span>
-                        ) : (
-                          <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
-                            {record.status.toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* 3. Time + Duration Row & Location */}
+                      {/* 2. Timing & Duration Row + Location (Information Container) */}
                       <div className="bg-slate-50 dark:bg-slate-800/40 px-3 py-2 rounded-xl border border-slate-100 dark:border-slate-800/80 space-y-1 text-xs">
                         {/* Time & Duration in One Row */}
                         {checkIn ? (
@@ -1188,7 +1175,7 @@ export const AttendanceView: React.FC = () => {
                                     ? formatWorkingDuration(record.workingDurationMinutes)
                                     : 'Live'}
                                 </div>
-                                <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tight leading-none mt-0.5">
+                                <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium leading-none mt-0.5">
                                   Duration
                                 </div>
                               </div>
@@ -1223,24 +1210,61 @@ export const AttendanceView: React.FC = () => {
                         ) : null}
                       </div>
 
-                      {/* 4. Action Buttons */}
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenStaffHistory(staffMember.id, staffMember.name, staffMember.email)}
-                          className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/70 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 font-bold text-[11px] transition-colors cursor-pointer"
-                        >
-                          Staff History
-                        </button>
-                        {isOwnerOrAdmin ? (
+                      {/* 3. Bottom Row: Status Badge (Left) + Action Buttons (Right) */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+                        {/* Attendance Status Badge */}
+                        <div className="shrink-0">
+                          {isUnmarked ? (
+                            <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                              NOT CHECKED IN
+                            </span>
+                          ) : record.workingState === 'working' ? (
+                            <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              WORKING
+                            </span>
+                          ) : record.status === 'present' ? (
+                            <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                              PRESENT
+                            </span>
+                          ) : record.status === 'late' ? (
+                            <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300">
+                              LATE {record.lateMinutes ? `(${record.lateMinutes}m)` : ''}
+                            </span>
+                          ) : record.status === 'half_day' ? (
+                            <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300">
+                              HALF DAY
+                            </span>
+                          ) : record.status === 'leave' || record.status === 'holiday' ? (
+                            <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                              {record.status.toUpperCase()}
+                            </span>
+                          ) : (
+                            <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                              {record.status.toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                           <button
                             type="button"
-                            onClick={() => handleOpenCorrection(record)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[11px] transition-colors cursor-pointer"
+                            onClick={() => handleOpenStaffHistory(staffMember.id, staffMember.name, staffMember.email)}
+                            className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/70 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 font-bold text-[11px] transition-colors cursor-pointer"
                           >
-                            Edit
+                            Staff History
                           </button>
-                        ) : null}
+                          {isOwnerOrAdmin ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenCorrection(record)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[11px] transition-colors cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   );
@@ -1577,13 +1601,7 @@ export const AttendanceView: React.FC = () => {
               </div>
             ) : (
               historyGroupedByDate.map(({ date, records }) => {
-                const dateObj = new Date(date + 'T00:00:00');
-                const formattedDateHeader = dateObj.toLocaleDateString('en-GB', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                });
+                const formattedDateHeader = formatDisplayDateWithWeekday(date);
 
                 return (
                   <div
@@ -1591,8 +1609,8 @@ export const AttendanceView: React.FC = () => {
                     className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden"
                   >
                     {/* Date Section Header */}
-                    <div className="px-4 py-3 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="px-3.5 sm:px-4 py-2.5 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
                         <div className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
                         <span className="text-xs font-black text-slate-900 dark:text-slate-100 truncate">
                           {formattedDateHeader}
@@ -1797,7 +1815,7 @@ export const AttendanceView: React.FC = () => {
                       </table>
                     </div>
 
-                    {/* Mobile Card List View (< lg) - Compact & Information-Dense */}
+                    {/* Mobile Card List View (< lg) - Compact & Information-Dense with Status at Bottom */}
                     <div className="block lg:hidden divide-y divide-slate-100 dark:divide-slate-800">
                       {records.map((rec) => {
                         const staffObj = staff.find((s) => s.id === rec.staffId);
@@ -1849,37 +1867,7 @@ export const AttendanceView: React.FC = () => {
                               </div>
                             </div>
 
-                            {/* 2. Attendance Status Badge */}
-                            <div className="pt-0.5">
-                              {rec.workingState === 'working' ? (
-                                <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 items-center gap-1">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  WORKING
-                                </span>
-                              ) : rec.status === 'present' ? (
-                                <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                                  PRESENT
-                                </span>
-                              ) : rec.status === 'late' ? (
-                                <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300">
-                                  LATE {rec.lateMinutes ? `(${rec.lateMinutes}m)` : ''}
-                                </span>
-                              ) : rec.status === 'half_day' ? (
-                                <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300">
-                                  HALF DAY
-                                </span>
-                              ) : rec.status === 'leave' || rec.status === 'holiday' ? (
-                                <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
-                                  {rec.status.toUpperCase()}
-                                </span>
-                              ) : (
-                                <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
-                                  {rec.status.toUpperCase()}
-                                </span>
-                              )}
-                            </div>
-
-                            {/* 3. Time + Duration Row & Location */}
+                            {/* 2. Timing & Duration Row + Location (Information Container) */}
                             <div className="bg-slate-50 dark:bg-slate-800/40 px-3 py-2 rounded-xl border border-slate-100 dark:border-slate-800/80 space-y-1 text-xs">
                               {/* Time & Duration in One Row */}
                               {checkIn ? (
@@ -1897,7 +1885,7 @@ export const AttendanceView: React.FC = () => {
                                           ? formatWorkingDuration(rec.workingDurationMinutes)
                                           : 'Live'}
                                       </div>
-                                      <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tight leading-none mt-0.5">
+                                      <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium leading-none mt-0.5">
                                         Duration
                                       </div>
                                     </div>
@@ -1932,24 +1920,57 @@ export const AttendanceView: React.FC = () => {
                               ) : null}
                             </div>
 
-                            {/* 4. Action Buttons */}
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenStaffHistory(rec.staffId, rec.staffName, rec.staffEmail)}
-                                className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/70 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 font-bold text-[11px] transition-colors cursor-pointer"
-                              >
-                                Staff History
-                              </button>
-                              {isOwnerOrAdmin ? (
+                            {/* 3. Bottom Row: Status Badge (Left) + Action Buttons (Right) */}
+                            <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+                              {/* Status Badge */}
+                              <div className="shrink-0">
+                                {rec.workingState === 'working' ? (
+                                  <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    WORKING
+                                  </span>
+                                ) : rec.status === 'present' ? (
+                                  <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                    PRESENT
+                                  </span>
+                                ) : rec.status === 'late' ? (
+                                  <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300">
+                                    LATE {rec.lateMinutes ? `(${rec.lateMinutes}m)` : ''}
+                                  </span>
+                                ) : rec.status === 'half_day' ? (
+                                  <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300">
+                                    HALF DAY
+                                  </span>
+                                ) : rec.status === 'leave' || rec.status === 'holiday' ? (
+                                  <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
+                                    {rec.status.toUpperCase()}
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                                    {rec.status.toUpperCase()}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                                 <button
                                   type="button"
-                                  onClick={() => handleOpenCorrection(rec)}
-                                  className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[11px] transition-colors cursor-pointer"
+                                  onClick={() => handleOpenStaffHistory(rec.staffId, rec.staffName, rec.staffEmail)}
+                                  className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/70 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 font-bold text-[11px] transition-colors cursor-pointer"
                                 >
-                                  Edit
+                                  Staff History
                                 </button>
-                              ) : null}
+                                {isOwnerOrAdmin ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenCorrection(rec)}
+                                    className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-[11px] transition-colors cursor-pointer"
+                                  >
+                                    Edit
+                                  </button>
+                                ) : null}
+                              </div>
                             </div>
                           </div>
                         );
