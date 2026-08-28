@@ -307,6 +307,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     };
   });
 
+  const hasRevenueData = salesChartData.some((d) => d.sales > 0 || d.collections > 0) || totalSales > 0 || todayPayments > 0;
+
   const completedJobsCount = jobs.filter((j) => j.status === 'completed' || j.status === 'closed').length;
   const inProgressJobsCount = jobs.filter((j) => j.status === 'in_progress').length;
   const assignedJobsCount = jobs.filter((j) => j.status === 'assigned').length;
@@ -460,49 +462,77 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* Interactive Featured Summary Cards: Urgent Jobs & Today's Revenue */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3.5">
-        {/* Urgent Jobs Summary Card (Compact positive state when 0, prominent alert when >0) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 items-stretch">
+        {/* Urgent Jobs Summary Card (Consistent 2-column height, padding, & alignment) */}
         {urgentJobsList.length === 0 ? (
           <div
             onClick={() => navigate('jobs', { statusFilter: 'all' })}
-            className="p-4 sm:p-4.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700 transition-all group"
+            className="p-4 sm:p-4.5 rounded-2xl bg-gradient-to-br from-emerald-50/70 via-teal-50/30 to-white dark:from-emerald-950/30 dark:via-teal-950/15 dark:to-slate-900 border-2 border-emerald-200/80 dark:border-emerald-800/80 hover:border-emerald-400 dark:hover:border-emerald-600 shadow-xs hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between h-full overflow-hidden"
           >
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 shrink-0">
+                <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-600/30 shrink-0">
                   <CheckCircle2 className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/60">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/60">
                       All Normal
                     </span>
                   </div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-0.5">
-                    No Urgent Jobs
+                  <h3 className="text-base font-black text-slate-900 dark:text-slate-100 mt-0.5 group-hover:text-emerald-600 transition-colors">
+                    Urgent Jobs Summary
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    All service requests are currently under control.
+                    All service requests are on schedule with 0 urgent flags
                   </p>
                 </div>
               </div>
+
               <div className="text-right shrink-0">
-                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-1 rounded-xl">
-                  0 Urgent
-                </span>
+                <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                  0
+                </div>
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Total Urgent
+                </div>
               </div>
             </div>
-            <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-              <span>View all scheduled jobs</span>
-              <span className="text-indigo-600 font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                Open Jobs <ArrowRight className="w-3.5 h-3.5" />
+
+            {/* Metric Quick Stats Pills */}
+            <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-emerald-200/60 dark:border-emerald-900/40">
+              <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Active Pending</div>
+                <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">0</div>
+              </div>
+
+              <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Unassigned Techs</div>
+                <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100">0</div>
+              </div>
+
+              <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Est. Job Value</div>
+                <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                  {curr}0
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Action Footer */}
+            <div className="mt-2.5 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 pt-1 border-t border-emerald-200/40 dark:border-emerald-900/30">
+              <span className="flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5" /> Quick Access Filtered List
+              </span>
+              <span className="inline-flex items-center gap-1 bg-emerald-600 text-white text-[11px] font-bold px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-xl group-hover:bg-emerald-700 transition-colors shadow-xs">
+                View List <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
               </span>
             </div>
           </div>
         ) : (
           <div
             onClick={() => setIsUrgentModalOpen(true)}
-            className="relative p-4 sm:p-4.5 rounded-2xl bg-gradient-to-br from-rose-50 via-amber-50/40 to-white dark:from-rose-950/40 dark:via-amber-950/20 dark:to-slate-900 border-2 border-rose-200 dark:border-rose-800/80 hover:border-rose-400 dark:hover:border-rose-600 shadow-xs hover:shadow-lg transition-all cursor-pointer group overflow-hidden"
+            className="relative p-4 sm:p-4.5 rounded-2xl bg-gradient-to-br from-rose-50 via-amber-50/40 to-white dark:from-rose-950/40 dark:via-amber-950/20 dark:to-slate-900 border-2 border-rose-200 dark:border-rose-800/80 hover:border-rose-400 dark:hover:border-rose-600 shadow-xs hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between h-full overflow-hidden"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -541,17 +571,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {/* Metric Quick Stats Pills */}
             <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-rose-200/60 dark:border-rose-900/40">
               <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Active Pending</div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Active Pending</div>
                 <div className="text-sm font-extrabold text-amber-600 dark:text-amber-400">{activeUrgentJobs.length}</div>
               </div>
 
               <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Unassigned Techs</div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Unassigned Techs</div>
                 <div className="text-sm font-extrabold text-rose-600 dark:text-rose-400">{unassignedUrgentJobs.length}</div>
               </div>
 
               <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Est. Job Value</div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Est. Job Value</div>
                 <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
                   {curr}{urgentJobsList.reduce((sum, j) => sum + j.estimatedAmount, 0).toLocaleString()}
                 </div>
@@ -559,7 +589,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             {/* Quick Action Footer */}
-            <div className="mt-2.5 flex items-center justify-between text-xs font-bold text-rose-600 dark:text-rose-400 pt-1">
+            <div className="mt-2.5 flex items-center justify-between text-xs font-bold text-rose-600 dark:text-rose-400 pt-1 border-t border-rose-200/40 dark:border-rose-900/30">
               <span className="flex items-center gap-1.5">
                 <Filter className="w-3.5 h-3.5" /> Quick Access Filtered List
               </span>
@@ -573,7 +603,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Today's Revenue Interactive Summary Card */}
         <div
           onClick={() => setIsRevenueModalOpen(true)}
-          className="relative p-4 sm:p-4.5 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-white dark:from-emerald-950/40 dark:via-teal-950/20 dark:to-slate-900 border-2 border-emerald-200 dark:border-emerald-800/80 hover:border-emerald-400 dark:hover:border-emerald-600 shadow-xs hover:shadow-lg transition-all cursor-pointer group overflow-hidden"
+          className="relative p-4 sm:p-4.5 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-white dark:from-emerald-950/40 dark:via-teal-950/20 dark:to-slate-900 border-2 border-emerald-200 dark:border-emerald-800/80 hover:border-emerald-400 dark:hover:border-emerald-600 shadow-xs hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between h-full overflow-hidden"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -608,19 +638,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Metric Quick Stats Pills */}
           <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-emerald-200/60 dark:border-emerald-900/40">
             <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Paid Invoices</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Paid Invoices</div>
               <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">{todayPaidInvoices.length}</div>
             </div>
 
             <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Total Invoiced</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Total Invoiced</div>
               <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
                 {curr}{totalSales.toLocaleString()}
               </div>
             </div>
 
             <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">Pending Due</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Pending Due</div>
               <div className="text-sm font-extrabold text-rose-600 dark:text-rose-400">
                 {curr}{pendingPayments.toLocaleString()}
               </div>
@@ -628,7 +658,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Quick Action Footer */}
-          <div className="mt-2.5 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 pt-1">
+          <div className="mt-2.5 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 pt-1 border-t border-emerald-200/40 dark:border-emerald-900/30">
             <span className="flex items-center gap-1.5">
               <Receipt className="w-3.5 h-3.5" /> Quick Access Receipts & Transactions
             </span>
@@ -761,54 +791,54 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* Enquiries & Intake Module Quick Conversion Banner */}
-      <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white shadow-xs border border-blue-800/60 flex flex-col md:flex-row md:items-center justify-between gap-3.5">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/30 shrink-0">
+      <div className="p-4 sm:p-4.5 rounded-2xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white shadow-xs border border-blue-800/60 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/30 shrink-0 flex items-center justify-center self-center">
             <HelpCircle className="w-5 h-5" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-300 bg-blue-500/20 px-2 py-0.5 rounded-full border border-blue-400/30">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2 mb-0.5">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-300 bg-blue-500/20 px-2.5 py-0.5 rounded-full border border-blue-400/30">
                 Service Enquiries & Intake
               </span>
               {followUpsDueTodayCount > 0 && (
-                <span className="text-[10px] font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-400/30 flex items-center gap-1">
+                <span className="text-[10px] font-bold text-amber-300 bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-400/30 flex items-center gap-1">
                   <CalendarClock className="w-3 h-3" /> {followUpsDueTodayCount} Follow-up{followUpsDueTodayCount > 1 ? 's' : ''} Due Today
                 </span>
               )}
             </div>
-            <h3 className="text-sm sm:text-base font-black text-white mt-0.5">
+            <h3 className="text-sm sm:text-base font-black text-white leading-tight">
               Prospective Customer Intake & Job Conversion
             </h3>
-            <p className="text-xs text-blue-200/80">
+            <p className="text-xs text-blue-200/80 mt-0.5 leading-relaxed">
               Manage incoming calls, qualify requests, prepare quotes, and convert directly into scheduled field jobs.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap shrink-0">
-          <div className="flex items-center gap-1.5">
-            <div className="px-2.5 py-1 rounded-xl bg-white/10 backdrop-blur-xs border border-white/10 text-center">
-              <div className="text-[9px] text-blue-200 uppercase font-semibold">New</div>
+        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap lg:flex-nowrap shrink-0 justify-between lg:justify-end">
+          <div className="grid grid-cols-4 gap-1.5 sm:gap-2 shrink-0">
+            <div className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-xs border border-white/15 text-center min-w-[58px] sm:min-w-[66px] flex flex-col items-center justify-center">
+              <div className="text-[9px] sm:text-[10px] text-blue-200 uppercase font-bold tracking-wider">New</div>
               <div className="text-xs sm:text-sm font-black text-white">{newEnquiriesCount}</div>
             </div>
-            <div className="px-2.5 py-1 rounded-xl bg-white/10 backdrop-blur-xs border border-white/10 text-center">
-              <div className="text-[9px] text-blue-200 uppercase font-semibold">Qualified</div>
+            <div className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-xs border border-white/15 text-center min-w-[58px] sm:min-w-[66px] flex flex-col items-center justify-center">
+              <div className="text-[9px] sm:text-[10px] text-blue-200 uppercase font-bold tracking-wider">Qualified</div>
               <div className="text-xs sm:text-sm font-black text-purple-300">{qualifiedEnquiriesCount}</div>
             </div>
-            <div className="px-2.5 py-1 rounded-xl bg-white/10 backdrop-blur-xs border border-white/10 text-center">
-              <div className="text-[9px] text-blue-200 uppercase font-semibold">Quoted</div>
+            <div className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-xs border border-white/15 text-center min-w-[58px] sm:min-w-[66px] flex flex-col items-center justify-center">
+              <div className="text-[9px] sm:text-[10px] text-blue-200 uppercase font-bold tracking-wider">Quoted</div>
               <div className="text-xs sm:text-sm font-black text-sky-300">{quotedEnquiriesCount}</div>
             </div>
-            <div className="px-2.5 py-1 rounded-xl bg-white/10 backdrop-blur-xs border border-white/10 text-center">
-              <div className="text-[9px] text-blue-200 uppercase font-semibold">Converted</div>
+            <div className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-xs border border-white/15 text-center min-w-[58px] sm:min-w-[66px] flex flex-col items-center justify-center">
+              <div className="text-[9px] sm:text-[10px] text-blue-200 uppercase font-bold tracking-wider">Converted</div>
               <div className="text-xs sm:text-sm font-black text-emerald-300">{convertedEnquiriesCount}</div>
             </div>
           </div>
 
           <button
             onClick={() => setActiveTab('enquiries')}
-            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95"
+            className="px-3.5 sm:px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
           >
             <span>Open Enquiries</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -868,45 +898,58 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Main Charts & Today's Dispatch Schedule Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 sm:gap-4">
         {/* Sales & Collections Trend Chart */}
-        <div className="lg:col-span-2 p-4 sm:p-4.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
-          <div className="flex items-center justify-between mb-3">
+        <div className="lg:col-span-2 p-4 sm:p-4.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2.5">
             <div>
               <h2 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-slate-100">Revenue & Collections Overview</h2>
-              <p className="text-[11px] text-slate-500">Monthly billing vs payment receipts</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">Monthly billing vs payment receipts</p>
             </div>
-            <span className="text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-lg">
-              2026 Trend
+            <span className="text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
+              {now.getFullYear()} Trend
             </span>
           </div>
 
-          <div className="h-52 sm:h-56 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={salesChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    borderColor: '#1e293b',
-                    borderRadius: '12px',
-                    color: '#fff',
-                    fontSize: '12px',
-                  }}
-                />
-                <Area type="monotone" dataKey="sales" name="Sales Invoiced" stroke="#4f46e5" strokeWidth={2.5} fillOpacity={1} fill="url(#salesGrad)" />
-                <Area type="monotone" dataKey="collections" name="Payments Collected" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colGrad)" />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="h-48 sm:h-52 w-full flex items-center justify-center">
+            {!hasRevenueData ? (
+              <div className="h-full w-full flex flex-col items-center justify-center text-center p-4 rounded-xl bg-slate-50/60 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-800">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-1.5 shadow-2xs">
+                  <TrendingUp className="w-4.5 h-4.5" />
+                </div>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200">No Revenue & Billing Activity Yet</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-sm mt-0.5">
+                  Monthly invoices and payments collected will automatically graph here once transactions are recorded.
+                </p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={salesChartData} margin={{ top: 8, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#0f172a',
+                      borderColor: '#1e293b',
+                      borderRadius: '12px',
+                      color: '#fff',
+                      fontSize: '12px',
+                    }}
+                    formatter={(value: any) => [`${curr}${Number(value).toLocaleString()}`, '']}
+                  />
+                  <Area type="monotone" dataKey="sales" name="Sales Invoiced" stroke="#4f46e5" strokeWidth={2.5} fillOpacity={1} fill="url(#salesGrad)" />
+                  <Area type="monotone" dataKey="collections" name="Payments Collected" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colGrad)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
