@@ -258,12 +258,18 @@ export const SearchableStaffSelect: React.FC<SearchableStaffSelectProps> = ({
                           {staff.name}
                         </div>
                         <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 flex-wrap truncate mt-0.5">
-                          <span className="font-bold text-indigo-600 dark:text-indigo-400 tracking-tight">
-                            {code}
-                          </span>
-                          <span className="text-slate-300 dark:text-slate-600">·</span>
-                          <span className="truncate">{roleLabel}</span>
-                          {staff.phone && (
+                          {code ? (
+                            <span className="font-bold text-indigo-600 dark:text-indigo-400 tracking-tight">
+                              {code}
+                            </span>
+                          ) : null}
+                          {code && roleLabel ? (
+                            <span className="text-slate-300 dark:text-slate-600">·</span>
+                          ) : null}
+                          {roleLabel ? (
+                            <span className="truncate">{roleLabel}</span>
+                          ) : null}
+                          {staff.phone ? (
                             <>
                               <span className="text-slate-300 dark:text-slate-600 hidden xs:inline">·</span>
                               <span className="text-slate-400 dark:text-slate-500 text-[10px] hidden xs:flex items-center gap-0.5">
@@ -271,7 +277,7 @@ export const SearchableStaffSelect: React.FC<SearchableStaffSelectProps> = ({
                                 {staff.phone}
                               </span>
                             </>
-                          )}
+                          ) : null}
                         </div>
                       </div>
                     </div>
