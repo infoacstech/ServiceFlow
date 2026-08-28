@@ -570,38 +570,71 @@ export class AuthService {
 
     // 3. Authenticate Credentials (Database password match + Firebase Auth integration)
     let authUser: FirebaseUser | null = null;
+    const cleanAuthPass = authPass.trim();
+    const storedUserPass = (user?.password || '').trim();
     const isStoredPasswordMatch =
-      user &&
-      (user.password === authPass ||
-        (user.password && user.password.trim() === authPass.trim()) ||
-        (!user.password && authPass === 'ServiFlow@123') ||
-        authPass === 'ServiFlow@123');
+      Boolean(user) &&
+      (storedUserPass === cleanAuthPass ||
+        storedUserPass === authPass ||
+        (!storedUserPass && cleanAuthPass === 'ServiFlow@123') ||
+        cleanAuthPass === 'ServiFlow@123');
 
     try {
-      const cred = await signInWithEmailAndPassword(auth, targetEmail, authPass);
+      // Primary: Authenticate against Firebase Authentication with provided password
+      const cred = await signInWithEmailAndPassword(auth, targetEmail, cleanAuthPass);
       authUser = cred.user;
-    } catch (authErr: any) {
-      console.log('Firebase Auth signIn notice:', authErr?.code);
 
-      // If user exists in Firestore and password matches the assigned/default password:
+      // When Firebase Auth succeeds with new password, keep Firestore user password in sync
+      if (user) {
+        user.password = cleanAuthPass;
+      }
+    } catch (authErr: any) {
+      console.log('Firebase Auth signIn notice:', authErr?.code, authErr?.message);
+
+      // If user exists in Firestore and password matches the assigned/updated Firestore password:
       if (user && isStoredPasswordMatch) {
         // Try creating the Firebase Auth account if missing so future sign-ins use Firebase Auth
         try {
-          const createCred = await createUserWithEmailAndPassword(auth, targetEmail, authPass);
+          const createCred = await createUserWithEmailAndPassword(auth, targetEmail, cleanAuthPass);
           authUser = createCred.user;
+          user.password = cleanAuthPass;
         } catch (createErr: any) {
-          // If already in use in Firebase Auth with another password, use Firestore authenticated user
-          authUser = {
-            uid: user.id,
-            email: user.email || targetEmail,
-            displayName: user.name,
-          } as any;
+          // If already in use in Firebase Auth with previous password, try updating Firebase Auth password if possible
+          try {
+            // Attempt sign-in with common default or fallback if different
+            if (storedUserPass && storedUserPass !== cleanAuthPass) {
+              const prevCred = await signInWithEmailAndPassword(auth, targetEmail, storedUserPass);
+              if (prevCred.user) {
+                await firebaseUpdatePassword(prevCred.user, cleanAuthPass);
+                authUser = prevCred.user;
+                user.password = cleanAuthPass;
+              }
+            } else if (cleanAuthPass !== 'ServiFlow@123') {
+              const defaultCred = await signInWithEmailAndPassword(auth, targetEmail, 'ServiFlow@123');
+              if (defaultCred.user) {
+                await firebaseUpdatePassword(defaultCred.user, cleanAuthPass);
+                authUser = defaultCred.user;
+                user.password = cleanAuthPass;
+              }
+            }
+          } catch {
+            // If background Firebase Auth password sync is not possible now, authenticate via verified Firestore user
+          }
+
+          if (!authUser) {
+            authUser = {
+              uid: user.id,
+              email: user.email || targetEmail,
+              displayName: user.name,
+            } as any;
+          }
+          user.password = cleanAuthPass;
         }
       } else if (user && !isStoredPasswordMatch) {
-        throw new Error('Incorrect password. Please check your password or contact your Business Administrator.');
+        throw new Error('Incorrect password. Please check your password or use "Forgot Password?" to reset it.');
       } else if (isSuperAdminEmail) {
         try {
-          const createCred = await createUserWithEmailAndPassword(auth, targetEmail, authPass);
+          const createCred = await createUserWithEmailAndPassword(auth, targetEmail, cleanAuthPass);
           authUser = createCred.user;
         } catch {
           authUser = {
@@ -617,6 +650,11 @@ export class AuthService {
 
     if (!authUser && !user) {
       throw new Error('Authentication failed. Please check your credentials.');
+    }
+
+    // 4. Finalize user profile and sync password to database
+    if (user && cleanAuthPass) {
+      user.password = cleanAuthPass;
     }
 
     // 4. Finalize user profile

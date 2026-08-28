@@ -4215,21 +4215,30 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateUserPassword = async (userId: string, newPassword: string) => {
-    saveToFirestore('users', userId, { password: newPassword });
+    const cleanPass = newPassword.trim();
+    await saveToFirestore('users', userId, { password: cleanPass });
+
+    setUsers((prev) => {
+      const updated = prev.map((u) => (u.id === userId ? { ...u, password: cleanPass } : u));
+      saveCache('serviflow_users_cache', updated);
+      return updated;
+    });
+
+    if (currentUser?.id === userId) {
+      const updatedUser = { ...currentUser, password: cleanPass };
+      setCurrentUser(updatedUser);
+      localStorage.setItem('serviflow_user_session', JSON.stringify(updatedUser));
+    }
 
     if (auth.currentUser && currentUser?.id === userId) {
       try {
-        await firebaseUpdatePassword(auth.currentUser, newPassword);
+        await firebaseUpdatePassword(auth.currentUser, cleanPass);
       } catch (err) {
-        console.warn('Firebase Auth update password warning:', err);
+        console.warn('Firebase Auth update password notice:', err);
       }
     }
 
-    if (currentUser?.id === userId) {
-      setCurrentUser((prev) => (prev ? { ...prev, password: newPassword } : null));
-    }
-
-    showToast('Password updated successfully in Firebase Authentication & Firestore!', 'success');
+    showToast('Password updated successfully!', 'success');
     logActivity('Password Changed', 'staff', userId, 'User updated account password');
   };
 
