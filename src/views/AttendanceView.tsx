@@ -12,6 +12,8 @@ import {
   formatWorkingDuration,
 } from '../utils/geolocation';
 import { StaffAttendanceHistoryModal } from '../components/StaffAttendanceHistoryModal';
+import { SearchableStaffSelect } from '../components/SearchableStaffSelect';
+import { getEmployeeCode, formatRoleLabel } from '../utils/employeeCode';
 import {
   Clock,
   MapPin,
@@ -229,10 +231,18 @@ export const AttendanceView: React.FC = () => {
           if (historyStatus === 'leave' && !['leave', 'holiday', 'weekly_off'].includes(r.status)) return false;
         }
 
-        // Search Query
+        // Search Query (Matches Name, Employee Code, Phone, Role, Location, Notes)
         if (historySearchQuery.trim()) {
           const q = historySearchQuery.toLowerCase();
+          const cleanDigits = q.replace(/[^0-9]/g, '');
+          const staffObj = staff.find((s) => s.id === r.staffId || (s.email && r.staffEmail?.toLowerCase() === s.email.toLowerCase()));
+          const empCode = (r.staffEmployeeCode || getEmployeeCode(staffObj, staff)).toLowerCase();
+          const empCodeDigits = empCode.replace(/[^0-9]/g, '');
+          const phoneDigits = (r.staffPhone || staffObj?.phone || '').replace(/[^0-9]/g, '');
+
           const matchName = r.staffName?.toLowerCase().includes(q);
+          const matchCode = empCode.includes(q) || (cleanDigits && empCodeDigits.includes(cleanDigits));
+          const matchPhone = cleanDigits && phoneDigits.includes(cleanDigits);
           const matchRole = r.staffRole?.toLowerCase().includes(q);
           const matchLoc =
             r.checkInLocationName?.toLowerCase().includes(q) ||
@@ -240,7 +250,7 @@ export const AttendanceView: React.FC = () => {
           const matchNotes =
             r.checkInNotes?.toLowerCase().includes(q) ||
             r.manualCorrection?.reason?.toLowerCase().includes(q);
-          if (!matchName && !matchRole && !matchLoc && !matchNotes) return false;
+          if (!matchName && !matchCode && !matchPhone && !matchRole && !matchLoc && !matchNotes) return false;
         }
 
         return true;
@@ -453,10 +463,17 @@ export const AttendanceView: React.FC = () => {
       }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
+        const cleanDigits = q.replace(/[^0-9]/g, '');
+        const empCode = getEmployeeCode(staffMember, staff).toLowerCase();
+        const empCodeDigits = empCode.replace(/[^0-9]/g, '');
+        const phoneDigits = (staffMember.phone || '').replace(/[^0-9]/g, '');
+
         const matchName = staffMember.name?.toLowerCase().includes(q);
+        const matchCode = empCode.includes(q) || (cleanDigits && empCodeDigits.includes(cleanDigits));
+        const matchPhone = cleanDigits && phoneDigits.includes(cleanDigits);
         const matchRole = staffMember.role?.toLowerCase().includes(q);
         const matchLoc = record.checkInLocationName?.toLowerCase().includes(q);
-        if (!matchName && !matchRole && !matchLoc) return false;
+        if (!matchName && !matchCode && !matchPhone && !matchRole && !matchLoc) return false;
       }
       return true;
     });
@@ -836,19 +853,18 @@ export const AttendanceView: React.FC = () => {
                 <option value="leave">On Leave / Holiday</option>
               </select>
 
-              {/* Staff Member Filter */}
-              <select
-                value={filterStaffId}
-                onChange={(e) => setFilterStaffId(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200"
-              >
-                <option value="all">All Staff Members ({staff.length})</option>
-                {staff.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.role})
-                  </option>
-                ))}
-              </select>
+              {/* Staff Member Searchable Filter */}
+              <div className="w-full sm:w-64 min-w-[200px]">
+                <SearchableStaffSelect
+                  value={filterStaffId}
+                  onChange={(id) => setFilterStaffId(id)}
+                  staffList={staff}
+                  allowAll={true}
+                  allLabel="All Staff Members"
+                  placeholder="All Staff Members"
+                  id="daily-roster-staff-select"
+                />
+              </div>
             </div>
 
             {/* Search Input */}
@@ -858,7 +874,7 @@ export const AttendanceView: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search staff name or site..."
+                placeholder="Search name, code (EMP-...), phone, site..."
                 className="w-full pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
               />
             </div>
@@ -909,8 +925,18 @@ export const AttendanceView: React.FC = () => {
                                   <span>{staffMember.name}</span>
                                   <Eye className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
-                                <div className="text-[10px] text-slate-400 capitalize">
-                                  {staffMember.role?.replace('_', ' ')} • {staffMember.phone || 'No phone'}
+                                <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 flex-wrap mt-0.5">
+                                  <span className="font-bold text-indigo-600 dark:text-indigo-400 tracking-tight">
+                                    {getEmployeeCode(staffMember, staff)}
+                                  </span>
+                                  <span className="text-slate-300 dark:text-slate-600">·</span>
+                                  <span>{formatRoleLabel(staffMember.role)}</span>
+                                  {staffMember.phone && (
+                                    <>
+                                      <span className="text-slate-300 dark:text-slate-600">•</span>
+                                      <span className="text-[10px] text-slate-400">{staffMember.phone}</span>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1281,23 +1307,18 @@ export const AttendanceView: React.FC = () => {
                     />
                   </div>
 
-                  {/* Staff Member */}
+                  {/* Staff Member Searchable Selector */}
                   <div>
-                    <label className="text-[10px] sm:text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 block mb-1">
-                      Staff Member
-                    </label>
-                    <select
+                    <SearchableStaffSelect
                       value={historyStaffId}
-                      onChange={(e) => setHistoryStaffId(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option value="all">All Staff Members</option>
-                      {staff.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({s.role?.replace('_', ' ')})
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(id) => setHistoryStaffId(id)}
+                      staffList={staff}
+                      allowAll={true}
+                      allLabel="All Staff Members"
+                      label="Staff Member"
+                      placeholder="All Staff Members"
+                      id="history-staff-select"
+                    />
                   </div>
 
                   {/* Status */}
@@ -1443,8 +1464,18 @@ export const AttendanceView: React.FC = () => {
                                         <span>{rec.staffName}</span>
                                         <Eye className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                                       </div>
-                                      <div className="text-[10px] text-slate-400 capitalize">
-                                        {roleDisplay.replace('_', ' ')} {phoneDisplay ? `• ${phoneDisplay}` : ''}
+                                      <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 flex-wrap mt-0.5">
+                                        <span className="font-bold text-indigo-600 dark:text-indigo-400 tracking-tight">
+                                          {rec.staffEmployeeCode || getEmployeeCode(staffObj, staff)}
+                                        </span>
+                                        <span className="text-slate-300 dark:text-slate-600">·</span>
+                                        <span>{formatRoleLabel(roleDisplay)}</span>
+                                        {phoneDisplay && (
+                                          <>
+                                            <span className="text-slate-300 dark:text-slate-600">•</span>
+                                            <span className="text-[10px] text-slate-400">{phoneDisplay}</span>
+                                          </>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
@@ -1601,8 +1632,12 @@ export const AttendanceView: React.FC = () => {
                                   <div className="font-extrabold text-xs text-slate-900 dark:text-slate-100 truncate">
                                     {rec.staffName}
                                   </div>
-                                  <div className="text-[10px] text-slate-400 capitalize truncate">
-                                    {roleDisplay.replace('_', ' ')}
+                                  <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 truncate mt-0.5">
+                                    <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                      {rec.staffEmployeeCode || getEmployeeCode(staffObj, staff)}
+                                    </span>
+                                    <span className="text-slate-300 dark:text-slate-600">·</span>
+                                    <span>{formatRoleLabel(roleDisplay)}</span>
                                   </div>
                                 </div>
                               </div>
@@ -2234,20 +2269,16 @@ export const AttendanceView: React.FC = () => {
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
-                  Select Staff Member:
-                </label>
-                <select
+                <SearchableStaffSelect
                   value={leaveStaffId}
-                  onChange={(e) => setLeaveStaffId(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border bg-slate-50 dark:bg-slate-800 font-bold"
-                >
-                  {staff.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.role})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(id) => setLeaveStaffId(id)}
+                  staffList={staff}
+                  allowAll={false}
+                  label="Select Staff Member"
+                  placeholder="Choose Staff Member..."
+                  required={true}
+                  id="leave-staff-select"
+                />
               </div>
 
               <div>
@@ -2319,6 +2350,7 @@ export const AttendanceView: React.FC = () => {
             setSelectedStaffForHistory(null);
           }}
           staffMember={selectedStaffForHistory}
+          staffList={staff}
           attendanceRecords={attendanceRecords}
           isOwnerOrAdmin={isOwnerOrAdmin}
           onOpenCorrection={(record) => {

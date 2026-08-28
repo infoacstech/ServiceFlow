@@ -37,6 +37,7 @@ export interface User {
   password?: string;
   requestedDate?: string;
   referralCode?: string;
+  employeeCode?: string; // e.g. EMP-0001
 }
 
 export interface Business {
@@ -660,6 +661,7 @@ export interface AttendanceRecord {
   businessId: string;
   staffId: string;
   staffName: string;
+  staffEmployeeCode?: string;
   staffRole?: UserRole;
   staffAvatar?: string;
   staffEmail?: string;

@@ -50,6 +50,7 @@ import {
   formatDistance,
   DEFAULT_ATTENDANCE_RULES,
 } from '../utils/geolocation';
+import { getEmployeeCode, generateNextEmployeeCode } from '../utils/employeeCode';
 import {
   DEMO_BUSINESSES,
   DEMO_USERS,
@@ -4043,9 +4044,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         password: data.password || 'ServiFlow@123',
       });
 
+      const assignedEmployeeCode =
+        data.employeeCode ||
+        generateNextEmployeeCode((users || []).filter((u) => u.businessId === currentBusiness.id));
+
       const newStaff: User = {
         ...result.user,
         ...data,
+        employeeCode: assignedEmployeeCode,
         id: result.user.id,
         businessId: currentBusiness.id,
         approvalStatus: 'active',
@@ -4856,6 +4862,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         businessId: tenantId,
         staffId: activeStaffId,
         staffName: staffUser.name,
+        staffEmployeeCode: getEmployeeCode(staffUser, users),
         staffRole: staffUser.role,
         staffEmail: staffUser.email,
         staffPhone: staffUser.phone,
@@ -5239,6 +5246,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       businessId: tenantId,
       staffId: staffId,
       staffName: staffUser.name,
+      staffEmployeeCode: getEmployeeCode(staffUser, users),
       staffRole: staffUser.role,
       staffEmail: staffUser.email,
       staffPhone: staffUser.phone,

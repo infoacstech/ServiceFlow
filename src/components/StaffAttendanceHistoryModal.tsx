@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { User, AttendanceRecord } from '../types';
 import { formatWorkingDuration, formatDistance } from '../utils/geolocation';
+import { getEmployeeCode, formatRoleLabel } from '../utils/employeeCode';
 import {
   Calendar,
   Clock,
@@ -26,6 +27,7 @@ interface StaffAttendanceHistoryModalProps {
   attendanceRecords: AttendanceRecord[];
   onOpenCorrection?: (record: AttendanceRecord) => void;
   isOwnerOrAdmin?: boolean;
+  staffList?: User[];
 }
 
 export const StaffAttendanceHistoryModal: React.FC<StaffAttendanceHistoryModalProps> = ({
@@ -34,7 +36,8 @@ export const StaffAttendanceHistoryModal: React.FC<StaffAttendanceHistoryModalPr
   onClose,
   attendanceRecords,
   onOpenCorrection,
-  isOwnerOrAdmin,
+  isOwnerOrAdmin = false,
+  staffList = [],
 }) => {
   // Selected Month & Year (Default: current month YYYY-MM)
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
@@ -132,9 +135,11 @@ export const StaffAttendanceHistoryModal: React.FC<StaffAttendanceHistoryModalPr
 
   // Export Staff Monthly CSV
   const handleExportStaffCSV = () => {
+    const employeeCode = getEmployeeCode(staffMember, staffList);
     const headers = [
       'Date',
       'Staff Name',
+      'Employee Code',
       'Role',
       'Status',
       'Working State',
@@ -151,7 +156,8 @@ export const StaffAttendanceHistoryModal: React.FC<StaffAttendanceHistoryModalPr
     const rows = staffMonthRecords.map((r) => [
       r.date || '',
       `"${staffMember.name}"`,
-      staffMember.role || 'staff',
+      `"${employeeCode}"`,
+      formatRoleLabel(staffMember.role),
       r.status,
       r.workingState,
       r.checkInTime || '',
@@ -173,7 +179,7 @@ export const StaffAttendanceHistoryModal: React.FC<StaffAttendanceHistoryModalPr
     link.setAttribute('href', encodedUri);
     link.setAttribute(
       'download',
-      `attendance_${staffMember.name.toLowerCase().replace(/\s+/g, '_')}_${selectedMonth}.csv`
+      `attendance_${staffMember.name.toLowerCase().replace(/\s+/g, '_')}_${employeeCode}_${selectedMonth}.csv`
     );
     document.body.appendChild(link);
     link.click();
@@ -190,12 +196,15 @@ export const StaffAttendanceHistoryModal: React.FC<StaffAttendanceHistoryModalPr
               {staffMember.name.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-slate-100 truncate">
                   {staffMember.name}
                 </h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 shrink-0">
-                  {staffMember.role?.replace('_', ' ')}
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-black uppercase bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shrink-0 tracking-tight">
+                  {getEmployeeCode(staffMember, staffList)}
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 shrink-0">
+                  {formatRoleLabel(staffMember.role)}
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
