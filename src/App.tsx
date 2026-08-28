@@ -333,6 +333,7 @@ const MainContent: React.FC = () => {
       <QuickActionFab
         onOpenNewJob={handleOpenNewJob}
         onNavigate={handleTabChange}
+        activeTab={activeTab}
       />
 
       {/* Root-Level Full Viewport User Profile & Settings Drawer */}

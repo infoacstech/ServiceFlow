@@ -45,6 +45,9 @@ import {
   CalendarDays,
   CalendarRange,
   Eye,
+  ChevronDown,
+  ChevronUp,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 export const AttendanceView: React.FC = () => {
@@ -94,6 +97,16 @@ export const AttendanceView: React.FC = () => {
   const [historyStaffId, setHistoryStaffId] = useState<string>('all');
   const [historyStatus, setHistoryStatus] = useState<string>('all');
   const [historySearchQuery, setHistorySearchQuery] = useState<string>('');
+  const [isHistoryFiltersOpen, setIsHistoryFiltersOpen] = useState<boolean>(true);
+
+  // Active filter count for Attendance History
+  const activeHistoryFilterCount = useMemo(() => {
+    let count = 0;
+    if (historyStaffId !== 'all') count++;
+    if (historyStatus !== 'all') count++;
+    if (historySearchQuery.trim() !== '') count++;
+    return count;
+  }, [historyStaffId, historyStatus, historySearchQuery]);
 
   // Modals
   const [correctionModalRecord, setCorrectionModalRecord] = useState<AttendanceRecord | null>(null);
@@ -653,7 +666,7 @@ export const AttendanceView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-5 pb-16 animate-in fade-in" id="attendance-management-view">
+    <div className="space-y-5 pb-28 sm:pb-20 animate-in fade-in" id="attendance-management-view">
       {/* 1. Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-sm">
         <div>
@@ -696,31 +709,33 @@ export const AttendanceView: React.FC = () => {
       </div>
 
       {/* 2. Top Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto">
-        {[
-          { id: 'roster', label: 'Daily Roster & Live Tracking', icon: Users },
-          { id: 'history', label: 'Attendance History', icon: History },
-          { id: 'locations', label: 'Permitted Geofence Sites', icon: Building2 },
-          { id: 'rules', label: 'Shift & Working Rules', icon: Sliders },
-          { id: 'audit', label: 'Security & Audit Logs', icon: ShieldCheck },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              <Icon className="w-4 h-4" /> {tab.label}
-            </button>
-          );
-        })}
+      <div className="w-full max-w-full overflow-x-auto scrollbar-none pb-2 border-b border-slate-200 dark:border-slate-800 touch-pan-x">
+        <div className="flex items-center gap-2 min-w-max">
+          {[
+            { id: 'roster', label: 'Daily Roster & Live Tracking', icon: Users },
+            { id: 'history', label: 'Attendance History', icon: History },
+            { id: 'locations', label: 'Permitted Geofence Sites', icon: Building2 },
+            { id: 'rules', label: 'Shift & Working Rules', icon: Sliders },
+            { id: 'audit', label: 'Security & Audit Logs', icon: ShieldCheck },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-2xl text-xs font-extrabold whitespace-nowrap shrink-0 transition-all cursor-pointer select-none ${
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Icon className="w-4 h-4 shrink-0" /> <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -1037,249 +1052,314 @@ export const AttendanceView: React.FC = () => {
       {activeTab === 'history' && (
         <div className="space-y-4">
           {/* Quick Date Presets & Month Stepper Toolbar */}
-          <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-3xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+          <div className="bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between gap-3 shadow-2xs">
             {/* Quick Range Presets */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mr-1">
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 sm:pb-0 touch-pan-x">
+              <span className="text-[10px] sm:text-xs font-extrabold text-slate-400 uppercase tracking-wider mr-1 shrink-0">
                 Presets:
               </span>
               <button
                 type="button"
                 onClick={() => setHistoryPreset('this_month')}
-                className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-700 dark:text-slate-300 hover:text-indigo-600 text-xs font-bold transition-all cursor-pointer"
+                className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-700 dark:text-slate-300 hover:text-indigo-600 text-xs font-bold transition-all cursor-pointer shrink-0"
               >
                 This Month
               </button>
               <button
                 type="button"
                 onClick={() => setHistoryPreset('last_month')}
-                className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-700 dark:text-slate-300 hover:text-indigo-600 text-xs font-bold transition-all cursor-pointer"
+                className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-700 dark:text-slate-300 hover:text-indigo-600 text-xs font-bold transition-all cursor-pointer shrink-0"
               >
                 Last Month
               </button>
               <button
                 type="button"
                 onClick={() => setHistoryPreset('last_7_days')}
-                className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-700 dark:text-slate-300 hover:text-indigo-600 text-xs font-bold transition-all cursor-pointer"
+                className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-700 dark:text-slate-300 hover:text-indigo-600 text-xs font-bold transition-all cursor-pointer shrink-0"
               >
                 Last 7 Days
               </button>
               <button
                 type="button"
                 onClick={() => setHistoryPreset('last_30_days')}
-                className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-700 dark:text-slate-300 hover:text-indigo-600 text-xs font-bold transition-all cursor-pointer"
+                className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-700 dark:text-slate-300 hover:text-indigo-600 text-xs font-bold transition-all cursor-pointer shrink-0"
               >
                 Last 30 Days
               </button>
             </div>
 
             {/* Month Navigator & Export */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleHistoryShiftMonth('prev')}
-                className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 transition-all cursor-pointer"
-                title="Shift to Previous Month"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" /> Prev Month
-              </button>
-              <button
-                type="button"
-                onClick={() => handleHistoryShiftMonth('next')}
-                className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 transition-all cursor-pointer"
-                title="Shift to Next Month"
-              >
-                Next Month <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+            <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleHistoryShiftMonth('prev')}
+                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 transition-all cursor-pointer"
+                  title="Shift to Previous Month"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" /> <span className="hidden xs:inline">Prev</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleHistoryShiftMonth('next')}
+                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 transition-all cursor-pointer"
+                  title="Shift to Next Month"
+                >
+                  <span className="hidden xs:inline">Next</span> <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={handleExportHistoryCSV}
-                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer ml-1"
+                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
               >
-                <Download className="w-3.5 h-3.5" /> Export Report
+                <Download className="w-3.5 h-3.5" /> <span>Export Report</span>
               </button>
             </div>
           </div>
 
-          {/* History KPI Summary Cards */}
+          {/* History KPI Summary Cards (Balanced 2-col on mobile, Total Hours spans full-width) */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
-            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-800">
-              <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+            {/* Card 1: Working Days */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between">
+              <div className="text-[10px] sm:text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">
                 Working Days
               </div>
-              <div className="text-xl font-black text-slate-900 dark:text-slate-100 mt-0.5">
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 mt-1 leading-tight">
                 {historyKpis.workingDays}
               </div>
-              <div className="text-[10px] text-slate-400">Distinct active dates</div>
+              <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">Distinct active dates</div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-900/50">
-              <div className="text-[10px] font-bold uppercase text-emerald-700 dark:text-emerald-300">
+            {/* Card 2: Present */}
+            <div className="p-3.5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-900/50 flex flex-col justify-between">
+              <div className="text-[10px] sm:text-[11px] font-bold uppercase text-emerald-700 dark:text-emerald-300">
                 Present
               </div>
-              <div className="text-xl font-black text-emerald-950 dark:text-emerald-100 mt-0.5">
+              <div className="text-xl sm:text-2xl font-black text-emerald-950 dark:text-emerald-100 mt-1 leading-tight">
                 {historyKpis.presentCount}
               </div>
-              <div className="text-[10px] text-emerald-600">Total present logs</div>
+              <div className="text-[10px] sm:text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">Total present logs</div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/50">
-              <div className="text-[10px] font-bold uppercase text-amber-700 dark:text-amber-300">
+            {/* Card 3: Late */}
+            <div className="p-3.5 rounded-2xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-900/50 flex flex-col justify-between">
+              <div className="text-[10px] sm:text-[11px] font-bold uppercase text-amber-700 dark:text-amber-300">
                 Late
               </div>
-              <div className="text-xl font-black text-amber-950 dark:text-amber-100 mt-0.5">
+              <div className="text-xl sm:text-2xl font-black text-amber-950 dark:text-amber-100 mt-1 leading-tight">
                 {historyKpis.lateCount}
               </div>
-              <div className="text-[10px] text-amber-600">After shift start</div>
+              <div className="text-[10px] sm:text-[11px] text-amber-600 dark:text-amber-400 mt-0.5 truncate">After shift start</div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-sky-50/80 dark:bg-sky-950/40 border border-sky-200/60 dark:border-sky-900/50">
-              <div className="text-[10px] font-bold uppercase text-sky-700 dark:text-sky-300">
+            {/* Card 4: Half Day */}
+            <div className="p-3.5 rounded-2xl bg-sky-50/80 dark:bg-sky-950/40 border border-sky-200/60 dark:border-sky-900/50 flex flex-col justify-between">
+              <div className="text-[10px] sm:text-[11px] font-bold uppercase text-sky-700 dark:text-sky-300">
                 Half Day
               </div>
-              <div className="text-xl font-black text-sky-950 dark:text-sky-100 mt-0.5">
+              <div className="text-xl sm:text-2xl font-black text-sky-950 dark:text-sky-100 mt-1 leading-tight">
                 {historyKpis.halfDayCount}
               </div>
-              <div className="text-[10px] text-sky-600">Partial work hours</div>
+              <div className="text-[10px] sm:text-[11px] text-sky-600 dark:text-sky-400 mt-0.5 truncate">Partial work hours</div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-rose-50/80 dark:bg-rose-950/40 border border-rose-200/60 dark:border-rose-900/50">
-              <div className="text-[10px] font-bold uppercase text-rose-700 dark:text-rose-300">
+            {/* Card 5: Absent */}
+            <div className="p-3.5 rounded-2xl bg-rose-50/80 dark:bg-rose-950/40 border border-rose-200/60 dark:border-rose-900/50 flex flex-col justify-between">
+              <div className="text-[10px] sm:text-[11px] font-bold uppercase text-rose-700 dark:text-rose-300">
                 Absent
               </div>
-              <div className="text-xl font-black text-rose-950 dark:text-rose-100 mt-0.5">
+              <div className="text-xl sm:text-2xl font-black text-rose-950 dark:text-rose-100 mt-1 leading-tight">
                 {historyKpis.absentCount}
               </div>
-              <div className="text-[10px] text-rose-600">Unexcused absence</div>
+              <div className="text-[10px] sm:text-[11px] text-rose-600 dark:text-rose-400 mt-0.5 truncate">Unexcused absence</div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200/60 dark:border-purple-900/50">
-              <div className="text-[10px] font-bold uppercase text-purple-700 dark:text-purple-300">
+            {/* Card 6: Leave / Off */}
+            <div className="p-3.5 rounded-2xl bg-purple-50/80 dark:bg-purple-950/40 border border-purple-200/60 dark:border-purple-900/50 flex flex-col justify-between">
+              <div className="text-[10px] sm:text-[11px] font-bold uppercase text-purple-700 dark:text-purple-300">
                 Leave / Off
               </div>
-              <div className="text-xl font-black text-purple-950 dark:text-purple-100 mt-0.5">
+              <div className="text-xl sm:text-2xl font-black text-purple-950 dark:text-purple-100 mt-1 leading-tight">
                 {historyKpis.leaveCount}
               </div>
-              <div className="text-[10px] text-purple-600">Approved leaves</div>
+              <div className="text-[10px] sm:text-[11px] text-purple-600 dark:text-purple-400 mt-0.5 truncate">Approved leaves</div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-900/50">
-              <div className="text-[10px] font-bold uppercase text-indigo-700 dark:text-indigo-300">
+            {/* Card 7: Total Hours (Full width on mobile & tablet) */}
+            <div className="col-span-2 sm:col-span-3 lg:col-span-1 p-3.5 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-900/50 flex flex-col justify-between">
+              <div className="text-[10px] sm:text-[11px] font-bold uppercase text-indigo-700 dark:text-indigo-300">
                 Total Hours
               </div>
-              <div className="text-xl font-black text-indigo-950 dark:text-indigo-100 mt-0.5">
+              <div className="text-xl sm:text-2xl font-black text-indigo-950 dark:text-indigo-100 mt-1 leading-tight">
                 {formatWorkingDuration(historyKpis.totalDurationMinutes)}
               </div>
-              <div className="text-[10px] text-indigo-600">Cumulative duration</div>
+              <div className="text-[10px] sm:text-[11px] text-indigo-600 dark:text-indigo-400 mt-0.5 truncate">Cumulative duration</div>
             </div>
           </div>
 
-          {/* History Filter Form Controls */}
-          <div className="p-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-2xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-              {/* From Date */}
-              <div>
-                <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">
-                  From Date
-                </label>
-                <input
-                  type="date"
-                  value={historyStartDate}
-                  onChange={(e) => setHistoryStartDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              {/* To Date */}
-              <div>
-                <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">
-                  To Date
-                </label>
-                <input
-                  type="date"
-                  value={historyEndDate}
-                  onChange={(e) => setHistoryEndDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-
-              {/* Staff Member */}
-              <div>
-                <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">
-                  Staff Member
-                </label>
-                <select
-                  value={historyStaffId}
-                  onChange={(e) => setHistoryStaffId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="all">All Staff Members</option>
-                  {staff.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.role?.replace('_', ' ')})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">
-                  Status
-                </label>
-                <select
-                  value={historyStatus}
-                  onChange={(e) => setHistoryStatus(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="present">Present (On Time)</option>
-                  <option value="late">Late Arrival</option>
-                  <option value="half_day">Half Day</option>
-                  <option value="leave">Leave / Holiday / Off</option>
-                  <option value="absent">Absent</option>
-                  <option value="working">Currently Working</option>
-                  <option value="completed">Completed Shift</option>
-                </select>
-              </div>
-
-              {/* Search */}
-              <div>
-                <label className="text-[11px] font-bold uppercase text-slate-500 block mb-1">
-                  Search
-                </label>
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    placeholder="Staff, site, notes..."
-                    value={historySearchQuery}
-                    onChange={(e) => setHistorySearchQuery(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Filter Action Bar */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
-              <span className="text-slate-500 font-semibold">
-                Showing <strong className="text-slate-900 dark:text-slate-100">{historyFilteredRecords.length}</strong> record{historyFilteredRecords.length !== 1 ? 's' : ''} across <strong className="text-slate-900 dark:text-slate-100">{historyGroupedByDate.length}</strong> date{historyGroupedByDate.length !== 1 ? 's' : ''}
-              </span>
+          {/* History Collapsible Filter Panel */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden transition-all">
+            {/* Filter Box Header / Toggle Bar */}
+            <div className="p-3.5 sm:p-4 flex items-center justify-between gap-2">
               <button
                 type="button"
-                onClick={handleClearHistoryFilters}
-                className="flex items-center gap-1 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 font-bold transition-colors cursor-pointer"
+                onClick={() => setIsHistoryFiltersOpen(!isHistoryFiltersOpen)}
+                className="flex items-center gap-2 cursor-pointer text-left min-w-0 flex-1 select-none"
               >
-                <RotateCcw className="w-3.5 h-3.5" /> Clear Filters
+                <div className="w-7 h-7 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 flex items-center justify-center shrink-0">
+                  <Filter className="w-3.5 h-3.5" />
+                </div>
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <span className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    Filters & Search
+                  </span>
+                  {activeHistoryFilterCount > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-600 text-white shrink-0">
+                      {activeHistoryFilterCount} active
+                    </span>
+                  )}
+                  {/* Current Active Date Range Pill */}
+                  <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300 shrink-0">
+                    <CalendarRange className="w-3 h-3 text-indigo-500" /> {historyStartDate} → {historyEndDate}
+                  </span>
+                </div>
               </button>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                {(activeHistoryFilterCount > 0 || historySearchQuery.trim() !== '') && (
+                  <button
+                    type="button"
+                    onClick={handleClearHistoryFilters}
+                    className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsHistoryFiltersOpen(!isHistoryFiltersOpen)}
+                  className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                  title={isHistoryFiltersOpen ? 'Collapse filters' : 'Expand filters'}
+                >
+                  {isHistoryFiltersOpen ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </div>
+
+            {/* Collapsible Filter Body */}
+            {isHistoryFiltersOpen && (
+              <div className="px-3.5 sm:px-4 pb-4 pt-1 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3 pt-2">
+                  {/* From Date */}
+                  <div>
+                    <label className="text-[10px] sm:text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 block mb-1">
+                      From Date
+                    </label>
+                    <input
+                      type="date"
+                      value={historyStartDate}
+                      onChange={(e) => setHistoryStartDate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* To Date */}
+                  <div>
+                    <label className="text-[10px] sm:text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 block mb-1">
+                      To Date
+                    </label>
+                    <input
+                      type="date"
+                      value={historyEndDate}
+                      onChange={(e) => setHistoryEndDate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* Staff Member */}
+                  <div>
+                    <label className="text-[10px] sm:text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 block mb-1">
+                      Staff Member
+                    </label>
+                    <select
+                      value={historyStaffId}
+                      onChange={(e) => setHistoryStaffId(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="all">All Staff Members</option>
+                      {staff.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.role?.replace('_', ' ')})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <label className="text-[10px] sm:text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 block mb-1">
+                      Status
+                    </label>
+                    <select
+                      value={historyStatus}
+                      onChange={(e) => setHistoryStatus(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="present">Present (On Time)</option>
+                      <option value="late">Late Arrival</option>
+                      <option value="half_day">Half Day</option>
+                      <option value="leave">Leave / Holiday / Off</option>
+                      <option value="absent">Absent</option>
+                      <option value="working">Currently Working</option>
+                      <option value="completed">Completed Shift</option>
+                    </select>
+                  </div>
+
+                  {/* Search */}
+                  <div className="sm:col-span-2 lg:col-span-1">
+                    <label className="text-[10px] sm:text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 block mb-1">
+                      Search Query
+                    </label>
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="Staff, location, notes..."
+                        value={historySearchQuery}
+                        onChange={(e) => setHistorySearchQuery(e.target.value)}
+                        className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filter Action Bar */}
+                <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-slate-800 text-xs">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">
+                    Showing <strong className="text-slate-900 dark:text-slate-100 font-bold">{historyFilteredRecords.length}</strong> record{historyFilteredRecords.length !== 1 ? 's' : ''} across <strong className="text-slate-900 dark:text-slate-100 font-bold">{historyGroupedByDate.length}</strong> date{historyGroupedByDate.length !== 1 ? 's' : ''}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleClearHistoryFilters}
+                    className="flex items-center gap-1 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 font-bold transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Clear Filters
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* History Records List (Grouped by Date) */}
           <div className="space-y-4">
             {historyGroupedByDate.length === 0 ? (
-              <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 shadow-2xs">
+              <div className="p-10 sm:p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 shadow-2xs">
                 <CalendarRange className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
                 <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
                   No attendance records found
@@ -1290,7 +1370,7 @@ export const AttendanceView: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleClearHistoryFilters}
-                  className="mt-4 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-all cursor-pointer"
+                  className="mt-4 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-all cursor-pointer shadow-xs"
                 >
                   Reset Date & Filters
                 </button>
@@ -1311,14 +1391,14 @@ export const AttendanceView: React.FC = () => {
                     className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xs overflow-hidden"
                   >
                     {/* Date Section Header */}
-                    <div className="px-4 py-3 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-2 h-2 rounded-full bg-indigo-600" />
-                        <span className="text-xs font-black text-slate-900 dark:text-slate-100">
+                    <div className="px-4 py-3 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
+                        <span className="text-xs font-black text-slate-900 dark:text-slate-100 truncate">
                           {formattedDateHeader}
                         </span>
                       </div>
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 shrink-0">
                         {records.length} {records.length === 1 ? 'record' : 'records'}
                       </span>
                     </div>
@@ -1507,29 +1587,30 @@ export const AttendanceView: React.FC = () => {
                         const roleDisplay = rec.staffRole || staffObj?.role || 'technician';
 
                         return (
-                          <div key={rec.id} className="p-4 space-y-3">
-                            {/* Top row: Staff & Status */}
-                            <div className="flex items-center justify-between gap-2">
+                          <div key={rec.id} className="p-3.5 sm:p-4 space-y-3">
+                            {/* Top row: Staff & Status (Protected against wrapping overlaps) */}
+                            <div className="flex items-start justify-between gap-2.5">
                               <div
                                 onClick={() => handleOpenStaffHistory(rec.staffId, rec.staffName, rec.staffEmail)}
-                                className="flex items-center gap-2.5 cursor-pointer min-w-0"
+                                className="flex items-center gap-2.5 cursor-pointer min-w-0 flex-1"
                               >
                                 <div className="w-8 h-8 rounded-xl bg-indigo-600/10 text-indigo-600 flex items-center justify-center font-bold shrink-0">
                                   {(rec.staffName || 'S').charAt(0).toUpperCase()}
                                 </div>
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                   <div className="font-extrabold text-xs text-slate-900 dark:text-slate-100 truncate">
                                     {rec.staffName}
                                   </div>
-                                  <div className="text-[10px] text-slate-400 capitalize">
+                                  <div className="text-[10px] text-slate-400 capitalize truncate">
                                     {roleDisplay.replace('_', ' ')}
                                   </div>
                                 </div>
                               </div>
 
-                              <div className="shrink-0">
+                              <div className="shrink-0 self-start mt-0.5">
                                 {rec.workingState === 'working' ? (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300">
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                     Working
                                   </span>
                                 ) : rec.status === 'present' ? (
@@ -1553,10 +1634,10 @@ export const AttendanceView: React.FC = () => {
                             </div>
 
                             {/* Middle row: Shift & Duration metrics */}
-                            <div className="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-xl text-xs">
+                            <div className="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-2xl text-xs">
                               <div>
                                 <div className="text-[10px] text-slate-400 uppercase font-semibold">Shift Timing</div>
-                                <div className="font-extrabold text-slate-900 dark:text-slate-100">
+                                <div className="font-extrabold text-slate-900 dark:text-slate-100 truncate">
                                   {rec.checkInTime || '—'} → {rec.checkOutTime || (rec.workingState === 'working' ? 'Active' : '—')}
                                 </div>
                               </div>
@@ -1573,8 +1654,8 @@ export const AttendanceView: React.FC = () => {
                             </div>
 
                             {/* Location tag & Actions */}
-                            <div className="flex items-center justify-between gap-2 pt-1">
-                              <div className="text-[11px] text-slate-500 truncate flex items-center gap-1">
+                            <div className="flex items-center justify-between gap-2 pt-0.5">
+                              <div className="text-[11px] text-slate-500 truncate flex items-center gap-1 min-w-0 flex-1 mr-1">
                                 <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
                                 <span className="truncate">{rec.checkInLocationName || 'Site Location'}</span>
                                 {rec.checkInDistance !== undefined && (
@@ -1588,7 +1669,7 @@ export const AttendanceView: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleOpenStaffHistory(rec.staffId, rec.staffName, rec.staffEmail)}
-                                  className="px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-[10px]"
+                                  className="px-2.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-[11px] cursor-pointer"
                                 >
                                   History
                                 </button>
@@ -1596,7 +1677,7 @@ export const AttendanceView: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => handleOpenCorrection(rec)}
-                                    className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-[10px]"
+                                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-[11px] cursor-pointer hover:bg-indigo-50 hover:text-indigo-600"
                                   >
                                     Edit
                                   </button>

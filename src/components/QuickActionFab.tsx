@@ -23,11 +23,13 @@ import {
 interface QuickActionFabProps {
   onOpenNewJob: () => void;
   onNavigate: (tab: string) => void;
+  activeTab?: string;
 }
 
 export const QuickActionFab: React.FC<QuickActionFabProps> = ({
   onOpenNewJob,
   onNavigate,
+  activeTab,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isOnboardTenantModalOpen, setIsOnboardTenantModalOpen] = useState(false);
@@ -53,8 +55,8 @@ export const QuickActionFab: React.FC<QuickActionFabProps> = ({
     showToast,
   } = useApp();
 
-  // If user is logged out, don't show FAB
-  if (!currentUser) return null;
+  // If user is logged out or on attendance tab, don't show FAB
+  if (!currentUser || activeTab === 'attendance') return null;
 
   const isSuperAdmin = currentUser.role === 'super_admin';
   const isOwner = currentUser.role === 'business_owner';
@@ -133,7 +135,7 @@ export const QuickActionFab: React.FC<QuickActionFabProps> = ({
 
   return (
     <>
-      <div className="fixed bottom-20 sm:bottom-8 right-5 z-40 flex flex-col items-end">
+      <div className="fixed bottom-22 sm:bottom-8 right-4 sm:right-6 z-40 flex flex-col items-end">
         {/* Backdrop when FAB is open */}
         {isOpen && (
           <div
