@@ -259,9 +259,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
         },
         {
           id: 'attendance',
-          label: 'Attendance & GPS',
+          label: permissions.canManageStaff ? 'Attendance & GPS' : 'My Attendance',
           icon: Clock,
-          visible: permissions.canManageStaff,
+          visible: true,
         },
         {
           id: 'inventory',

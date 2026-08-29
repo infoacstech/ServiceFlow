@@ -41,6 +41,8 @@ import type {
   AttendanceStatus,
   AttendanceLocationType,
   AttendanceVerificationStatus,
+  AttendanceIssue,
+  AttendanceIssueType,
 } from '../types';
 import {
   getCurrentGpsPosition,
@@ -390,6 +392,7 @@ interface AppContextType {
   attendanceLocations: AttendanceLocation[];
   attendanceWorkingRules: AttendanceWorkingRules;
   attendanceAuditLogs: AttendanceAuditItem[];
+  attendanceIssues: AttendanceIssue[];
   checkInAttendance: (params: {
     staffId?: string;
     targetType: AttendanceLocationType;
@@ -428,6 +431,21 @@ interface AppContextType {
   updateAttendanceLocation: (id: string, updates: Partial<AttendanceLocation>) => Promise<void>;
   deleteAttendanceLocation: (id: string) => Promise<void>;
   updateAttendanceWorkingRules: (rules: Partial<AttendanceWorkingRules>) => Promise<void>;
+  reportAttendanceIssue: (params: {
+    date: string;
+    issueType: AttendanceIssueType;
+    description: string;
+    attendanceId?: string;
+    suggestedCheckInTime?: string;
+    suggestedCheckOutTime?: string;
+    suggestedStatus?: AttendanceStatus;
+  }) => Promise<{ success: boolean; message: string; issue?: AttendanceIssue }>;
+  resolveAttendanceIssue: (
+    issueId: string,
+    resolution: 'approved' | 'rejected',
+    notes?: string,
+    autoApplyCorrection?: boolean
+  ) => Promise<{ success: boolean; message: string }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -671,6 +689,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
   const [attendanceAuditLogs, setAttendanceAuditLogs] = useState<AttendanceAuditItem[]>(() =>
     loadCache('serviflow_attendance_audit_cache', [])
+  );
+  const [attendanceIssues, setAttendanceIssues] = useState<AttendanceIssue[]>(() =>
+    loadCache('serviflow_attendance_issues_cache', [])
   );
 
   // Referral Bonus States
@@ -1373,6 +1394,17 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (error) => handleFirestoreError(error, OperationType.GET, 'attendanceAuditLogs')
     );
 
+    // 26. Attendance Issues
+    const unsubAttendanceIssues = onSnapshot(
+      collection(db, 'attendanceIssues'),
+      (snapshot) => {
+        const cloudItems = snapshot.docs.map((d) => d.data() as AttendanceIssue);
+        setAttendanceIssues(cloudItems);
+        saveCache('serviflow_attendance_issues_cache', cloudItems);
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'attendanceIssues')
+    );
+
     return () => {
       unsubBiz();
       unsubUsers();
@@ -1400,6 +1432,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubAttendance();
       unsubAttendanceLocations();
       unsubAttendanceAuditLogs();
+      unsubAttendanceIssues();
     };
   }, []);
 
@@ -2604,15 +2637,36 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ? referralPayoutRequests
     : referralPayoutRequests.filter((p) => p.businessId === currBizId);
 
+  const isEmployeeRole = currentUser?.role === 'technician';
+
   const filteredAttendanceRecords = isSuperAdminUser
     ? attendanceRecords
-    : attendanceRecords.filter((a) => a.businessId === currBizId);
+    : attendanceRecords.filter((a) => {
+        if (a.businessId !== currBizId) return false;
+        if (isEmployeeRole && currentUser) {
+          const matchStaffId = a.staffId === currentUser.id;
+          const matchEmail = currentUser.email && a.staffEmail?.toLowerCase() === currentUser.email.toLowerCase();
+          return matchStaffId || matchEmail;
+        }
+        return true;
+      });
   const filteredAttendanceLocations = isSuperAdminUser
     ? attendanceLocations
     : attendanceLocations.filter((l) => l.businessId === currBizId);
   const filteredAttendanceAuditLogs = isSuperAdminUser
     ? attendanceAuditLogs
     : attendanceAuditLogs.filter((l) => l.businessId === currBizId);
+  const filteredAttendanceIssues = isSuperAdminUser
+    ? attendanceIssues
+    : attendanceIssues.filter((i) => {
+        if (i.businessId !== currBizId) return false;
+        if (isEmployeeRole && currentUser) {
+          const matchStaffId = i.staffId === currentUser.id;
+          const matchEmail = currentUser.email && i.staffEmail?.toLowerCase() === currentUser.email.toLowerCase();
+          return matchStaffId || matchEmail;
+        }
+        return true;
+      });
   const attendanceWorkingRules: AttendanceWorkingRules =
     currentBusiness?.attendanceWorkingRules || DEFAULT_ATTENDANCE_RULES;
 
@@ -5344,6 +5398,201 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Attendance & shift working rules updated successfully.', 'success');
   };
 
+  const reportAttendanceIssue = async (params: {
+    date: string;
+    issueType: AttendanceIssueType;
+    description: string;
+    attendanceId?: string;
+    suggestedCheckInTime?: string;
+    suggestedCheckOutTime?: string;
+    suggestedStatus?: AttendanceStatus;
+  }): Promise<{ success: boolean; message: string; issue?: AttendanceIssue }> => {
+    try {
+      if (!currentUser) {
+        showToast('You must be logged in to report an attendance issue.', 'error');
+        return { success: false, message: 'Not logged in' };
+      }
+      if (!params.description || params.description.trim().length < 4) {
+        showToast('Please provide a short description of the attendance issue.', 'error');
+        return { success: false, message: 'Description too short' };
+      }
+
+      const tenantId = currentUser.businessId || currentBusiness?.id || 'biz-default';
+      const staffCode = getEmployeeCode(currentUser, users);
+      const issueId = `att-issue-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const nowIso = new Date().toISOString();
+
+      const newIssue: AttendanceIssue = {
+        id: issueId,
+        businessId: tenantId,
+        attendanceId: params.attendanceId,
+        staffId: currentUser.id,
+        staffName: currentUser.name,
+        staffEmployeeCode: staffCode,
+        staffEmail: currentUser.email,
+        staffPhone: currentUser.phone,
+        staffRole: currentUser.role,
+        date: params.date,
+        issueType: params.issueType,
+        description: params.description.trim(),
+        suggestedCheckInTime: params.suggestedCheckInTime,
+        suggestedCheckOutTime: params.suggestedCheckOutTime,
+        suggestedStatus: params.suggestedStatus,
+        status: 'pending',
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+
+      setAttendanceIssues((prev) => [newIssue, ...prev.filter((i) => i.id !== issueId)]);
+      await saveToFirestore('attendanceIssues', issueId, newIssue);
+
+      // Create Notification doc for Business Owner & Managers
+      const notif: Notification = {
+        id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+        businessId: tenantId,
+        title: `Attendance Issue: ${currentUser.name}`,
+        message: `${currentUser.name} (${staffCode || 'Staff'}) reported an attendance issue for ${params.date}: ${params.description.trim()}`,
+        type: 'system',
+        read: false,
+        createdAt: nowIso,
+        senderUserId: currentUser.id,
+        senderRoleId: currentUser.role,
+        authorName: currentUser.name,
+        targetRoleId: 'business_owner',
+        actionType: 'attendance_issue',
+      };
+      saveToFirestore('notifications', notif.id, notif);
+
+      showToast('Attendance issue request submitted to Admin for review.', 'success');
+      logActivity('Attendance Issue Reported', 'staff', issueId, `${currentUser.name} reported issue for ${params.date}`);
+      return { success: true, message: 'Issue submitted successfully', issue: newIssue };
+    } catch (err: any) {
+      console.error('Error reporting attendance issue:', err);
+      showToast(err?.message || 'Failed to submit attendance issue request.', 'error');
+      return { success: false, message: err?.message || 'Failed to submit issue' };
+    }
+  };
+
+  const resolveAttendanceIssue = async (
+    issueId: string,
+    resolution: 'approved' | 'rejected',
+    notes?: string,
+    autoApplyCorrection: boolean = true
+  ): Promise<{ success: boolean; message: string }> => {
+    if (currentUser?.role !== 'business_owner' && currentUser?.role !== 'manager' && currentUser?.role !== 'super_admin') {
+      showToast('Unauthorized: Only Managers and Business Owners can resolve attendance issue requests.', 'error');
+      return { success: false, message: 'Unauthorized' };
+    }
+
+    const targetIssue = attendanceIssues.find((i) => i.id === issueId);
+    if (!targetIssue) {
+      showToast('Attendance issue request not found.', 'error');
+      return { success: false, message: 'Issue not found' };
+    }
+
+    const nowIso = new Date().toISOString();
+    const updatedIssue: AttendanceIssue = {
+      ...targetIssue,
+      status: resolution === 'approved' ? 'resolved' : 'rejected',
+      resolutionNotes: notes || (resolution === 'approved' ? 'Approved by Admin' : 'Rejected by Admin'),
+      resolvedBy: currentUser.id,
+      resolvedByName: currentUser.name,
+      resolvedAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    setAttendanceIssues((prev) => prev.map((i) => (i.id === issueId ? updatedIssue : i)));
+    await saveToFirestore('attendanceIssues', issueId, updatedIssue);
+
+    // If approved and autoApplyCorrection is requested, update the attendance record accordingly
+    if (resolution === 'approved' && autoApplyCorrection) {
+      let rec = attendanceRecords.find(
+        (r) =>
+          (r.id === targetIssue.attendanceId || (r.staffId === targetIssue.staffId && r.date === targetIssue.date)) &&
+          r.businessId === targetIssue.businessId
+      );
+
+      if (rec) {
+        await manualCorrectAttendance(
+          rec.id,
+          {
+            status: targetIssue.suggestedStatus,
+            checkInTime: targetIssue.suggestedCheckInTime,
+            checkOutTime: targetIssue.suggestedCheckOutTime,
+            notes: notes || `Correction applied following issue request: ${targetIssue.description}`,
+          },
+          `Resolved Issue Request: ${targetIssue.description}`
+        );
+      } else if (targetIssue.suggestedCheckInTime) {
+        // Create new attendance record if none existed for that date
+        const staffUser = users.find((u) => u.id === targetIssue.staffId);
+        const recordId = `att-${targetIssue.staffId}-${targetIssue.date}`;
+        const newRecord: AttendanceRecord = {
+          id: recordId,
+          businessId: targetIssue.businessId,
+          staffId: targetIssue.staffId,
+          staffName: targetIssue.staffName,
+          staffEmployeeCode: targetIssue.staffEmployeeCode,
+          staffRole: targetIssue.staffRole,
+          date: targetIssue.date,
+          status: targetIssue.suggestedStatus || 'present',
+          workingState: targetIssue.suggestedCheckOutTime ? 'completed' : 'not_checked_in',
+          checkInTime: targetIssue.suggestedCheckInTime,
+          checkOutTime: targetIssue.suggestedCheckOutTime,
+          checkInVerificationStatus: 'manual_correction',
+          checkInLocationName: 'Manual Correction',
+          checkInDistance: 0,
+          manualCorrection: {
+            correctedBy: currentUser.id,
+            correctedByName: currentUser.name,
+            correctedAt: nowIso,
+            reason: `Resolved Issue: ${targetIssue.description}`,
+            previousRecord: {},
+            changesDescription: `Created attendance record from issue request`,
+          },
+          auditTrail: [
+            {
+              id: `audit-${Date.now()}`,
+              attendanceId: recordId,
+              businessId: targetIssue.businessId,
+              eventType: 'manual_correction',
+              timestamp: nowIso,
+              userId: currentUser.id,
+              userName: currentUser.name,
+              userRole: currentUser.role,
+              details: `Attendance record created after approving issue request from ${targetIssue.staffName}.`,
+            },
+          ],
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
+        setAttendanceRecords((prev) => [newRecord, ...prev.filter((r) => r.id !== recordId)]);
+        await saveToFirestore('attendance', recordId, newRecord);
+      }
+    }
+
+    // Send notification back to staff member
+    const notif: Notification = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+      businessId: targetIssue.businessId,
+      title: `Attendance Request ${resolution === 'approved' ? 'Approved' : 'Rejected'}`,
+      message: `Your attendance issue request for ${targetIssue.date} has been ${resolution === 'approved' ? 'approved and updated' : 'rejected'}. ${notes ? `Note: ${notes}` : ''}`,
+      type: 'system',
+      read: false,
+      createdAt: nowIso,
+      senderUserId: currentUser.id,
+      senderRoleId: currentUser.role,
+      authorName: currentUser.name,
+      targetUserId: targetIssue.staffId,
+      actionType: 'attendance_resolution',
+    };
+    saveToFirestore('notifications', notif.id, notif);
+
+    showToast(`Attendance issue request ${resolution === 'approved' ? 'approved' : 'rejected'}.`, 'success');
+    logActivity('Attendance Issue Resolved', 'staff', issueId, `Marked as ${resolution} by ${currentUser.name}`);
+    return { success: true, message: 'Issue resolved' };
+  };
+
   const getRolePermissions = (roleCode?: UserRole): RolePermission => {
     if (!roleCode) {
       return {
@@ -5571,6 +5820,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         attendanceLocations: filteredAttendanceLocations,
         attendanceWorkingRules,
         attendanceAuditLogs: filteredAttendanceAuditLogs,
+        attendanceIssues: filteredAttendanceIssues,
         checkInAttendance,
         checkOutAttendance,
         manualCorrectAttendance,
@@ -5579,6 +5829,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateAttendanceLocation,
         deleteAttendanceLocation,
         updateAttendanceWorkingRules,
+        reportAttendanceIssue,
+        resolveAttendanceIssue,
       }}
     >
       {children}

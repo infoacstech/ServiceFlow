@@ -434,7 +434,7 @@ export interface Notification {
   scheduledDate?: string;
   scheduledTime?: string;
   priority?: JobPriority;
-  actionType?: 'assigned' | 'accepted' | 'started' | 'completed' | 'general';
+  actionType?: 'assigned' | 'accepted' | 'started' | 'completed' | 'general' | 'attendance_issue' | 'attendance_resolution';
   broadcastSeverity?: 'info' | 'warning' | 'critical' | 'success';
   authorName?: string;
 }
@@ -654,6 +654,41 @@ export interface AttendanceAuditItem {
     targetLocationName?: string;
   };
   ipOrDevice?: string;
+}
+
+export type AttendanceIssueType =
+  | 'wrong_check_in'
+  | 'wrong_check_out'
+  | 'wrong_status'
+  | 'gps_issue'
+  | 'missed_check_in_out'
+  | 'duration_incorrect'
+  | 'leave_adjustment'
+  | 'other';
+
+export interface AttendanceIssue {
+  id: string;
+  businessId: string;
+  attendanceId?: string;
+  staffId: string;
+  staffName: string;
+  staffEmployeeCode?: string;
+  staffEmail?: string;
+  staffPhone?: string;
+  staffRole?: UserRole;
+  date: string; // YYYY-MM-DD
+  issueType: AttendanceIssueType;
+  description: string;
+  suggestedCheckInTime?: string;
+  suggestedCheckOutTime?: string;
+  suggestedStatus?: AttendanceStatus;
+  status: 'pending' | 'resolved' | 'rejected';
+  resolutionNotes?: string;
+  resolvedBy?: string;
+  resolvedByName?: string;
+  resolvedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface AttendanceRecord {

@@ -39,6 +39,7 @@ import { SuperAdminView } from './views/SuperAdminView';
 import { SettingsView } from './views/SettingsView';
 import { NotificationsView } from './views/NotificationsView';
 import { AttendanceView } from './views/AttendanceView';
+import { EmployeeAttendanceView } from './views/EmployeeAttendanceView';
 import { LoginView } from './views/LoginView';
 
 const MainContent: React.FC = () => {
@@ -165,8 +166,9 @@ const MainContent: React.FC = () => {
       case 'services':
         return { allowed: permissions.canManageServices, label: 'Admin or Manager' };
       case 'staff':
-      case 'attendance':
         return { allowed: permissions.canManageStaff, label: 'Admin or Manager' };
+      case 'attendance':
+        return { allowed: true, label: '' };
       case 'inventory':
         return { allowed: permissions.canManageInventory, label: 'Admin or Manager' };
       case 'quotations':
@@ -270,7 +272,8 @@ const MainContent: React.FC = () => {
 
                   {activeTab === 'staff' && <StaffView />}
 
-                  {activeTab === 'attendance' && <AttendanceView />}
+                  {activeTab === 'attendance' &&
+                    (permissions.canManageStaff ? <AttendanceView /> : <EmployeeAttendanceView />)}
 
                   {activeTab === 'inventory' && <InventoryView />}
 

@@ -5,6 +5,7 @@ import {
   AttendanceStatus,
   AttendanceLocation,
   AttendanceLocationType,
+  AttendanceIssue,
   User,
 } from '../types';
 import {
@@ -58,6 +59,7 @@ export const AttendanceView: React.FC = () => {
     attendanceLocations,
     attendanceWorkingRules,
     attendanceAuditLogs,
+    attendanceIssues,
     staff,
     currentBusiness,
     currentUser,
@@ -67,6 +69,7 @@ export const AttendanceView: React.FC = () => {
     updateAttendanceLocation,
     deleteAttendanceLocation,
     updateAttendanceWorkingRules,
+    resolveAttendanceIssue,
     showToast,
   } = useApp();
 
@@ -92,7 +95,15 @@ export const AttendanceView: React.FC = () => {
   };
 
   // Navigation tab within Attendance Dashboard
-  const [activeTab, setActiveTab] = useState<'roster' | 'history' | 'locations' | 'rules' | 'audit'>('roster');
+  const [activeTab, setActiveTab] = useState<'roster' | 'history' | 'issues' | 'locations' | 'rules' | 'audit'>('roster');
+
+  // Issues review filter and modal states
+  const [issueFilterStatus, setIssueFilterStatus] = useState<string>('all');
+  const [issueSearchQuery, setIssueSearchQuery] = useState<string>('');
+  const [selectedIssueForReview, setSelectedIssueForReview] = useState<AttendanceIssue | null>(null);
+  const [resolutionAction, setResolutionAction] = useState<'resolve' | 'reject'>('resolve');
+  const [resolutionNotes, setResolutionNotes] = useState<string>('');
+  const [isProcessingIssue, setIsProcessingIssue] = useState<boolean>(false);
 
   // Filter state for Daily Roster
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
@@ -572,6 +583,71 @@ export const AttendanceView: React.FC = () => {
     }
   };
 
+  // Filtered list of attendance issues
+  const filteredAttendanceIssues = useMemo(() => {
+    return (attendanceIssues || [])
+      .filter((issue) => {
+        if (issueFilterStatus !== 'all' && issue.status !== issueFilterStatus) {
+          return false;
+        }
+        if (issueSearchQuery.trim()) {
+          const q = issueSearchQuery.trim().toLowerCase();
+          const staffMatch = (issue.staffName || '').toLowerCase().includes(q);
+          const descMatch = (issue.description || '').toLowerCase().includes(q);
+          const dateMatch = (issue.date || '').toLowerCase().includes(q);
+          const typeMatch = (issue.issueType || '').toLowerCase().includes(q);
+          if (!staffMatch && !descMatch && !dateMatch && !typeMatch) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  }, [attendanceIssues, issueFilterStatus, issueSearchQuery]);
+
+  // Open Issue review
+  const handleOpenIssueReview = (issue: AttendanceIssue, action: 'resolve' | 'reject') => {
+    setSelectedIssueForReview(issue);
+    setResolutionAction(action);
+    setResolutionNotes(
+      action === 'resolve'
+        ? `Approved: Attendance timings updated for ${issue.date}.`
+        : 'Reviewed and declined by manager.'
+    );
+  };
+
+  // Process resolution of issue
+  const handleExecuteIssueResolution = async () => {
+    if (!selectedIssueForReview) return;
+    setIsProcessingIssue(true);
+    try {
+      if (resolutionAction === 'resolve') {
+        const res = await resolveAttendanceIssue(
+          selectedIssueForReview.id,
+          'approved',
+          resolutionNotes || 'Approved by administrator.',
+          true
+        );
+        if (res.success) {
+          showToast('Attendance issue approved and attendance record updated.', 'success');
+          setSelectedIssueForReview(null);
+        }
+      } else {
+        const res = await resolveAttendanceIssue(
+          selectedIssueForReview.id,
+          'rejected',
+          resolutionNotes || 'Declined after review.'
+        );
+        if (res.success) {
+          showToast('Attendance issue request declined.', 'info');
+          setSelectedIssueForReview(null);
+        }
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Action failed', 'error');
+    } finally {
+      setIsProcessingIssue(false);
+    }
+  };
+
   // Open modal for Location add/edit
   const handleOpenLocationModal = (loc?: AttendanceLocation) => {
     if (loc) {
@@ -747,11 +823,17 @@ export const AttendanceView: React.FC = () => {
       <div className="w-full max-w-full overflow-x-auto scrollbar-none pb-2 border-b border-slate-200 dark:border-slate-800 touch-pan-x">
         <div className="flex items-center gap-2 min-w-max">
           {[
-            { id: 'roster', label: 'Daily Roster & Live Tracking', icon: Users },
-            { id: 'history', label: 'Attendance History', icon: History },
-            { id: 'locations', label: 'Permitted Geofence Sites', icon: Building2 },
-            { id: 'rules', label: 'Shift & Working Rules', icon: Sliders },
-            { id: 'audit', label: 'Security & Audit Logs', icon: ShieldCheck },
+            { id: 'roster', label: 'Daily Roster & Live Tracking', icon: Users, count: 0 },
+            { id: 'history', label: 'Attendance History', icon: History, count: 0 },
+            {
+              id: 'issues',
+              label: 'Issue Requests',
+              icon: AlertTriangle,
+              count: (attendanceIssues || []).filter((i) => i.status === 'pending').length,
+            },
+            { id: 'locations', label: 'Permitted Geofence Sites', icon: Building2, count: 0 },
+            { id: 'rules', label: 'Shift & Working Rules', icon: Sliders, count: 0 },
+            { id: 'audit', label: 'Security & Audit Logs', icon: ShieldCheck, count: 0 },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -767,6 +849,17 @@ export const AttendanceView: React.FC = () => {
                 }`}
               >
                 <Icon className="w-4 h-4 shrink-0" /> <span>{tab.label}</span>
+                {tab.count > 0 && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                      isActive
+                        ? 'bg-white text-indigo-700'
+                        : 'bg-rose-500 text-white animate-pulse'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -1985,6 +2078,198 @@ export const AttendanceView: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
+      {/* TAB: EMPLOYEE ISSUE REQUESTS & DISCREPANCIES                              */}
+      {/* ========================================================================= */}
+      {activeTab === 'issues' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                Employee Attendance Discrepancy Requests ({filteredAttendanceIssues.length})
+                {(attendanceIssues || []).filter((i) => i.status === 'pending').length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white">
+                    {(attendanceIssues || []).filter((i) => i.status === 'pending').length} Pending
+                  </span>
+                )}
+              </h2>
+              <p className="text-[11px] text-slate-500">
+                Review technician check-in adjustments, missed punch-ins, and GPS discrepancy appeals
+              </p>
+            </div>
+
+            {/* Filter pills */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {[
+                { id: 'all', label: 'All Requests' },
+                { id: 'pending', label: 'Pending Review' },
+                { id: 'resolved', label: 'Approved & Updated' },
+                { id: 'rejected', label: 'Declined' },
+              ].map((pill) => (
+                <button
+                  key={pill.id}
+                  type="button"
+                  onClick={() => setIssueFilterStatus(pill.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    issueFilterStatus === pill.id
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {pill.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={issueSearchQuery}
+              onChange={(e) => setIssueSearchQuery(e.target.value)}
+              placeholder="Search requests by staff name, date, reason..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 shadow-xs focus:ring-2 focus:ring-indigo-500/20"
+            />
+          </div>
+
+          {/* Issues List */}
+          {filteredAttendanceIssues.length === 0 ? (
+            <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-xs text-slate-400 space-y-2">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-500 mx-auto flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <div className="font-bold text-slate-700 dark:text-slate-300 text-sm">No Attendance Issues Found</div>
+              <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                No staff attendance adjustment requests match the selected filters.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {filteredAttendanceIssues.map((issue) => {
+                const staffMember = staff.find((s) => s.id === issue.staffId);
+                const empCode = staffMember ? getEmployeeCode(staffMember, staff) : 'EMP-—';
+                const isPending = issue.status === 'pending';
+                const isResolved = issue.status === 'resolved';
+
+                return (
+                  <div
+                    key={issue.id}
+                    className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-3"
+                  >
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-2xl bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-black text-xs shrink-0">
+                          {issue.staffName.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                            {issue.staffName}
+                          </div>
+                          <div className="text-[11px] text-slate-500 font-semibold flex items-center gap-1">
+                            <span className="font-mono text-indigo-600 dark:text-indigo-400">{empCode}</span>
+                            <span>•</span>
+                            <span>{formatRoleLabel(issue.staffRole || 'technician')}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            isPending
+                              ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 animate-pulse'
+                              : isResolved
+                              ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300'
+                              : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
+                          }`}
+                        >
+                          {isPending && <Clock className="w-3 h-3" />}
+                          {isResolved && <CheckCircle2 className="w-3 h-3" />}
+                          {!isPending && !isResolved && <X className="w-3 h-3" />}
+                          {issue.status}
+                        </span>
+                        <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                          Date: <strong>{formatDisplayDate(issue.date)}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Issue Category & Details */}
+                    <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-500 text-[10.5px]">Issue Type:</span>
+                        <span className="font-extrabold text-indigo-600 dark:text-indigo-400 capitalize">
+                          {issue.issueType.replace('_', ' ')}
+                        </span>
+                      </div>
+
+                      <div>
+                        <div className="text-[10.5px] font-bold text-slate-500 mb-0.5">Staff Explanation:</div>
+                        <p className="text-slate-800 dark:text-slate-200 text-xs font-normal italic bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800">
+                          "{issue.description}"
+                        </p>
+                      </div>
+
+                      {/* Suggested Timings / Status */}
+                      {(issue.suggestedCheckInTime || issue.suggestedCheckOutTime || issue.suggestedStatus) && (
+                        <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between text-[11px]">
+                          <span className="font-semibold text-slate-500">Requested Timings:</span>
+                          <span className="font-extrabold text-slate-900 dark:text-slate-100">
+                            {issue.suggestedCheckInTime || '—'} → {issue.suggestedCheckOutTime || '—'}
+                            {issue.suggestedStatus && (
+                              <span className="ml-1.5 px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950 text-indigo-600 text-[10px] uppercase">
+                                {issue.suggestedStatus.replace('_', ' ')}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Resolution Notes if reviewed */}
+                      {issue.resolutionNotes && (
+                        <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-[11px]">
+                          <span className="font-bold text-slate-500">Admin Response:</span>
+                          <p className="text-slate-700 dark:text-slate-300 mt-0.5">{issue.resolutionNotes}</p>
+                          {issue.resolvedByName && (
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                              Reviewed by {issue.resolvedByName} on{' '}
+                              {issue.resolvedAt ? new Date(issue.resolvedAt).toLocaleDateString() : ''}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions for Pending Issues */}
+                    {isPending && isOwnerOrAdmin && (
+                      <div className="pt-1 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenIssueReview(issue, 'resolve')}
+                          className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                        >
+                          <Check className="w-3.5 h-3.5" /> Approve & Update
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenIssueReview(issue, 'reject')}
+                          className="py-2 px-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 text-rose-700 dark:text-rose-300 font-extrabold text-xs flex items-center justify-center gap-1 border border-rose-200 dark:border-rose-900 transition-all cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" /> Decline
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* TAB 2: PERMITTED GEOFENCE SITES MANAGER                                    */}
       {/* ========================================================================= */}
       {activeTab === 'locations' && (
@@ -2611,6 +2896,98 @@ export const AttendanceView: React.FC = () => {
             handleOpenCorrection(record);
           }}
         />
+      )}
+
+      {/* Attendance Issue Review & Resolution Modal */}
+      {selectedIssueForReview && (
+        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-5 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                  {resolutionAction === 'resolve' ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Approve & Update Record
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="w-4 h-4 text-rose-500" /> Decline Issue Request
+                    </>
+                  )}
+                </h3>
+                <p className="text-[10.5px] text-slate-400">
+                  {selectedIssueForReview.staffName} • {formatDisplayDate(selectedIssueForReview.date)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedIssueForReview(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-500 font-bold">Issue Category:</span>
+                  <span className="font-extrabold text-indigo-600 capitalize">
+                    {selectedIssueForReview.issueType.replace('_', ' ')}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  <span className="font-bold">Staff Note:</span> "{selectedIssueForReview.description}"
+                </div>
+                {(selectedIssueForReview.suggestedCheckInTime || selectedIssueForReview.suggestedCheckOutTime) && (
+                  <div className="text-[11px] text-slate-700 dark:text-slate-300 pt-1 border-t font-semibold">
+                    Suggested Timings: {selectedIssueForReview.suggestedCheckInTime || '—'} →{' '}
+                    {selectedIssueForReview.suggestedCheckOutTime || '—'}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Resolution Note for Employee:
+                </label>
+                <textarea
+                  rows={2}
+                  value={resolutionNotes}
+                  onChange={(e) => setResolutionNotes(e.target.value)}
+                  placeholder="e.g. Approved. Shift times adjusted as confirmed by client site."
+                  className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t">
+              <button
+                type="button"
+                onClick={() => setSelectedIssueForReview(null)}
+                className="px-4 py-2 rounded-xl border text-xs font-bold text-slate-600 dark:text-slate-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteIssueResolution}
+                disabled={isProcessingIssue}
+                className={`px-5 py-2 rounded-xl text-white font-extrabold text-xs shadow-md disabled:opacity-50 flex items-center gap-1.5 cursor-pointer ${
+                  resolutionAction === 'resolve'
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                {isProcessingIssue
+                  ? 'Saving...'
+                  : resolutionAction === 'resolve'
+                  ? 'Confirm Approval'
+                  : 'Confirm Decline'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

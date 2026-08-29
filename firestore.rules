@@ -270,15 +270,34 @@ service cloud.firestore {
     // Attendance & GPS Verification Rules
     match /attendance/{docId} {
       allow read: if isAuthenticated() && (
-        isTenantMember(resource.data.businessId) || isSuperAdmin()
+        isSuperAdmin() ||
+        isTenantOwner(resource.data.businessId) ||
+        (isTenantMember(resource.data.businessId) && resource.data.staffId == request.auth.uid)
       );
       allow create: if isAuthenticated() && (
         isTenantMember(request.resource.data.businessId) || isSuperAdmin()
       );
       allow update: if isAuthenticated() && (
-        isTenantMember(resource.data.businessId) || isSuperAdmin()
+        isSuperAdmin() ||
+        isTenantOwner(resource.data.businessId) ||
+        (isTenantMember(resource.data.businessId) && resource.data.staffId == request.auth.uid && request.resource.data.staffId == request.auth.uid)
       );
       allow delete: if isAuthenticated() && (
+        isTenantOwner(resource.data.businessId) || isSuperAdmin()
+      );
+    }
+
+    match /attendanceIssues/{docId} {
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        isTenantOwner(resource.data.businessId) ||
+        (isTenantMember(resource.data.businessId) && resource.data.staffId == request.auth.uid)
+      );
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (isTenantMember(request.resource.data.businessId) && request.resource.data.staffId == request.auth.uid)
+      );
+      allow update, delete: if isAuthenticated() && (
         isTenantOwner(resource.data.businessId) || isSuperAdmin()
       );
     }

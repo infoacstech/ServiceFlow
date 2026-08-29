@@ -389,6 +389,10 @@
     "attendanceAuditLogs/{logId}": {
       "schema": "attendanceAuditLogs",
       "description": "Immutable attendance and verification audit trail records"
+    },
+    "attendanceIssues/{issueId}": {
+      "schema": "attendanceIssues",
+      "description": "Staff submitted attendance correction requests and issues"
     }
   }
 }
