@@ -149,47 +149,47 @@ export const StaffCalendarTimeline: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 max-w-full overflow-hidden">
       {/* Calendar Top Controls & Week Selector */}
-      <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+          <div className="p-2.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 shrink-0">
             <CalendarIcon className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
               Technician Weekly Dispatch Timeline
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Drag and drop job cards to reassign technicians or reschedule dates
             </p>
           </div>
         </div>
 
         {/* Week Navigation Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             onClick={() => navigateWeek('prev')}
-            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
+            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
             title="Previous Week"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             onClick={() => navigateWeek('today')}
-            className="px-3.5 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 text-xs font-bold border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors"
+            className="px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 text-xs font-bold border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors cursor-pointer"
           >
             Current Week
           </button>
           <button
             onClick={() => navigateWeek('next')}
-            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
+            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
             title="Next Week"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
 
-          <span className="ml-2 text-xs font-black text-slate-800 dark:text-slate-200 font-mono bg-slate-50 dark:bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-200/80 dark:border-slate-700">
+          <span className="text-xs font-black text-slate-800 dark:text-slate-200 font-mono bg-slate-50 dark:bg-slate-800/80 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border border-slate-200/80 dark:border-slate-700 whitespace-nowrap">
             {weekDays[0].monthName} {weekDays[0].dayNum} – {weekDays[6].monthName} {weekDays[6].dayNum}, {weekDays[0].date.getFullYear()}
           </span>
         </div>
@@ -197,17 +197,17 @@ export const StaffCalendarTimeline: React.FC = () => {
 
       {/* Unassigned Jobs Dock */}
       {unassignedJobs.length > 0 && (
-        <div className="p-4 rounded-3xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 space-y-3">
-          <div className="flex items-center justify-between">
+        <div className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 space-y-2.5 sm:space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
             <h3 className="text-xs font-extrabold text-amber-900 dark:text-amber-200 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" /> Unassigned Jobs Pending Allocation ({unassignedJobs.length})
+              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" /> Unassigned Jobs Pending Allocation ({unassignedJobs.length})
             </h3>
             <span className="text-[11px] text-amber-700 dark:text-amber-300 italic">
               Drag any job onto a technician's day slot below
             </span>
           </div>
 
-          <div className="flex items-center gap-3 overflow-x-auto pb-2 no-scrollbar">
+          <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-thin">
             {(unassignedJobs || []).map((job) => {
               const cust = (customers || []).find((c) => c.id === job.customerId);
               return (
@@ -216,7 +216,7 @@ export const StaffCalendarTimeline: React.FC = () => {
                   draggable
                   onDragStart={(e) => handleDragStart(e, job.id)}
                   onClick={() => setSelectedJob(job)}
-                  className="shrink-0 w-60 p-3 rounded-2xl bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-800 shadow-xs cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-indigo-500 transition-all space-y-1.5"
+                  className="shrink-0 w-56 sm:w-60 p-3 rounded-2xl bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-800 shadow-xs cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-indigo-500 transition-all space-y-1.5"
                 >
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{job.jobId}</span>
@@ -236,19 +236,19 @@ export const StaffCalendarTimeline: React.FC = () => {
       )}
 
       {/* Interactive Timeline Matrix Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-xs min-w-[900px]">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden max-w-full">
+        <div className="overflow-x-auto scrollbar-thin relative">
+          <table className="w-full border-collapse text-xs min-w-[840px] sm:min-w-[960px]">
             {/* Header: Technician Column + 7 Days */}
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
-                <th className="p-4 text-left font-black w-56 sticky left-0 bg-slate-50 dark:bg-slate-800/90 z-10 border-r border-slate-200 dark:border-slate-800">
+                <th className="p-3 sm:p-4 text-left font-black w-44 sm:w-56 sticky left-0 bg-slate-50 dark:bg-slate-800/95 z-20 border-r border-slate-200 dark:border-slate-800 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)]">
                   Technician / Staff
                 </th>
                 {weekDays.map((day) => (
                   <th
                     key={day.isoDate}
-                    className={`p-3 text-center font-bold border-r border-slate-200/80 dark:border-slate-800/80 last:border-r-0 ${
+                    className={`p-2.5 sm:p-3 text-center font-bold border-r border-slate-200/80 dark:border-slate-800/80 last:border-r-0 min-w-[110px] sm:min-w-[130px] ${
                       day.isToday ? 'bg-indigo-50/70 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300' : ''
                     }`}
                   >
@@ -268,116 +268,128 @@ export const StaffCalendarTimeline: React.FC = () => {
 
             {/* Body: Each Staff Member Row */}
             <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
-              {uniqueStaff.map((tech) => {
-                // Get all jobs for this technician across the week
-                const techWeekJobs = (jobs || []).filter((j) => j.assignedStaffId === tech.id);
-                const techName = tech?.name || tech?.email || 'Technician';
-                const techInitials = (tech?.name || tech?.email || 'TC').substring(0, 2).toUpperCase();
+              {uniqueStaff.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-slate-500 dark:text-slate-400">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <UserIcon className="w-8 h-8 text-slate-400 opacity-60" />
+                      <p className="font-bold text-xs text-slate-600 dark:text-slate-300">No staff members found in this business</p>
+                      <p className="text-[11px] text-slate-400">Add technicians via "Add Team Member" to start dispatching jobs on the weekly calendar.</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                uniqueStaff.map((tech) => {
+                  // Get all jobs for this technician across the week
+                  const techWeekJobs = (jobs || []).filter((j) => j.assignedStaffId === tech.id);
+                  const techName = tech?.name || tech?.email || 'Technician';
+                  const techInitials = (tech?.name || tech?.email || 'TC').substring(0, 2).toUpperCase();
 
-                return (
-                  <tr key={tech.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                    {/* Left Sticky Column: Technician Profile */}
-                    <td className="p-3.5 sticky left-0 bg-white dark:bg-slate-900 z-10 border-r border-slate-200 dark:border-slate-800 space-y-1">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-xl bg-slate-200 dark:bg-slate-800 overflow-hidden ring-2 ring-indigo-500/20 shrink-0 font-bold flex items-center justify-center text-xs text-slate-700 dark:text-slate-300">
-                          {tech?.avatar ? (
-                            <img src={tech.avatar} alt={techName} className="w-full h-full object-cover" />
-                          ) : (
-                            techInitials
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="font-extrabold text-xs text-slate-900 dark:text-slate-100 truncate">
-                            {techName}
-                          </h4>
-                          <div className="flex items-center gap-1">
-                            <span className="text-[9px] px-1.5 py-0.2 rounded-md font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 truncate">
-                              {(tech?.role || 'staff').replace('_', ' ')}
-                            </span>
+                  return (
+                    <tr key={tech.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                      {/* Left Sticky Column: Technician Profile */}
+                      <td className="p-2.5 sm:p-3.5 sticky left-0 bg-white dark:bg-slate-900/95 z-10 border-r border-slate-200 dark:border-slate-800 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.06)] space-y-1">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-200 dark:bg-slate-800 overflow-hidden ring-2 ring-indigo-500/20 shrink-0 font-bold flex items-center justify-center text-xs text-slate-700 dark:text-slate-300">
+                            {tech?.avatar ? (
+                              <img src={tech.avatar} alt={techName} className="w-full h-full object-cover" />
+                            ) : (
+                              techInitials
+                            )}
                           </div>
-                        </div>
-                      </div>
-
-                      <div className="text-[10px] text-slate-400 font-medium flex items-center justify-between pt-1">
-                        <span>Jobs this week:</span>
-                        <span className="font-bold text-slate-700 dark:text-slate-300">{techWeekJobs.length}</span>
-                      </div>
-                    </td>
-
-                    {/* 7 Day Timeline Cells */}
-                    {weekDays.map((day) => {
-                      const dayJobs = techWeekJobs.filter((j) => j.scheduledDate === day.isoDate);
-                      const isTargetHovered =
-                        dragOverCell?.staffId === tech.id && dragOverCell?.dateStr === day.isoDate;
-                      const isOverbooked = dayJobs.length >= 3;
-
-                      return (
-                        <td
-                          key={day.isoDate}
-                          onDragOver={(e) => handleDragOver(e, tech.id, day.isoDate)}
-                          onDragLeave={handleDragLeave}
-                          onDrop={(e) => handleDrop(e, tech.id, day.isoDate)}
-                          className={`p-2 vertical-top h-28 border-r border-slate-200/80 dark:border-slate-800/80 last:border-r-0 transition-all ${
-                            isTargetHovered
-                              ? 'bg-indigo-100/80 dark:bg-indigo-900/40 ring-2 ring-indigo-500 ring-inset'
-                              : day.isToday
-                              ? 'bg-indigo-50/30 dark:bg-indigo-950/20'
-                              : ''
-                          }`}
-                        >
-                          <div className="h-full space-y-1.5 flex flex-col justify-between">
-                            {/* Job Cards list */}
-                            <div className="space-y-1.5 overflow-y-auto max-h-32 pr-0.5 no-scrollbar">
-                              {(dayJobs || []).map((job) => {
-                                const cust = (customers || []).find((c) => c.id === job.customerId);
-
-                                return (
-                                  <div
-                                    key={job.id}
-                                    draggable
-                                    onDragStart={(e) => handleDragStart(e, job.id)}
-                                    onClick={() => setSelectedJob(job)}
-                                    className={`p-2 rounded-xl border text-left cursor-grab active:cursor-grabbing hover:scale-[1.02] transition-all shadow-2xs group relative ${getStatusBadgeStyle(
-                                      job.status
-                                    )}`}
-                                  >
-                                    <div className="flex items-center justify-between gap-1">
-                                      <span className="font-mono font-black text-[10px]">{job.jobId}</span>
-                                      <span className="text-[9px] font-extrabold uppercase truncate">
-                                        {job.scheduledTime?.split('-')[0] || 'Scheduled'}
-                                      </span>
-                                    </div>
-
-                                    <p className="text-[11px] font-bold truncate leading-tight mt-0.5">
-                                      {(job as any).serviceName || job.description}
-                                    </p>
-
-                                    <div className="flex items-center justify-between text-[10px] opacity-80 mt-1">
-                                      <span className="truncate">{cust?.name || 'Client'}</span>
-                                      <GripVertical className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                          <div className="min-w-0">
+                            <h4 className="font-extrabold text-xs text-slate-900 dark:text-slate-100 truncate">
+                              {techName}
+                            </h4>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[9px] px-1.5 py-0.2 rounded-md font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 truncate">
+                                {(tech?.role || 'staff').replace('_', ' ')}
+                              </span>
                             </div>
-
-                            {/* Drop hint or Overbooked notice */}
-                            {dayJobs.length === 0 ? (
-                              <div className="text-[10px] text-slate-300 dark:text-slate-700 text-center py-2 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-                                Available
-                              </div>
-                            ) : isOverbooked ? (
-                              <div className="text-[9px] font-bold text-amber-600 dark:text-amber-400 text-center bg-amber-50 dark:bg-amber-950/60 rounded-md py-0.5">
-                                High Workload ({dayJobs.length} Jobs)
-                              </div>
-                            ) : null}
                           </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
+                        </div>
+
+                        <div className="text-[10px] text-slate-400 font-medium flex items-center justify-between pt-1">
+                          <span>Jobs this week:</span>
+                          <span className="font-bold text-slate-700 dark:text-slate-300">{techWeekJobs.length}</span>
+                        </div>
+                      </td>
+
+                      {/* 7 Day Timeline Cells */}
+                      {weekDays.map((day) => {
+                        const dayJobs = techWeekJobs.filter((j) => j.scheduledDate === day.isoDate);
+                        const isTargetHovered =
+                          dragOverCell?.staffId === tech.id && dragOverCell?.dateStr === day.isoDate;
+                        const isOverbooked = dayJobs.length >= 3;
+
+                        return (
+                          <td
+                            key={day.isoDate}
+                            onDragOver={(e) => handleDragOver(e, tech.id, day.isoDate)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDrop(e, tech.id, day.isoDate)}
+                            className={`p-2 align-top h-28 border-r border-slate-200/80 dark:border-slate-800/80 last:border-r-0 min-w-[110px] sm:min-w-[130px] transition-all ${
+                              isTargetHovered
+                                ? 'bg-indigo-100/80 dark:bg-indigo-900/40 ring-2 ring-indigo-500 ring-inset'
+                                : day.isToday
+                                ? 'bg-indigo-50/30 dark:bg-indigo-950/20'
+                                : ''
+                            }`}
+                          >
+                            <div className="h-full space-y-1.5 flex flex-col justify-between">
+                              {/* Job Cards list */}
+                              <div className="space-y-1.5 overflow-y-auto max-h-32 pr-0.5 no-scrollbar">
+                                {(dayJobs || []).map((job) => {
+                                  const cust = (customers || []).find((c) => c.id === job.customerId);
+
+                                  return (
+                                    <div
+                                      key={job.id}
+                                      draggable
+                                      onDragStart={(e) => handleDragStart(e, job.id)}
+                                      onClick={() => setSelectedJob(job)}
+                                      className={`p-2 rounded-xl border text-left cursor-grab active:cursor-grabbing hover:scale-[1.02] transition-all shadow-2xs group relative ${getStatusBadgeStyle(
+                                        job.status
+                                      )}`}
+                                    >
+                                      <div className="flex items-center justify-between gap-1">
+                                        <span className="font-mono font-black text-[10px]">{job.jobId}</span>
+                                        <span className="text-[9px] font-extrabold uppercase truncate">
+                                          {job.scheduledTime?.split('-')[0] || 'Scheduled'}
+                                        </span>
+                                      </div>
+
+                                      <p className="text-[11px] font-bold truncate leading-tight mt-0.5">
+                                        {(job as any).serviceName || job.description}
+                                      </p>
+
+                                      <div className="flex items-center justify-between text-[10px] opacity-80 mt-1">
+                                        <span className="truncate">{cust?.name || 'Client'}</span>
+                                        <GripVertical className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Drop hint or Overbooked notice */}
+                              {dayJobs.length === 0 ? (
+                                <div className="text-[10px] text-slate-300 dark:text-slate-700 text-center py-2 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                                  Available
+                                </div>
+                              ) : isOverbooked ? (
+                                <div className="text-[9px] font-bold text-amber-600 dark:text-amber-400 text-center bg-amber-50 dark:bg-amber-950/60 rounded-md py-0.5">
+                                  High Workload ({dayJobs.length} Jobs)
+                                </div>
+                              ) : null}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

@@ -183,43 +183,47 @@ export const StaffView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-12 animate-in fade-in">
+    <div className="space-y-4 sm:space-y-6 pb-12 animate-in fade-in max-w-full overflow-x-hidden">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <UserCheck className="w-5 h-5 text-indigo-600" /> Staff & Field Executives
-            </h1>
-            <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
-              {activeStaffCount} / {capacity.maxStaff} Staff Used ({capacity.planName})
-            </span>
+      <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+              <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <UserCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0" /> Staff & Field Executives
+              </h1>
+              <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 whitespace-nowrap">
+                {activeStaffCount} / {capacity.maxStaff} Staff Used ({capacity.planName})
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Manage field technicians, dispatch calendar, and account credentials</p>
           </div>
-          <p className="text-xs text-slate-500 mt-1">Manage field technicians, dispatch calendar, and account credentials</p>
         </div>
 
         {/* View Switcher Tabs & Add Staff Button */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center p-1.5 bg-slate-100 dark:bg-slate-800 rounded-2xl gap-1">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="grid grid-cols-2 sm:flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl gap-1 w-full sm:w-auto">
             <button
               onClick={() => setActiveTab('calendar')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all text-center ${
                 activeTab === 'calendar'
                   ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              <Calendar className="w-4 h-4" /> Weekly Dispatch Calendar
+              <Calendar className="w-4 h-4 shrink-0" />
+              <span className="truncate">Weekly Dispatch Calendar</span>
             </button>
             <button
               onClick={() => setActiveTab('directory')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all relative ${
+              className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all relative text-center ${
                 activeTab === 'directory'
                   ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
-              <Users className="w-4 h-4" /> Team Directory ({businessUsers.length})
+              <Users className="w-4 h-4 shrink-0" />
+              <span className="truncate">Team Directory ({businessUsers.length})</span>
               {pendingApprovals.length > 0 && (
                 <span className="w-2 h-2 rounded-full bg-amber-500 absolute -top-0.5 -right-0.5 animate-ping" />
               )}
@@ -229,9 +233,10 @@ export const StaffView: React.FC = () => {
           {isOwnerOrAdmin && (
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all shrink-0"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm transition-all active:scale-95 shrink-0 cursor-pointer"
             >
-              <UserPlus className="w-4 h-4" /> Add Team Member
+              <UserPlus className="w-4 h-4 shrink-0" />
+              <span>Add Team Member</span>
             </button>
           )}
         </div>
