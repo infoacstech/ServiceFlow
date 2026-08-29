@@ -151,10 +151,23 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-lg">
         {bottomItems.map((item) => {
           const Icon = item.icon;
-          const isDashboard = item.id === 'super_admin_dashboard';
-          const isActive =
-            (activeTab === item.id || (isDashboard && activeTab === 'super_admin')) &&
-            !isMoreMenuOpen;
+          let isActive = false;
+          if (isSuperAdmin) {
+            if (item.id === 'super_admin_dashboard') {
+              isActive = activeTab === 'super_admin_dashboard' || activeTab === 'super_admin';
+            } else if (item.id === 'super_admin_pending') {
+              isActive = activeTab === 'super_admin_pending' || activeTab === 'super_admin_approvals';
+            } else if (item.id === 'super_admin_tenants') {
+              isActive = activeTab === 'super_admin_tenants';
+            } else if (item.id === 'super_admin_support') {
+              isActive = activeTab === 'super_admin_support';
+            } else {
+              isActive = activeTab === item.id;
+            }
+          } else {
+            isActive = activeTab === item.id;
+          }
+          isActive = isActive && !isMoreMenuOpen;
 
           return (
             <button
@@ -217,7 +230,11 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
                 {superAdminModules.map((m) => {
                   const Icon = m.icon;
                   const isDashboard = m.id === 'super_admin_dashboard';
-                  const isCurrent = activeTab === m.id || (isDashboard && activeTab === 'super_admin');
+                  const isPending = m.id === 'super_admin_pending';
+                  const isCurrent =
+                    activeTab === m.id ||
+                    (isDashboard && activeTab === 'super_admin') ||
+                    (isPending && activeTab === 'super_admin_approvals');
 
                   return (
                     <button

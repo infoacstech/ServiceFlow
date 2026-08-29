@@ -202,6 +202,64 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
     }
   }, [activeSubSection]);
 
+  const handleSwitchTabSection = (
+    section:
+      | 'overview'
+      | 'approvals'
+      | 'tenants'
+      | 'analytics'
+      | 'referrals'
+      | 'cleanup'
+      | 'support'
+      | 'notifications'
+      | 'settings'
+      | 'plans'
+      | 'audit'
+      | 'sessions'
+  ) => {
+    setActiveTabSection(section);
+    if (onNavigate) {
+      switch (section) {
+        case 'overview':
+          onNavigate('super_admin_dashboard');
+          break;
+        case 'approvals':
+          onNavigate('super_admin_pending');
+          break;
+        case 'tenants':
+          onNavigate('super_admin_tenants');
+          break;
+        case 'analytics':
+          onNavigate('super_admin_analytics');
+          break;
+        case 'referrals':
+          onNavigate('super_admin_referrals');
+          break;
+        case 'cleanup':
+          onNavigate('super_admin_data_maintenance');
+          break;
+        case 'support':
+          onNavigate('super_admin_support');
+          break;
+        case 'notifications':
+          onNavigate('super_admin_notifications');
+          break;
+        case 'settings':
+          onNavigate('super_admin_settings');
+          break;
+        case 'plans':
+          onNavigate('super_admin_plans');
+          break;
+        case 'audit':
+          onNavigate('super_admin_audit');
+          break;
+        case 'sessions':
+          onNavigate('super_admin_security');
+          break;
+      }
+    }
+  };
+
   // Payout Process Modal State
   const [selectedPayoutForAction, setSelectedPayoutForAction] = useState<ReferralPayoutRequest | null>(null);
   const [payoutActionType, setPayoutActionType] = useState<'completed' | 'approved' | 'rejected'>('completed');
@@ -607,7 +665,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
       {/* 2. DASHBOARD TABS - High-Value Platform Views */}
       <div className="flex items-center gap-1.5 overflow-x-auto p-1.5 bg-slate-200/60 dark:bg-slate-900/80 rounded-2xl border border-slate-300/60 dark:border-slate-800 text-xs font-bold scrollbar-none w-full max-w-full touch-pan-x">
         <button
-          onClick={() => setActiveTabSection('overview')}
+          onClick={() => handleSwitchTabSection('overview')}
           className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
             activeTabSection === 'overview'
               ? 'bg-purple-600 text-white shadow-md'
@@ -619,7 +677,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveTabSection('approvals')}
+          onClick={() => handleSwitchTabSection('approvals')}
           className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
             activeTabSection === 'approvals'
               ? 'bg-amber-600 text-white shadow-md'
@@ -637,7 +695,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
 
         <button
           onClick={() => {
-            setActiveTabSection('tenants');
+            handleSwitchTabSection('tenants');
             setTenantStatusFilter('all');
           }}
           className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
@@ -654,7 +712,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveTabSection('analytics')}
+          onClick={() => handleSwitchTabSection('analytics')}
           className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
             activeTabSection === 'analytics'
               ? 'bg-blue-600 text-white shadow-md'
@@ -666,7 +724,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveTabSection('referrals')}
+          onClick={() => handleSwitchTabSection('referrals')}
           className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
             activeTabSection === 'referrals'
               ? 'bg-amber-600 text-white shadow-md'
@@ -683,7 +741,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveTabSection('audit')}
+          onClick={() => handleSwitchTabSection('audit')}
           className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
             activeTabSection === 'audit'
               ? 'bg-emerald-600 text-white shadow-md'
@@ -706,7 +764,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
               {activeTabSection === 'cleanup' && 'Data & Maintenance View'}
             </span>
             <button
-              onClick={() => setActiveTabSection('overview')}
+              onClick={() => handleSwitchTabSection('overview')}
               className="p-0.5 rounded-md hover:bg-purple-500/20 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100"
               title="Return to Overview"
             >
@@ -807,7 +865,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                   className="w-full sm:w-auto justify-center px-4 py-2.5 sm:py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer transition-all"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>+ Onboard New Tenant</span>
+                  <span>Onboard New Tenant</span>
                 </button>
 
                 {/* Secondary Actions */}
@@ -824,7 +882,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setActiveTabSection('notifications')}
+                    onClick={() => handleSwitchTabSection('notifications')}
                     className="flex-1 sm:flex-none justify-center px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-slate-200/70 dark:border-slate-700"
                   >
                     <Bell className="w-3.5 h-3.5 text-slate-500 shrink-0" />
@@ -836,7 +894,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                 <div className="pt-2 sm:pt-0 sm:pl-2 sm:border-l border-t sm:border-t-0 border-slate-200 dark:border-slate-800 w-full sm:w-auto">
                   <button
                     type="button"
-                    onClick={() => setActiveTabSection('cleanup')}
+                    onClick={() => handleSwitchTabSection('cleanup')}
                     className="w-full sm:w-auto justify-center px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 dark:text-rose-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-rose-200/80 dark:border-rose-900/50"
                     title="Development/Demo only: Wipe database records except Super Admin"
                   >
@@ -869,7 +927,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                   </div>
                 </div>
                 <button
-                  onClick={() => setActiveTabSection('approvals')}
+                  onClick={() => handleSwitchTabSection('approvals')}
                   className="text-xs font-bold text-amber-900 dark:text-amber-200 underline hover:no-underline"
                 >
                   View All Pending ({pendingCount}) →
@@ -1098,7 +1156,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                 className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Onboard New Tenant</span>
+                <span>Onboard New Tenant</span>
               </button>
 
               <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100">
@@ -1108,7 +1166,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
           </div>
 
           {pendingRegistrations.length === 0 ? (
-            <div className="p-6 sm:p-7 text-center text-slate-500 dark:text-slate-400 space-y-3">
+            <div className="p-6 sm:p-7 text-center text-slate-500 dark:text-slate-400 space-y-2.5">
               <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center">
                 <CheckCircle2 className="w-5 h-5" />
               </div>
@@ -1117,27 +1175,6 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
                   All business signup requests have been reviewed. When a new business registers from the login page, their request will appear here for 1-click approval.
                 </p>
-              </div>
-              <div className="flex items-center justify-center pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewTenantForm({
-                      businessName: '',
-                      industryType: 'CCTV & Security',
-                      ownerName: '',
-                      ownerEmail: '',
-                      ownerPhone: '',
-                      ownerPassword: '1234',
-                      initialStatus: 'active',
-                    });
-                    setIsAddTenantModalOpen(true);
-                  }}
-                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>+ Onboard New Tenant</span>
-                </button>
               </div>
             </div>
           ) : (
@@ -1309,7 +1346,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                   className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ Onboard New Tenant</span>
+                  <span>Onboard New Tenant</span>
                 </button>
               </div>
             </div>

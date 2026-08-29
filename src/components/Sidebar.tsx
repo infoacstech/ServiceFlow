@@ -394,9 +394,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
                   const Icon = item.icon;
                   // Handle matching for super_admin base tab
                   const isDashboard = item.id === 'super_admin_dashboard';
+                  const isPending = item.id === 'super_admin_pending';
                   const isActive =
                     activeTab === item.id ||
-                    (isDashboard && activeTab === 'super_admin');
+                    (isDashboard && activeTab === 'super_admin') ||
+                    (isPending && activeTab === 'super_admin_approvals');
 
                   return (
                     <button
