@@ -34,29 +34,33 @@ export const sendJobDispatchToTechnician = (
   business?: Business
 ) => {
   const techPhone = technician?.phone || '';
-  const mapsLink = job.location
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.location)}`
-    : '';
+  const estAmount =
+    typeof job.estimatedAmount === 'number'
+      ? job.estimatedAmount
+      : Number(job.estimatedAmount) || 0;
+  const currency = business?.currency || '₹';
+  const timeSlot = job.scheduledTimeSlot || job.scheduledTime || '';
+  const scheduledFormatted = timeSlot
+    ? `${job.scheduledDate} (${timeSlot})`
+    : job.scheduledDate || 'Scheduled';
 
   const message = `🛠️ *NEW JOB ASSIGNED - ${business?.name || 'ServiFlow'}*
 ━━━━━━━━━━━━━━━━━━━━
 📌 *Job ID:* ${job.jobId}
 🎯 *Service:* ${job.description}
 ⚡ *Priority:* ${(job.priority || 'Normal').toUpperCase()}
-📅 *Scheduled:* ${job.scheduledDate} (${job.scheduledTimeSlot || job.scheduledTime})
+📅 *Scheduled:* ${scheduledFormatted}
 
 👤 *Customer Details:*
 • *Name:* ${customer?.name || 'Customer'}
-• *Mobile:* ${customer?.mobile || 'N/A'}
-• *Company:* ${customer?.companyName || 'N/A'}
+• *Mobile:* ${customer?.mobile || 'N/A'}${customer?.companyName ? `\n• *Company:* ${customer.companyName}` : ''}
 
-📍 *Site Location / Address:*
+📍 *Site Address:*
 ${job.location || customer?.address || 'Site Address'}
-${mapsLink ? `🗺️ *Google Maps Navigation:* ${mapsLink}` : ''}
 
-💰 *Est. Amount:* ${business?.currency || '₹'}${job.estimatedAmount || 0}
+💰 *Est. Amount:* ${currency}${estAmount}
 ━━━━━━━━━━━━━━━━━━━━
-_Please open the ServiFlow App to accept and begin this job._`;
+_Please open the ServiFlow App to view and manage this job._`;
 
   openWhatsApp(techPhone, message);
 };

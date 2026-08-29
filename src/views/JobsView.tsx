@@ -104,6 +104,18 @@ export const JobsView: React.FC<JobsViewProps> = ({
 
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
+  // Lock body scroll when modals are open
+  useEffect(() => {
+    if (isCreateModalOpen || selectedJob) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isCreateModalOpen, selectedJob]);
+
   // New Job Form State
   const [newJobData, setNewJobData] = useState({
     customerId: customers?.[0]?.id || '',
@@ -112,9 +124,9 @@ export const JobsView: React.FC<JobsViewProps> = ({
     priority: 'medium' as JobPriority,
     assignedStaffId: (staff || []).find((s) => s.role === 'technician')?.id || '',
     scheduledDate: new Date().toISOString().split('T')[0],
-    scheduledTime: '09:00 AM - 11:00 AM (Morning 1)',
-    location: customers?.[0]?.address ? `${customers[0].address}, ${customers[0].city}` : '',
-    estimatedAmount: services?.[0]?.price || 1500,
+    scheduledTime: '09:00 AM - 11:00 AM',
+    location: customers?.[0]?.address ? `${customers[0].address}, ${customers[0].city || ''}`.trim() : '',
+    estimatedAmount: services?.[0]?.price ?? 1500,
     status: 'assigned' as JobStatus,
   });
 
@@ -136,7 +148,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
         setNewJobData((prev) => ({
           ...prev,
           customerId: firstCust.id,
-          location: prev.location || `${firstCust.address || ''}, ${firstCust.city || ''}`,
+          location: prev.location || `${firstCust.address || ''}, ${firstCust.city || ''}`.trim() || 'Site Address',
         }));
       }
       if (!newJobData.serviceId && services.length > 0) {
@@ -145,7 +157,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
           ...prev,
           serviceId: firstSrv.id,
           description: prev.description || firstSrv.name,
-          estimatedAmount: prev.estimatedAmount || firstSrv.price,
+          estimatedAmount: prev.estimatedAmount !== undefined && prev.estimatedAmount > 0 ? prev.estimatedAmount : (firstSrv.price || 1500),
         }));
       }
       if (!newJobData.assignedStaffId && staff.length > 0) {
@@ -248,10 +260,15 @@ export const JobsView: React.FC<JobsViewProps> = ({
       return;
     }
 
+    const parsedAmount = typeof newJobData.estimatedAmount === 'number'
+      ? Math.max(0, newJobData.estimatedAmount)
+      : Math.max(0, parseFloat(String(newJobData.estimatedAmount)) || 0);
+
     addJob({
       ...newJobData,
       customerId: targetCustomerId,
       location: targetLocation || newJobData.location || 'Site Location',
+      estimatedAmount: parsedAmount,
     });
 
     showToast('Job scheduled and assigned successfully!', 'success');
@@ -926,13 +943,13 @@ export const JobsView: React.FC<JobsViewProps> = ({
 
       {/* Create Job Wizard Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <form
             onSubmit={handleCreateJob}
-            className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 my-8 max-h-[90vh] overflow-y-auto"
+            className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-4 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 my-auto max-h-[90vh] flex flex-col"
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 shrink-0">
               <div>
                 <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <Briefcase className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
@@ -943,14 +960,14 @@ export const JobsView: React.FC<JobsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsCreateModalOpen(false)}
-                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Form Fields Grid */}
-            <div className="space-y-4 text-xs">
+            <div className="space-y-4 text-xs overflow-y-auto pr-1 flex-1">
               {/* SECTION: Customer Selection or Quick Add */}
               <div className="p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 space-y-2.5">
                 <div className="flex items-center justify-between">
@@ -973,13 +990,12 @@ export const JobsView: React.FC<JobsViewProps> = ({
                       id="job-customer-search-select"
                       customers={customers}
                       value={newJobData.customerId}
-                      onAddNewCustomer={() => setIsQuickAddCustomer(true)}
                       onChange={(custId, cust) => {
                         setNewJobData({
                           ...newJobData,
                           customerId: custId,
                           location: cust
-                            ? `${cust.address || ''}, ${cust.city || ''}`.trim()
+                            ? `${cust.address || ''}, ${cust.city || ''}`.trim() || newJobData.location
                             : newJobData.location,
                         });
                       }}
@@ -1280,7 +1296,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
             </div>
 
             {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsCreateModalOpen(false)}
