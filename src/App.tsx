@@ -63,34 +63,40 @@ const MainContent: React.FC = () => {
   const [jobsFilter, setJobsFilter] = useState<JobInitialFilter | null>(null);
   const [invoicesFilter, setInvoicesFilter] = useState<InvoiceInitialFilter | null>(null);
 
-  // Sync activeTab when user or auth state changes
+  const prevUserIdRef = React.useRef<string | null>(null);
+
+  // Sync activeTab only when switching authenticated user/session
   React.useEffect(() => {
     if (currentUser) {
-      const isTechUser = currentUser.role === 'technician';
-      const isSuperUser = currentUser.role === 'super_admin';
-      const savedTab = localStorage.getItem('serviflow_active_tab') || sessionStorage.getItem('serviflow_active_tab');
+      if (prevUserIdRef.current !== currentUser.id) {
+        prevUserIdRef.current = currentUser.id;
+        const isTechUser = currentUser.role === 'technician';
+        const isSuperUser = currentUser.role === 'super_admin';
+        const savedTab = localStorage.getItem('serviflow_active_tab') || sessionStorage.getItem('serviflow_active_tab');
 
-      if (isTechUser) {
-        // Technicians & staff must default to 'jobs' (My Jobs) and are restricted from dashboard
-        if (!savedTab || savedTab === 'login' || savedTab === 'dashboard') {
-          setActiveTab('jobs');
-          localStorage.setItem('serviflow_active_tab', 'jobs');
-          sessionStorage.setItem('serviflow_active_tab', 'jobs');
+        if (isTechUser) {
+          // Technicians & staff must default to 'jobs' (My Jobs) and are restricted from dashboard
+          if (!savedTab || savedTab === 'login' || savedTab === 'dashboard') {
+            setActiveTab('jobs');
+            localStorage.setItem('serviflow_active_tab', 'jobs');
+            sessionStorage.setItem('serviflow_active_tab', 'jobs');
+          } else {
+            setActiveTab(savedTab);
+          }
+        } else if (!savedTab || savedTab === 'login') {
+          const defaultTab = isSuperUser ? 'super_admin_dashboard' : 'dashboard';
+          setActiveTab(defaultTab);
+          localStorage.setItem('serviflow_active_tab', defaultTab);
+          sessionStorage.setItem('serviflow_active_tab', defaultTab);
         } else {
           setActiveTab(savedTab);
         }
-      } else if (!savedTab || savedTab === 'login') {
-        const defaultTab = isSuperUser ? 'super_admin_dashboard' : 'dashboard';
-        setActiveTab(defaultTab);
-        localStorage.setItem('serviflow_active_tab', defaultTab);
-        sessionStorage.setItem('serviflow_active_tab', defaultTab);
-      } else {
-        setActiveTab(savedTab);
       }
     } else if (!isAuthInitializing) {
+      prevUserIdRef.current = null;
       setActiveTab('login');
     }
-  }, [currentUser, isAuthInitializing]);
+  }, [currentUser?.id, currentUser?.role, isAuthInitializing]);
 
   const handleTabChange = (tab: string) => {
     let targetTab = tab;
@@ -236,7 +242,10 @@ const MainContent: React.FC = () => {
 
         {/* View Content Area with Natural Scroll & Pull-To-Refresh */}
         <main className="flex-1 min-w-0 flex flex-col w-full">
-          <PullToRefresh className="p-3 sm:p-4 lg:p-5 pb-24 sm:pb-8 w-full max-w-full">
+          <PullToRefresh
+            disabled={isCreateJobOpen || isOnboardingOpen || isAuthModalOpen || isProfileDrawerOpen || isInstallModalOpen}
+            className="p-3 sm:p-4 lg:p-5 pb-24 sm:pb-8 w-full max-w-full"
+          >
             <div key={activeTab} className="animate-in fade-in duration-200">
               {!currentTabAccess.allowed ? (
                 <AccessDeniedView

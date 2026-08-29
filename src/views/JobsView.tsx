@@ -104,16 +104,18 @@ export const JobsView: React.FC<JobsViewProps> = ({
 
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
-  // Lock body scroll when modals are open
+  // Lock body scroll and touch behavior when modals are open
   useEffect(() => {
     if (isCreateModalOpen || selectedJob) {
+      const originalOverflow = document.body.style.overflow;
+      const originalTouchAction = document.body.style.touchAction;
       document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
+      document.body.style.touchAction = 'none';
+      return () => {
+        document.body.style.overflow = originalOverflow || '';
+        document.body.style.touchAction = originalTouchAction || '';
+      };
     }
-    return () => {
-      document.body.style.overflow = '';
-    };
   }, [isCreateModalOpen, selectedJob]);
 
   // New Job Form State
@@ -622,9 +624,30 @@ export const JobsView: React.FC<JobsViewProps> = ({
 
       {/* Selected Job Detail Modal */}
       {selectedJob && (
-        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-6 border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b pb-3">
+        <div
+          role="dialog"
+          aria-modal="true"
+          data-modal="true"
+          className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setSelectedJob(null);
+            }
+          }}
+          onTouchMove={(e) => {
+            if (e.target === e.currentTarget) {
+              e.preventDefault();
+            }
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-4 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 my-auto max-h-[90vh] flex flex-col overscroll-contain"
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 shrink-0">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-indigo-600">{selectedJob.jobId}</span>
@@ -636,7 +659,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
                         `Job Number ${selectedJob.jobId} for ${custName}. Service issue: ${selectedJob.description}. Assigned technician: ${techName}. Location: ${selectedJob.location}. Scheduled: ${selectedJob.scheduledDate}.`
                       );
                     }}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 font-semibold text-[11px] transition-all"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 font-semibold text-[11px] transition-all cursor-pointer"
                     title="Listen to job summary voice voice"
                   >
                     <Volume2 className="w-3.5 h-3.5" /> Speak Voice Details
@@ -646,12 +669,15 @@ export const JobsView: React.FC<JobsViewProps> = ({
                   {(customers || []).find((c) => c.id === selectedJob.customerId)?.name}
                 </h3>
               </div>
-              <button onClick={() => setSelectedJob(null)} className="text-slate-400">
+              <button
+                onClick={() => setSelectedJob(null)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-xs overflow-y-auto pr-1 flex-1 overscroll-contain">
               {/* Visual Horizontal Progress Stepper Component */}
               <JobServiceProgressBar
                 job={selectedJob}
@@ -943,10 +969,29 @@ export const JobsView: React.FC<JobsViewProps> = ({
 
       {/* Create Job Wizard Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        <div
+          role="dialog"
+          aria-modal="true"
+          data-modal="true"
+          className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto overscroll-contain"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsCreateModalOpen(false);
+            }
+          }}
+          onTouchMove={(e) => {
+            if (e.target === e.currentTarget) {
+              e.preventDefault();
+            }
+          }}
+        >
           <form
             onSubmit={handleCreateJob}
-            className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-4 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 my-auto max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+            className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-4 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 my-auto max-h-[90vh] flex flex-col overscroll-contain"
           >
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 shrink-0">
@@ -967,7 +1012,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
             </div>
 
             {/* Form Fields Grid */}
-            <div className="space-y-4 text-xs overflow-y-auto pr-1 flex-1">
+            <div className="space-y-4 text-xs overflow-y-auto pr-1 flex-1 overscroll-contain">
               {/* SECTION: Customer Selection or Quick Add */}
               <div className="p-3.5 rounded-2xl bg-slate-50/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 space-y-2.5">
                 <div className="flex items-center justify-between">
