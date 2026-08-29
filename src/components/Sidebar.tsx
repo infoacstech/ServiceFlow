@@ -54,10 +54,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
     plans,
     referralPayoutRequests,
     activeSupportSession,
+    attendanceIssues,
     logoutUser,
   } = useApp();
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
   const permissions = getRolePermissions(currentUser?.role);
+
+  const pendingAttendanceIssuesCount = (attendanceIssues || []).filter(
+    (i) => i.status === 'pending'
+  ).length;
 
   const isTech = currentUser?.role === 'technician';
   const isSuperAdmin = currentUser?.role === 'super_admin';
@@ -262,6 +267,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
           label: permissions.canManageStaff ? 'Attendance & GPS' : 'My Attendance',
           icon: Clock,
           visible: true,
+          badge:
+            permissions.canManageStaff && pendingAttendanceIssuesCount > 0
+              ? `${pendingAttendanceIssuesCount}`
+              : undefined,
+          badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse',
         },
         {
           id: 'inventory',

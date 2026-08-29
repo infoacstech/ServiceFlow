@@ -79,6 +79,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     contracts,
     staff,
     enquiries,
+    attendanceIssues,
     currentBusiness,
     setIsActivityLogOpen,
     addCustomer,
@@ -382,6 +383,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             title="Listen to broadcast"
           >
             <Volume2 className="w-3.5 h-3.5" /> Listen Audio
+          </button>
+        </div>
+      )}
+
+      {/* Pending Attendance Correction Requests Alert Banner */}
+      {(attendanceIssues || []).filter((i) => i.status === 'pending').length > 0 && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-rose-500/10 to-indigo-500/10 dark:from-amber-950/40 dark:via-rose-950/30 dark:to-slate-900 p-4 rounded-2xl border border-amber-300 dark:border-amber-700/60 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-md shadow-amber-500/20 shrink-0">
+              <AlertTriangle className="w-5 h-5 animate-bounce" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-black uppercase tracking-wider bg-rose-600 text-white px-2 py-0.5 rounded-full">
+                  Action Required
+                </span>
+                <span className="text-xs font-extrabold text-slate-900 dark:text-slate-100">
+                  {(attendanceIssues || []).filter((i) => i.status === 'pending').length} Attendance Correction Request(s) Pending
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                Staff have submitted shift check-in or GPS boundary adjustment requests that require your review.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('attendance')}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shadow-md transition-all active:scale-95 cursor-pointer shrink-0 self-end sm:self-center"
+          >
+            <Clock className="w-4 h-4" /> Review in Attendance & GPS
           </button>
         </div>
       )}

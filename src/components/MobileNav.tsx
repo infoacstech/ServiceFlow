@@ -39,9 +39,20 @@ interface MobileNavProps {
 }
 
 export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab }) => {
-  const { currentUser, getRolePermissions, businesses, referralPayoutRequests, activeSupportSession } = useApp();
+  const {
+    currentUser,
+    getRolePermissions,
+    businesses,
+    referralPayoutRequests,
+    activeSupportSession,
+    attendanceIssues,
+  } = useApp();
   const permissions = getRolePermissions(currentUser?.role);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+
+  const pendingAttendanceCount = (attendanceIssues || []).filter(
+    (i) => i.status === 'pending'
+  ).length;
 
   const isTech = currentUser?.role === 'technician';
   const isSuperAdmin = currentUser?.role === 'super_admin';
@@ -245,12 +256,17 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
                           <button
                             key={m.id}
                             onClick={() => handleTabClick(m.id)}
-                            className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-center gap-2 transition-all active:scale-95 cursor-pointer min-h-[92px] ${
+                            className={`relative flex flex-col items-center justify-center p-3 rounded-2xl border text-center gap-2 transition-all active:scale-95 cursor-pointer min-h-[92px] ${
                               isCurrent
                                 ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-800 font-bold shadow-xs'
                                 : 'bg-slate-50 dark:bg-slate-800/60 hover:bg-indigo-50/50 border-slate-200/80 dark:border-slate-700/80'
                             }`}
                           >
+                            {m.id === 'attendance' && permissions.canManageStaff && pendingAttendanceCount > 0 && (
+                              <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-rose-500 text-white animate-pulse">
+                                {pendingAttendanceCount}
+                              </span>
+                            )}
                             <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-xs bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
                               <Icon className="w-5 h-5" />
                             </div>
