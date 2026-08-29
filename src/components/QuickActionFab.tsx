@@ -55,10 +55,18 @@ export const QuickActionFab: React.FC<QuickActionFabProps> = ({
     showToast,
   } = useApp();
 
-  // If user is logged out or on attendance, jobs, or customers tab, don't show FAB
-  if (!currentUser || activeTab === 'attendance' || activeTab === 'jobs' || activeTab === 'customers') return null;
+  // If user is logged out or on attendance, jobs, customers, or super admin tab, don't show FAB
+  if (
+    !currentUser ||
+    activeTab === 'attendance' ||
+    activeTab === 'jobs' ||
+    activeTab === 'customers' ||
+    activeTab === 'super_admin' ||
+    (currentUser.role as string) === 'super_admin'
+  )
+    return null;
 
-  const isSuperAdmin = currentUser.role === 'super_admin';
+  const isSuperAdmin = (currentUser.role as string) === 'super_admin';
   const isOwner = currentUser.role === 'business_owner';
   const isManager = currentUser.role === 'manager';
   const isTech = currentUser.role === 'technician';
