@@ -168,54 +168,75 @@ export const CustomersView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-12 animate-in fade-in">
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
-        <div>
-          <h1 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Users className="w-5 h-5 text-indigo-600" /> Customer CRM ({customers.length})
-          </h1>
-          <p className="text-xs text-slate-500">Manage client contact details, address records, jobs history, & contracts</p>
+    <div className="space-y-3.5 sm:space-y-4 pb-8 animate-in fade-in">
+      {/* Compact Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 px-4 py-3.5 sm:px-5 sm:py-4 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100/60 dark:border-indigo-900/40 shadow-2xs">
+            <Users className="w-4 h-4" />
+          </div>
+          <div>
+            <h1 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
+              Customer CRM <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full font-mono">({customers.length})</span>
+            </h1>
+            <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
+              Manage client contacts, service locations, job histories & contracts
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
+            type="button"
             onClick={() => setIsCsvModalOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-xs transition-all active:scale-95"
+            className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs transition-all active:scale-95 cursor-pointer shadow-2xs"
           >
-            <Upload className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Import CSV
+            <Upload className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            <span>Import CSV</span>
           </button>
           <button
+            type="button"
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-all shadow-md active:scale-95"
+            className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all shadow-xs active:scale-95 cursor-pointer"
           >
-            <Plus className="w-4 h-4" /> Add New Customer
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add New Customer</span>
           </button>
         </div>
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-white dark:bg-slate-900 p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
         <div className="relative flex-1 w-full">
-          <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, phone, company..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-600"
+            placeholder="Search by name, phone, company, address..."
+            className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200 placeholder:text-slate-400 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
+        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto scrollbar-none pb-0.5 sm:pb-0">
           {(['all', 'commercial', 'individual'] as const).map((t) => (
             <button
               key={t}
+              type="button"
               onClick={() => setFilterType(t)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize whitespace-nowrap transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize whitespace-nowrap transition-all cursor-pointer ${
                 filterType === t
                   ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >
               {t}
@@ -223,8 +244,9 @@ export const CustomersView: React.FC = () => {
           ))}
           {archivedCount > 0 && (
             <button
+              type="button"
               onClick={() => setFilterType('archived')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
                 filterType === 'archived'
                   ? 'bg-amber-600 text-white shadow-xs'
                   : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-900/60 hover:bg-amber-100'
@@ -237,84 +259,152 @@ export const CustomersView: React.FC = () => {
       </div>
 
       {/* Customers Table / Card Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((customer) => {
-          const customerJobs = jobs.filter((j) => j.customerId === customer.id);
-          const customerInvoices = invoices.filter((inv) => inv.customerId === customer.id);
-          const totalSpent = customerInvoices.reduce((sum, inv) => sum + inv.paidAmount, 0);
+      {filtered.length === 0 ? (
+        <div className="p-10 sm:p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-xs text-slate-400 space-y-3 shadow-xs">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-500 mx-auto flex items-center justify-center">
+            <Users className="w-6 h-6" />
+          </div>
+          <div className="font-extrabold text-slate-800 dark:text-slate-200 text-sm">
+            No customers found
+          </div>
+          <p className="text-slate-500 max-w-sm mx-auto text-xs">
+            {search
+              ? `No customer records matched "${search}". Try checking for typos or clear your search query.`
+              : filterType !== 'all'
+              ? `No ${filterType} customer accounts registered yet.`
+              : 'Start by clicking "Add New Customer" or import from a CSV file.'}
+          </p>
+          <div className="pt-2 flex items-center justify-center gap-2">
+            {search || filterType !== 'all' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setFilterType('all');
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-200"
+              >
+                Clear Filters
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(true)}
+                className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-xs shadow-xs hover:bg-indigo-700"
+              >
+                + Add Customer
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
+          {filtered.map((customer) => {
+            const customerJobs = jobs.filter((j) => j.customerId === customer.id);
+            const customerInvoices = invoices.filter((inv) => inv.customerId === customer.id);
+            const totalSpent = customerInvoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
 
-          return (
-            <div
-              key={customer.id}
-              onClick={() => setSelectedCustomer(customer)}
-              className={`p-5 rounded-3xl bg-white dark:bg-slate-900 border shadow-xs hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group ${
-                customer.isArchived
-                  ? 'border-amber-200/80 dark:border-amber-900/60 bg-amber-50/20'
-                  : 'border-slate-200/80 dark:border-slate-800'
-              }`}
-            >
-              <div>
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div>
-                    <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 transition-colors">
-                      {customer.name}
-                    </h3>
-                    {customer.companyName && (
-                      <div className="text-xs font-semibold text-indigo-600 flex items-center gap-1">
-                        <Building className="w-3 h-3" /> {customer.companyName}
+            const fullAddress = [
+              customer.address,
+              customer.city,
+              customer.state,
+              customer.pin ? `PIN: ${customer.pin}` : null,
+            ]
+              .filter(Boolean)
+              .join(', ');
+
+            return (
+              <div
+                key={customer.id}
+                onClick={() => setSelectedCustomer(customer)}
+                className={`p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white dark:bg-slate-900 border shadow-xs hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group ${
+                  customer.isArchived
+                    ? 'border-amber-200/80 dark:border-amber-900/60 bg-amber-50/20'
+                    : 'border-slate-200/80 dark:border-slate-800'
+                }`}
+              >
+                <div>
+                  {/* Card Header: Name & Type Badge */}
+                  <div className="flex items-start justify-between gap-2 mb-2.5">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-snug break-words">
+                        {customer.name}
+                      </h3>
+                      {customer.companyName && (
+                        <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1 mt-0.5 break-words">
+                          <Building className="w-3 h-3 shrink-0" />
+                          <span>{customer.companyName}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {customer.isArchived && (
+                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                          <Archive className="w-2.5 h-2.5" /> Archived
+                        </span>
+                      )}
+                      <span
+                        className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                          customer.customerType === 'commercial'
+                            ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60'
+                            : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
+                        }`}
+                      >
+                        {customer.customerType}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Contact & Location details */}
+                  <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300 my-3 pt-0.5">
+                    <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-semibold">
+                      <Phone className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 shrink-0" />
+                      <span className="font-mono text-xs">{customer.mobile || 'No phone'}</span>
+                      {customer.whatsapp && customer.whatsapp !== customer.mobile && (
+                        <span className="text-[10.5px] text-slate-400 font-normal">
+                          (WA: {customer.whatsapp})
+                        </span>
+                      )}
+                    </div>
+
+                    {customer.email && (
+                      <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+                        <Mail className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
+                        <span className="break-all text-[11.5px]">{customer.email}</span>
                       </div>
                     )}
+
+                    <div className="flex items-start gap-2 text-slate-600 dark:text-slate-400">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0 mt-0.5" />
+                      <span className="text-[11.5px] leading-relaxed break-words line-clamp-2">
+                        {fullAddress || 'No address recorded'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Footer: Metrics */}
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
+                  <div className="flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Jobs:</span>
+                    <span className="font-extrabold text-slate-900 dark:text-slate-100 font-mono">
+                      {customerJobs.length}
+                    </span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    {customer.isArchived && (
-                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                        <Archive className="w-2.5 h-2.5" /> Archived
-                      </span>
-                    )}
-                    <span
-                      className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
-                        customer.customerType === 'commercial'
-                          ? 'bg-purple-100 text-purple-700'
-                          : 'bg-emerald-100 text-emerald-700'
-                      }`}
-                    >
-                      {customer.customerType}
+                    <span>Spent:</span>
+                    <span className="font-extrabold text-emerald-600 dark:text-emerald-400 font-mono text-xs">
+                      {currencySymbol}
+                      {totalSpent.toLocaleString()}
                     </span>
                   </div>
                 </div>
-
-                <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400 my-3">
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{customer.mobile}</span>
-                  </div>
-                  {customer.email && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="truncate">{customer.email}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="truncate">{customer.address}, {customer.city}</span>
-                  </div>
-                </div>
               </div>
-
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 font-medium">
-                <div>
-                  <span>Jobs: </span>
-                  <span className="font-bold text-slate-900 dark:text-slate-100">{customerJobs.length}</span>
-                </div>
-                <div>
-                  <span>Spent: </span>
-                  <span className="font-bold text-emerald-600">{(currentBusiness?.currency || '₹')}{totalSpent}</span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Customer Profile Deep Detail Drawer / Modal */}
       {selectedCustomer && (
