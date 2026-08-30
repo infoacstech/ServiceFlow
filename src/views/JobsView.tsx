@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Job, JobPriority, JobStatus } from '../types';
-import { DateRangePicker, DateRange, getPresetDates, getLocalDateString } from '../components/DateRangePicker';
+import { DateRangePicker, DateRange, getPresetDates, getLocalDateString, formatDateDisplay } from '../components/DateRangePicker';
 import { VoiceNotesRecorder } from '../components/VoiceNotesRecorder';
 import { JobServiceProgressBar } from '../components/JobServiceProgressBar';
 import { CustomerSearchSelect } from '../components/CustomerSearchSelect';
@@ -209,20 +209,51 @@ export const JobsView: React.FC<JobsViewProps> = ({
    * - Otherwise use scheduledDate or createdAt.
    */
   const getJobEffectiveDate = (job: Job): string => {
-    if ((job.status === 'completed' || job.status === 'closed' || job.status === 'verified') && job.completionTime) {
-      try {
-        const compDate = new Date(job.completionTime);
-        if (!isNaN(compDate.getTime())) {
-          return getLocalDateString(compDate);
+    if ((job.status === 'completed' || job.status === 'closed' || job.status === 'verified')) {
+      const compTime = job.completionTime || (job as any).completedAt;
+      if (compTime) {
+        try {
+          const compDate = new Date(compTime);
+          if (!isNaN(compDate.getTime())) {
+            return getLocalDateString(compDate);
+          }
+        } catch {
+          // ignore and fallback
         }
-      } catch {
-        // ignore and fallback
       }
     }
     if (job.scheduledDate) {
+      if (job.scheduledDate.includes('T')) {
+        try {
+          const d = new Date(job.scheduledDate);
+          if (!isNaN(d.getTime())) return getLocalDateString(d);
+        } catch {
+          // ignore
+        }
+      }
       return job.scheduledDate.slice(0, 10);
     }
+    if ((job as any).date) {
+      const dStr = String((job as any).date);
+      if (dStr.includes('T')) {
+        try {
+          const d = new Date(dStr);
+          if (!isNaN(d.getTime())) return getLocalDateString(d);
+        } catch {
+          // ignore
+        }
+      }
+      return dStr.slice(0, 10);
+    }
     if (job.createdAt) {
+      try {
+        const d = new Date(job.createdAt);
+        if (!isNaN(d.getTime())) {
+          return getLocalDateString(d);
+        }
+      } catch {
+        // ignore
+      }
       return job.createdAt.slice(0, 10);
     }
     return getLocalDateString();
@@ -434,37 +465,38 @@ export const JobsView: React.FC<JobsViewProps> = ({
 
       {/* Quick Date Presets Row & Filter Header */}
       <div className="flex flex-col gap-2.5">
-        {/* Quick Date Filter Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1 flex items-center gap-1 shrink-0">
-            <Calendar className="w-3.5 h-3.5 text-indigo-600" /> Date:
-          </span>
+        {/* Quick Date Filter Chips + Right Side Interactive Date Selector */}
+        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 max-w-full">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1 flex items-center gap-1 shrink-0">
+              <Calendar className="w-3.5 h-3.5 text-indigo-600" /> Filter:
+            </span>
 
-          {[
-            { id: 'today', label: 'Today 📅' },
-            { id: 'yesterday', label: 'Yesterday' },
-            { id: 'last_7_days', label: 'Last 7 Days' },
-            { id: 'this_month', label: 'This Month' },
-            { id: 'all', label: 'All History' },
-          ].map((preset) => {
-            const isActive = dateRange.preset === preset.id;
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() => setDateRange(getPresetDates(preset.id))}
-                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
-                  isActive
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
-              >
-                {preset.label}
-              </button>
-            );
-          })}
+            {[
+              { id: 'today', label: 'Today' },
+              { id: 'last_7_days', label: 'Last 7 Days' },
+              { id: 'this_month', label: 'This Month' },
+              { id: 'all', label: 'All History' },
+            ].map((preset) => {
+              const isActive = dateRange.preset === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => setDateRange(getPresetDates(preset.id))}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
+                    isActive
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
+          </div>
 
-          <div className="shrink-0 ml-auto">
+          <div className="shrink-0 ml-auto sm:ml-0">
             <DateRangePicker value={dateRange} onChange={setDateRange} align="right" />
           </div>
         </div>
@@ -539,17 +571,19 @@ export const JobsView: React.FC<JobsViewProps> = ({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              {dateRange.preset === 'today'
-                ? 'Today’s Jobs'
+              {dateRange.preset === 'today' || (dateRange.startDate && dateRange.startDate === getLocalDateString() && dateRange.endDate === getLocalDateString())
+                ? `Today’s Jobs (${formatDateDisplay(getLocalDateString())})`
                 : dateRange.preset === 'yesterday'
-                ? 'Yesterday’s Jobs'
+                ? `Yesterday’s Jobs (${formatDateDisplay(dateRange.startDate)})`
+                : dateRange.startDate && dateRange.endDate && dateRange.startDate === dateRange.endDate
+                ? `Jobs on ${formatDateDisplay(dateRange.startDate)}`
                 : dateRange.preset === 'last_7_days'
                 ? 'Last 7 Days Jobs'
                 : dateRange.preset === 'this_month'
                 ? 'This Month Jobs'
-                : dateRange.preset === 'all'
+                : dateRange.preset === 'all' || (!dateRange.startDate && !dateRange.endDate)
                 ? 'All Historical Jobs'
-                : `Jobs (${dateRange.startDate || 'Start'} to ${dateRange.endDate || 'End'})`}
+                : `Jobs (${formatDateDisplay(dateRange.startDate)} to ${formatDateDisplay(dateRange.endDate)})`}
             </span>
             <span className="text-slate-300 dark:text-slate-700">•</span>
             <span className="text-slate-600 dark:text-slate-400 font-semibold">
