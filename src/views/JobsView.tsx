@@ -463,111 +463,131 @@ export const JobsView: React.FC<JobsViewProps> = ({
         </div>
       </div>
 
-      {/* Quick Date Presets Row & Filter Header */}
-      <div className="flex flex-col gap-2.5">
-        {/* Quick Date Filter Chips + Right Side Interactive Date Selector */}
-        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 max-w-full">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1 flex items-center gap-1 shrink-0">
-              <Calendar className="w-3.5 h-3.5 text-indigo-600" /> Filter:
-            </span>
+      {/* Compact Mobile-First Filters Section */}
+      <div className="flex flex-col gap-2">
+        {/* 1. Date Filter Row - Single Horizontal Scrollable Row */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 w-full flex-nowrap">
+          {[
+            { id: 'today', label: 'Today' },
+            { id: 'last_7_days', label: 'Last 7 Days' },
+            { id: 'this_month', label: 'This Month' },
+            { id: 'all', label: 'All History' },
+          ].map((preset) => {
+            const isActive = dateRange.preset === preset.id;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => setDateRange(getPresetDates(preset.id))}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
 
-            {[
-              { id: 'today', label: 'Today' },
-              { id: 'last_7_days', label: 'Last 7 Days' },
-              { id: 'this_month', label: 'This Month' },
-              { id: 'all', label: 'All History' },
-            ].map((preset) => {
-              const isActive = dateRange.preset === preset.id;
-              return (
-                <button
-                  key={preset.id}
-                  type="button"
-                  onClick={() => setDateRange(getPresetDates(preset.id))}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
-                    isActive
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  {preset.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="shrink-0 ml-auto sm:ml-0">
+          <div className="shrink-0">
             <DateRangePicker value={dateRange} onChange={setDateRange} align="right" />
           </div>
         </div>
 
-        {/* Search & Secondary Filter Row */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2 bg-white dark:bg-slate-900 p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs">
-          <div className="relative flex-1 w-full min-w-0">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search Job ID, Customer Name, Mobile Number, Service..."
-              className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl font-medium text-slate-800 dark:text-slate-200 placeholder:text-slate-400 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all text-xs"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-2 w-full md:w-auto overflow-x-auto scrollbar-none">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl font-bold border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shrink-0 cursor-pointer"
+        {/* 2. Full Width Search Bar */}
+        <div className="relative w-full">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search Job ID, Customer Name, Mobile Number, Service..."
+            className="w-full pl-9 pr-8 py-2 bg-white dark:bg-slate-900 rounded-xl font-medium text-slate-800 dark:text-slate-200 placeholder:text-slate-400 border border-slate-200/90 dark:border-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all text-xs shadow-2xs"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
             >
-              <option value="all">All Statuses</option>
-              <option value="pending_active">Pending / Active</option>
-              {statuses.map((s) => (
-                <option key={s} value={s}>
-                  {s.replace('_', ' ').toUpperCase()}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="px-2.5 py-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl font-bold border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shrink-0 cursor-pointer"
-            >
-              <option value="all">All Priorities</option>
-              <option value="urgent_high">Urgent & High</option>
-              <option value="urgent">Urgent</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-
-            <select
-              value={staffFilter}
-              onChange={(e) => setStaffFilter(e.target.value)}
-              className="px-2.5 py-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl font-bold border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shrink-0 max-w-[140px] truncate cursor-pointer"
-            >
-              <option value="all">All Staff</option>
-              {staff.map((st) => (
-                <option key={st.id} value={st.id}>
-                  {st.name}
-                </option>
-              ))}
-            </select>
-          </div>
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
-        {/* Active Date & Results Summary Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-indigo-50/50 dark:bg-slate-900/60 rounded-xl border border-indigo-100/80 dark:border-slate-800 text-xs">
+        {/* 3. Status, Priority & Staff Filter Row - Single Horizontal Scrollable Row */}
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none pb-0.5 w-full flex-nowrap">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className={`px-3 py-1.5 rounded-xl font-bold text-xs shrink-0 cursor-pointer shadow-2xs transition-all ${
+              statusFilter !== 'all'
+                ? 'bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-500 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500/30'
+                : 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+            }`}
+          >
+            <option value="all">All Statuses</option>
+            <option value="pending_active">Pending / Active</option>
+            {statuses.map((s) => (
+              <option key={s} value={s}>
+                {s.replace('_', ' ').toUpperCase()}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            className={`px-3 py-1.5 rounded-xl font-bold text-xs shrink-0 cursor-pointer shadow-2xs transition-all ${
+              priorityFilter !== 'all'
+                ? 'bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-500 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500/30'
+                : 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+            }`}
+          >
+            <option value="all">All Priorities</option>
+            <option value="urgent_high">Urgent & High</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+
+          <select
+            value={staffFilter}
+            onChange={(e) => setStaffFilter(e.target.value)}
+            className={`px-3 py-1.5 rounded-xl font-bold text-xs shrink-0 max-w-[150px] truncate cursor-pointer shadow-2xs transition-all ${
+              staffFilter !== 'all'
+                ? 'bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-500 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500/30'
+                : 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+            }`}
+          >
+            <option value="all">All Staff</option>
+            {staff.map((st) => (
+              <option key={st.id} value={st.id}>
+                {st.name}
+              </option>
+            ))}
+          </select>
+
+          {(statusFilter !== 'all' || priorityFilter !== 'all' || staffFilter !== 'all') && (
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter('all');
+                setPriorityFilter('all');
+                setStaffFilter('all');
+              }}
+              className="px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 hover:bg-rose-100 dark:hover:bg-rose-900/40 shrink-0 cursor-pointer flex items-center gap-1 transition-all"
+              title="Reset Status, Priority & Staff filters"
+            >
+              <X className="w-3 h-3" /> Reset
+            </button>
+          )}
+        </div>
+
+        {/* 4. Active Date & Results Summary Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-indigo-50/60 dark:bg-slate-900/60 rounded-xl border border-indigo-100/80 dark:border-slate-800 text-xs">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
@@ -599,7 +619,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
             <button
               type="button"
               onClick={() => setDateRange(getPresetDates('all'))}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-bold shadow-2xs hover:bg-indigo-700 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-bold shadow-2xs hover:bg-indigo-700 transition-all cursor-pointer shrink-0"
             >
               <History className="w-3 h-3" />
               <span>
@@ -609,6 +629,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
           )}
         </div>
       </div>
+
 
       {/* Board View (Kanban style columns for key workflow stages) */}
       {viewMode === 'board' ? (

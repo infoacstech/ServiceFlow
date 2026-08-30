@@ -371,10 +371,10 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
         type="button"
         id="jobs-date-picker-trigger"
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-1.5 sm:gap-2 px-3 py-2 rounded-xl text-xs font-extrabold border transition-all cursor-pointer shadow-2xs select-none ${
+        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold border transition-all shrink-0 cursor-pointer shadow-2xs select-none ${
           hasFilter
             ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600'
-            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
+            : 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
         }`}
         title="Click to select specific date or range"
       >
@@ -385,47 +385,55 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
       {/* Calendar & Date Picker Dropdown Popover */}
       {isOpen && (
-        <div
-          className={`absolute top-full mt-2 z-50 w-[calc(100vw-2rem)] sm:w-84 max-w-[340px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-3.5 space-y-3 animate-in fade-in zoom-in-95 duration-150 ${
-            align === 'right' ? 'right-0 sm:right-0' : 'left-0'
-          }`}
-          style={{ maxHeight: '85vh', overflowY: 'auto' }}
-        >
-          {/* Header & View Switcher */}
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl text-[11px] font-bold">
+        <>
+          {/* Backdrop for clean dismiss on tap outside */}
+          <div
+            className="fixed inset-0 z-40 bg-black/25 backdrop-blur-2xs sm:bg-transparent sm:backdrop-blur-none"
+            onClick={() => setIsOpen(false)}
+          />
+
+          <div
+            className={`fixed sm:absolute z-50 top-1/2 -translate-y-1/2 sm:translate-y-0 sm:top-full left-1/2 -translate-x-1/2 sm:translate-x-0 sm:left-auto ${
+              align === 'right' ? 'sm:right-0' : 'sm:left-0'
+            } sm:mt-2 w-[calc(100vw-2rem)] sm:w-84 max-w-[340px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-3.5 space-y-3 animate-in fade-in zoom-in-95 duration-150`}
+            style={{ maxHeight: '85vh', overflowY: 'auto' }}
+          >
+            {/* Header & View Switcher */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl text-[11px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('calendar')}
+                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                    activeTab === 'calendar'
+                      ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Date Calendar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('range')}
+                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                    activeTab === 'range'
+                      ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Custom Range
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={() => setActiveTab('calendar')}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                  activeTab === 'calendar'
-                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
+                onClick={() => handleSelectPreset('today')}
+                className="text-[11px] font-extrabold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
               >
-                Date Calendar
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('range')}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                  activeTab === 'range'
-                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                }`}
-              >
-                Custom Range
+                <RotateCcw className="w-3 h-3" /> Today
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => handleSelectPreset('today')}
-              className="text-[11px] font-extrabold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <RotateCcw className="w-3 h-3" /> Today
-            </button>
-          </div>
 
           {/* Quick Shortcuts Bar */}
           <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5">
@@ -579,6 +587,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
             </div>
           )}
         </div>
+        </>
       )}
     </div>
   );
