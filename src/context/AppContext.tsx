@@ -910,18 +910,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           const canonical = sorted[0];
           map.set(canonical.id, canonical);
-
-          // Safe auto-repair: Remove obsolete duplicate documents from Firestore
-          const duplicates = sorted.slice(1);
-          duplicates.forEach((dup) => {
-            console.log(
-              `[Deduplication] Removing duplicate user document (${dup.id}) for ${dup.email || dup.name} in business (${dup.businessId})`
-            );
-            deleteFromFirestore('users', dup.id);
-            if (dup.businessId) {
-              deleteFromFirestore('tenantMembers', `${dup.businessId}_${dup.id}`);
-            }
-          });
         });
 
         const allUsers = Array.from(map.values());
@@ -1483,24 +1471,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               const q = query(collection(db, 'users'), where('email', '==', targetEmail.toLowerCase()));
               const qSnap = await getDocs(q);
               if (!qSnap.empty) {
-                const oldDoc = qSnap.docs[0];
-                const oldDocId = oldDoc.id;
-                userRecord = { ...(oldDoc.data() as User), id: firebaseUser.uid };
-                // Ensure document is keyed by UID
-                await setDoc(doc(db, 'users', firebaseUser.uid), userRecord, { merge: true });
-
-                // Safe cleanup of obsolete pre-auth document
-                if (oldDocId && oldDocId !== firebaseUser.uid) {
-                  try {
-                    await deleteDoc(doc(db, 'users', oldDocId));
-                    await deleteDoc(doc(db, 'tenantMembers', `${userRecord.businessId}_${oldDocId}`));
-                    if (userRecord.role === 'business_owner' && userRecord.businessId && userRecord.businessId !== 'all') {
-                      await setDoc(doc(db, 'tenants', userRecord.businessId), { ownerId: firebaseUser.uid }, { merge: true });
-                    }
-                  } catch (e) {
-                    console.warn('Cleanup old user doc notice in onAuthStateChanged:', e);
-                  }
-                }
+                const foundDoc = qSnap.docs[0];
+                const foundUser = foundDoc.data() as User;
+                userRecord = { ...foundUser, id: foundDoc.id };
+                // Attach authUid pointer without deleting the canonical document
+                await setDoc(
+                  doc(db, 'users', foundDoc.id),
+                  { ...cleanFirestoreData(userRecord), authUid: firebaseUser.uid },
+                  { merge: true }
+                );
               }
             }
           }

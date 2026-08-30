@@ -338,19 +338,6 @@ export class AuthService {
 
     const uid = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
-    // Clean up any stale user documents with this email in Firestore before creating the fresh one
-    try {
-      const oldSnap = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
-      for (const d of oldSnap.docs) {
-        if (d.id !== uid) {
-          await deleteDoc(doc(db, 'users', d.id));
-          await deleteDoc(doc(db, 'tenantMembers', `${params.businessId}_${d.id}`));
-        }
-      }
-    } catch (cleanErr) {
-      console.warn('Old user cleanup note:', cleanErr);
-    }
-
     const user: User = {
       id: uid,
       name: name,
@@ -657,7 +644,6 @@ export class AuthService {
       user.password = cleanAuthPass;
     }
 
-    // 4. Finalize user profile
     if (!user && isSuperAdminEmail) {
       user = {
         id: authUser?.uid || `admin-${Date.now()}`,
@@ -671,39 +657,23 @@ export class AuthService {
         joiningDate: new Date().toISOString().split('T')[0],
       };
       await setDoc(doc(db, 'users', user.id), cleanFirestoreData(user));
-    } else if (user && authUser) {
-      const oldDocId = originalDocId;
-      // If authUser has a UID and it's a real Firebase Auth user, sync id if needed
-      if (authUser.uid && authUser.uid.length >= 20 && !authUser.uid.startsWith('usr-') && !authUser.uid.startsWith('admin-')) {
-        const previousId = user.id;
-        user.id = authUser.uid;
-        await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user), { merge: true });
+    } else if (user) {
+      // Preserve canonical user document at user.id and attach authUid if available
+      const updatePayload: Partial<User> = {
+        ...cleanFirestoreData(user),
+      };
+      if (authUser?.uid) {
+        (updatePayload as any).authUid = authUser.uid;
+      }
+      if (cleanAuthPass) {
+        updatePayload.password = cleanAuthPass;
+      }
 
-        if (oldDocId && oldDocId !== authUser.uid) {
-          try {
-            await deleteDoc(doc(db, 'users', oldDocId));
-            await deleteDoc(doc(db, 'tenantMembers', `${user.businessId}_${oldDocId}`));
-            await setDoc(
-              doc(db, 'tenantMembers', `${user.businessId}_${authUser.uid}`),
-              cleanFirestoreData({
-                id: `${user.businessId}_${authUser.uid}`,
-                tenantId: user.businessId,
-                userId: authUser.uid,
-                role: user.role,
-                status: 'active',
-                updatedAt: new Date().toISOString(),
-              }),
-              { merge: true }
-            );
-            if (user.role === 'business_owner' && user.businessId && user.businessId !== 'all') {
-              await setDoc(doc(db, 'tenants', user.businessId), { ownerId: authUser.uid }, { merge: true });
-            }
-          } catch (cleanupErr) {
-            console.warn('Old user doc cleanup notice:', cleanupErr);
-          }
-        }
-      } else {
-        await setDoc(doc(db, 'users', user.id), cleanFirestoreData(user), { merge: true });
+      await setDoc(doc(db, 'users', user.id), updatePayload, { merge: true });
+
+      // If authUser has a distinct Firebase UID, also mirror/link to avoid UID lookup misses
+      if (authUser?.uid && authUser.uid !== user.id && authUser.uid.length >= 20 && !authUser.uid.startsWith('usr-') && !authUser.uid.startsWith('admin-')) {
+        await setDoc(doc(db, 'users', authUser.uid), { ...updatePayload, id: user.id }, { merge: true });
       }
     }
 
@@ -723,12 +693,12 @@ export class AuthService {
       if (!user.businessId || user.businessId === 'all') {
         user.businessId = `tenant-${user.id}`;
       }
-      await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user), { merge: true });
+      await setDoc(doc(db, 'users', user.id), cleanFirestoreData(user), { merge: true });
     }
 
     if (user.role !== 'super_admin' && (user.businessId === 'all' || !user.businessId)) {
       user.businessId = `tenant-${user.id}`;
-      await setDoc(doc(db, 'users', authUser.uid), cleanFirestoreData(user), { merge: true });
+      await setDoc(doc(db, 'users', user.id), cleanFirestoreData(user), { merge: true });
     }
 
     // Security Status Checks
@@ -879,6 +849,23 @@ export class AuthService {
   static async updateCurrentUserPassword(newPass: string): Promise<void> {
     if (auth.currentUser) {
       await firebaseUpdatePassword(auth.currentUser, newPass);
+    }
+  }
+
+  /**
+   * Explicit Staff Account Deletion
+   * ONLY to be called when an authorized Business Owner or Super Admin explicitly requests staff deletion.
+   */
+  static async deleteStaffAccount(userId: string, businessId: string): Promise<void> {
+    if (!userId) return;
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+      if (businessId) {
+        await deleteDoc(doc(db, 'tenantMembers', `${businessId}_${userId}`));
+      }
+    } catch (err) {
+      console.warn('Error deleting staff account:', err);
+      throw err;
     }
   }
 }
