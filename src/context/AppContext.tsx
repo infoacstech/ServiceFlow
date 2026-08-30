@@ -3147,16 +3147,29 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (checkReadOnlySupportGuard()) return;
     const perm = canUpdateRecord(currentUser, 'customer');
     if (!perm.allowed) {
-      showToast(perm.reason || 'Permission Denied: Only Business Owners can edit customer records.', 'error');
+      showToast(perm.reason || 'Permission Denied: You do not have permission to edit customer records.', 'error');
       return;
     }
     const target = customers.find((c) => c.id === id);
-    if (target && target.businessId !== currentBusiness.id && !isSuperAdminUser) {
+    if (!target) {
+      showToast('Customer record not found.', 'error');
+      return;
+    }
+    if (target.businessId !== currentBusiness.id && !isSuperAdminUser) {
       showToast('Unauthorized: Cannot modify customer belonging to another tenant business.', 'error');
       return;
     }
+
+    const updatedCustomer = { ...target, ...updates };
+    setCustomers((prev) => {
+      const updated = prev.map((c) => (c.id === id ? updatedCustomer : c));
+      saveCache('serviflow_customers_cache', updated);
+      return updated;
+    });
+
     firestoreService.updateCustomer(id, updates);
-    showToast('Customer information updated & synced to Firestore', 'success');
+    logActivity('Customer Updated', 'customer', id, `Updated customer profile "${updates.name || target.name}"`);
+    showToast('Customer information updated successfully.', 'success');
   };
 
   const deleteCustomer = async (id: string): Promise<{ success: boolean; message: string; blockedByRecords?: boolean }> => {

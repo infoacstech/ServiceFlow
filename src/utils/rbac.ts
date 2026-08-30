@@ -105,15 +105,20 @@ export function canUpdateRecord(
     return { allowed: true };
   }
 
+  // Authorized staff (Managers) can edit customer records
+  if (entity === 'customer' && isManagerRole(user)) {
+    return { allowed: true };
+  }
+
   // Job execution lifecycle updates (technician starting, reporting, completing assigned jobs)
   if (entity === 'job' && isJobExecutionLifecycle) {
     return { allowed: true };
   }
 
-  // Otherwise, Managers and Staff cannot edit/modify existing master business data
+  // Otherwise, field staff/technicians have read-only access to customer & master data
   return {
     allowed: false,
-    reason: `Permission Denied: Only Business Owners can edit or modify existing ${entity.replace('_', ' ')} records.`,
+    reason: `Permission Denied: Only Business Owners and authorized managers can edit ${entity.replace('_', ' ')} records.`,
   };
 }
 
