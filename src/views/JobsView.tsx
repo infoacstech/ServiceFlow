@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Job, JobPriority, JobStatus } from '../types';
-import { DateRangePicker, DateRange, getPresetDates } from '../components/DateRangePicker';
+import { DateRangePicker, DateRange, getPresetDates, getLocalDateString } from '../components/DateRangePicker';
 import { VoiceNotesRecorder } from '../components/VoiceNotesRecorder';
 import { JobServiceProgressBar } from '../components/JobServiceProgressBar';
 import { CustomerSearchSelect } from '../components/CustomerSearchSelect';
@@ -28,6 +28,8 @@ import {
   TrendingUp,
   Coins,
   Share2,
+  History,
+  Sparkles,
 } from 'lucide-react';
 import { playJobVoiceNotification, speakText } from '../utils/audioNotification';
 import {
@@ -81,11 +83,13 @@ export const JobsView: React.FC<JobsViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>(initialFilter?.statusFilter || 'all');
   const [priorityFilter, setPriorityFilter] = useState<string>(initialFilter?.priorityFilter || 'all');
   const [staffFilter, setStaffFilter] = useState<string>('all');
+  
+  // Requirement: Jobs page open hote hi DEFAULT mein sirf TODAY ki jobs show honi chahiye.
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     if (initialFilter?.datePreset) {
       return getPresetDates(initialFilter.datePreset);
     }
-    return { startDate: '', endDate: '', preset: 'all' };
+    return getPresetDates('today');
   });
 
   useEffect(() => {
@@ -103,6 +107,19 @@ export const JobsView: React.FC<JobsViewProps> = ({
   }, [initialFilter]);
 
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+
+  // Customer & Staff Lookups for fast filtering and matching
+  const customerMap = useMemo(() => {
+    const map = new Map<string, (typeof customers)[0]>();
+    (customers || []).forEach((c) => map.set(c.id, c));
+    return map;
+  }, [customers]);
+
+  const staffMap = useMemo(() => {
+    const map = new Map<string, (typeof staff)[0]>();
+    (staff || []).forEach((s) => map.set(s.id, s));
+    return map;
+  }, [staff]);
 
   // Lock body scroll and touch behavior when modals are open
   useEffect(() => {
@@ -125,7 +142,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
     description: services?.[0]?.name || '',
     priority: 'medium' as JobPriority,
     assignedStaffId: (staff || []).find((s) => s.role === 'technician')?.id || '',
-    scheduledDate: new Date().toISOString().split('T')[0],
+    scheduledDate: getLocalDateString(),
     scheduledTime: '09:00 AM - 11:00 AM',
     location: customers?.[0]?.address ? `${customers[0].address}, ${customers[0].city || ''}`.trim() : '',
     estimatedAmount: services?.[0]?.price ?? 1500,
@@ -186,36 +203,109 @@ export const JobsView: React.FC<JobsViewProps> = ({
     'closed',
   ];
 
-  const filteredJobs = (jobs || []).filter((j) => {
-    const s = (search || '').toLowerCase();
-    const matchesSearch =
-      (j.jobId || '').toLowerCase().includes(s) ||
-      (j.description || '').toLowerCase().includes(s) ||
-      (j.location || '').toLowerCase().includes(s);
-    const matchesStatus =
-      statusFilter === 'all'
-        ? true
-        : statusFilter === 'pending_active'
-        ? j.status !== 'completed' && j.status !== 'closed' && j.status !== 'cancelled'
-        : j.status === statusFilter;
-    const matchesPriority =
-      priorityFilter === 'all'
-        ? true
-        : priorityFilter === 'urgent_high'
-        ? j.priority === 'urgent' || j.priority === 'high'
-        : j.priority === priorityFilter;
-    const matchesStaff = staffFilter === 'all' || j.assignedStaffId === staffFilter;
+  /**
+   * Determine the effective date of a job:
+   * - If completed/verified/closed and has completionTime, use the date it was completed.
+   * - Otherwise use scheduledDate or createdAt.
+   */
+  const getJobEffectiveDate = (job: Job): string => {
+    if ((job.status === 'completed' || job.status === 'closed' || job.status === 'verified') && job.completionTime) {
+      try {
+        const compDate = new Date(job.completionTime);
+        if (!isNaN(compDate.getTime())) {
+          return getLocalDateString(compDate);
+        }
+      } catch {
+        // ignore and fallback
+      }
+    }
+    if (job.scheduledDate) {
+      return job.scheduledDate.slice(0, 10);
+    }
+    if (job.createdAt) {
+      return job.createdAt.slice(0, 10);
+    }
+    return getLocalDateString();
+  };
 
-    const matchesDate = (() => {
-      if (!j.scheduledDate) return true;
-      const d = j.scheduledDate.slice(0, 10);
-      if (dateRange.startDate && d < dateRange.startDate) return false;
-      if (dateRange.endDate && d > dateRange.endDate) return false;
-      return true;
-    })();
+  /**
+   * Matches search across Job ID, customer name, customer mobile/phone, description, technician, location
+   */
+  const isJobMatchingSearch = (job: Job, query: string): boolean => {
+    if (!query) return true;
+    const q = query.trim().toLowerCase();
+    const rawDigits = q.replace(/[^0-9]/g, '');
 
-    return matchesSearch && matchesStatus && matchesPriority && matchesStaff && matchesDate;
-  });
+    if ((job.jobId || '').toLowerCase().includes(q)) return true;
+    if ((job.description || '').toLowerCase().includes(q)) return true;
+    if ((job.location || '').toLowerCase().includes(q)) return true;
+
+    const cust = job.customerId ? customerMap.get(job.customerId) : undefined;
+    if (cust) {
+      if ((cust.name || '').toLowerCase().includes(q)) return true;
+      if (cust.companyName && (cust.companyName || '').toLowerCase().includes(q)) return true;
+      if (cust.mobile) {
+        const mobileClean = cust.mobile.replace(/[^0-9]/g, '');
+        if (rawDigits && mobileClean.includes(rawDigits)) return true;
+        if (cust.mobile.toLowerCase().includes(q)) return true;
+      }
+      if (cust.whatsapp) {
+        const waClean = cust.whatsapp.replace(/[^0-9]/g, '');
+        if (rawDigits && waClean.includes(rawDigits)) return true;
+        if (cust.whatsapp.toLowerCase().includes(q)) return true;
+      }
+      if (cust.address && cust.address.toLowerCase().includes(q)) return true;
+      if (cust.city && cust.city.toLowerCase().includes(q)) return true;
+    }
+
+    const tech = job.assignedStaffId ? staffMap.get(job.assignedStaffId) : undefined;
+    if (tech) {
+      if ((tech.name || '').toLowerCase().includes(q)) return true;
+      if (tech.phone && rawDigits && tech.phone.replace(/[^0-9]/g, '').includes(rawDigits)) return true;
+    }
+
+    return false;
+  };
+
+  /**
+   * Date range filter check
+   */
+  const isJobInSelectedDateRange = (job: Job, range: DateRange): boolean => {
+    if (!range.startDate && !range.endDate) return true; // All time
+    const jobDate = getJobEffectiveDate(job);
+    if (range.startDate && jobDate < range.startDate) return false;
+    if (range.endDate && jobDate > range.endDate) return false;
+    return true;
+  };
+
+  // Filtered jobs list based on active filters
+  const filteredJobs = useMemo(() => {
+    return (jobs || []).filter((j) => {
+      const matchesSearch = isJobMatchingSearch(j, search);
+      const matchesStatus =
+        statusFilter === 'all'
+          ? true
+          : statusFilter === 'pending_active'
+          ? j.status !== 'completed' && j.status !== 'closed' && j.status !== 'cancelled'
+          : j.status === statusFilter;
+      const matchesPriority =
+        priorityFilter === 'all'
+          ? true
+          : priorityFilter === 'urgent_high'
+          ? j.priority === 'urgent' || j.priority === 'high'
+          : j.priority === priorityFilter;
+      const matchesStaff = staffFilter === 'all' || j.assignedStaffId === staffFilter;
+      const matchesDate = isJobInSelectedDateRange(j, dateRange);
+
+      return matchesSearch && matchesStatus && matchesPriority && matchesStaff && matchesDate;
+    });
+  }, [jobs, search, statusFilter, priorityFilter, staffFilter, dateRange, customerMap, staffMap]);
+
+  // Count matches in entire history when search is non-empty
+  const allHistoryMatchCount = useMemo(() => {
+    if (!search.trim()) return 0;
+    return (jobs || []).filter((j) => isJobMatchingSearch(j, search)).length;
+  }, [jobs, search, customerMap, staffMap]);
 
   const handleCreateJob = (e: React.FormEvent) => {
     e.preventDefault();
@@ -342,72 +432,147 @@ export const JobsView: React.FC<JobsViewProps> = ({
         </div>
       </div>
 
-      {/* Search & Filter Row */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 bg-white dark:bg-slate-900 p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs">
-        <div className="relative flex-1 w-full min-w-0">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search Job ID, address, description..."
-            className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl font-medium text-slate-800 dark:text-slate-200 placeholder:text-slate-400 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all text-xs"
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+      {/* Quick Date Presets Row & Filter Header */}
+      <div className="flex flex-col gap-2.5">
+        {/* Quick Date Filter Chips */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1 flex items-center gap-1 shrink-0">
+            <Calendar className="w-3.5 h-3.5 text-indigo-600" /> Date:
+          </span>
+
+          {[
+            { id: 'today', label: 'Today 📅' },
+            { id: 'yesterday', label: 'Yesterday' },
+            { id: 'last_7_days', label: 'Last 7 Days' },
+            { id: 'this_month', label: 'This Month' },
+            { id: 'all', label: 'All History' },
+          ].map((preset) => {
+            const isActive = dateRange.preset === preset.id;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => setDateRange(getPresetDates(preset.id))}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
+
+          <div className="shrink-0 ml-auto">
+            <DateRangePicker value={dateRange} onChange={setDateRange} align="right" />
+          </div>
         </div>
 
-        <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-2 w-full md:w-auto overflow-x-auto scrollbar-none pb-0.5 sm:pb-0">
-          <div className="shrink-0">
-            <DateRangePicker value={dateRange} onChange={setDateRange} />
+        {/* Search & Secondary Filter Row */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2 bg-white dark:bg-slate-900 p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-xs">
+          <div className="relative flex-1 w-full min-w-0">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search Job ID, Customer Name, Mobile Number, Service..."
+              className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl font-medium text-slate-800 dark:text-slate-200 placeholder:text-slate-400 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all text-xs"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-2.5 py-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl font-bold border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shrink-0"
-          >
-            <option value="all">All Statuses</option>
-            <option value="pending_active">Pending / Active</option>
-            {statuses.map((s) => (
-              <option key={s} value={s}>
-                {s.replace('_', ' ').toUpperCase()}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-2 w-full md:w-auto overflow-x-auto scrollbar-none">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-2.5 py-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl font-bold border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shrink-0 cursor-pointer"
+            >
+              <option value="all">All Statuses</option>
+              <option value="pending_active">Pending / Active</option>
+              {statuses.map((s) => (
+                <option key={s} value={s}>
+                  {s.replace('_', ' ').toUpperCase()}
+                </option>
+              ))}
+            </select>
 
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            className="px-2.5 py-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl font-bold border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shrink-0"
-          >
-            <option value="all">All Priorities</option>
-            <option value="urgent_high">Urgent & High</option>
-            <option value="urgent">Urgent</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className="px-2.5 py-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl font-bold border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shrink-0 cursor-pointer"
+            >
+              <option value="all">All Priorities</option>
+              <option value="urgent_high">Urgent & High</option>
+              <option value="urgent">Urgent</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
 
-          <select
-            value={staffFilter}
-            onChange={(e) => setStaffFilter(e.target.value)}
-            className="px-2.5 py-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl font-bold border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shrink-0 max-w-[140px] truncate"
-          >
-            <option value="all">All Staff</option>
-            {staff.map((st) => (
-              <option key={st.id} value={st.id}>
-                {st.name}
-              </option>
-            ))}
-          </select>
+            <select
+              value={staffFilter}
+              onChange={(e) => setStaffFilter(e.target.value)}
+              className="px-2.5 py-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl font-bold border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shrink-0 max-w-[140px] truncate cursor-pointer"
+            >
+              <option value="all">All Staff</option>
+              {staff.map((st) => (
+                <option key={st.id} value={st.id}>
+                  {st.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Active Date & Results Summary Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-indigo-50/50 dark:bg-slate-900/60 rounded-xl border border-indigo-100/80 dark:border-slate-800 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+              {dateRange.preset === 'today'
+                ? 'Today’s Jobs'
+                : dateRange.preset === 'yesterday'
+                ? 'Yesterday’s Jobs'
+                : dateRange.preset === 'last_7_days'
+                ? 'Last 7 Days Jobs'
+                : dateRange.preset === 'this_month'
+                ? 'This Month Jobs'
+                : dateRange.preset === 'all'
+                ? 'All Historical Jobs'
+                : `Jobs (${dateRange.startDate || 'Start'} to ${dateRange.endDate || 'End'})`}
+            </span>
+            <span className="text-slate-300 dark:text-slate-700">•</span>
+            <span className="text-slate-600 dark:text-slate-400 font-semibold">
+              <strong className="text-slate-900 dark:text-slate-100 font-mono">{filteredJobs.length}</strong> total
+            </span>
+            <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+              (<strong>{filteredJobs.filter((j) => j.status === 'completed' || j.status === 'verified' || j.status === 'closed').length}</strong> Completed)
+            </span>
+          </div>
+
+          {/* Prompt if user search has matches in other dates */}
+          {Boolean(search.trim() && dateRange.preset !== 'all' && allHistoryMatchCount > filteredJobs.length) && (
+            <button
+              type="button"
+              onClick={() => setDateRange(getPresetDates('all'))}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-bold shadow-2xs hover:bg-indigo-700 transition-all cursor-pointer"
+            >
+              <History className="w-3 h-3" />
+              <span>
+                Found {allHistoryMatchCount} matches across All History — Show All
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
