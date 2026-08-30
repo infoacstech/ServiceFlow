@@ -3403,6 +3403,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString().split('T')[0],
     };
 
+    setJobs((prev) => {
+      const next = [...prev.filter((j) => j.id !== newJob.id), newJob];
+      saveCache('serviflow_jobs_cache', next);
+      return next;
+    });
+
     firestoreService.saveDocument<Job>('jobs', newJob.id, newJob);
 
     // Broadcast instant Notification doc in Firestore for staff members
@@ -3467,9 +3473,19 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     if (isActuallyOffline) {
+      setJobs((prev) => {
+        const next = prev.map((j) => (j.id === id ? { ...j, ...updates } : j));
+        saveCache('serviflow_jobs_cache', next);
+        return next;
+      });
       addToSyncQueue('update_job', id, updates, 'Updated job schedule/assignment');
       showToast('Offline Mode: Saved locally and queued for sync.', 'info');
     } else {
+      setJobs((prev) => {
+        const next = prev.map((j) => (j.id === id ? { ...j, ...updates } : j));
+        saveCache('serviflow_jobs_cache', next);
+        return next;
+      });
       firestoreService.updateJob(id, updates);
 
       // If technician was updated or reassigned, create targeted notification for the new assignee
@@ -3581,6 +3597,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedHistory = [...(target.activityHistory || []), newActivityItem];
 
     if (isActuallyOffline) {
+      setJobs((prev) => {
+        const next = prev.map((j) => (j.id === id ? { ...j, status, activityHistory: updatedHistory } : j));
+        saveCache('serviflow_jobs_cache', next);
+        return next;
+      });
       addToSyncQueue(
         'update_job_status',
         id,
@@ -3589,6 +3610,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       showToast(`Offline: ${getJobStatusSuccessMsg(status)} (queued for sync)`, 'info');
     } else {
+      setJobs((prev) => {
+        const next = prev.map((j) => (j.id === id ? { ...j, status, activityHistory: updatedHistory } : j));
+        saveCache('serviflow_jobs_cache', next);
+        return next;
+      });
       firestoreService.updateJob(id, { status, activityHistory: updatedHistory });
 
       // If status changed to accepted, on_the_way, or started, notify Business Owner & Managers
@@ -3649,6 +3675,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast('Unauthorized: Cannot delete job belonging to another tenant business.', 'error');
       return;
     }
+    setJobs((prev) => {
+      const next = prev.filter((j) => j.id !== id);
+      saveCache('serviflow_jobs_cache', next);
+      return next;
+    });
     firestoreService.deleteJob(id);
     logActivity('Job Deleted', 'job', id, 'Deleted job record from Firestore');
     showToast('Job deleted from Firestore', 'info');
@@ -3671,6 +3702,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const techUser = (users || []).find((u) => u.id === existingJob?.assignedStaffId) || currentUser;
     const techName = techUser?.name || 'Staff Technician';
     const customer = (customers || []).find((c) => c.id === existingJob?.customerId);
+
+    setJobs((prev) => {
+      const next = prev.map((j) => (j.id === id ? { ...j, ...startUpdates } : j));
+      saveCache('serviflow_jobs_cache', next);
+      return next;
+    });
 
     if (isActuallyOffline) {
       addToSyncQueue('start_job', id, { beforePhotos, notes }, 'Technician started job work on site');
@@ -3750,6 +3787,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       customerFeedback: data.customerFeedback || '',
       materialsUsed: data.materialsUsed || [],
     };
+
+    setJobs((prev) => {
+      const next = prev.map((j) => (j.id === id ? { ...j, ...completionData } : j));
+      saveCache('serviflow_jobs_cache', next);
+      return next;
+    });
 
     const assignedTech = (users || []).find((u) => u.id === existingJob?.assignedStaffId) || currentUser;
     const techName = assignedTech?.name || currentUser?.name || 'Staff Member';

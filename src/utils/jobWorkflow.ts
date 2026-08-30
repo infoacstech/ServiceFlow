@@ -239,3 +239,26 @@ export function validateJobStatusTransition(
     requiresReason: false,
   };
 }
+
+/**
+ * Standard centralized job status categorizers
+ */
+export const isJobPending = (status: JobStatus): boolean => {
+  return status === 'new' || status === 'scheduled' || status === 'assigned' || status === 'accepted';
+};
+
+export const isJobInProgress = (status: JobStatus): boolean => {
+  return status === 'on_the_way' || status === 'started' || status === 'in_progress' || status === 'on_hold';
+};
+
+export const isJobCompleted = (status: JobStatus): boolean => {
+  return status === 'completed' || status === 'verified' || status === 'closed';
+};
+
+export const isJobActive = (status: JobStatus): boolean => {
+  return !isJobCompleted(status) && status !== 'cancelled';
+};
+
+export const isJobActivePending = (status: JobStatus): boolean => {
+  return isJobPending(status) && status !== 'cancelled';
+};

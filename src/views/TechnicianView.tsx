@@ -31,19 +31,11 @@ import {
   sendJobCompletionSummaryToCustomer,
   sendGoogleReviewRequest,
 } from '../utils/whatsappHelper';
-
-// Single reliable status categorization helpers
-export const isJobPending = (status: JobStatus): boolean => {
-  return status === 'new' || status === 'scheduled' || status === 'assigned' || status === 'accepted';
-};
-
-export const isJobInProgress = (status: JobStatus): boolean => {
-  return status === 'on_the_way' || status === 'started' || status === 'in_progress' || status === 'on_hold';
-};
-
-export const isJobCompleted = (status: JobStatus): boolean => {
-  return status === 'completed' || status === 'verified' || status === 'closed';
-};
+import {
+  isJobPending,
+  isJobInProgress,
+  isJobCompleted,
+} from '../utils/jobWorkflow';
 
 export function formatJobSchedule(scheduledDate?: string, scheduledTimeSlot?: string): string {
   let dateStr = '';

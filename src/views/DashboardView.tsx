@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { speakText } from '../utils/audioNotification';
+import {
+  isJobPending,
+  isJobInProgress,
+  isJobCompleted,
+  isJobActive,
+  isJobActivePending,
+} from '../utils/jobWorkflow';
 import { EnquiryFormModal } from '../components/enquiries/EnquiryFormModal';
 import { CustomerSearchSelect } from '../components/CustomerSearchSelect';
 import {
@@ -206,9 +213,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // KPI Calculations
   const todayStr = new Date().toISOString().split('T')[0];
-  const todaysJobs = jobs.filter((j) => j.scheduledDate === todayStr || j.status === 'in_progress' || j.status === 'assigned');
-  const pendingJobs = jobs.filter((j) => j.status !== 'completed' && j.status !== 'closed' && j.status !== 'cancelled');
-  const completedJobs = jobs.filter((j) => j.status === 'completed' || j.status === 'closed');
+  const todaysJobs = jobs.filter(
+    (j) => (j.scheduledDate === todayStr || isJobInProgress(j.status) || j.status === 'assigned') && isJobActive(j.status)
+  );
+  const pendingJobs = jobs.filter((j) => isJobActive(j.status));
+  const completedJobs = jobs.filter((j) => isJobCompleted(j.status));
   
   const todayPayments = invoices
     .filter((inv) => inv.status === 'paid')
@@ -229,12 +238,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // Urgent Jobs calculations & modal filters
   const urgentJobsList = jobs.filter((j) => j.priority === 'urgent' || j.priority === 'high');
-  const activeUrgentJobs = urgentJobsList.filter(
-    (j) => j.status !== 'completed' && j.status !== 'closed' && j.status !== 'cancelled'
-  );
-  const unassignedUrgentJobs = urgentJobsList.filter(
-    (j) => !j.assignedStaffId && j.status !== 'completed' && j.status !== 'closed' && j.status !== 'cancelled'
-  );
+  const activeUrgentJobs = urgentJobsList.filter((j) => isJobActive(j.status));
+  const activePendingUrgentJobs = urgentJobsList.filter((j) => isJobActivePending(j.status));
+  const unassignedUrgentJobs = urgentJobsList.filter((j) => !j.assignedStaffId && isJobActive(j.status));
+  const activeUrgentValue = activeUrgentJobs.reduce((sum, j) => sum + (j.estimatedAmount || 0), 0);
 
   const filteredUrgentModalJobs = urgentJobsList.filter((job) => {
     const customer = customers.find((c) => c.id === job.customerId);
@@ -251,8 +258,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       urgentTabFilter === 'all'
         ? true
         : urgentTabFilter === 'pending'
-        ? job.status !== 'completed' && job.status !== 'closed' && job.status !== 'cancelled'
-        : !job.assignedStaffId && job.status !== 'completed' && job.status !== 'closed' && job.status !== 'cancelled';
+        ? isJobActive(job.status)
+        : !job.assignedStaffId && isJobActive(job.status);
 
     return matchesSearch && matchesTab;
   });
@@ -310,10 +317,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const hasRevenueData = salesChartData.some((d) => d.sales > 0 || d.collections > 0) || totalSales > 0 || todayPayments > 0;
 
-  const completedJobsCount = jobs.filter((j) => j.status === 'completed' || j.status === 'closed').length;
-  const inProgressJobsCount = jobs.filter((j) => j.status === 'in_progress').length;
-  const assignedJobsCount = jobs.filter((j) => j.status === 'assigned').length;
-  const newJobsCount = jobs.filter((j) => j.status === 'new').length;
+  const completedJobsCount = jobs.filter((j) => isJobCompleted(j.status)).length;
+  const inProgressJobsCount = jobs.filter((j) => isJobInProgress(j.status)).length;
+  const assignedJobsCount = jobs.filter((j) => j.status === 'assigned' || j.status === 'accepted').length;
+  const newJobsCount = jobs.filter((j) => j.status === 'new' || j.status === 'scheduled').length;
   const totalWorkflowJobs = completedJobsCount + inProgressJobsCount + assignedJobsCount + newJobsCount;
 
   const jobStatusData = [
@@ -496,7 +503,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Interactive Featured Summary Cards: Urgent Jobs & Today's Revenue */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 items-stretch">
         {/* Urgent Jobs Summary Card (Consistent 2-column height, padding, & alignment) */}
-        {urgentJobsList.length === 0 ? (
+        {activeUrgentJobs.length === 0 ? (
           <div
             onClick={() => navigate('jobs', { statusFilter: 'all' })}
             className="p-4 sm:p-4.5 rounded-2xl bg-gradient-to-br from-emerald-50/70 via-teal-50/30 to-white dark:from-emerald-950/30 dark:via-teal-950/15 dark:to-slate-900 border-2 border-emerald-200/80 dark:border-emerald-800/80 hover:border-emerald-400 dark:hover:border-emerald-600 shadow-xs hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between h-full overflow-hidden"
@@ -516,7 +523,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     Urgent Jobs Summary
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    All service requests are on schedule with 0 urgent flags
+                    All service requests are on schedule with 0 active urgent flags
                   </p>
                 </div>
               </div>
@@ -592,7 +599,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
               <div className="text-right shrink-0">
                 <div className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400">
-                  {urgentJobsList.length}
+                  {activeUrgentJobs.length}
                 </div>
                 <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   Total Urgent
@@ -604,7 +611,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-rose-200/60 dark:border-rose-900/40">
               <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
                 <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Active Pending</div>
-                <div className="text-sm font-extrabold text-amber-600 dark:text-amber-400">{activeUrgentJobs.length}</div>
+                <div className="text-sm font-extrabold text-amber-600 dark:text-amber-400">{activePendingUrgentJobs.length}</div>
               </div>
 
               <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
@@ -615,7 +622,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
                 <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Est. Job Value</div>
                 <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
-                  {curr}{urgentJobsList.reduce((sum, j) => sum + j.estimatedAmount, 0).toLocaleString()}
+                  {curr}{activeUrgentValue.toLocaleString()}
                 </div>
               </div>
             </div>
