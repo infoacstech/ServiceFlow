@@ -22,6 +22,9 @@ import {
   Lock,
   Trash2,
   Sparkles,
+  Search,
+  Filter,
+  RotateCcw,
 } from 'lucide-react';
 
 export const StaffView: React.FC = () => {
@@ -29,6 +32,10 @@ export const StaffView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'calendar' | 'directory'>('calendar');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [deletingStaffUser, setDeletingStaffUser] = useState<User | null>(null);
+
+  // Directory Search & Filter state
+  const [staffSearchQuery, setStaffSearchQuery] = useState('');
+  const [staffRoleFilter, setStaffRoleFilter] = useState('all');
 
   // Form states
   const [name, setName] = useState('');
@@ -62,6 +69,26 @@ export const StaffView: React.FC = () => {
     }
     return result;
   }, [users, staff, currentBusiness.id]);
+
+  // Filter staff by search query and role filter
+  const filteredBusinessUsers = React.useMemo(() => {
+    return businessUsers.filter((u) => {
+      if (staffRoleFilter !== 'all' && u.role !== staffRoleFilter) {
+        return false;
+      }
+      if (staffSearchQuery.trim()) {
+        const s = staffSearchQuery.toLowerCase();
+        const matches =
+          (u.name || '').toLowerCase().includes(s) ||
+          (u.email || '').toLowerCase().includes(s) ||
+          (u.phone || '').toLowerCase().includes(s) ||
+          (u.role || '').toLowerCase().includes(s) ||
+          (u.skills || []).some((sk) => sk.toLowerCase().includes(s));
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [businessUsers, staffSearchQuery, staffRoleFilter]);
 
   // Exclude super_admin and business_owner from staff count so the plan quota strictly applies to staff / technicians
   const activeStaffCount = businessUsers.filter(
@@ -326,145 +353,224 @@ export const StaffView: React.FC = () => {
       {activeTab === 'calendar' ? (
         <StaffCalendarTimeline />
       ) : (
-        /* Staff Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {businessUsers.map((st) => {
-            const assignedJobs = jobs.filter((j) => j.assignedStaffId === st.id);
-            const completedJobs = assignedJobs.filter((j) => j.status === 'completed' || j.status === 'closed');
+        <div className="space-y-4">
+          {/* Directory Search & Role Filter Bar */}
+          <div className="bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* Dynamic Typeahead Search */}
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={staffSearchQuery}
+                onChange={(e) => setStaffSearchQuery(e.target.value)}
+                placeholder="Search staff by name, email, phone, role, skills..."
+                className="w-full pl-10 pr-8 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium"
+              />
+              {staffSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setStaffSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
 
-            const isPending = st.approvalStatus === 'pending';
-            const isBlocked = st.approvalStatus === 'blocked';
-            const isRejected = st.approvalStatus === 'rejected';
+            {/* Role Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+              {[
+                { id: 'all', label: 'All Staff' },
+                { id: 'technician', label: 'Technicians' },
+                { id: 'manager', label: 'Managers' },
+                { id: 'dispatcher', label: 'Dispatchers' },
+                { id: 'accountant', label: 'Accountants' },
+              ].map((rf) => (
+                <button
+                  key={rf.id}
+                  type="button"
+                  onClick={() => setStaffRoleFilter(rf.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                    staffRoleFilter === rf.id
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {rf.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-            return (
-              <div
-                key={st.id}
-                className={`p-5 rounded-3xl bg-white dark:bg-slate-900 border shadow-xs flex flex-col justify-between space-y-4 ${
-                  isBlocked
-                    ? 'border-rose-200 dark:border-rose-900/50 bg-rose-50/20 dark:bg-rose-950/10'
-                    : isPending
-                    ? 'border-amber-200 dark:border-amber-900/50 bg-amber-50/20 dark:bg-amber-950/10'
-                    : 'border-slate-200/80 dark:border-slate-800'
-                }`}
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-slate-200 dark:bg-slate-800 overflow-hidden ring-2 ring-indigo-500/30 shrink-0">
-                        {st.avatar ? (
-                          <img src={st.avatar} alt={st.name || 'Staff'} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center font-bold text-slate-700 dark:text-slate-200">
-                            {(st?.name || st?.email || 'US').substring(0, 2).toUpperCase()}
+          {/* Staff Grid */}
+          {filteredBusinessUsers.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-12 text-center space-y-3 shadow-xs">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-500 flex items-center justify-center mx-auto shadow-2xs">
+                <Users className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                No staff members found
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                {staffSearchQuery
+                  ? `No team members match "${staffSearchQuery}". Check spelling or clear search.`
+                  : 'No team members match the selected role filter.'}
+              </p>
+              <div className="pt-2 flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStaffSearchQuery('');
+                    setStaffRoleFilter('all');
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Search</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredBusinessUsers.map((st) => {
+                const assignedJobs = jobs.filter((j) => j.assignedStaffId === st.id);
+                const completedJobs = assignedJobs.filter((j) => j.status === 'completed' || j.status === 'closed');
+
+                const isPending = st.approvalStatus === 'pending';
+                const isBlocked = st.approvalStatus === 'blocked';
+                const isRejected = st.approvalStatus === 'rejected';
+
+                return (
+                  <div
+                    key={st.id}
+                    className={`p-5 rounded-3xl bg-white dark:bg-slate-900 border shadow-xs flex flex-col justify-between space-y-4 ${
+                      isBlocked
+                        ? 'border-rose-200 dark:border-rose-900/50 bg-rose-50/20 dark:bg-rose-950/10'
+                        : isPending
+                        ? 'border-amber-200 dark:border-amber-900/50 bg-amber-50/20 dark:bg-amber-950/10'
+                        : 'border-slate-200/80 dark:border-slate-800'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-2xl bg-slate-200 dark:bg-slate-800 overflow-hidden ring-2 ring-indigo-500/30 shrink-0">
+                            {st.avatar ? (
+                              <img src={st.avatar} alt={st.name || 'Staff'} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center font-bold text-slate-700 dark:text-slate-200">
+                                {(st?.name || st?.email || 'US').substring(0, 2).toUpperCase()}
+                              </div>
+                            )}
                           </div>
-                        )}
+
+                          <div>
+                            <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                              {st?.name || st?.email || 'Staff'}
+                            </h3>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
+                                {(st?.role || 'staff').replace('_', ' ')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div>
+                          {isBlocked ? (
+                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 flex items-center gap-1">
+                              <Ban className="w-3 h-3" /> Blocked
+                            </span>
+                          ) : isPending ? (
+                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 flex items-center gap-1">
+                              <Clock className="w-3 h-3" /> Pending
+                            </span>
+                          ) : isRejected ? (
+                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-400 flex items-center gap-1">
+                              <XCircle className="w-3 h-3" /> Rejected
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" /> Active
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      <div>
-                        <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                          {st?.name || st?.email || 'Staff'}
-                        </h3>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
-                            {(st?.role || 'staff').replace('_', ' ')}
-                          </span>
+                      <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400">
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-3.5 h-3.5 text-slate-400" />
+                          <span className="truncate">{st.email}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{st.phone || '+91 98765 00000'}</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* Status Badge */}
-                    <div>
-                      {isBlocked ? (
-                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 flex items-center gap-1">
-                          <Ban className="w-3 h-3" /> Blocked
-                        </span>
-                      ) : isPending ? (
-                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> Pending
-                        </span>
-                      ) : isRejected ? (
-                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-400 flex items-center gap-1">
-                          <XCircle className="w-3 h-3" /> Rejected
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> Active
-                        </span>
+                    <div className="space-y-3">
+                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-center text-xs">
+                        <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                          <div className="text-[10px] text-slate-400">Assigned Jobs</div>
+                          <div className="font-bold text-slate-900 dark:text-slate-100">{assignedJobs.length}</div>
+                        </div>
+                        <div className="p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl">
+                          <div className="text-[10px] text-emerald-700 dark:text-emerald-400">Completed</div>
+                          <div className="font-bold text-emerald-800 dark:text-emerald-300">{completedJobs.length}</div>
+                        </div>
+                      </div>
+
+                      {/* Owner Controls (Block / Unblock / Approve / Delete) */}
+                      {isOwnerOrAdmin && st.id !== currentUser?.id && st.role !== 'super_admin' && (
+                        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                          {isPending ? (
+                            <>
+                              <button
+                                onClick={() => updateUserStatus(st.id, 'active')}
+                                className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-xs transition-all"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                              </button>
+                              <button
+                                onClick={() => updateUserStatus(st.id, 'rejected')}
+                                className="py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-600 font-bold text-xs transition-all"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          ) : isBlocked ? (
+                            <button
+                              onClick={() => updateUserStatus(st.id, 'active')}
+                              className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Unblock Access
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => updateUserStatus(st.id, 'blocked')}
+                              className="flex-1 py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 dark:bg-slate-800 dark:hover:bg-rose-950/60 dark:hover:text-rose-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+                            >
+                              <Ban className="w-3.5 h-3.5 text-rose-500" /> Block Access
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => setDeletingStaffUser(st)}
+                            className="py-1.5 px-2.5 rounded-xl bg-slate-100 hover:bg-rose-100 dark:bg-slate-800 dark:hover:bg-rose-950/60 text-slate-500 hover:text-rose-600 transition-all"
+                            title="Delete staff account permanently"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
-
-                  <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400">
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="truncate">{st.email}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{st.phone || '+91 98765 00000'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-center text-xs">
-                    <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                      <div className="text-[10px] text-slate-400">Assigned Jobs</div>
-                      <div className="font-bold text-slate-900 dark:text-slate-100">{assignedJobs.length}</div>
-                    </div>
-                    <div className="p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl">
-                      <div className="text-[10px] text-emerald-700 dark:text-emerald-400">Completed</div>
-                      <div className="font-bold text-emerald-800 dark:text-emerald-300">{completedJobs.length}</div>
-                    </div>
-                  </div>
-
-                  {/* Owner Controls (Block / Unblock / Approve / Delete) */}
-                  {isOwnerOrAdmin && st.id !== currentUser?.id && st.role !== 'super_admin' && (
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
-                      {isPending ? (
-                        <>
-                          <button
-                            onClick={() => updateUserStatus(st.id, 'active')}
-                            className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-xs transition-all"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Approve
-                          </button>
-                          <button
-                            onClick={() => updateUserStatus(st.id, 'rejected')}
-                            className="py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-600 font-bold text-xs transition-all"
-                          >
-                            Reject
-                          </button>
-                        </>
-                      ) : isBlocked ? (
-                        <button
-                          onClick={() => updateUserStatus(st.id, 'active')}
-                          className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Unblock Access
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => updateUserStatus(st.id, 'blocked')}
-                          className="flex-1 py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 dark:bg-slate-800 dark:hover:bg-rose-950/60 dark:hover:text-rose-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
-                        >
-                          <Ban className="w-3.5 h-3.5 text-rose-500" /> Block Access
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => setDeletingStaffUser(st)}
-                        className="py-1.5 px-2.5 rounded-xl bg-slate-100 hover:bg-rose-100 dark:bg-slate-800 dark:hover:bg-rose-950/60 text-slate-500 hover:text-rose-600 transition-all"
-                        title="Delete staff account permanently"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

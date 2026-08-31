@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
@@ -17,35 +17,59 @@ import {
   Filter,
   CheckCircle2,
   Calendar,
+  RotateCcw,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ActivityLog } from '../types';
+import { DateRangePicker, DateRange, getLocalDateString, getPresetDates } from './DateRangePicker';
 
 export const ActivityLogDrawer: React.FC = () => {
   const { activityLogs, isActivityLogOpen, setIsActivityLogOpen, logActivity, currentBusiness } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEntity, setSelectedEntity] = useState<string>('all');
-  const [logLimit, setLogLimit] = useState<number | 'all'>(10);
+  const [logLimit, setLogLimit] = useState<number | 'all'>(15);
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
   const [showAddNoteModal, setShowAddNoteModal] = useState(false);
   const [noteAction, setNoteAction] = useState('');
   const [noteDescription, setNoteDescription] = useState('');
   const [noteEntityType, setNoteEntityType] = useState<ActivityLog['entityType']>('job');
 
+  // Default to TODAY only as per requirement
+  const todayStr = useMemo(() => getLocalDateString(new Date()), []);
+  const [dateRange, setDateRange] = useState<DateRange>(() => ({
+    startDate: todayStr,
+    endDate: todayStr,
+    preset: 'today',
+  }));
+
   if (!isActivityLogOpen) return null;
 
-  // Filter activity logs
+  // Filter activity logs by date, search term, and entity
   const allFilteredLogs = (activityLogs || []).filter((log) => {
-    const s = (searchTerm || '').toLowerCase();
-    const matchesSearch =
-      (log.action || '').toLowerCase().includes(s) ||
-      (log.description || '').toLowerCase().includes(s) ||
-      (log.userName || '').toLowerCase().includes(s) ||
-      (log.entityId || '').toLowerCase().includes(s);
+    // 1. Date filter (match timestamp against dateRange)
+    if (log.timestamp) {
+      const logDate = log.timestamp.slice(0, 10);
+      if (dateRange.startDate && logDate < dateRange.startDate) return false;
+      if (dateRange.endDate && logDate > dateRange.endDate) return false;
+    }
 
+    // 2. Search term (case-insensitive substring on action, description, username, entityId, etc.)
+    if (searchTerm.trim()) {
+      const s = searchTerm.toLowerCase();
+      const matchesSearch =
+        (log.action || '').toLowerCase().includes(s) ||
+        (log.description || '').toLowerCase().includes(s) ||
+        (log.userName || '').toLowerCase().includes(s) ||
+        (log.entityId || '').toLowerCase().includes(s) ||
+        (log.entityType || '').toLowerCase().includes(s);
+      if (!matchesSearch) return false;
+    }
+
+    // 3. Entity category filter
     const matchesEntity = selectedEntity === 'all' || log.entityType === selectedEntity;
+    if (!matchesEntity) return false;
 
-    return matchesSearch && matchesEntity;
+    return true;
   });
 
   const displayedLogs = logLimit === 'all' ? allFilteredLogs : allFilteredLogs.slice(0, logLimit);
@@ -192,14 +216,48 @@ export const ActivityLogDrawer: React.FC = () => {
               </div>
             </div>
 
-            {/* Controls & Search */}
+            {/* Controls, Date Filter & Search */}
             <div className="p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 space-y-2.5 bg-white dark:bg-slate-900">
-              {/* Full Width Search input */}
+              {/* Row 1: Single Horizontal Scrollable Date Filter Row */}
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 w-full">
+                {[
+                  { key: 'today', label: 'Today' },
+                  { key: 'yesterday', label: 'Yesterday' },
+                  { key: 'last_7_days', label: 'Last 7 Days' },
+                  { key: 'this_month', label: 'This Month' },
+                  { key: 'all', label: 'All History' },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setDateRange(getPresetDates(item.key))}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                      dateRange.preset === item.key
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+
+                {/* Calendar / Custom Date Selector */}
+                <div className="shrink-0">
+                  <DateRangePicker
+                    value={dateRange}
+                    onChange={setDateRange}
+                    align="right"
+                    compact={true}
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Full Width Typeahead Search input */}
               <div className="relative w-full">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search actions, staff, or descriptions..."
+                  placeholder="Search actions, user, ID, description..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
@@ -215,7 +273,7 @@ export const ActivityLogDrawer: React.FC = () => {
                 )}
               </div>
 
-              {/* Entity category pills (Horizontally scrollable) */}
+              {/* Row 3: Entity category pills (Horizontally scrollable) */}
               <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 w-full">
                 {entityCategories.map((cat) => (
                   <button
@@ -253,7 +311,7 @@ export const ActivityLogDrawer: React.FC = () => {
                 {/* Compact Limit Selector */}
                 <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-lg shrink-0 border border-slate-200/80 dark:border-slate-700/80">
                   <span className="text-[10px] font-bold text-slate-400 pl-1.5">Limit:</span>
-                  {([10, 25, 50, 'all'] as const).map((lim) => (
+                  {([15, 30, 50, 'all'] as const).map((lim) => (
                     <button
                       key={String(lim)}
                       type="button"
@@ -274,16 +332,43 @@ export const ActivityLogDrawer: React.FC = () => {
             {/* Timeline Content */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5 space-y-4 bg-slate-50/40 dark:bg-slate-900/30">
               {displayedLogs.length === 0 ? (
-                <div className="text-center py-12 px-4">
-                  <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3 text-slate-400">
+                <div className="text-center py-12 px-4 space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-500 flex items-center justify-center mx-auto shadow-2xs">
                     <Filter className="w-6 h-6" />
                   </div>
-                  <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">
-                    No activities found
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                    No activity records found
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
-                    Try clearing your search or selecting a different category filter.
+                    {searchTerm
+                      ? `No logs match "${searchTerm}".`
+                      : dateRange.preset === 'today'
+                      ? 'No activity recorded today yet.'
+                      : 'No activity logs found for the selected date and filters.'}
                   </p>
+                  <div className="pt-2 flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDateRange(getPresetDates('today'));
+                        setSearchTerm('');
+                        setSelectedEntity('all');
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Reset Filters</span>
+                    </button>
+                    {dateRange.preset !== 'all' && (
+                      <button
+                        type="button"
+                        onClick={() => setDateRange(getPresetDates('all'))}
+                        className="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 cursor-pointer"
+                      >
+                        Show All History
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="relative pl-5 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">

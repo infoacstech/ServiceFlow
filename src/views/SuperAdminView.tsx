@@ -55,9 +55,11 @@ import {
   Radio,
   Zap,
   Filter,
+  Calendar,
 } from 'lucide-react';
 import { ReferralRecord, ReferralPayoutRequest } from '../types';
 import { ReferralAnalytics } from '../components/ReferralAnalytics';
+import { DateRangePicker, DateRange, getLocalDateString, getPresetDates } from '../components/DateRangePicker';
 
 export interface SuperAdminViewProps {
   activeSubSection?: string;
@@ -266,7 +268,49 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
   const [payoutTxnRef, setPayoutTxnRef] = useState('');
   const [payoutAdminNote, setPayoutAdminNote] = useState('');
   const [isProcessingPayoutAction, setIsProcessingPayoutAction] = useState(false);
-  const [auditLogsLimit, setAuditLogsLimit] = useState<number | 'all'>(10);
+  const [auditLogsLimit, setAuditLogsLimit] = useState<number | 'all'>(15);
+
+  // Security Audit Logs Date & Search Filters (Default to Today)
+  const todaySuperAdminDate = useMemo(() => getLocalDateString(new Date()), []);
+  const [auditDateRange, setAuditDateRange] = useState<DateRange>(() => ({
+    startDate: todaySuperAdminDate,
+    endDate: todaySuperAdminDate,
+    preset: 'today',
+  }));
+  const [auditSearchQuery, setAuditSearchQuery] = useState('');
+  const [auditCategoryFilter, setAuditCategoryFilter] = useState('all');
+
+  // Filtered Security Audit Logs
+  const filteredSecurityAuditLogs = useMemo(() => {
+    return (securityAuditLogs || []).filter((log) => {
+      // 1. Date Range
+      if (log.timestamp) {
+        const logD = log.timestamp.slice(0, 10);
+        if (auditDateRange.startDate && logD < auditDateRange.startDate) return false;
+        if (auditDateRange.endDate && logD > auditDateRange.endDate) return false;
+      }
+
+      // 2. Search Query (Actor, Role, Action, Category, Target Business, Details)
+      if (auditSearchQuery.trim()) {
+        const s = auditSearchQuery.toLowerCase();
+        const matchesSearch =
+          (log.actorName || '').toLowerCase().includes(s) ||
+          (log.actorRole || '').toLowerCase().includes(s) ||
+          (log.action || '').toLowerCase().includes(s) ||
+          (log.category || '').toLowerCase().includes(s) ||
+          (log.targetBusinessName || '').toLowerCase().includes(s) ||
+          (log.details || '').toLowerCase().includes(s);
+        if (!matchesSearch) return false;
+      }
+
+      // 3. Category Filter
+      if (auditCategoryFilter !== 'all' && log.category !== auditCategoryFilter) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [securityAuditLogs, auditDateRange, auditSearchQuery, auditCategoryFilter]);
 
   // Referral System Sub-tab & Filters
   const [referralSubTab, setReferralSubTab] = useState<'conversions' | 'payouts' | 'leaderboard'>('conversions');
@@ -2472,10 +2516,11 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
 
       {/* SECTION 5: Security Audit Logs */}
       {activeTabSection === 'audit' && (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm space-y-0">
           <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
+              <h2 className="font-extrabold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-purple-600" />
                 Security Audit Logs & Compliance Trail
               </h2>
               <p className="text-xs text-slate-500">
@@ -2487,14 +2532,14 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                 Showing{' '}
                 <strong>
                   {auditLogsLimit === 'all'
-                    ? securityAuditLogs.length
-                    : Math.min(auditLogsLimit, securityAuditLogs.length)}
+                    ? filteredSecurityAuditLogs.length
+                    : Math.min(auditLogsLimit, filteredSecurityAuditLogs.length)}
                 </strong>{' '}
-                of {securityAuditLogs.length} Events
+                of {filteredSecurityAuditLogs.length} Events ({securityAuditLogs.length} total)
               </span>
               <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
                 <span className="text-[10px] text-slate-400 pl-1 font-bold">Limit:</span>
-                {([10, 25, 50, 'all'] as const).map((lim) => (
+                {([15, 30, 50, 'all'] as const).map((lim) => (
                   <button
                     key={String(lim)}
                     type="button"
@@ -2512,47 +2557,170 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
             </div>
           </div>
 
+          {/* Filter Bar: Date Filters, Search, Category Pills */}
+          <div className="p-4 bg-slate-50/70 dark:bg-slate-800/40 border-b border-slate-200/80 dark:border-slate-800 space-y-3">
+            {/* Row 1: Single Horizontal Scrollable Date Filter Row */}
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 w-full">
+              {[
+                { key: 'today', label: 'Today' },
+                { key: 'yesterday', label: 'Yesterday' },
+                { key: 'last_7_days', label: 'Last 7 Days' },
+                { key: 'this_month', label: 'This Month' },
+                { key: 'all', label: 'All History' },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setAuditDateRange(getPresetDates(item.key))}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                    auditDateRange.preset === item.key
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+
+              <div className="shrink-0">
+                <DateRangePicker
+                  value={auditDateRange}
+                  onChange={setAuditDateRange}
+                  align="right"
+                  compact={true}
+                />
+              </div>
+            </div>
+
+            {/* Row 2: Dynamic Full Width Search */}
+            <div className="relative w-full">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={auditSearchQuery}
+                onChange={(e) => setAuditSearchQuery(e.target.value)}
+                placeholder="Search audit logs by actor name, role, action event, target business, details..."
+                className="w-full pl-9 pr-8 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+              />
+              {auditSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setAuditSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Row 3: Category Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 w-full">
+              {[
+                { id: 'all', label: 'All Categories' },
+                { id: 'AUTH_SESSION', label: 'Auth & Access' },
+                { id: 'DATA_MAINTENANCE', label: 'Data Maintenance' },
+                { id: 'REFERRAL_PAYOUT', label: 'Payouts & Referrals' },
+                { id: 'TENANT_LIFECYCLE', label: 'Tenant Lifecycle' },
+                { id: 'SUPPORT_ACCESS', label: 'Support Sessions' },
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setAuditCategoryFilter(cat.id)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                    auditCategoryFilter === cat.id
+                      ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs'
+                      : 'bg-white dark:bg-slate-800/90 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700/80'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-bold uppercase">
-                <tr>
-                  <th className="p-4">Timestamp</th>
-                  <th className="p-4">Actor</th>
-                  <th className="p-4">Action Event</th>
-                  <th className="p-4">Category</th>
-                  <th className="p-4">Target Business</th>
-                  <th className="p-4">Details</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {(auditLogsLimit === 'all'
-                  ? securityAuditLogs
-                  : securityAuditLogs.slice(0, auditLogsLimit)
-                ).map((log, idx) => (
-                  <tr key={log.id || `audit-log-${idx}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                    <td className="p-4 font-mono text-[11px] text-slate-500">
-                      {new Date(log.timestamp).toLocaleString()}
-                    </td>
-                    <td className="p-4">
-                      <div className="font-bold text-slate-800 dark:text-slate-200">{log.actorName}</div>
-                      <div className="text-[10px] text-slate-400">{log.actorRole}</div>
-                    </td>
-                    <td className="p-4 font-mono font-bold text-purple-700 dark:text-purple-300">
-                      {log.action}
-                    </td>
-                    <td className="p-4">
-                      <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 font-bold text-[10px] text-slate-700 dark:text-slate-300">
-                        {log.category}
-                      </span>
-                    </td>
-                    <td className="p-4 font-medium text-slate-700 dark:text-slate-300">
-                      {log.targetBusinessName || 'N/A'}
-                    </td>
-                    <td className="p-4 text-slate-600 dark:text-slate-400">{log.details}</td>
+            {filteredSecurityAuditLogs.length === 0 ? (
+              <div className="text-center py-12 px-4 space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 flex items-center justify-center mx-auto shadow-2xs">
+                  <Filter className="w-6 h-6" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                  No security audit events found
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                  {auditSearchQuery
+                    ? `No events match "${auditSearchQuery}".`
+                    : auditDateRange.preset === 'today'
+                    ? 'No security events recorded today yet.'
+                    : 'No security events found for the selected date and filters.'}
+                </p>
+                <div className="pt-2 flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuditDateRange(getPresetDates('today'));
+                      setAuditSearchQuery('');
+                      setAuditCategoryFilter('all');
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 text-purple-700 dark:text-purple-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset Filters</span>
+                  </button>
+                  {auditDateRange.preset !== 'all' && (
+                    <button
+                      type="button"
+                      onClick={() => setAuditDateRange(getPresetDates('all'))}
+                      className="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-200 cursor-pointer"
+                    >
+                      Show All History
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-bold uppercase">
+                  <tr>
+                    <th className="p-4">Timestamp</th>
+                    <th className="p-4">Actor</th>
+                    <th className="p-4">Action Event</th>
+                    <th className="p-4">Category</th>
+                    <th className="p-4">Target Business</th>
+                    <th className="p-4">Details</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {(auditLogsLimit === 'all'
+                    ? filteredSecurityAuditLogs
+                    : filteredSecurityAuditLogs.slice(0, auditLogsLimit)
+                  ).map((log, idx) => (
+                    <tr key={log.id || `audit-log-${idx}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                      <td className="p-4 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                        {new Date(log.timestamp).toLocaleString()}
+                      </td>
+                      <td className="p-4">
+                        <div className="font-bold text-slate-800 dark:text-slate-200">{log.actorName}</div>
+                        <div className="text-[10px] text-slate-400">{log.actorRole}</div>
+                      </td>
+                      <td className="p-4 font-mono font-bold text-purple-700 dark:text-purple-300">
+                        {log.action}
+                      </td>
+                      <td className="p-4">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 font-bold text-[10px] text-slate-700 dark:text-slate-300">
+                          {log.category}
+                        </span>
+                      </td>
+                      <td className="p-4 font-medium text-slate-700 dark:text-slate-300">
+                        {log.targetBusinessName || 'N/A'}
+                      </td>
+                      <td className="p-4 text-slate-600 dark:text-slate-400">{log.details}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}

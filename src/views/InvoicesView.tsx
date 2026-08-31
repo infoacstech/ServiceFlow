@@ -106,10 +106,18 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
 
   const filtered = (invoices || []).filter((inv) => {
     const cust = (customers || []).find((c) => c.id === inv.customerId);
-    const s = (search || '').toLowerCase();
-    const matchesSearch =
-      (inv.invoiceNumber || '').toLowerCase().includes(s) ||
-      (cust?.name || '').toLowerCase().includes(s);
+    if (search.trim()) {
+      const s = search.toLowerCase();
+      const matchesSearch =
+        (inv.invoiceNumber || '').toLowerCase().includes(s) ||
+        (cust?.name || '').toLowerCase().includes(s) ||
+        (cust?.mobile || '').toLowerCase().includes(s) ||
+        (cust?.whatsapp || '').toLowerCase().includes(s) ||
+        (cust?.companyName || '').toLowerCase().includes(s) ||
+        (cust?.email || '').toLowerCase().includes(s) ||
+        (inv.items || []).some((it) => (it.description || '').toLowerCase().includes(s));
+      if (!matchesSearch) return false;
+    }
 
     const matchesStatus =
       statusFilter === 'all'
@@ -120,7 +128,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
         ? inv.status === 'paid' && inv.balanceAmount === 0
         : inv.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
+    return matchesStatus;
   });
 
   return (
@@ -143,23 +151,32 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
       </div>
 
       {/* Search & Status Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center gap-3 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800">
+      <div className="flex flex-col sm:flex-row items-center gap-3 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
         <div className="relative flex-1 w-full">
-          <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by invoice number (INV-2026-089), customer..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs font-medium focus:outline-none"
+            placeholder="Search by invoice number (INV-2026-089), customer, mobile, items..."
+            className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl font-semibold text-xs border border-slate-200 dark:border-slate-700"
+            className="px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl font-semibold text-xs border border-slate-200 dark:border-slate-700 cursor-pointer"
           >
             <option value="all">All Invoices</option>
             <option value="pending">Pending Balance Due</option>
@@ -171,83 +188,111 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
 
       {/* Invoices Table */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-semibold uppercase tracking-wider">
-              <tr>
-                <th className="p-3.5">Invoice No</th>
-                <th className="p-3.5">Customer</th>
-                <th className="p-3.5">Issue Date</th>
-                <th className="p-3.5">Due Date</th>
-                <th className="p-3.5">Total</th>
-                <th className="p-3.5">Paid</th>
-                <th className="p-3.5">Balance</th>
-                <th className="p-3.5">Status</th>
-                <th className="p-3.5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {(filtered || []).map((inv) => {
-                const customer = (customers || []).find((c) => c.id === inv.customerId);
+        {filtered.length === 0 ? (
+          <div className="text-center py-12 px-4 space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-500 flex items-center justify-center mx-auto shadow-2xs">
+              <Receipt className="w-6 h-6" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              No invoices found
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+              {search
+                ? `No invoices match "${search}". Try searching with customer name or invoice number.`
+                : 'No invoices recorded for the selected status.'}
+            </p>
+            <div className="pt-2 flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('');
+                  setStatusFilter('all');
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition-all cursor-pointer"
+              >
+                Reset Filters
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-semibold uppercase tracking-wider">
+                <tr>
+                  <th className="p-3.5">Invoice No</th>
+                  <th className="p-3.5">Customer</th>
+                  <th className="p-3.5">Issue Date</th>
+                  <th className="p-3.5">Due Date</th>
+                  <th className="p-3.5">Total</th>
+                  <th className="p-3.5">Paid</th>
+                  <th className="p-3.5">Balance</th>
+                  <th className="p-3.5">Status</th>
+                  <th className="p-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filtered.map((inv) => {
+                  const customer = (customers || []).find((c) => c.id === inv.customerId);
 
-                return (
-                  <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <td className="p-3.5 font-extrabold text-indigo-600">{inv.invoiceNumber}</td>
-                    <td className="p-3.5 font-bold text-slate-900 dark:text-slate-100">{customer?.name}</td>
-                    <td className="p-3.5 text-slate-500">{inv.date}</td>
-                    <td className="p-3.5 text-slate-500">{inv.dueDate}</td>
-                    <td className="p-3.5 font-bold">{currentBusiness.currency}{inv.grandTotal}</td>
-                    <td className="p-3.5 text-emerald-600 font-bold">{currentBusiness.currency}{inv.paidAmount}</td>
-                    <td className="p-3.5 text-rose-600 font-extrabold">{currentBusiness.currency}{inv.balanceAmount}</td>
-                    <td className="p-3.5">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                          inv.status === 'paid'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : inv.status === 'partial'
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-rose-100 text-rose-700'
-                        }`}
-                      >
-                        {inv.status}
-                      </span>
-                    </td>
-                    <td className="p-3.5 text-right space-x-1.5">
-                      <button
-                        onClick={() => {
-                          const cust = (customers || []).find((c) => c.id === inv.customerId);
-                          sendInvoiceWhatsAppReminder(inv, cust, currentBusiness);
-                        }}
-                        className="px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 text-[11px] inline-flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-                        title="Send invoice & UPI link on WhatsApp"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
-                      </button>
-                      <button
-                        onClick={() => setSelectedInvoice(inv)}
-                        className="px-3 py-1.5 rounded-xl bg-slate-100 font-bold text-slate-700 hover:bg-slate-200 text-[11px]"
-                      >
-                        View
-                      </button>
-                      {inv.balanceAmount > 0 && (
+                  return (
+                    <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                      <td className="p-3.5 font-extrabold text-indigo-600">{inv.invoiceNumber}</td>
+                      <td className="p-3.5 font-bold text-slate-900 dark:text-slate-100">{customer?.name}</td>
+                      <td className="p-3.5 text-slate-500">{inv.date}</td>
+                      <td className="p-3.5 text-slate-500">{inv.dueDate}</td>
+                      <td className="p-3.5 font-bold">{currentBusiness.currency}{inv.grandTotal}</td>
+                      <td className="p-3.5 text-emerald-600 font-bold">{currentBusiness.currency}{inv.paidAmount}</td>
+                      <td className="p-3.5 text-rose-600 font-extrabold">{currentBusiness.currency}{inv.balanceAmount}</td>
+                      <td className="p-3.5">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                            inv.status === 'paid'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : inv.status === 'partial'
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-rose-100 text-rose-700'
+                          }`}
+                        >
+                          {inv.status}
+                        </span>
+                      </td>
+                      <td className="p-3.5 text-right space-x-1.5">
                         <button
                           onClick={() => {
-                            setSelectedInvoice(inv);
-                            setPayAmount(inv.balanceAmount);
-                            setIsPaymentModalOpen(true);
+                            const cust = (customers || []).find((c) => c.id === inv.customerId);
+                            sendInvoiceWhatsAppReminder(inv, cust, currentBusiness);
                           }}
-                          className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-xs text-[11px]"
+                          className="px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 text-[11px] inline-flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                          title="Send invoice & UPI link on WhatsApp"
                         >
-                          Record Pay
+                          <MessageSquare className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
                         </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                        <button
+                          onClick={() => setSelectedInvoice(inv)}
+                          className="px-3 py-1.5 rounded-xl bg-slate-100 font-bold text-slate-700 hover:bg-slate-200 text-[11px]"
+                        >
+                          View
+                        </button>
+                        {inv.balanceAmount > 0 && (
+                          <button
+                            onClick={() => {
+                              setSelectedInvoice(inv);
+                              setPayAmount(inv.balanceAmount);
+                              setIsPaymentModalOpen(true);
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-xs text-[11px]"
+                          >
+                            Record Pay
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Record Payment Modal */}
