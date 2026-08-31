@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Customer, Job, Invoice, RecurringContract } from '../types';
+import { CustomerPortalShareModal } from './CustomerPortalShareModal';
 import {
   Wrench,
   Receipt,
@@ -20,6 +21,8 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Sparkles,
+  QrCode,
+  Share2,
 } from 'lucide-react';
 
 interface CustomerServiceSummaryProps {
@@ -43,6 +46,7 @@ export const CustomerServiceSummary: React.FC<CustomerServiceSummaryProps> = ({ 
 
   const [activeTab, setActiveTab] = useState<'all' | 'maintenance' | 'history' | 'invoices'>('all');
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
 
@@ -205,12 +209,23 @@ export const CustomerServiceSummary: React.FC<CustomerServiceSummaryProps> = ({ 
           ))}
         </div>
 
-        <button
-          onClick={() => setIsScheduleModalOpen(true)}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs shrink-0 self-end sm:self-auto"
-        >
-          <Plus className="w-3.5 h-3.5" /> Schedule Maintenance
-        </button>
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setIsShareModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 text-xs font-bold transition-all shadow-xs"
+          >
+            <QrCode className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Portal & QR
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsScheduleModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs"
+          >
+            <Plus className="w-3.5 h-3.5" /> Schedule Maintenance
+          </button>
+        </div>
       </div>
 
       {/* SECTION 1: UPCOMING SCHEDULED MAINTENANCE JOBS & AMC CONTRACTS */}
@@ -634,6 +649,16 @@ export const CustomerServiceSummary: React.FC<CustomerServiceSummaryProps> = ({ 
             </div>
           </form>
         </div>
+      )}
+
+      {/* Customer Portal Share Modal */}
+      {isShareModalOpen && customer && (
+        <CustomerPortalShareModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          customer={customer}
+          currentBusiness={currentBusiness}
+        />
       )}
     </div>
   );

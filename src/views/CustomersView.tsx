@@ -4,6 +4,7 @@ import { Customer, Job } from '../types';
 import { CsvImportModal, CsvColumnMapping } from '../components/CsvImportModal';
 import { CustomerServiceSummary } from '../components/CustomerServiceSummary';
 import { DeleteCustomerModal } from '../components/DeleteCustomerModal';
+import { CustomerPortalShareModal } from '../components/CustomerPortalShareModal';
 import {
   Users,
   Plus,
@@ -36,9 +37,15 @@ import {
   Clock,
   Eye,
   Lock,
+  QrCode,
+  Share2,
 } from 'lucide-react';
 
-export const CustomersView: React.FC = () => {
+interface CustomersViewProps {
+  onNavigate?: (tab: string) => void;
+}
+
+export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate }) => {
   const {
     customers,
     addCustomer,
@@ -81,6 +88,7 @@ export const CustomersView: React.FC = () => {
   const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
   const [timelineLimit, setTimelineLimit] = useState<number | 'all'>(10);
   const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
+  const [portalCustomerForShare, setPortalCustomerForShare] = useState<Customer | null>(null);
 
   // Add Customer Form Data
   const [formData, setFormData] = useState<Omit<Customer, 'id' | 'businessId' | 'createdAt'>>({
@@ -546,6 +554,18 @@ export const CustomersView: React.FC = () => {
                               <span>View Customer Details</span>
                             </button>
 
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenCardMenuId(null);
+                                setPortalCustomerForShare(customer);
+                              }}
+                              className="w-full text-left px-3.5 py-2 hover:bg-indigo-50/70 dark:hover:bg-indigo-950/50 flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold cursor-pointer"
+                            >
+                              <QrCode className="w-3.5 h-3.5" />
+                              <span>Share Portal & QR Code</span>
+                            </button>
+
                             {cleanPhone && (
                               <a
                                 href={`tel:${cleanPhone}`}
@@ -644,18 +664,33 @@ export const CustomersView: React.FC = () => {
                         </div>
                       )}
 
-                      {/* Quick Call Button */}
-                      {cleanPhone && (
-                        <a
-                          href={`tel:${cleanPhone}`}
-                          onClick={(e) => e.stopPropagation()}
-                          title="Call customer immediately"
-                          className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold flex items-center gap-1 transition-colors border border-emerald-200/60 dark:border-emerald-800/60"
+                      {/* Quick Actions: Call & Portal Link */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {cleanPhone && (
+                          <a
+                            href={`tel:${cleanPhone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            title="Call customer immediately"
+                            className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold flex items-center gap-1 transition-colors border border-emerald-200/60 dark:border-emerald-800/60"
+                          >
+                            <Phone className="w-2.5 h-2.5" />
+                            <span>Call</span>
+                          </a>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPortalCustomerForShare(customer);
+                          }}
+                          title="Get Customer Self-Service Portal Link & QR Sticker"
+                          className="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-300 text-[11px] font-bold flex items-center gap-1 transition-colors border border-indigo-200/60 dark:border-indigo-800/60 cursor-pointer"
                         >
-                          <Phone className="w-2.5 h-2.5" />
-                          <span>Call</span>
-                        </a>
-                      )}
+                          <QrCode className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                          <span>Link & QR</span>
+                        </button>
+                      </div>
                     </div>
 
                     {customer.email && (
@@ -767,6 +802,15 @@ export const CustomersView: React.FC = () => {
                     <span>WhatsApp</span>
                   </a>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => setPortalCustomerForShare(selectedCustomer)}
+                  className="flex-1 sm:flex-none justify-center px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-2 shadow-xs transition-all cursor-pointer active:scale-95"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span>Share Portal & QR</span>
+                </button>
 
                 {canEditCustomers ? (
                   <button
@@ -1681,6 +1725,15 @@ export const CustomersView: React.FC = () => {
           setSelectedCustomer(null);
         }}
       />
+      {/* Customer Self-Service Portal Share & QR Sticker Modal */}
+      {portalCustomerForShare && (
+        <CustomerPortalShareModal
+          isOpen={!!portalCustomerForShare}
+          onClose={() => setPortalCustomerForShare(null)}
+          customer={portalCustomerForShare}
+          businessName={currentBusiness?.name || 'ServiFlow'}
+        />
+      )}
     </div>
   );
 };

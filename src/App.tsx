@@ -45,6 +45,7 @@ import { LoginView } from './views/LoginView';
 const MainContent: React.FC = () => {
   const {
     currentUser,
+    currentBusiness,
     isAuthInitializing,
     isAuthModalOpen,
     setIsAuthModalOpen,
@@ -62,6 +63,13 @@ const MainContent: React.FC = () => {
 
   const [jobsFilter, setJobsFilter] = useState<JobInitialFilter | null>(null);
   const [invoicesFilter, setInvoicesFilter] = useState<InvoiceInitialFilter | null>(null);
+  const [isPublicCustomerPortal, setIsPublicCustomerPortal] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('portal') === 'customer' || !!params.get('cid') || !!params.get('customer');
+    }
+    return false;
+  });
 
   const prevUserIdRef = React.useRef<string | null>(null);
 
@@ -136,6 +144,38 @@ const MainContent: React.FC = () => {
 
   // 2. Unauthenticated State (Logged Out or No Active Session)
   if (!currentUser) {
+    if (isPublicCustomerPortal) {
+      return (
+        <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased overflow-x-hidden">
+          <header className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 px-4 py-3">
+            <div className="max-w-4xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white font-black flex items-center justify-center text-sm shadow-sm">
+                  {currentBusiness?.name?.charAt(0) || 'S'}
+                </div>
+                <span className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                  {currentBusiness?.name || 'ServiFlow Portal'}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsPublicCustomerPortal(false)}
+                className="text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl transition-colors cursor-pointer"
+              >
+                Staff / Admin Login →
+              </button>
+            </div>
+          </header>
+
+          <main className="flex-1 max-w-4xl mx-auto w-full p-4 sm:p-6 overflow-y-auto">
+            <CustomerPortalView onBackToApp={() => setIsPublicCustomerPortal(false)} />
+          </main>
+          <ToastContainer />
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased overflow-x-hidden">
         <main className="flex-1 max-w-7xl mx-auto w-full min-h-screen overflow-y-auto">
