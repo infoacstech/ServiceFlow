@@ -30,6 +30,8 @@ import {
   Share2,
   History,
   Sparkles,
+  Edit2,
+  Check,
 } from 'lucide-react';
 import { playJobVoiceNotification, speakText } from '../utils/audioNotification';
 import {
@@ -73,6 +75,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
     addJob,
     addCustomer,
     addService,
+    updateJob,
     updateJobStatus,
     currentBusiness,
     showToast,
@@ -107,6 +110,18 @@ export const JobsView: React.FC<JobsViewProps> = ({
   }, [initialFilter]);
 
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [isEditingBilledAmount, setIsEditingBilledAmount] = useState(false);
+  const [editedBilledAmount, setEditedBilledAmount] = useState<string>('');
+
+  // Keep selectedJob synced with updated jobs array
+  useEffect(() => {
+    if (selectedJob) {
+      const freshJob = (jobs || []).find((j) => j.id === selectedJob.id);
+      if (freshJob && (freshJob.estimatedAmount !== selectedJob.estimatedAmount || freshJob.status !== selectedJob.status || freshJob.materialsUsed !== selectedJob.materialsUsed || freshJob.notes !== selectedJob.notes)) {
+        setSelectedJob(freshJob);
+      }
+    }
+  }, [jobs]);
 
   // Customer & Staff Lookups for fast filtering and matching
   const customerMap = useMemo(() => {
@@ -135,8 +150,19 @@ export const JobsView: React.FC<JobsViewProps> = ({
     }
   }, [isCreateModalOpen, selectedJob]);
 
-  // New Job Form State
-  const [newJobData, setNewJobData] = useState({
+  // New Job Form State - Note: estimatedAmount is blank by default, never hardcoded ₹1500
+  const [newJobData, setNewJobData] = useState<{
+    customerId: string;
+    serviceId: string;
+    description: string;
+    priority: JobPriority;
+    assignedStaffId: string;
+    scheduledDate: string;
+    scheduledTime: string;
+    location: string;
+    estimatedAmount: number | string;
+    status: JobStatus;
+  }>({
     customerId: customers?.[0]?.id || '',
     serviceId: services?.[0]?.id || '',
     description: services?.[0]?.name || '',
@@ -145,7 +171,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
     scheduledDate: getLocalDateString(),
     scheduledTime: '09:00 AM - 11:00 AM',
     location: customers?.[0]?.address ? `${customers[0].address}, ${customers[0].city || ''}`.trim() : '',
-    estimatedAmount: services?.[0]?.price ?? 1500,
+    estimatedAmount: '',
     status: 'assigned' as JobStatus,
   });
 
@@ -159,7 +185,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
     companyName: '',
   });
 
-  // Keep newJobData synchronized when modal opens or lists load
+  // Keep newJobData synchronized when modal opens or lists load without forcing ₹1500
   useEffect(() => {
     if (isCreateModalOpen) {
       if (!newJobData.customerId && customers.length > 0) {
@@ -176,7 +202,6 @@ export const JobsView: React.FC<JobsViewProps> = ({
           ...prev,
           serviceId: firstSrv.id,
           description: prev.description || firstSrv.name,
-          estimatedAmount: prev.estimatedAmount !== undefined && prev.estimatedAmount > 0 ? prev.estimatedAmount : (firstSrv.price || 1500),
         }));
       }
       if (!newJobData.assignedStaffId && staff.length > 0) {
@@ -383,9 +408,12 @@ export const JobsView: React.FC<JobsViewProps> = ({
       return;
     }
 
-    const parsedAmount = typeof newJobData.estimatedAmount === 'number'
-      ? Math.max(0, newJobData.estimatedAmount)
-      : Math.max(0, parseFloat(String(newJobData.estimatedAmount)) || 0);
+    const parsedAmount =
+      newJobData.estimatedAmount === '' ||
+      newJobData.estimatedAmount === undefined ||
+      isNaN(Number(newJobData.estimatedAmount))
+        ? 0
+        : Math.max(0, Number(newJobData.estimatedAmount));
 
     addJob({
       ...newJobData,
@@ -397,6 +425,18 @@ export const JobsView: React.FC<JobsViewProps> = ({
     showToast('Job scheduled and assigned successfully!', 'success');
     setIsCreateModalOpen(false);
     setIsQuickAddCustomer(false);
+    setNewJobData({
+      customerId: '',
+      serviceId: '',
+      description: '',
+      priority: 'medium',
+      assignedStaffId: '',
+      scheduledDate: getLocalDateString(),
+      scheduledTime: '09:00 AM - 11:00 AM',
+      location: '',
+      estimatedAmount: '',
+      status: 'assigned',
+    });
     setQuickCustomer({
       name: '',
       mobile: '',
@@ -989,7 +1029,9 @@ export const JobsView: React.FC<JobsViewProps> = ({
                   const unitCost = inv?.purchasePrice || (m.unitPrice * 0.65);
                   return acc + (unitCost * m.quantity);
                 }, 0);
-                const billedAmount = selectedJob.estimatedAmount || 0;
+                const billedAmount = typeof selectedJob.estimatedAmount === 'number'
+                  ? selectedJob.estimatedAmount
+                  : (parseFloat(String(selectedJob.estimatedAmount)) || 0);
                 const laborCostEst = Math.round(billedAmount * 0.15); // Estimated 15% technician/labor allocation
                 const totalJobCost = materialCost + laborCostEst;
                 const grossProfit = Math.max(0, billedAmount - totalJobCost);
@@ -1016,28 +1058,79 @@ export const JobsView: React.FC<JobsViewProps> = ({
                     </div>
 
                     <div className="grid grid-cols-4 gap-1.5 text-center pt-1">
-                      <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
-                        <span className="text-[10px] text-slate-400 block">Billed</span>
-                        <span className="font-extrabold text-slate-900 dark:text-slate-100">
-                          {currentBusiness.currency}{billedAmount}
-                        </span>
+                      <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 relative group">
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="text-[10px] text-slate-400 block">Billed</span>
+                          {!isEditingBilledAmount && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsEditingBilledAmount(true);
+                                setEditedBilledAmount(String(billedAmount));
+                              }}
+                              className="text-slate-400 hover:text-indigo-600 p-0.5 cursor-pointer transition-colors"
+                              title="Edit Billed / Charge Amount"
+                            >
+                              <Edit2 className="w-2.5 h-2.5" />
+                            </button>
+                          )}
+                        </div>
+                        {isEditingBilledAmount ? (
+                          <div className="flex items-center gap-1 mt-1">
+                            <input
+                              type="number"
+                              min="0"
+                              value={editedBilledAmount}
+                              onChange={(e) => setEditedBilledAmount(e.target.value)}
+                              className="w-full text-xs font-bold px-1 py-0.5 border rounded bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-center"
+                              placeholder="0"
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newAmount = Math.max(0, parseFloat(editedBilledAmount) || 0);
+                                updateJob(selectedJob.id, { estimatedAmount: newAmount });
+                                setSelectedJob({ ...selectedJob, estimatedAmount: newAmount });
+                                setIsEditingBilledAmount(false);
+                                showToast(`Billed amount updated to ${currentBusiness.currency || '₹'}${newAmount}`, 'success');
+                              }}
+                              className="p-1 rounded bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer"
+                              title="Save"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setIsEditingBilledAmount(false)}
+                              className="p-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 hover:bg-slate-300 cursor-pointer"
+                              title="Cancel"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="font-extrabold text-slate-900 dark:text-slate-100">
+                            {currentBusiness.currency || '₹'}{billedAmount}
+                          </span>
+                        )}
                       </div>
                       <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
                         <span className="text-[10px] text-slate-400 block">Parts Cost</span>
                         <span className="font-bold text-slate-600 dark:text-slate-300">
-                          {currentBusiness.currency}{materialCost}
+                          {currentBusiness.currency || '₹'}{materialCost}
                         </span>
                       </div>
                       <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
                         <span className="text-[10px] text-slate-400 block">Labor Est.</span>
                         <span className="font-bold text-slate-600 dark:text-slate-300">
-                          {currentBusiness.currency}{laborCostEst}
+                          {currentBusiness.currency || '₹'}{laborCostEst}
                         </span>
                       </div>
                       <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800">
                         <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-semibold">Net Profit</span>
                         <span className="font-black text-emerald-700 dark:text-emerald-300">
-                          {currentBusiness.currency}{grossProfit}
+                          {currentBusiness.currency || '₹'}{grossProfit}
                         </span>
                       </div>
                     </div>
@@ -1349,7 +1442,11 @@ export const JobsView: React.FC<JobsViewProps> = ({
                         ...newJobData,
                         serviceId: e.target.value,
                         description: s ? s.name : newJobData.description,
-                        estimatedAmount: s ? s.price : newJobData.estimatedAmount,
+                        // If user has not typed an amount yet, suggest service price if present, else leave as is
+                        estimatedAmount:
+                          newJobData.estimatedAmount !== '' && newJobData.estimatedAmount !== undefined
+                            ? newJobData.estimatedAmount
+                            : (s && s.price ? s.price : ''),
                       });
                     }}
                     className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -1357,7 +1454,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
                     <option value="" disabled>-- Select a Service --</option>
                     {services.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name} - {currentBusiness.currency}{s.price}
+                        {s.name} {s.price ? `- ${currentBusiness.currency || '₹'}${s.price}` : ''}
                       </option>
                     ))}
                   </select>
@@ -1397,19 +1494,30 @@ export const JobsView: React.FC<JobsViewProps> = ({
 
                 <div>
                   <label className="font-semibold block mb-1 text-slate-800 dark:text-slate-200">
-                    Estimated Amount ({currentBusiness.currency}) *
+                    Billed / Charge Amount ({currentBusiness.currency || '₹'})
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="50"
-                    value={newJobData.estimatedAmount}
-                    onChange={(e) =>
-                      setNewJobData({ ...newJobData, estimatedAmount: parseFloat(e.target.value) || 0 })
-                    }
-                    placeholder="1500"
-                    className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">
+                      {currentBusiness.currency || '₹'}
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={newJobData.estimatedAmount}
+                      onChange={(e) =>
+                        setNewJobData({
+                          ...newJobData,
+                          estimatedAmount: e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0),
+                        })
+                      }
+                      placeholder="Enter amount (e.g. 500, 2500) or 0"
+                      className="w-full pl-8 pr-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <span className="text-[10.5px] text-slate-400 mt-1 block">
+                    Actual customer charge. If blank, saves as {currentBusiness.currency || '₹'}0.
+                  </span>
                 </div>
               </div>
 

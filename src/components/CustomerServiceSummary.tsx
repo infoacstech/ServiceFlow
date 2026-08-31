@@ -99,7 +99,7 @@ export const CustomerServiceSummary: React.FC<CustomerServiceSummaryProps> = ({ 
       scheduledDate: newJobDate,
       scheduledTime: newJobTime,
       location: `${customer.address || ''}, ${customer.city || ''}`,
-      estimatedAmount: selectedSvc ? selectedSvc.price : 1500,
+      estimatedAmount: selectedSvc ? selectedSvc.price : 0,
       status: newJobStaffId ? 'assigned' : 'new',
     });
 

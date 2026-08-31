@@ -28,7 +28,7 @@ export const CustomerPortalView: React.FC = () => {
       scheduledDate: new Date().toISOString().split('T')[0],
       scheduledTime: '02:00 PM',
       location: customer.address,
-      estimatedAmount: 1500,
+      estimatedAmount: 0,
       status: 'new',
     });
 

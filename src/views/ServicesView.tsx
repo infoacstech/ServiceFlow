@@ -27,7 +27,7 @@ export const ServicesView: React.FC = () => {
   const [serviceFormData, setServiceFormData] = useState({
     categoryId: categories[0]?.id || '',
     name: '',
-    price: 1500,
+    price: 0,
     taxPercent: 18,
     estimatedMinutes: 60,
     description: '',
@@ -61,7 +61,7 @@ export const ServicesView: React.FC = () => {
     setServiceFormData({
       categoryId: categories[0]?.id || '',
       name: '',
-      price: 1500,
+      price: 0,
       taxPercent: 18,
       estimatedMinutes: 60,
       description: '',

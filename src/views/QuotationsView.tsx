@@ -39,7 +39,7 @@ export const QuotationsView: React.FC = () => {
     {
       description: services[0]?.name || '4K Camera Installation & Wiring',
       quantity: 1,
-      rate: services[0]?.price || 1500,
+      rate: services[0]?.price || 0,
       taxPercent: 18,
     },
   ]);

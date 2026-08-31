@@ -111,7 +111,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [isQuickQuoteOpen, setIsQuickQuoteOpen] = useState(false);
   const [quoteCustomerId, setQuoteCustomerId] = useState('');
   const [quoteDescription, setQuoteDescription] = useState('');
-  const [quoteRate, setQuoteRate] = useState<number>(1500);
+  const [quoteRate, setQuoteRate] = useState<number>(0);
   const [quoteTax, setQuoteTax] = useState<number>(18);
   const [quoteNotes, setQuoteNotes] = useState('Payment 50% advance upon quotation approval.');
 
@@ -185,7 +185,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
     showToast('Quotation generated and saved successfully!', 'success');
     setQuoteDescription('');
-    setQuoteRate(1500);
+    setQuoteRate(0);
     setIsQuickQuoteOpen(false);
   };
 

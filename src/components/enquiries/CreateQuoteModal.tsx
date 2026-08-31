@@ -26,7 +26,7 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
   useEffect(() => {
     if (enquiry) {
       setDescription(`${enquiry.serviceRequired}${enquiry.description ? ` - ${enquiry.description}` : ''}`);
-      setRate(enquiry.estimatedValue || 1500);
+      setRate(enquiry.estimatedValue || 0);
     }
   }, [enquiry]);
 
