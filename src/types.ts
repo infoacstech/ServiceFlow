@@ -267,6 +267,7 @@ export interface Job {
   location: string;
   estimatedAmount: number;
   status: JobStatus;
+  source?: 'manual' | 'customer_portal' | 'crm';
   notes?: string;
   completionNotes?: string;
   beforePhotos?: string[];
@@ -423,7 +424,7 @@ export interface Notification {
   read: boolean;
   createdAt: string;
   senderUserId?: string;
-  senderRoleId?: UserRole;
+  senderRoleId?: UserRole | 'customer';
   targetRoleId?: UserRole;
   targetUserId?: string;
   jobId?: string;
@@ -434,7 +435,7 @@ export interface Notification {
   scheduledDate?: string;
   scheduledTime?: string;
   priority?: JobPriority;
-  actionType?: 'assigned' | 'accepted' | 'started' | 'completed' | 'general' | 'attendance_issue' | 'attendance_resolution';
+  actionType?: 'assigned' | 'accepted' | 'started' | 'completed' | 'general' | 'attendance_issue' | 'attendance_resolution' | 'customer_request';
   broadcastSeverity?: 'info' | 'warning' | 'critical' | 'success';
   authorName?: string;
 }

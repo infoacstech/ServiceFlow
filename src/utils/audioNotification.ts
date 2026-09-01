@@ -460,6 +460,59 @@ export function playTransactionVoiceNotification(
 }
 
 /**
+ * Triggers instant chime + multi-language voice alert for New Customer Service Request from Portal
+ */
+export function playCustomerServiceRequestVoiceNotification(
+  jobId: string,
+  customerName?: string,
+  serviceTitle?: string,
+  location?: string
+): void {
+  if (!isVoiceNotificationEnabled()) return;
+
+  playNotificationChime();
+
+  const lang = getSelectedVoiceLanguage();
+  const name = customerName || 'ग्राहक';
+  const title = (serviceTitle || 'सर्विस कॉल').replace(/[^\w\s]/gi, ' ');
+  let speechMessage = '';
+
+  if (lang.startsWith('hi')) {
+    // Hindi
+    speechMessage = `नया सर्विस अनुरोध प्राप्त हुआ! ग्राहक ${name} ने ${title} के लिए नया जॉब अनुरोध भेजा है.${
+      location ? ` लोकेशन: ${location}.` : ''
+    }`;
+  } else if (lang.startsWith('mr')) {
+    // Marathi
+    speechMessage = `नवीन सेवा विनंती आली आहे! ग्राहक ${name} यांनी ${title} साठी नवीन जॉब नोंदवला आहे.`;
+  } else if (lang.startsWith('gu')) {
+    // Gujarati
+    speechMessage = `નવી સર્વિસ વિનંતી મળી! ગ્રાહક ${name} તરફથી ${title} માટે નવી જોબ રિક્વેસ્ટ આવી છે.`;
+  } else if (lang.startsWith('bn')) {
+    // Bengali
+    speechMessage = `নতুন সার্ভিস রিকোয়েস্ট! গ্রাহক ${name} ${title} এর জন্য সার্ভিস বুক করেছেন।`;
+  } else if (lang.startsWith('ta')) {
+    // Tamil
+    speechMessage = `புதிய சேவை கோரிக்கை! வாடிக்கையாளர் ${name} ${title} சேவைக்காக முன்பதிவு செய்துள்ளார்.`;
+  } else if (lang.startsWith('te')) {
+    // Telugu
+    speechMessage = `కొత్త సర్వీస్ అభ్యర్థన! కస్టమర్ ${name} ${title} కోసం సర్వీస్ బుక్ చేశారు.`;
+  } else if (lang.startsWith('kn')) {
+    // Kannada
+    speechMessage = `ಹೊಸ ಸೇವಾ ವಿನಂತಿ! ಗ್ರಾಹಕ ${name} ಅವರು ${title} ಗಾಗಿ ಹೊಸ ಜಾಬ್ ಬುಕ್ ಮಾಡಿದ್ದಾರೆ.`;
+  } else {
+    // English
+    speechMessage = `New Customer Service Request! Client ${name} has requested a visit for ${title}.${
+      location ? ` Location: ${location}.` : ''
+    }`;
+  }
+
+  setTimeout(() => {
+    speakText(speechMessage, { rate: 0.95, pitch: 1.05, lang });
+  }, 350);
+}
+
+/**
  * Triggers custom voice notification
  */
 export function playCustomVoiceNotification(heading: string, detail?: string): void {

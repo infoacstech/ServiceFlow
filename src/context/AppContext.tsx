@@ -91,6 +91,7 @@ import {
   playJobVoiceNotification,
   playJobCompletedVoiceNotification,
   playJobStatusVoiceNotification,
+  playCustomerServiceRequestVoiceNotification,
   playCustomVoiceNotification,
   sendBackgroundSystemNotification,
   requestBrowserNotificationPermission,
@@ -284,7 +285,10 @@ interface AppContextType {
 
   addServiceCategory: (name: string, description?: string) => ServiceCategory;
 
-  addJob: (j: Omit<Job, 'id' | 'businessId' | 'jobId' | 'createdAt'>, options?: { silentToast?: boolean }) => Job;
+  addJob: (
+    j: Omit<Job, 'id' | 'businessId' | 'jobId' | 'createdAt'>,
+    options?: { silentToast?: boolean; isCustomerPortalRequest?: boolean; customerBusinessId?: string }
+  ) => Job | null;
   updateJob: (id: string, updates: Partial<Job>) => void;
   updateJobStatus: (id: string, status: JobStatus, reason?: string) => void;
   deleteJob: (id: string) => void;
@@ -1141,23 +1145,40 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               // Check if notification is targeted to the current active user
               let isTargetedToMe = false;
 
+              const isCustomerServiceRequest =
+                notif.actionType === 'customer_request' ||
+                notif.title?.toLowerCase().includes('customer service request') ||
+                notif.title?.toLowerCase().includes('portal booking') ||
+                notif.title?.toLowerCase().includes('service request');
+
               const isJobAssignment =
-                notif.actionType === 'assigned' ||
-                notif.title?.toLowerCase().includes('assigned') ||
-                notif.title?.toLowerCase().includes('job issued') ||
-                notif.title?.toLowerCase().includes('job reassigned');
+                !isCustomerServiceRequest &&
+                (notif.actionType === 'assigned' ||
+                  notif.title?.toLowerCase().includes('assigned') ||
+                  notif.title?.toLowerCase().includes('job issued') ||
+                  notif.title?.toLowerCase().includes('job reassigned'));
 
               const isJobStatusUpdate =
-                notif.actionType === 'accepted' ||
-                notif.actionType === 'started' ||
-                notif.actionType === 'completed' ||
-                notif.title?.toLowerCase().includes('job accepted') ||
-                notif.title?.toLowerCase().includes('job on the way') ||
-                notif.title?.toLowerCase().includes('job started') ||
-                notif.title?.toLowerCase().includes('job work started') ||
-                notif.title?.toLowerCase().includes('job completed');
+                !isCustomerServiceRequest &&
+                (notif.actionType === 'accepted' ||
+                  notif.actionType === 'started' ||
+                  notif.actionType === 'completed' ||
+                  notif.title?.toLowerCase().includes('job accepted') ||
+                  notif.title?.toLowerCase().includes('job on the way') ||
+                  notif.title?.toLowerCase().includes('job started') ||
+                  notif.title?.toLowerCase().includes('job work started') ||
+                  notif.title?.toLowerCase().includes('job completed'));
 
-              if (isJobAssignment) {
+              if (isCustomerServiceRequest) {
+                // Business Owner & Managers (and Super Admin) receive direct audio alert and popup for incoming customer portal bookings
+                if (
+                  currentUser.role === 'business_owner' ||
+                  currentUser.role === 'manager' ||
+                  currentUser.role === 'super_admin'
+                ) {
+                  isTargetedToMe = true;
+                }
+              } else if (isJobAssignment) {
                 // Only the assigned technician receives the voice alert and popup
                 if (currentUser.role === 'technician') {
                   if (notif.targetUserId) {
@@ -1215,7 +1236,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 });
 
                 // Trigger Voice Audio Alert
-                if (notif.actionType === 'assigned') {
+                if (isCustomerServiceRequest) {
+                  playCustomerServiceRequestVoiceNotification(
+                    notif.jobId || 'NEW',
+                    notif.customerName,
+                    notif.jobTitle || notif.title,
+                    notif.jobLocation
+                  );
+                } else if (notif.actionType === 'assigned') {
                   playJobVoiceNotification(
                     notif.jobId || 'NEW',
                     notif.jobTitle || notif.title,
@@ -3355,20 +3383,29 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Job Actions
   const addJob = (
     data: Omit<Job, 'id' | 'businessId' | 'jobId' | 'createdAt'>,
-    options?: { silentToast?: boolean }
+    options?: { silentToast?: boolean; isCustomerPortalRequest?: boolean; customerBusinessId?: string }
   ) => {
-    if (checkReadOnlySupportGuard()) return;
-    const perm = canCreateRecord(currentUser, 'job');
-    if (!perm.allowed) {
-      showToast(perm.reason || 'Permission Denied: Cannot create jobs.', 'error');
-      return;
+    const isCustomerPortal = Boolean(options?.isCustomerPortalRequest);
+
+    if (!isCustomerPortal) {
+      if (checkReadOnlySupportGuard()) return null;
+      const perm = canCreateRecord(currentUser, 'job');
+      if (!perm.allowed) {
+        showToast(perm.reason || 'Permission Denied: Cannot create jobs.', 'error');
+        return null;
+      }
     }
 
-    if (currentBusiness.id !== 'all' && currentUser?.role !== 'super_admin') {
+    const resolvedBusinessId =
+      options?.customerBusinessId ||
+      (data as any).businessId ||
+      (currentBusiness.id !== 'all' ? currentBusiness.id : (businesses[0]?.id || 'default'));
+
+    if (!isCustomerPortal && resolvedBusinessId !== 'all' && currentUser?.role !== 'super_admin') {
       const currentMonthPrefix = new Date().toISOString().substring(0, 7);
       const monthlyJobCount = (jobs || []).filter(
         (j) =>
-          j.businessId === currentBusiness.id &&
+          j.businessId === resolvedBusinessId &&
           (j.createdAt?.startsWith(currentMonthPrefix) || j.scheduledDate?.startsWith(currentMonthPrefix))
       ).length;
       const capacity = checkMonthlyJobCapacity(monthlyJobCount, currentBusiness.planId || currentBusiness.plan);
@@ -3378,21 +3415,22 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             `Monthly job limit reached (${monthlyJobCount}/${capacity.maxJobs}) for ${capacity.planName} plan. Upgrade to create more jobs.`,
           'error'
         );
-        return;
+        return null;
       }
     }
 
-    const count = filteredJobs.length + 101;
+    const count = (jobs || []).filter((j) => j.businessId === resolvedBusinessId).length + 101;
     const jobId = `JOB-${new Date().getFullYear()}-${count}`;
     const id = `job-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newJob: Job = {
       ...data,
       id,
-      businessId: currentBusiness.id,
+      businessId: resolvedBusinessId,
       jobId,
       scheduledTime: data.scheduledTime || '09:00 AM - 11:00 AM',
       scheduledTimeSlot: data.scheduledTimeSlot || data.scheduledTime || '09:00 AM - 11:00 AM',
       createdAt: new Date().toISOString().split('T')[0],
+      source: isCustomerPortal ? 'customer_portal' : ((data as any).source || 'manual'),
     };
 
     setJobs((prev) => {
@@ -3403,12 +3441,62 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     firestoreService.saveDocument<Job>('jobs', newJob.id, newJob);
 
-    // Broadcast instant Notification doc in Firestore for staff members
     const assignedStaff = (users || []).find((u) => u.id === data.assignedStaffId);
     const customer = (customers || []).find((c) => c.id === data.customerId);
+
+    // If Customer Service Request from Customer Portal
+    if (isCustomerPortal) {
+      const newNotif: Notification = {
+        id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+        businessId: resolvedBusinessId,
+        title: `🚨 New Customer Service Request: ${customer?.name || 'Customer'}`,
+        message: `Client ${customer?.name || 'Customer'} requested a service visit for "${data.description}". Preferred Date: ${data.scheduledDate} (${data.scheduledTime || data.scheduledTimeSlot || 'Morning slot'}).`,
+        type: 'job',
+        read: false,
+        createdAt: new Date().toISOString(),
+        senderUserId: customer?.id || 'portal-customer',
+        senderRoleId: 'customer',
+        targetRoleId: 'business_owner',
+        jobId: jobId,
+        jobTitle: data.description,
+        jobLocation: data.location || customer?.address,
+        customerName: customer?.name,
+        customerPhone: customer?.mobile,
+        scheduledDate: data.scheduledDate,
+        scheduledTime: data.scheduledTimeSlot || data.scheduledTime,
+        priority: data.priority || 'high',
+        actionType: 'customer_request',
+      };
+      saveToFirestore('notifications', newNotif.id, newNotif);
+      seenNotifIdsRef.current.add(newNotif.id);
+
+      // If active owner/manager on this device, instantly trigger voice announcement & alert card
+      if (currentUser?.role === 'business_owner' || currentUser?.role === 'manager' || currentUser?.role === 'super_admin') {
+        playCustomerServiceRequestVoiceNotification(
+          jobId,
+          customer?.name,
+          data.description,
+          data.location || customer?.address
+        );
+        setActiveJobPopup(newNotif);
+        sendBackgroundSystemNotification(newNotif.title, {
+          body: newNotif.message,
+          data: { jobId: newNotif.jobId, url: '/' },
+        });
+      }
+
+      logActivity('Customer Request', 'job', newJob.id, `New portal booking received from ${customer?.name || 'Customer'} (${jobId})`);
+
+      if (!options?.silentToast) {
+        showToast(`Service request submitted successfully! Reference: ${jobId}`, 'success');
+      }
+      return newJob;
+    }
+
+    // Standard Staff / Admin Job assignment notification doc
     const newNotif: Notification = {
       id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
-      businessId: currentBusiness.id,
+      businessId: resolvedBusinessId,
       title: `New Job Assigned: ${jobId}`,
       message: `New service task ${jobId} (${data.description}) assigned${assignedStaff ? ' to ' + assignedStaff.name : ''}. Scheduled for ${data.scheduledDate} (${data.scheduledTime || data.scheduledTimeSlot || '09:00 AM'})`,
       type: 'job',

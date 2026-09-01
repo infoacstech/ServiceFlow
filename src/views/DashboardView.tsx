@@ -243,6 +243,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const unassignedUrgentJobs = urgentJobsList.filter((j) => !j.assignedStaffId && isJobActive(j.status));
   const activeUrgentValue = activeUrgentJobs.reduce((sum, j) => sum + (j.estimatedAmount || 0), 0);
 
+  // Incoming Customer Service Requests (From Customer Portal / QR / Direct Requests)
+  const incomingCustomerRequests = (jobs || []).filter(
+    (j) =>
+      (j.status === 'new' || j.status === 'scheduled') &&
+      (!j.assignedStaffId || j.description?.includes('[Portal Booking]') || (j as any).source === 'customer_portal')
+  );
+
   const filteredUrgentModalJobs = urgentJobsList.filter((job) => {
     const customer = customers.find((c) => c.id === job.customerId);
     const searchLow = urgentSearch.toLowerCase();
@@ -422,6 +429,99 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           >
             <Clock className="w-4 h-4" /> Review in Attendance & GPS
           </button>
+        </div>
+      )}
+
+      {/* Incoming Customer Service Requests Alert Card (Self-Service Portal / QR Bookings) */}
+      {incomingCustomerRequests.length > 0 && (
+        <div className="bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-emerald-500/10 dark:from-indigo-950/40 dark:via-purple-950/30 dark:to-slate-900 p-4 sm:p-5 rounded-2xl border-2 border-indigo-300 dark:border-indigo-700/70 shadow-md flex flex-col gap-3.5 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-600/30 shrink-0">
+                <Sparkles className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-black uppercase tracking-wider bg-indigo-600 text-white px-2 py-0.5 rounded-full">
+                    Portal Booking
+                  </span>
+                  <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100">
+                    {incomingCustomerRequests.length} New Customer Service Call Request(s)
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                  Customers have requested service visits online. Review details, contact clients, and assign field technicians.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              <button
+                type="button"
+                onClick={() => navigate('portal')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-700 dark:text-slate-200 font-bold text-xs border border-slate-200 dark:border-slate-700 shadow-xs transition-all active:scale-95 cursor-pointer"
+              >
+                Portal View
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('jobs', { statusFilter: 'new' })}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-md shadow-indigo-600/20 transition-all active:scale-95 cursor-pointer"
+              >
+                <Briefcase className="w-4 h-4" /> Dispatch in Jobs
+              </button>
+            </div>
+          </div>
+
+          {/* Quick List of Latest 3 Incoming Requests */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
+            {incomingCustomerRequests.slice(0, 3).map((reqJob) => {
+              const reqCustomer = customers.find((c) => c.id === reqJob.customerId);
+              return (
+                <div
+                  key={reqJob.id}
+                  className="p-3 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-indigo-100 dark:border-indigo-900/60 shadow-xs flex flex-col justify-between gap-2"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-[11px] font-black text-indigo-600 dark:text-indigo-400">
+                        {reqJob.jobId}
+                      </span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                        {reqJob.scheduledDate}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-xs text-slate-900 dark:text-slate-100 mt-1 line-clamp-1">
+                      {reqCustomer?.name || 'Customer'}
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">
+                      {reqJob.description}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-700/60">
+                    {reqCustomer?.mobile ? (
+                      <a
+                        href={`tel:${reqCustomer.mobile}`}
+                        className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                      >
+                        <Phone className="w-3 h-3" /> {reqCustomer.mobile}
+                      </a>
+                    ) : (
+                      <span className="text-[10px] text-slate-400">No mobile</span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => navigate('jobs', { statusFilter: 'new' })}
+                      className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold text-[11px] transition-colors cursor-pointer"
+                    >
+                      Assign Staff →
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

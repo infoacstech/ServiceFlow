@@ -26,7 +26,15 @@ export const JobNotificationPopup: React.FC<JobNotificationPopupProps> = ({ onOp
   if (!activeJobPopup) return null;
 
   const notif = activeJobPopup;
-  const isAssign = notif.actionType === 'assigned' || notif.title.toLowerCase().includes('job issued') || notif.title.toLowerCase().includes('assigned');
+  const isCustomerRequest =
+    notif.actionType === 'customer_request' ||
+    notif.title.toLowerCase().includes('customer service request') ||
+    notif.title.toLowerCase().includes('portal booking') ||
+    notif.title.toLowerCase().includes('service request');
+
+  const isAssign =
+    !isCustomerRequest &&
+    (notif.actionType === 'assigned' || notif.title.toLowerCase().includes('job issued') || notif.title.toLowerCase().includes('assigned'));
   
   // Job assignment popup is strictly for the assigned technician, never the owner/manager who created it
   if (isAssign && currentUser?.role !== 'technician') {

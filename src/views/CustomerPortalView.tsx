@@ -131,10 +131,14 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ onBackTo
       notes: `Booked via Customer Self-Service Portal. Preferred Slot: ${preferredTimeSlot}. Contact: ${contactMobile || customer.mobile}`,
     };
 
-    addJob(newJob);
+    const createdJob = addJob(newJob, {
+      isCustomerPortalRequest: true,
+      customerBusinessId: customer.businessId || currentBusiness.id,
+      silentToast: false,
+    });
     setIsSubmitting(false);
     setIsBookModalOpen(false);
-    setSubmittedJobId(`JOB-${Date.now().toString().slice(-4)}`);
+    setSubmittedJobId(createdJob?.jobId || `REQ-${Date.now().toString().slice(-4)}`);
     showToast('Your service request has been submitted to the dispatch team!', 'success');
     setServiceNotes('');
   };
