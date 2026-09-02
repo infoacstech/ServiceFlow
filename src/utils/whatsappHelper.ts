@@ -228,3 +228,45 @@ _Team ${business?.name || 'ServiFlow'}_`;
 
   openWhatsApp(custPhone, message);
 };
+
+/**
+ * 7. Send Scheduled AMC Maintenance Visit Reminder to Customer (Bot message)
+ */
+export const sendAmcVisitReminderWhatsApp = (
+  contract: RecurringContract,
+  customer?: Customer,
+  business?: Business,
+  visitDate?: string,
+  timeSlot?: string,
+  technicianName?: string
+) => {
+  const custPhone = customer?.whatsapp || customer?.mobile || '';
+  const scheduledDate = visitDate || contract.nextVisitDate || 'Upcoming';
+  const slot = timeSlot || '10:00 AM - 01:00 PM';
+  const visitNum = (contract.visitsUsed || 0) + 1;
+  const techText = technicianName ? `\n👷 *Assigned Engineer:* ${technicianName}` : '';
+  const equipText = contract.equipmentDetails ? `\n⚙️ *Equipment Covered:* ${contract.equipmentDetails}` : '';
+
+  const message = `🛠️ *PREVENTIVE MAINTENANCE VISIT ALERT - ${business?.name || 'ServiFlow'}*
+━━━━━━━━━━━━━━━━━━━━
+Dear *${customer?.name || 'Valued Customer'}*,
+
+Your routine preventive maintenance service is due under your AMC contract:
+
+📄 *Contract No:* ${contract.contractNumber} (${contract.name})
+🎯 *Scheduled Visit:* Visit #${visitNum} of ${contract.visitsAllowed}
+📅 *Visit Date:* *${scheduledDate}*
+⏰ *Preferred Slot:* ${slot}${techText}${equipText}
+
+📍 *Service Address:*
+${customer?.address || 'Your Registered Site'}
+
+Our service engineer will arrive to inspect, clean, and service your equipment for flawless performance.
+
+_Need to reschedule? Kindly reply to this message or call our helpline: ${business?.mobile || business?.whatsapp || ''}_
+
+Thank you for choosing *${business?.name || 'ServiFlow'}*!`;
+
+  openWhatsApp(custPhone, message);
+};
+

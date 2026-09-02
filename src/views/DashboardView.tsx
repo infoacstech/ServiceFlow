@@ -45,7 +45,9 @@ import {
   Megaphone,
   Volume2,
   Radio,
+  Wrench,
 } from 'lucide-react';
+import { getUpcomingDueAmcContracts } from '../utils/amcHelper';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -84,6 +86,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     invoices,
     inventory,
     contracts,
+    batchScheduleDueAmcVisits,
     staff,
     enquiries,
     attendanceIssues,
@@ -249,6 +252,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       (j.status === 'new' || j.status === 'scheduled') &&
       (!j.assignedStaffId || j.description?.includes('[Portal Booking]') || (j as any).source === 'customer_portal')
   );
+
+  // Due AMC Preventive Maintenance Visits (due now or within 7 days)
+  const dueAmcContracts = React.useMemo(() => {
+    return getUpcomingDueAmcContracts(contracts || [], 7);
+  }, [contracts]);
 
   const filteredUrgentModalJobs = urgentJobsList.filter((job) => {
     const customer = customers.find((c) => c.id === job.customerId);
@@ -521,6 +529,48 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Due AMC Maintenance Visits Alert Card */}
+      {dueAmcContracts.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-indigo-500/10 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-slate-900 p-4 sm:p-5 rounded-2xl border-2 border-amber-300 dark:border-amber-700/70 shadow-md flex flex-col gap-3.5 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-md shadow-amber-500/30 shrink-0">
+                <Wrench className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-black uppercase tracking-wider bg-amber-500 text-white px-2 py-0.5 rounded-full">
+                    AMC Preventive Visits Due
+                  </span>
+                  <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100">
+                    {dueAmcContracts.length} Preventive Maintenance Visit(s) Due
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                  Scheduled preventive visits under AMC contracts are due for servicing. 1-click auto-dispatch to assign field technicians.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              <button
+                type="button"
+                onClick={() => navigate('contracts')}
+                className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-700 dark:text-slate-200 font-bold text-xs border border-slate-200 dark:border-slate-700 shadow-xs transition-all active:scale-95 cursor-pointer"
+              >
+                View All AMCs
+              </button>
+              <button
+                type="button"
+                onClick={() => batchScheduleDueAmcVisits()}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-md shadow-amber-500/20 transition-all active:scale-95 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4" /> 1-Click Auto-Dispatch
+              </button>
+            </div>
           </div>
         </div>
       )}

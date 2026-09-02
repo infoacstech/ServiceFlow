@@ -92,10 +92,17 @@ import {
   playJobCompletedVoiceNotification,
   playJobStatusVoiceNotification,
   playCustomerServiceRequestVoiceNotification,
+  playAmcAutoScheduledVoiceNotification,
   playCustomVoiceNotification,
   sendBackgroundSystemNotification,
   requestBrowserNotificationPermission,
 } from '../utils/audioNotification';
+import {
+  calculateNextVisitDate,
+  addMonthsToDateString,
+  getFrequencyIntervalMonths,
+  getUpcomingDueAmcContracts,
+} from '../utils/amcHelper';
 import {
   collection,
   doc,
@@ -324,6 +331,19 @@ interface AppContextType {
   recordPayment: (p: Omit<Payment, 'id' | 'businessId'>) => Payment;
 
   addContract: (c: Omit<RecurringContract, 'id' | 'businessId' | 'contractNumber'>) => RecurringContract;
+  updateContract: (id: string, updates: Partial<RecurringContract>) => void;
+  deleteContract: (id: string) => void;
+  scheduleAmcVisit: (
+    contractId: string,
+    options?: {
+      scheduledDate?: string;
+      scheduledTime?: string;
+      technicianId?: string;
+      notes?: string;
+      silentToast?: boolean;
+    }
+  ) => Job | null;
+  batchScheduleDueAmcVisits: (contractIds?: string[]) => { scheduledJobs: Job[]; count: number };
   addExpense: (e: Omit<Expense, 'id' | 'businessId'>) => void;
   addStaff: (st: Omit<User, 'id' | 'businessId'>) => Promise<User | undefined>;
   deleteStaff: (userId: string) => void;
@@ -4123,11 +4143,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Contract Actions
   const addContract = (data: Omit<RecurringContract, 'id' | 'businessId' | 'contractNumber'>) => {
-    if (checkReadOnlySupportGuard()) return;
+    if (checkReadOnlySupportGuard()) return {} as RecurringContract;
     const perm = canCreateRecord(currentUser, 'contract');
     if (!perm.allowed) {
       showToast(perm.reason || 'Permission Denied: Cannot create service contracts.', 'error');
-      return;
+      return {} as RecurringContract;
     }
     const num = `AMC-${new Date().getFullYear()}-${filteredContracts.length + 101}`;
     const newContract: RecurringContract = {
@@ -4135,11 +4155,182 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `amc-${Date.now()}`,
       businessId: currentBusiness.id,
       contractNumber: num,
+      nextVisitDate: data.nextVisitDate || data.startDate,
     };
+
+    setContracts((prev) => {
+      const updated = [newContract, ...prev];
+      saveCache('serviflow_contracts_cache', updated);
+      return updated;
+    });
+
     saveToFirestore('contracts', newContract.id, newContract);
     logActivity('Service Contract Created', 'contract', newContract.id, `Created contract ${num}`);
     showToast(`Service contract ${num} registered`, 'success');
     return newContract;
+  };
+
+  const updateContract = (id: string, updates: Partial<RecurringContract>) => {
+    if (checkReadOnlySupportGuard()) return;
+    const perm = canUpdateRecord(currentUser, 'contract');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Cannot update service contracts.', 'error');
+      return;
+    }
+    const target = (contracts || []).find((c) => c.id === id);
+    if (!target) {
+      showToast('AMC Contract not found.', 'error');
+      return;
+    }
+
+    const updatedContract = { ...target, ...updates };
+    setContracts((prev) => {
+      const updated = prev.map((c) => (c.id === id ? updatedContract : c));
+      saveCache('serviflow_contracts_cache', updated);
+      return updated;
+    });
+
+    saveToFirestore('contracts', id, updatedContract);
+    logActivity('Contract Updated', 'contract', id, `Updated AMC contract ${target.contractNumber}`);
+    showToast(`Contract ${target.contractNumber} updated`, 'success');
+  };
+
+  const deleteContract = (id: string) => {
+    if (checkReadOnlySupportGuard()) return;
+    const perm = canDeleteRecord(currentUser, 'contract');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Cannot delete service contracts.', 'error');
+      return;
+    }
+    const target = (contracts || []).find((c) => c.id === id);
+    if (!target) return;
+
+    setContracts((prev) => {
+      const updated = prev.filter((c) => c.id !== id);
+      saveCache('serviflow_contracts_cache', updated);
+      return updated;
+    });
+
+    deleteFromFirestore('contracts', id);
+    logActivity('Contract Deleted', 'contract', id, `Deleted AMC contract ${target.contractNumber}`);
+    showToast(`AMC contract ${target.contractNumber} deleted`, 'info');
+  };
+
+  const scheduleAmcVisit = (
+    contractId: string,
+    options?: {
+      scheduledDate?: string;
+      scheduledTime?: string;
+      technicianId?: string;
+      notes?: string;
+      silentToast?: boolean;
+    }
+  ): Job | null => {
+    if (checkReadOnlySupportGuard()) return null;
+    const targetContract = (contracts || []).find((c) => c.id === contractId);
+    if (!targetContract) {
+      showToast('AMC contract not found.', 'error');
+      return null;
+    }
+
+    if ((targetContract.visitsRemaining || 0) <= 0) {
+      showToast(`All ${targetContract.visitsAllowed} visits for contract ${targetContract.contractNumber} have already been utilized.`, 'error');
+      return null;
+    }
+
+    const customer = (customers || []).find((c) => c.id === targetContract.customerId);
+    const visitNum = (targetContract.visitsUsed || 0) + 1;
+    const visitDate = options?.scheduledDate || calculateNextVisitDate(targetContract) || new Date().toISOString().split('T')[0];
+    const visitTime = options?.scheduledTime || '10:00 AM - 12:00 PM';
+    const assignedTechId = options?.technicianId || targetContract.assignedTechnicianId || (users.find((u) => u.role === 'technician')?.id || 'user-tech-1');
+    const assignedTech = (users || []).find((u) => u.id === assignedTechId);
+
+    const newJob = addJob({
+      customerId: targetContract.customerId,
+      serviceId: targetContract.serviceId || 'srv-1',
+      description: `AMC Preventive Maintenance [Visit #${visitNum} of ${targetContract.visitsAllowed}]: ${targetContract.name}`,
+      priority: 'medium',
+      assignedStaffId: assignedTechId,
+      assignedStaffName: assignedTech?.name,
+      scheduledDate: visitDate,
+      scheduledTime: visitTime,
+      scheduledTimeSlot: visitTime,
+      location: customer?.address || targetContract.equipmentDetails || 'Customer Site',
+      estimatedAmount: 0,
+      status: assignedTechId ? 'assigned' : 'scheduled',
+      source: 'amc_auto_scheduler',
+      contractId: targetContract.id,
+      contractNumber: targetContract.contractNumber,
+      amcVisitNumber: visitNum,
+      notes: options?.notes || `Routine AMC maintenance. Equipment: ${targetContract.equipmentDetails || 'Covered equipment'}.`,
+    }, { silentToast: options?.silentToast });
+
+    if (newJob) {
+      const interval = getFrequencyIntervalMonths(targetContract.visitFrequency);
+      const newVisitsUsed = visitNum;
+      const newVisitsRemaining = Math.max(0, (targetContract.visitsAllowed || 1) - newVisitsUsed);
+      const nextDate = newVisitsRemaining > 0 ? addMonthsToDateString(visitDate, interval) : targetContract.endDate;
+
+      const updatedContract: RecurringContract = {
+        ...targetContract,
+        visitsUsed: newVisitsUsed,
+        visitsRemaining: newVisitsRemaining,
+        lastVisitDate: visitDate,
+        nextVisitDate: nextDate,
+        assignedTechnicianId: assignedTechId,
+      };
+
+      setContracts((prev) => {
+        const updated = prev.map((c) => (c.id === contractId ? updatedContract : c));
+        saveCache('serviflow_contracts_cache', updated);
+        return updated;
+      });
+
+      saveToFirestore('contracts', contractId, updatedContract);
+      logActivity('AMC Visit Scheduled', 'contract', contractId, `Dispatched visit #${visitNum} for ${targetContract.contractNumber} (Job ${newJob.jobId})`);
+
+      if (!options?.silentToast) {
+        showToast(`Dispatched Visit #${visitNum} for ${targetContract.contractNumber} (${newJob.jobId})!`, 'success');
+      }
+    }
+
+    return newJob;
+  };
+
+  const batchScheduleDueAmcVisits = (contractIds?: string[]): { scheduledJobs: Job[]; count: number } => {
+    if (checkReadOnlySupportGuard()) return { scheduledJobs: [], count: 0 };
+    const perm = canCreateRecord(currentUser, 'job');
+    if (!perm.allowed) {
+      showToast(perm.reason || 'Permission Denied: Cannot create service jobs.', 'error');
+      return { scheduledJobs: [], count: 0 };
+    }
+
+    const candidateContracts = contractIds && contractIds.length > 0
+      ? (contracts || []).filter((c) => contractIds.includes(c.id))
+      : getUpcomingDueAmcContracts(contracts || [], 7);
+
+    const eligible = candidateContracts.filter((c) => (c.visitsRemaining || 0) > 0 && c.status !== 'cancelled');
+
+    if (eligible.length === 0) {
+      showToast('No pending or due AMC visits found to schedule.', 'info');
+      return { scheduledJobs: [], count: 0 };
+    }
+
+    const scheduledJobs: Job[] = [];
+
+    eligible.forEach((contract) => {
+      const job = scheduleAmcVisit(contract.id, { silentToast: true });
+      if (job) {
+        scheduledJobs.push(job);
+      }
+    });
+
+    if (scheduledJobs.length > 0) {
+      playAmcAutoScheduledVoiceNotification(scheduledJobs.length);
+      showToast(`⚡ Batch Generated ${scheduledJobs.length} AMC preventive maintenance visits!`, 'success');
+    }
+
+    return { scheduledJobs, count: scheduledJobs.length };
   };
 
   // Expense Actions
@@ -5886,6 +6077,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         recordPayment,
 
         addContract,
+        updateContract,
+        deleteContract,
+        scheduleAmcVisit,
+        batchScheduleDueAmcVisits,
         addExpense,
         addStaff,
         deleteStaff,

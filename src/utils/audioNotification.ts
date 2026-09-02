@@ -513,6 +513,50 @@ export function playCustomerServiceRequestVoiceNotification(
 }
 
 /**
+ * Triggers instant chime + multi-language voice alert when AMC Maintenance Visits are Auto-Scheduled
+ */
+export function playAmcAutoScheduledVoiceNotification(jobsCount: number): void {
+  if (!isVoiceNotificationEnabled()) return;
+
+  playNotificationChime();
+
+  const lang = getSelectedVoiceLanguage();
+  let speechMessage = '';
+
+  if (lang.startsWith('hi')) {
+    // Hindi
+    speechMessage = `एएमसी मेंटेनेंस अपडेट! ${jobsCount} नए रूटीन सर्विस जॉब्स स्वतः शेड्यूल और डिस्पैच कर दिए गए हैं.`;
+  } else if (lang.startsWith('mr')) {
+    // Marathi
+    speechMessage = `एएमसी देखभाल अपडेट! ${jobsCount} नवीन सर्व्हिस जॉब्स यशस्वीरित्या शेड्यूल आणि डिस्पॅच केले गेले आहेत.`;
+  } else if (lang.startsWith('gu')) {
+    // Gujarati
+    speechMessage = `એએમસી મેઇન્ટેનન્સ અપડેટ! ${jobsCount} નવી સર્વિસ જોબ્સ સફળતાપૂર્વક શેડ્યૂલ થઈ ગઈ છે.`;
+  } else if (lang.startsWith('bn')) {
+    // Bengali
+    speechMessage = `এএমসি রক্ষণাবেক্ষণ আপডেট! ${jobsCount}টি নতুন সার্ভিস জব অটো-শিডিউল করা হয়েছে।`;
+  } else if (lang.startsWith('ta')) {
+    // Tamil
+    speechMessage = `ஏஎம்சி பராமரிப்பு புதுப்பிப்பு! ${jobsCount} புதிய சேவை பணிகள் திட்டமிடப்பட்டுள்ளன.`;
+  } else if (lang.startsWith('te')) {
+    // Telugu
+    speechMessage = `ఏఎంసీ నిర్వహణ నవీకరణ! ${jobsCount} కొత్త సర్వీస్ జాబ్స్ విజయవంతంగా షెడ్యూల్ చేయబడ్డాయి.`;
+  } else if (lang.startsWith('kn')) {
+    // Kannada
+    speechMessage = `ಎಎಂಸಿ ನಿರ್ವಹಣೆ ಅಪ್‌ಡೇಟ್! ${jobsCount} ಹೊಸ ಸರ್ವಿಸ್ ಜಾಬ್‌ಗಳು ನಿಗದಿಯಾಗಿವೆ.`;
+  } else {
+    // English
+    speechMessage = `AMC Maintenance Update! ${jobsCount} preventive service visit${
+      jobsCount === 1 ? ' has' : 's have'
+    } been scheduled and dispatched.`;
+  }
+
+  setTimeout(() => {
+    speakText(speechMessage, { rate: 0.95, pitch: 1.05, lang });
+  }, 350);
+}
+
+/**
  * Triggers custom voice notification
  */
 export function playCustomVoiceNotification(heading: string, detail?: string): void {

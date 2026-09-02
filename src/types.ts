@@ -267,7 +267,10 @@ export interface Job {
   location: string;
   estimatedAmount: number;
   status: JobStatus;
-  source?: 'manual' | 'customer_portal' | 'crm';
+  source?: 'manual' | 'customer_portal' | 'crm' | 'amc_auto_scheduler';
+  contractId?: string;
+  contractNumber?: string;
+  amcVisitNumber?: number;
   notes?: string;
   completionNotes?: string;
   beforePhotos?: string[];
@@ -393,6 +396,11 @@ export interface RecurringContract {
   visitsRemaining: number;
   renewalDate: string;
   status: 'active' | 'expiring_soon' | 'expired' | 'cancelled';
+  nextVisitDate?: string;
+  lastVisitDate?: string;
+  assignedTechnicianId?: string;
+  equipmentDetails?: string;
+  notes?: string;
 }
 
 export type ExpenseCategory =
