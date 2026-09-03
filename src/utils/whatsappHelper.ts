@@ -19,9 +19,11 @@ export const sanitizePhoneNumber = (phone: string): string => {
 export const openWhatsApp = (phone: string, text: string) => {
   const cleanPhone = sanitizePhoneNumber(phone);
   const encodedText = encodeURIComponent(text);
+  // Uses api.whatsapp.com to trigger standard OS package chooser when both
+  // regular WhatsApp and WhatsApp Business are installed on the device.
   const url = cleanPhone
-    ? `https://wa.me/${cleanPhone}?text=${encodedText}`
-    : `https://wa.me/?text=${encodedText}`;
+    ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`
+    : `https://api.whatsapp.com/send?text=${encodedText}`;
   window.open(url, '_blank', 'noopener,noreferrer');
 };
 
