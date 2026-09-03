@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useBackHandler } from '../utils/backNavigation';
 import { Search, X, Users, Briefcase, Receipt, FileText, Package, UserCheck } from 'lucide-react';
 
 interface GlobalSearchModalProps {
@@ -18,6 +19,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ onSelectTa
     staff,
     currentBusiness,
   } = useApp();
+
+  useBackHandler(isSearchOpen, () => setIsSearchOpen(false), 'global-search-modal');
 
   const [query, setQuery] = useState('');
 

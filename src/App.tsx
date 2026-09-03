@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { navigationManager, useBackHandler } from './utils/backNavigation';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { MobileNav } from './components/MobileNav';
@@ -54,12 +55,20 @@ const MainContent: React.FC = () => {
     isInstallModalOpen,
     setIsInstallModalOpen,
     getRolePermissions,
+    showToast,
   } = useApp();
   const [activeTab, setActiveTab] = useState<string>(() => {
     return localStorage.getItem('serviflow_active_tab') || sessionStorage.getItem('serviflow_active_tab') || 'dashboard';
   });
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isCreateJobOpen, setIsCreateJobOpen] = useState(false);
+
+  // Global Android / Browser Hardware Back Button handling for App-level modals & drawers
+  useBackHandler(isCreateJobOpen, () => setIsCreateJobOpen(false), 'app-create-job');
+  useBackHandler(isOnboardingOpen, () => setIsOnboardingOpen(false), 'app-onboarding');
+  useBackHandler(isAuthModalOpen, () => setIsAuthModalOpen(false), 'app-auth-modal');
+  useBackHandler(isProfileDrawerOpen, () => setIsProfileDrawerOpen(false), 'app-profile-drawer');
+  useBackHandler(isInstallModalOpen, () => setIsInstallModalOpen(false), 'app-install-modal');
 
   const [jobsFilter, setJobsFilter] = useState<JobInitialFilter | null>(null);
   const [invoicesFilter, setInvoicesFilter] = useState<InvoiceInitialFilter | null>(null);
@@ -72,6 +81,23 @@ const MainContent: React.FC = () => {
   });
 
   const prevUserIdRef = React.useRef<string | null>(null);
+
+  // Initialize global navigation manager once on mount
+  useEffect(() => {
+    navigationManager.init(
+      activeTab,
+      (targetTab) => {
+        setActiveTab(targetTab);
+        if (currentUser) {
+          localStorage.setItem('serviflow_active_tab', targetTab);
+          sessionStorage.setItem('serviflow_active_tab', targetTab);
+        }
+      },
+      (msg, type) => {
+        showToast(msg, type === 'warning' ? 'info' : type);
+      }
+    );
+  }, []);
 
   // Sync activeTab only when switching authenticated user/session
   React.useEffect(() => {
@@ -86,23 +112,28 @@ const MainContent: React.FC = () => {
           // Technicians & staff must default to 'jobs' (My Jobs) and are restricted from dashboard
           if (!savedTab || savedTab === 'login' || savedTab === 'dashboard') {
             setActiveTab('jobs');
+            navigationManager.pushScreen('jobs');
             localStorage.setItem('serviflow_active_tab', 'jobs');
             sessionStorage.setItem('serviflow_active_tab', 'jobs');
           } else {
             setActiveTab(savedTab);
+            navigationManager.pushScreen(savedTab);
           }
         } else if (!savedTab || savedTab === 'login') {
           const defaultTab = isSuperUser ? 'super_admin_dashboard' : 'dashboard';
           setActiveTab(defaultTab);
+          navigationManager.pushScreen(defaultTab);
           localStorage.setItem('serviflow_active_tab', defaultTab);
           sessionStorage.setItem('serviflow_active_tab', defaultTab);
         } else {
           setActiveTab(savedTab);
+          navigationManager.pushScreen(savedTab);
         }
       }
     } else if (!isAuthInitializing) {
       prevUserIdRef.current = null;
       setActiveTab('login');
+      navigationManager.pushScreen('login');
     }
   }, [currentUser?.id, currentUser?.role, isAuthInitializing]);
 
@@ -114,6 +145,7 @@ const MainContent: React.FC = () => {
     if (currentUser?.role === 'super_admin' && tab === 'super_admin') {
       targetTab = 'super_admin_dashboard';
     }
+    navigationManager.pushScreen(targetTab);
     setActiveTab(targetTab);
     if (currentUser) {
       localStorage.setItem('serviflow_active_tab', targetTab);

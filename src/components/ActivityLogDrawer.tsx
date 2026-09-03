@@ -22,6 +22,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { ActivityLog } from '../types';
 import { DateRangePicker, DateRange, getLocalDateString, getPresetDates } from './DateRangePicker';
+import { useBackHandler } from '../utils/backNavigation';
 
 export const ActivityLogDrawer: React.FC = () => {
   const { activityLogs, isActivityLogOpen, setIsActivityLogOpen, logActivity, currentBusiness } = useApp();
@@ -30,6 +31,11 @@ export const ActivityLogDrawer: React.FC = () => {
   const [logLimit, setLogLimit] = useState<number | 'all'>(15);
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
   const [showAddNoteModal, setShowAddNoteModal] = useState(false);
+
+  // Back button handling: nested note modal first, then the drawer itself
+  useBackHandler(showAddNoteModal, () => setShowAddNoteModal(false), 'activity-log-note-modal');
+  useBackHandler(isActivityLogOpen, () => setIsActivityLogOpen(false), 'activity-log-drawer');
+
   const [noteAction, setNoteAction] = useState('');
   const [noteDescription, setNoteDescription] = useState('');
   const [noteEntityType, setNoteEntityType] = useState<ActivityLog['entityType']>('job');
