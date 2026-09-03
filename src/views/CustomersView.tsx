@@ -549,18 +549,18 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
                 }`}
               >
                 {/* Row 1: Customer Name → Customer Type badge → Jobs: X → 3-dot menu */}
-                <div className="flex items-center justify-between gap-1.5 min-w-0">
-                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-tight truncate">
+                <div className="h-7 flex items-center justify-between gap-1.5 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1 h-7">
+                    <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-none truncate">
                       {customer.name}
                     </h3>
                     {customer.companyName && (
-                      <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 truncate hidden md:inline">
+                      <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 truncate hidden md:inline leading-none">
                         • {customer.companyName}
                       </span>
                     )}
                     <span
-                      className={`text-[9px] sm:text-[9.5px] font-black uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded-full shrink-0 ${
+                      className={`text-[9px] sm:text-[9.5px] font-black uppercase tracking-wider px-1.5 sm:px-2 h-5 rounded-full shrink-0 inline-flex items-center justify-center leading-none ${
                         customer.customerType === 'commercial'
                           ? 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60'
                           : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
@@ -568,154 +568,158 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
                     >
                       {customer.customerType}
                     </span>
-                    <span className="text-[9.5px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700/60 px-1.5 py-0.5 rounded-md shrink-0 flex items-center gap-1 font-mono">
+                  </div>
+
+                  {/* Fixed Right-Aligned Cluster: Jobs Badge & 3-Dot Action Menu */}
+                  <div className="flex items-center gap-1.5 shrink-0 h-7">
+                    <span className="text-[9.5px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700/60 px-1.5 h-6 rounded-md shrink-0 inline-flex items-center justify-center gap-1 font-mono leading-none">
                       <Briefcase className="w-2.5 h-2.5 text-slate-400 shrink-0" />
                       <span>Jobs: {customerJobs.length}</span>
                     </span>
-                  </div>
 
-                  {/* 3-Dot Action Menu Trigger */}
-                  <div className="relative shrink-0 ml-1" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      type="button"
-                      aria-label="Customer actions"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenCardMenuId(openCardMenuId === customer.id ? null : customer.id);
-                      }}
-                      className="w-7 h-7 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-
-                    {/* 3-Dot Dropdown Menu */}
-                    {openCardMenuId === customer.id && (
-                      <div
-                        className="absolute right-0 top-full mt-1 w-52 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 py-1.5 z-30 animate-in fade-in zoom-in-95 text-xs font-semibold text-slate-700 dark:text-slate-200"
-                        onClick={(e) => e.stopPropagation()}
+                    {/* 3-Dot Action Menu Trigger */}
+                    <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        aria-label="Customer actions"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenCardMenuId(openCardMenuId === customer.id ? null : customer.id);
+                        }}
+                        className="w-7 h-7 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
                       >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOpenCardMenuId(null);
-                            setSelectedCustomer(customer);
-                          }}
-                          className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 cursor-pointer"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-indigo-500" />
-                          <span>View Customer Details</span>
-                        </button>
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
 
-                        {canEditCustomers && (
+                      {/* 3-Dot Dropdown Menu */}
+                      {openCardMenuId === customer.id && (
+                        <div
+                          className="absolute right-0 top-full mt-1 w-52 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 py-1.5 z-30 animate-in fade-in zoom-in-95 text-xs font-semibold text-slate-700 dark:text-slate-200"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <button
                             type="button"
-                            onClick={(e) => {
+                            onClick={() => {
                               setOpenCardMenuId(null);
-                              openEditCustomerModal(customer, e);
+                              setSelectedCustomer(customer);
                             }}
                             className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 cursor-pointer"
                           >
-                            <Edit2 className="w-3.5 h-3.5 text-amber-500" />
-                            <span>Edit Customer</span>
+                            <Eye className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>View Customer Details</span>
                           </button>
-                        )}
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOpenCardMenuId(null);
-                            if (onOpenNewJob) {
-                              onOpenNewJob(customer.id);
-                            } else if (onNavigate) {
-                              onNavigate('jobs', { customerId: customer.id });
-                            }
-                          }}
-                          className="w-full text-left px-3.5 py-2 hover:bg-indigo-50/70 dark:hover:bg-indigo-950/50 flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold cursor-pointer"
-                        >
-                          <Briefcase className="w-3.5 h-3.5" />
-                          <span>Add Job</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOpenCardMenuId(null);
-                            setStatementCustomer(customer);
-                          }}
-                          className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 cursor-pointer"
-                        >
-                          <FileText className="w-3.5 h-3.5 text-emerald-500" />
-                          <span>Customer Statement</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOpenCardMenuId(null);
-                            setPortalCustomerForShare(customer);
-                          }}
-                          className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 cursor-pointer"
-                        >
-                          <QrCode className="w-3.5 h-3.5 text-indigo-500" />
-                          <span>Share Customer Link</span>
-                        </button>
-
-                        {cleanPhone && (
-                          <a
-                            href={`tel:${cleanPhone}`}
-                            onClick={() => setOpenCardMenuId(null)}
-                            className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 text-emerald-600 dark:text-emerald-400 cursor-pointer"
-                          >
-                            <PhoneCall className="w-3.5 h-3.5" />
-                            <span>Call Customer</span>
-                          </a>
-                        )}
-
-                        {isOwnerOrAdmin && (
-                          <>
-                            <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
-                            {customer.isArchived ? (
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  setOpenCardMenuId(null);
-                                  await unarchiveCustomer(customer.id);
-                                }}
-                                className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 text-slate-600 dark:text-slate-300 cursor-pointer"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5" />
-                                <span>Restore Customer</span>
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  setOpenCardMenuId(null);
-                                  await archiveCustomer(customer.id);
-                                }}
-                                className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 text-amber-600 dark:text-amber-400 cursor-pointer"
-                              >
-                                <Archive className="w-3.5 h-3.5" />
-                                <span>Archive Customer</span>
-                              </button>
-                            )}
-
+                          {canEditCustomers && (
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={(e) => {
                                 setOpenCardMenuId(null);
-                                setSelectedCustomer(customer);
-                                setIsDeleteModalOpen(true);
+                                openEditCustomerModal(customer, e);
                               }}
-                              className="w-full text-left px-3.5 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2 text-rose-600 dark:text-rose-400 cursor-pointer"
+                              className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 cursor-pointer"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Delete Customer</span>
+                              <Edit2 className="w-3.5 h-3.5 text-amber-500" />
+                              <span>Edit Customer</span>
                             </button>
-                          </>
-                        )}
-                      </div>
-                    )}
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenCardMenuId(null);
+                              if (onOpenNewJob) {
+                                onOpenNewJob(customer.id);
+                              } else if (onNavigate) {
+                                onNavigate('jobs', { customerId: customer.id });
+                              }
+                            }}
+                            className="w-full text-left px-3.5 py-2 hover:bg-indigo-50/70 dark:hover:bg-indigo-950/50 flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold cursor-pointer"
+                          >
+                            <Briefcase className="w-3.5 h-3.5" />
+                            <span>Add Job</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenCardMenuId(null);
+                              setStatementCustomer(customer);
+                            }}
+                            className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 cursor-pointer"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Customer Statement</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenCardMenuId(null);
+                              setPortalCustomerForShare(customer);
+                            }}
+                            className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 cursor-pointer"
+                          >
+                            <QrCode className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>Share Customer Link</span>
+                          </button>
+
+                          {cleanPhone && (
+                            <a
+                              href={`tel:${cleanPhone}`}
+                              onClick={() => setOpenCardMenuId(null)}
+                              className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 text-emerald-600 dark:text-emerald-400 cursor-pointer"
+                            >
+                              <PhoneCall className="w-3.5 h-3.5" />
+                              <span>Call Customer</span>
+                            </a>
+                          )}
+
+                          {isOwnerOrAdmin && (
+                            <>
+                              <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
+                              {customer.isArchived ? (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    setOpenCardMenuId(null);
+                                    await unarchiveCustomer(customer.id);
+                                  }}
+                                  className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 text-slate-600 dark:text-slate-300 cursor-pointer"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" />
+                                  <span>Restore Customer</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    setOpenCardMenuId(null);
+                                    await archiveCustomer(customer.id);
+                                  }}
+                                  className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 text-amber-600 dark:text-amber-400 cursor-pointer"
+                                >
+                                  <Archive className="w-3.5 h-3.5" />
+                                  <span>Archive Customer</span>
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenCardMenuId(null);
+                                  setSelectedCustomer(customer);
+                                  setIsDeleteModalOpen(true);
+                                }}
+                                className="w-full text-left px-3.5 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-2 text-rose-600 dark:text-rose-400 cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete Customer</span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
