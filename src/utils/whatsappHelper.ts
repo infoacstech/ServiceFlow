@@ -4,7 +4,8 @@
  * Technicians, Customers, Dispatchers, and Billing.
  */
 
-import { Business, Customer, Invoice, Job, RecurringContract, User } from '../types';
+import { Business, Customer, Invoice, Job, Quotation, RecurringContract, User } from '../types';
+import { formatIndiaDate } from './dateUtils';
 
 export const sanitizePhoneNumber = (phone: string): string => {
   let cleaned = (phone || '').replace(/[^0-9]/g, '');
@@ -266,6 +267,57 @@ Our service engineer will arrive to inspect, clean, and service your equipment f
 _Need to reschedule? Kindly reply to this message or call our helpline: ${business?.mobile || business?.whatsapp || ''}_
 
 Thank you for choosing *${business?.name || 'ServiFlow'}*!`;
+
+  openWhatsApp(custPhone, message);
+};
+
+/**
+ * 8. Send Official Quotation / Estimate to Customer via WhatsApp
+ */
+export const sendQuotationWhatsApp = (
+  quotation: Quotation,
+  customer?: Customer,
+  business?: Business
+) => {
+  const custPhone = customer?.whatsapp || customer?.mobile || '';
+  const curr = business?.currency || '₹';
+
+  const itemsList = (quotation.items || [])
+    .map(
+      (it, idx) =>
+        `${idx + 1}. *${it.description}*\n   Qty: ${it.quantity} × ${curr}${it.rate} = *${curr}${it.amount}*`
+    )
+    .join('\n');
+
+  const formattedDate = formatIndiaDate(quotation.date);
+  const formattedValidUntil = formatIndiaDate(quotation.validUntil);
+
+  const taxDetails =
+    quotation.taxTotal > 0
+      ? `• *Subtotal:* ${curr}${quotation.subtotal.toLocaleString('en-IN')}\n• *GST / Tax:* ${curr}${quotation.taxTotal.toLocaleString('en-IN')}\n`
+      : '';
+
+  const message = `📋 *SERVICE ESTIMATE / QUOTATION - ${business?.name || 'ServiFlow'}*
+━━━━━━━━━━━━━━━━━━━━
+Dear *${customer?.name || 'Valued Customer'}*,
+
+Here is the official price quotation for your requested service:
+
+📄 *Quotation No:* *${quotation.quotationNumber}*
+📅 *Date:* ${formattedDate}
+⏳ *Valid Until:* *${formattedValidUntil}*
+
+📝 *Line Items:*
+${itemsList}
+
+━━━━━━━━━━━━━━━━━━━━
+${taxDetails}💰 *Grand Total:* *${curr}${quotation.grandTotal.toLocaleString('en-IN')}*
+━━━━━━━━━━━━━━━━━━━━
+${quotation.notes ? `📌 *Notes:* ${quotation.notes}\n` : ''}
+To approve this estimate or for any clarifications, please reply directly to this message or contact us at *${business?.mobile || business?.whatsapp || ''}*.
+
+Thank you for your business!
+_Team ${business?.name || 'ServiFlow'}_`;
 
   openWhatsApp(custPhone, message);
 };

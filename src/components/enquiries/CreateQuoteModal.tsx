@@ -51,7 +51,7 @@ export const CreateQuoteModal: React.FC<CreateQuoteModalProps> = ({
             quantity: 1,
             rate: rate,
             taxPercent: taxPercent,
-            amount: grandTotal,
+            amount: rate,
           },
         ],
         notes: notes.trim(),

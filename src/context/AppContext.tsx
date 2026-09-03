@@ -103,6 +103,7 @@ import {
   getFrequencyIntervalMonths,
   getUpcomingDueAmcContracts,
 } from '../utils/amcHelper';
+import { getIndiaTodayDateString, getIndiaDatePlusDays } from '../utils/dateUtils';
 import {
   collection,
   doc,
@@ -3011,14 +3012,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const taxTotal = quoteData.items.reduce((sum, item) => sum + ((item.quantity * item.rate * (item.taxPercent || 0)) / 100), 0);
     const grandTotal = subtotal + taxTotal;
 
-    const validUntil = quoteData.validUntil || new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0];
+    const validUntil = quoteData.validUntil || getIndiaDatePlusDays(15);
 
     // 2. Create quotation
     const newQuotation = addQuotation(
       {
         customerId: custId || '',
         enquiryId: enq.id,
-        date: new Date().toISOString().split('T')[0],
+        date: getIndiaTodayDateString(),
         validUntil,
         status: 'sent',
         items: quoteData.items,
@@ -4045,8 +4046,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       invoiceNumber: invNum,
       quotationId: qt.id,
       customerId: qt.customerId,
-      date: new Date().toISOString().split('T')[0],
-      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      date: getIndiaTodayDateString(),
+      dueDate: getIndiaDatePlusDays(14),
       status: 'pending',
       items: qt.items,
       subtotal: qt.subtotal,
