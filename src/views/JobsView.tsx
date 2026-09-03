@@ -169,7 +169,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
     priority: 'medium' as JobPriority,
     assignedStaffId: (staff || []).find((s) => s.role === 'technician')?.id || '',
     scheduledDate: getLocalDateString(),
-    scheduledTime: '09:00 AM - 11:00 AM',
+    scheduledTime: TIME_SLOT_PRESETS[0],
     location: customers?.[0]?.address ? `${customers[0].address}, ${customers[0].city || ''}`.trim() : '',
     estimatedAmount: '',
     status: 'assigned' as JobStatus,
@@ -432,7 +432,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
       priority: 'medium',
       assignedStaffId: '',
       scheduledDate: getLocalDateString(),
-      scheduledTime: '09:00 AM - 11:00 AM',
+      scheduledTime: TIME_SLOT_PRESETS[0],
       location: '',
       estimatedAmount: '',
       status: 'assigned',
@@ -1611,8 +1611,19 @@ export const JobsView: React.FC<JobsViewProps> = ({
                       Select Time Slot *
                     </label>
                     <select
-                      value={newJobData.scheduledTime}
-                      onChange={(e) => setNewJobData({ ...newJobData, scheduledTime: e.target.value })}
+                      id="job-time-slot-select"
+                      value={
+                        TIME_SLOT_PRESETS.includes(newJobData.scheduledTime)
+                          ? newJobData.scheduledTime
+                          : 'CUSTOM'
+                      }
+                      onChange={(e) => {
+                        if (e.target.value === 'CUSTOM') {
+                          setNewJobData({ ...newJobData, scheduledTime: '' });
+                        } else {
+                          setNewJobData({ ...newJobData, scheduledTime: e.target.value });
+                        }
+                      }}
                       className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                       {TIME_SLOT_PRESETS.map((slot) => (
@@ -1625,46 +1636,22 @@ export const JobsView: React.FC<JobsViewProps> = ({
                   </div>
                 </div>
 
-                {/* Quick Time Slot Chips */}
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Quick Time Slot Presets:
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {TIME_SLOT_PRESETS.map((preset) => {
-                      const isSelected = newJobData.scheduledTime === preset;
-                      const shortLabel = preset.split(' ')[0] + ' ' + preset.split(' ')[1] + ' - ' + preset.split(' ')[3] + ' ' + preset.split(' ')[4];
-                      return (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => setNewJobData({ ...newJobData, scheduledTime: preset })}
-                          className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer border ${
-                            isSelected
-                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
-                          }`}
-                        >
-                          {shortLabel}
-                        </button>
-                      );
-                    })}
+                {/* Custom Time Slot Input (Visible when Custom is chosen) */}
+                {!TIME_SLOT_PRESETS.includes(newJobData.scheduledTime) && (
+                  <div className="pt-1">
+                    <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
+                      Custom Time Slot / Specific Time:
+                    </label>
+                    <input
+                      type="text"
+                      value={newJobData.scheduledTime}
+                      onChange={(e) => setNewJobData({ ...newJobData, scheduledTime: e.target.value })}
+                      placeholder="e.g. 10:30 AM or Exact 02:00 PM"
+                      className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      autoFocus
+                    />
                   </div>
-                </div>
-
-                {/* Custom Time Slot Text Override Input */}
-                <div className="pt-1">
-                  <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 block mb-1">
-                    Custom / Specific Time Note:
-                  </label>
-                  <input
-                    type="text"
-                    value={newJobData.scheduledTime}
-                    onChange={(e) => setNewJobData({ ...newJobData, scheduledTime: e.target.value })}
-                    placeholder="e.g. 10:30 AM or Exact 02:00 PM"
-                    className="w-full px-3 py-1.5 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
+                )}
               </div>
             </div>
 
