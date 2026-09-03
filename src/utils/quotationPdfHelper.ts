@@ -176,6 +176,8 @@ export const printQuotationDocument = (
           margin-bottom: 30px;
           font-size: 12px;
           color: #475569;
+          white-space: pre-wrap;
+          word-break: break-word;
         }
         .notes-box strong {
           color: #1e293b;

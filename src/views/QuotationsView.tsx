@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Quotation, LineItem, Customer } from '../types';
 import { CustomerSearchSelect } from '../components/CustomerSearchSelect';
@@ -21,10 +21,16 @@ import {
   RotateCcw,
   Check,
   Sparkles,
+  User,
+  Phone,
+  MapPin,
+  Calendar,
+  Tag,
   HelpCircle,
 } from 'lucide-react';
 import {
   getIndiaTodayDateString,
+  getIndiaTimeString,
   getIndiaDatePlusDays,
   isPastIndiaDate,
   formatIndiaDate,
@@ -42,7 +48,23 @@ interface AddedItem {
 
 const GST_PRESET_RATES = [0, 5, 12, 18, 28];
 
-type CreateModalStep = 'FORM' | 'REVIEW' | 'SUCCESS';
+type CreateModalStep = 'FORM' | 'SUCCESS';
+
+/**
+ * Format date in India-friendly DD/MM/YYYY format
+ */
+const formatIndiaDateDDMMYYYY = (dateStr?: string | Date | null): string => {
+  if (!dateStr) return '-';
+  try {
+    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      const [y, m, d] = dateStr.split('-');
+      return `${d}/${m}/${y}`;
+    }
+    return formatIndiaDate(dateStr, { day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch {
+    return String(dateStr);
+  }
+};
 
 export const QuotationsView: React.FC = () => {
   const {
@@ -63,12 +85,15 @@ export const QuotationsView: React.FC = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createStep, setCreateStep] = useState<CreateModalStep>('FORM');
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<AddedItem | null>(null);
 
   // Today in India Standard Time (Asia/Kolkata)
   const todayIndia = useMemo(() => getIndiaTodayDateString(), []);
+  const todayTimeIndia = useMemo(() => getIndiaTimeString(), []);
 
   // Form Header State
   const [customerId, setCustomerId] = useState('');
+  const [isChangingCustomer, setIsChangingCustomer] = useState(false);
   const [validUntil, setValidUntil] = useState('');
   const [notes, setNotes] = useState('Payment 50% advance upon quotation approval. Validity as stated.');
   const [isGstApplicable, setIsGstApplicable] = useState(true);
@@ -82,7 +107,7 @@ export const QuotationsView: React.FC = () => {
   const [entryRate, setEntryRate] = useState<number | ''>('');
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
-  // Added Items List State
+  // Added Items List State (Strict sequential array: 01, 02, 03...)
   const [addedItems, setAddedItems] = useState<AddedItem[]>([]);
 
   // Validation Errors
@@ -91,13 +116,21 @@ export const QuotationsView: React.FC = () => {
 
   // Saved Quotation for Success Step
   const [savedQuotation, setSavedQuotation] = useState<Quotation | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const descriptionInputRef = useRef<HTMLInputElement>(null);
+  const lineItemEntryRef = useRef<HTMLDivElement>(null);
+
+  // Active selected customer object
+  const selectedCustomer = useMemo(() => {
+    return customers.find((c) => c.id === customerId) || null;
+  }, [customers, customerId]);
 
   // Reset & Open Create Quotation Modal
   const handleOpenCreateModal = () => {
     const defaultCustId = customers[0]?.id || '';
     setCustomerId(defaultCustId);
+    setIsChangingCustomer(defaultCustId ? false : true);
 
     // Default valid until is strictly Current Date + 7 days in India Standard Time
     setValidUntil(getIndiaDatePlusDays(7));
@@ -109,7 +142,7 @@ export const QuotationsView: React.FC = () => {
     setIsCustomGst(false);
     setCustomGstRate('');
 
-    // Common Item Entry reset
+    // Common Item Entry reset (Rate strictly blank, Qty default 1)
     setEntryDescription('');
     setEntryQuantity(1);
     setEntryRate('');
@@ -121,12 +154,14 @@ export const QuotationsView: React.FC = () => {
     setHeaderErrors({});
     setEntryErrors({});
     setSavedQuotation(null);
+    setItemToDelete(null);
+    setIsSaving(false);
     setCreateStep('FORM');
     setShowDiscardConfirm(false);
     setIsCreateOpen(true);
   };
 
-  // Safe Close with Confirmation if user has unsaved items
+  // Safe Close with Confirmation if user has unsaved items or entered text
   const handleAttemptClose = () => {
     if (createStep === 'SUCCESS') {
       setIsCreateOpen(false);
@@ -150,11 +185,13 @@ export const QuotationsView: React.FC = () => {
     setIsCreateOpen(false);
     setAddedItems([]);
     setEditingItemId(null);
+    setItemToDelete(null);
   };
 
-  // When customer changes, reflect GST status if customer has GST
+  // When customer changes
   const handleCustomerChange = (id: string) => {
     setCustomerId(id);
+    setIsChangingCustomer(false);
     if (headerErrors.customerId) {
       setHeaderErrors((prev) => ({ ...prev, customerId: undefined }));
     }
@@ -163,6 +200,11 @@ export const QuotationsView: React.FC = () => {
     if (selectedCust?.gstNumber && selectedCust.gstNumber.trim().length > 0) {
       setIsGstApplicable(true);
     }
+  };
+
+  const handleRemoveCustomer = () => {
+    setCustomerId('');
+    setIsChangingCustomer(true);
   };
 
   // Effective GST Rate %
@@ -175,7 +217,7 @@ export const QuotationsView: React.FC = () => {
     return gstRate;
   }, [isGstApplicable, isCustomGst, customGstRate, gstRate]);
 
-  // Current Entry Amount Preview: Qty × Rate
+  // Current Entry Amount Preview: Qty × Rate (Amount = Qty × Rate auto-calculated)
   const currentEntryAmount = useMemo(() => {
     const q = typeof entryQuantity === 'number' ? entryQuantity : Number(entryQuantity) || 0;
     const r = typeof entryRate === 'number' ? entryRate : Number(entryRate) || 0;
@@ -208,7 +250,7 @@ export const QuotationsView: React.FC = () => {
 
     const qNum = typeof entryQuantity === 'number' ? entryQuantity : Number(entryQuantity);
     if (entryQuantity === '' || isNaN(qNum) || qNum <= 0) {
-      errs.quantity = 'Qty must be > 0';
+      errs.quantity = 'Qty must be at least 1';
       valid = false;
     }
 
@@ -231,7 +273,7 @@ export const QuotationsView: React.FC = () => {
     const itemAmount = q * r;
 
     if (editingItemId) {
-      // Update existing item
+      // Update existing item in place (strictly preserving sequence)
       setAddedItems((prev) =>
         prev.map((it) =>
           it.id === editingItemId
@@ -248,7 +290,7 @@ export const QuotationsView: React.FC = () => {
       setEditingItemId(null);
       showToast('Item updated in quotation list', 'success');
     } else {
-      // Add new item to list
+      // Append new item to the end (sequence 01, 02, 03... strictly preserved)
       const newItem: AddedItem = {
         id: `item-${Date.now()}-${addedItems.length}`,
         description: entryDescription.trim(),
@@ -257,9 +299,11 @@ export const QuotationsView: React.FC = () => {
         amount: itemAmount,
       };
       setAddedItems((prev) => [...prev, newItem]);
+      showToast('Item added to quotation', 'success');
     }
 
-    // Reset common entry fields automatically for next item
+    // Reset common entry fields automatically for next item:
+    // Description and Rate clear/reset; Qty resets to default 1
     setEntryDescription('');
     setEntryQuantity(1);
     setEntryRate('');
@@ -292,20 +336,39 @@ export const QuotationsView: React.FC = () => {
     setEntryQuantity(item.quantity);
     setEntryRate(item.rate);
     setEntryErrors({});
-    descriptionInputRef.current?.focus();
+    lineItemEntryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    setTimeout(() => {
+      descriptionInputRef.current?.focus();
+    }, 100);
   };
 
-  // Delete item from added list
-  const handleDeleteItem = (id: string) => {
-    setAddedItems((prev) => prev.filter((it) => it.id !== id));
-    if (editingItemId === id) {
+  // Confirm delete item (accidental deletion protection)
+  const handleConfirmDeleteItem = () => {
+    if (!itemToDelete) return;
+    const targetId = itemToDelete.id;
+    setAddedItems((prev) => prev.filter((it) => it.id !== targetId));
+    if (editingItemId === targetId) {
       handleCancelEdit();
     }
+    setItemToDelete(null);
+    showToast('Item removed from quotation', 'info');
   };
 
-  // Validate entire quotation before Review step
-  const handleProceedToReview = (e: React.FormEvent) => {
-    e.preventDefault();
+  // Quick suggestion handler: fills description only; rate stays blank as requested
+  const handleSelectQuickSuggestion = (serviceName: string) => {
+    setEntryDescription(serviceName);
+    if (entryErrors.description) {
+      setEntryErrors((prev) => ({ ...prev, description: undefined }));
+    }
+    // Focus next on rate or qty
+    setTimeout(() => {
+      descriptionInputRef.current?.focus();
+    }, 50);
+  };
+
+  // Validate and Confirm & Save Quotation to Database (Direct saving to Success)
+  const handleConfirmAndSaveQuotation = () => {
+    if (isSaving) return;
 
     const errs: { customerId?: string; validUntil?: string; items?: string } = {};
     let valid = true;
@@ -319,18 +382,26 @@ export const QuotationsView: React.FC = () => {
       errs.validUntil = 'Valid Until Date is required.';
       valid = false;
     } else if (isPastIndiaDate(validUntil)) {
-      errs.validUntil = `Valid Until Date cannot be in the past (Today in India is ${formatIndiaDate(todayIndia)}).`;
+      errs.validUntil = `Valid Until Date cannot be in the past (Today in India is ${formatIndiaDateDDMMYYYY(todayIndia)}).`;
       valid = false;
     }
 
     // If no items added yet, but user has filled common entry fields, prompt them
     if (addedItems.length === 0) {
       if (entryDescription.trim() && entryRate !== '') {
-        errs.items = 'Please click "Add Item" above to add this item to your quotation.';
+        errs.items = 'You have entered an item above. Please click "Add Item" to add it to your quotation before saving.';
       } else {
         errs.items = 'Please add at least one line item to the quotation.';
       }
       valid = false;
+    } else {
+      const invalidItem = addedItems.find(
+        (it) => !it.description.trim() || Number(it.quantity) <= 0 || Number(it.rate) < 0
+      );
+      if (invalidItem) {
+        errs.items = 'One or more line items have invalid description, quantity, or rate.';
+        valid = false;
+      }
     }
 
     setHeaderErrors(errs);
@@ -340,37 +411,41 @@ export const QuotationsView: React.FC = () => {
       return;
     }
 
-    // Advance to Review step
-    setCreateStep('REVIEW');
-  };
+    setIsSaving(true);
 
-  // Confirm and Save to Database (Firebase / AppContext)
-  const handleConfirmAndSaveQuotation = () => {
-    const formattedItems: LineItem[] = addedItems.map((item, idx) => ({
-      id: item.id || `item-${Date.now()}-${idx}`,
-      description: item.description,
-      quantity: item.quantity,
-      rate: item.rate,
-      taxPercent: effectiveGstRate,
-      amount: item.amount,
-    }));
+    try {
+      const formattedItems: LineItem[] = addedItems.map((item, idx) => ({
+        id: item.id || `item-${Date.now()}-${idx}`,
+        description: item.description,
+        quantity: item.quantity,
+        rate: item.rate,
+        taxPercent: effectiveGstRate,
+        amount: item.amount,
+      }));
 
-    const created = addQuotation({
-      customerId,
-      date: getIndiaTodayDateString(), // India Standard Time
-      validUntil,
-      notes: notes.trim(),
-      items: formattedItems,
-      subtotal: subtotalValue,
-      taxTotal: taxValue,
-      discountTotal: 0,
-      grandTotal: grandTotalValue,
-      status: 'draft',
-    });
+      const created = addQuotation({
+        customerId,
+        date: getIndiaTodayDateString(), // India Standard Time (Asia/Kolkata)
+        validUntil,
+        notes: notes.trim(),
+        items: formattedItems,
+        subtotal: subtotalValue,
+        taxTotal: taxValue,
+        discountTotal: 0,
+        grandTotal: grandTotalValue,
+        status: 'draft',
+      });
 
-    if (created) {
-      setSavedQuotation(created);
-      setCreateStep('SUCCESS');
+      if (created) {
+        setSavedQuotation(created);
+        setCreateStep('SUCCESS');
+        showToast(`Quotation ${created.quotationNumber} saved successfully!`, 'success');
+      }
+    } catch (error) {
+      console.error('Failed to create quotation:', error);
+      showToast('Failed to save quotation. Please try again.', 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -398,20 +473,24 @@ export const QuotationsView: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+      {/* Top Banner & Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
         <div>
           <h1 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <FileText className="w-5 h-5 text-indigo-600" /> Quotations & Estimates ({quotations.length})
           </h1>
-          <p className="text-xs text-slate-500">
-            Create professional price estimates in India Standard Time (IST) & convert them into live invoices with 1 click
+          <p className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-2">
+            <span>Create professional price estimates in India Standard Time (IST)</span>
+            <span className="hidden sm:inline text-slate-300">•</span>
+            <span className="inline-flex items-center gap-1 font-medium text-slate-600 dark:text-slate-400">
+              <Clock className="w-3.5 h-3.5 text-indigo-500" /> Today: {formatIndiaDateDDMMYYYY(todayIndia)}
+            </span>
           </p>
         </div>
 
         <button
           onClick={handleOpenCreateModal}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer"
+          className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Create Quotation
         </button>
@@ -470,11 +549,11 @@ export const QuotationsView: React.FC = () => {
                         )}
                       </td>
                       <td className="p-3.5 text-slate-500 font-medium">
-                        {formatIndiaDate(qt.date)}
+                        {formatIndiaDateDDMMYYYY(qt.date)}
                       </td>
                       <td className="p-3.5">
                         <span className={`font-medium ${isExpired ? 'text-amber-600 font-bold' : 'text-slate-600 dark:text-slate-300'}`}>
-                          {formatIndiaDate(qt.validUntil)}
+                          {formatIndiaDateDDMMYYYY(qt.validUntil)}
                         </span>
                         {isExpired && (
                           <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300">
@@ -523,8 +602,8 @@ export const QuotationsView: React.FC = () => {
 
       {/* Existing Quotation Preview & Share Modal */}
       {selectedQuotation && (
-        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-5 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
                 <span className="text-xs font-bold text-indigo-600">{selectedQuotation.quotationNumber}</span>
@@ -532,13 +611,13 @@ export const QuotationsView: React.FC = () => {
               </div>
               <button
                 onClick={() => setSelectedQuotation(null)}
-                className="p-1 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="p-1 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div id="quotation-print-area" className="p-6 bg-slate-50 dark:bg-slate-800/70 rounded-3xl border border-slate-200/80 dark:border-slate-700/60 text-xs space-y-4">
+            <div id="quotation-print-area" className="p-5 sm:p-6 bg-slate-50 dark:bg-slate-800/70 rounded-3xl border border-slate-200/80 dark:border-slate-700/60 text-xs space-y-4">
               <div className="flex justify-between items-start border-b border-slate-200 dark:border-slate-700 pb-3">
                 <div>
                   <div className="font-extrabold text-base text-slate-900 dark:text-slate-100">{currentBusiness.name}</div>
@@ -552,9 +631,9 @@ export const QuotationsView: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <div className="font-black text-indigo-600 text-sm tracking-wide">ESTIMATE / QUOTE</div>
-                  <div className="text-slate-500">Date: {formatIndiaDate(selectedQuotation.date)}</div>
+                  <div className="text-slate-500">Date: {formatIndiaDateDDMMYYYY(selectedQuotation.date)}</div>
                   <div className="text-slate-500 font-semibold">
-                    Valid Until: {formatIndiaDate(selectedQuotation.validUntil)}
+                    Valid Until: {formatIndiaDateDDMMYYYY(selectedQuotation.validUntil)}
                   </div>
                 </div>
               </div>
@@ -594,7 +673,7 @@ export const QuotationsView: React.FC = () => {
                   <tbody className="divide-y divide-slate-200/60 dark:divide-slate-700/60">
                     {selectedQuotation.items.map((it, idx) => (
                       <tr key={it.id || idx}>
-                        <td className="py-2 text-slate-400">{idx + 1}</td>
+                        <td className="py-2 text-slate-400 font-mono">{String(idx + 1).padStart(2, '0')}</td>
                         <td className="py-2 font-medium text-slate-900 dark:text-slate-100">{it.description}</td>
                         <td className="py-2 text-center text-slate-600 dark:text-slate-300">{it.quantity}</td>
                         <td className="py-2 text-right text-slate-600 dark:text-slate-300">
@@ -653,20 +732,20 @@ export const QuotationsView: React.FC = () => {
             <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
               <button
                 onClick={() => sendQuotationWhatsApp(selectedQuotation, previewCustomer || undefined, currentBusiness)}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
               >
                 <Share2 className="w-4 h-4" /> Share WhatsApp
               </button>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => printQuotationDocument(selectedQuotation, previewCustomer, currentBusiness)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-1.5 cursor-pointer"
                 >
                   <FileDown className="w-4 h-4 text-indigo-600" /> PDF / Print
                 </button>
                 <button
                   onClick={() => setSelectedQuotation(null)}
-                  className="px-5 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold text-xs hover:bg-slate-300 dark:hover:bg-slate-700 cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold text-xs hover:bg-slate-300 dark:hover:bg-slate-700 cursor-pointer"
                 >
                   Close
                 </button>
@@ -676,97 +755,197 @@ export const QuotationsView: React.FC = () => {
         </div>
       )}
 
-      {/* REDESIGNED CREATE QUOTATION MODAL */}
+      {/* REDESIGNED MOBILE-FIRST CREATE QUOTATION MODAL */}
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          {/* STEP 1: FORM (Single Common Line Item Entry + Added Items List) */}
+          {/* STEP 1: CREATE QUOTATION FORM */}
           {createStep === 'FORM' && (
-            <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full p-5 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto my-auto animate-in fade-in">
-              {/* Header */}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full p-4 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto my-auto animate-in fade-in">
+              {/* 1. HEADER */}
               <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
                 <div>
-                  <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-indigo-600" /> Create New Quotation
+                  <h3 className="font-extrabold text-base sm:text-lg text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-indigo-600" /> Create New Quotation
                   </h3>
-                  <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                    <Clock className="w-3 h-3 text-slate-400" /> Timezone: India Standard Time (Asia/Kolkata)
-                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span className="inline-flex items-center gap-1 font-semibold bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md text-[10px] text-indigo-700 dark:text-indigo-300">
+                      <Clock className="w-3 h-3 text-indigo-600" /> India Standard Time (Asia/Kolkata)
+                    </span>
+                    <span>•</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                      Date: {formatIndiaDateDDMMYYYY(todayIndia)}
+                    </span>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={handleAttemptClose}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   title="Close"
+                  id="btn-close-quotation-modal"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* 1. Customer Selection & Valid Until Date (IST) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs bg-slate-50/70 dark:bg-slate-800/40 p-3.5 rounded-2xl border border-slate-200/60 dark:border-slate-700/60">
-                <div>
-                  <CustomerSearchSelect
-                    id="quotation-customer-search-select"
-                    customers={customers}
-                    value={customerId}
-                    onChange={handleCustomerChange}
-                    label="Select Customer *"
-                    required
-                    placeholder="Search customer by name or phone..."
-                  />
-                  {headerErrors.customerId && (
-                    <p className="text-rose-500 text-[11px] font-semibold mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      {headerErrors.customerId}
-                    </p>
+              {/* 2. CUSTOMER SECTION */}
+              <div className="space-y-3 p-3.5 sm:p-4 bg-slate-50/80 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-700/60">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                    <User className="w-3.5 h-3.5 text-indigo-600" /> Select Customer *
+                  </span>
+                  {selectedCustomer && !isChangingCustomer && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsChangingCustomer(true)}
+                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Pencil className="w-3 h-3" /> Change
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRemoveCustomer}
+                        className="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    </div>
                   )}
                 </div>
 
-                <div>
-                  <label className="font-semibold block mb-1 text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                    <span>Valid Until Date *</span>
-                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">
-                      Default: +7 Days (IST)
+                {/* Customer Selector or Compact Selected Customer Card */}
+                {!selectedCustomer || isChangingCustomer ? (
+                  <div>
+                    <CustomerSearchSelect
+                      id="quotation-customer-search-select"
+                      customers={customers}
+                      value={customerId}
+                      onChange={handleCustomerChange}
+                      label=""
+                      required
+                      placeholder="Search customer by name or mobile number..."
+                    />
+                    {headerErrors.customerId && (
+                      <p className="text-rose-500 text-[11px] font-semibold mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        {headerErrors.customerId}
+                      </p>
+                    )}
+                    {isChangingCustomer && selectedCustomer && (
+                      <button
+                        type="button"
+                        onClick={() => setIsChangingCustomer(false)}
+                        className="mt-1.5 text-[11px] text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                      >
+                        Cancel change (Keep {selectedCustomer.name})
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  /* Compact Selected Customer Card */
+                  <div className="bg-white dark:bg-slate-900 p-3 sm:p-3.5 rounded-xl border border-indigo-100 dark:border-slate-700 shadow-xs space-y-1.5">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-slate-100">
+                          {selectedCustomer.name}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                            selectedCustomer.customerType === 'commercial'
+                              ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
+                              : 'bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300'
+                          }`}
+                        >
+                          {selectedCustomer.customerType || 'Individual'}
+                        </span>
+                        {selectedCustomer.companyName && (
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            • {selectedCustomer.companyName}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
+                      <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
+                        <Phone className="w-3.5 h-3.5 text-slate-400" />
+                        {selectedCustomer.mobile}
+                      </span>
+                      {(selectedCustomer.city || selectedCustomer.address) && (
+                        <span className="flex items-center gap-1 truncate max-w-xs">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">
+                            {[selectedCustomer.city, selectedCustomer.state].filter(Boolean).join(', ') || selectedCustomer.address}
+                          </span>
+                        </span>
+                      )}
+                      {selectedCustomer.gstNumber && (
+                        <span className="font-medium text-slate-500">
+                          GSTIN: <strong className="text-slate-700 dark:text-slate-300">{selectedCustomer.gstNumber}</strong>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Valid Until Date (IST, Mandatory, Default +7 days, DD/MM/YYYY) */}
+                <div className="pt-2.5 border-t border-slate-200/60 dark:border-slate-700/60 space-y-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-indigo-600" /> Valid Until Date (IST) *
+                    </label>
+                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2 py-0.5 rounded-md">
+                      Default: Quotation Date + 7 Days
                     </span>
-                  </label>
-                  <input
-                    type="date"
-                    min={todayIndia}
-                    value={validUntil}
-                    onChange={(e) => {
-                      setValidUntil(e.target.value);
-                      if (headerErrors.validUntil) {
-                        setHeaderErrors((prev) => ({ ...prev, validUntil: undefined }));
-                      }
-                    }}
-                    className={`w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 text-xs font-medium focus:outline-none transition-colors ${
-                      headerErrors.validUntil
-                        ? 'border-rose-400 focus:border-rose-500'
-                        : 'border-slate-200 dark:border-slate-700 focus:border-indigo-500'
-                    }`}
-                  />
-                  {headerErrors.validUntil ? (
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      type="date"
+                      min={todayIndia}
+                      value={validUntil}
+                      onChange={(e) => {
+                        setValidUntil(e.target.value);
+                        if (headerErrors.validUntil) {
+                          setHeaderErrors((prev) => ({ ...prev, validUntil: undefined }));
+                        }
+                      }}
+                      className={`w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 text-xs font-semibold focus:outline-none transition-colors ${
+                        headerErrors.validUntil
+                          ? 'border-rose-400 focus:border-rose-500'
+                          : 'border-slate-300 dark:border-slate-700 focus:border-indigo-500'
+                      }`}
+                    />
+                    <div className="flex items-center px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400">
+                      <span>Format (DD/MM/YYYY): </span>
+                      <strong className="ml-1 text-indigo-600 dark:text-indigo-400 font-bold">
+                        {validUntil ? formatIndiaDateDDMMYYYY(validUntil) : '-'}
+                      </strong>
+                    </div>
+                  </div>
+
+                  {headerErrors.validUntil && (
                     <p className="text-rose-500 text-[11px] font-semibold mt-1 flex items-center gap-1">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                       {headerErrors.validUntil}
-                    </p>
-                  ) : (
-                    <p className="text-slate-400 text-[10px] mt-1">
-                      Today: {formatIndiaDate(todayIndia)}
                     </p>
                   )}
                 </div>
               </div>
 
-              {/* 2. COMMON LINE ITEM ENTRY SECTION (Sirf EK common section) */}
-              <div className="p-4 bg-indigo-50/40 dark:bg-indigo-950/20 rounded-2xl border-2 border-indigo-200/80 dark:border-indigo-900/60 space-y-3">
+              {/* 3. LINE ITEM ENTRY (Common Single Entry Section) */}
+              <div
+                ref={lineItemEntryRef}
+                className="p-3.5 sm:p-4 bg-indigo-50/40 dark:bg-indigo-950/20 rounded-2xl border-2 border-indigo-200/80 dark:border-indigo-900/60 space-y-3"
+              >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-900 dark:text-indigo-200">
+                  <div className="flex items-center gap-1.5 text-xs font-black text-indigo-950 dark:text-indigo-200">
                     <Sparkles className="w-4 h-4 text-indigo-600" />
                     <span>
                       {editingItemId ? (
-                        <span className="text-amber-600 dark:text-amber-400 font-extrabold">
-                          Editing Line Item
+                        <span className="text-amber-600 dark:text-amber-400 font-black flex items-center gap-1">
+                          <Pencil className="w-3.5 h-3.5" /> Editing Line Item
                         </span>
                       ) : (
                         'Line Item Entry'
@@ -777,7 +956,7 @@ export const QuotationsView: React.FC = () => {
                     <button
                       type="button"
                       onClick={handleCancelEdit}
-                      className="text-[11px] font-semibold text-slate-500 hover:text-slate-700 flex items-center gap-1 cursor-pointer"
+                      className="text-[11px] font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 flex items-center gap-1 cursor-pointer"
                     >
                       <RotateCcw className="w-3 h-3" /> Cancel Edit
                     </button>
@@ -791,11 +970,9 @@ export const QuotationsView: React.FC = () => {
                       <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
                         Description *
                       </label>
-                      {services.length > 0 && !editingItemId && (
-                        <span className="text-[10px] text-slate-400">
-                          Tip: Type custom service or select quick suggestion below
-                        </span>
-                      )}
+                      <span className="text-[10px] text-slate-400">
+                        Type manually or pick from quick suggestions
+                      </span>
                     </div>
                     <input
                       ref={descriptionInputRef}
@@ -807,37 +984,30 @@ export const QuotationsView: React.FC = () => {
                           setEntryErrors((prev) => ({ ...prev, description: undefined }));
                         }
                       }}
-                      placeholder="e.g. AC Deep Cleaning & Gas Refill"
-                      className={`w-full px-3 py-2.5 rounded-xl border bg-white dark:bg-slate-900 text-xs font-medium focus:outline-none transition-colors ${
+                      placeholder="e.g. CCTV Camera Installation & Wiring"
+                      className={`w-full px-3.5 py-2.5 rounded-xl border bg-white dark:bg-slate-900 text-xs font-medium focus:outline-none transition-colors ${
                         entryErrors.description
                           ? 'border-rose-400 focus:border-rose-500'
                           : 'border-slate-300 dark:border-slate-700 focus:border-indigo-500'
                       }`}
                     />
                     {entryErrors.description && (
-                      <p className="text-rose-500 text-[11px] font-semibold mt-1">
+                      <p className="text-rose-500 text-[11px] font-semibold mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                         {entryErrors.description}
                       </p>
                     )}
 
-                    {/* Quick suggestion chips */}
+                    {/* Quick Suggestion Chips (Tapping auto-fills description only; rate remains blank) */}
                     {!editingItemId && services.length > 0 && (
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
                         <span className="text-[10px] text-slate-400 font-medium">Quick Suggestions:</span>
-                        {services.slice(0, 4).map((s) => (
+                        {services.slice(0, 6).map((s) => (
                           <button
                             key={s.id}
                             type="button"
-                            onClick={() => {
-                              setEntryDescription(s.name);
-                              if (s.price && s.price > 0) {
-                                setEntryRate(s.price);
-                              }
-                              if (entryErrors.description) {
-                                setEntryErrors((prev) => ({ ...prev, description: undefined }));
-                              }
-                            }}
-                            className="px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-medium text-slate-600 dark:text-slate-300 hover:border-indigo-400 hover:text-indigo-600 transition-colors cursor-pointer truncate max-w-[140px]"
+                            onClick={() => handleSelectQuickSuggestion(s.name)}
+                            className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-medium text-slate-700 dark:text-slate-300 hover:border-indigo-400 hover:text-indigo-600 transition-colors cursor-pointer truncate max-w-[170px]"
                             title={s.name}
                           >
                             + {s.name}
@@ -848,8 +1018,8 @@ export const QuotationsView: React.FC = () => {
                   </div>
 
                   {/* Qty, Rate & Auto-calculated Amount */}
-                  <div className="grid grid-cols-12 gap-2.5 items-end">
-                    {/* Qty */}
+                  <div className="grid grid-cols-12 gap-2 sm:gap-3 items-end">
+                    {/* Qty (Default 1) */}
                     <div className="col-span-4 sm:col-span-3">
                       <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
                         Qty *
@@ -866,9 +1036,9 @@ export const QuotationsView: React.FC = () => {
                           }
                         }}
                         placeholder="1"
-                        className={`w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 text-xs font-bold text-center focus:outline-none ${
+                        className={`w-full px-2.5 py-2 rounded-xl border bg-white dark:bg-slate-900 text-xs font-bold text-center focus:outline-none ${
                           entryErrors.quantity
-                            ? 'border-rose-400'
+                            ? 'border-rose-400 focus:border-rose-500'
                             : 'border-slate-300 dark:border-slate-700 focus:border-indigo-500'
                         }`}
                       />
@@ -879,8 +1049,8 @@ export const QuotationsView: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Rate (₹) */}
-                    <div className="col-span-5 sm:col-span-4">
+                    {/* Rate (₹) (Blank by default, no default value) */}
+                    <div className="col-span-4 sm:col-span-4">
                       <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
                         Rate ({currentBusiness.currency}) *
                       </label>
@@ -899,10 +1069,10 @@ export const QuotationsView: React.FC = () => {
                               setEntryErrors((prev) => ({ ...prev, rate: undefined }));
                             }
                           }}
-                          placeholder="Enter rate"
+                          placeholder="0.00"
                           className={`w-full pl-6 pr-2.5 py-2 rounded-xl border bg-white dark:bg-slate-900 text-xs font-bold text-right focus:outline-none ${
                             entryErrors.rate
-                              ? 'border-rose-400'
+                              ? 'border-rose-400 focus:border-rose-500'
                               : 'border-slate-300 dark:border-slate-700 focus:border-indigo-500'
                           }`}
                         />
@@ -914,8 +1084,8 @@ export const QuotationsView: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Amount Auto-calculate Preview */}
-                    <div className="col-span-3 sm:col-span-2">
+                    {/* Amount Auto-calculate Preview: Qty × Rate */}
+                    <div className="col-span-4 sm:col-span-2">
                       <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1 truncate">
                         Amount
                       </label>
@@ -950,18 +1120,18 @@ export const QuotationsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* 3. ADDED ITEMS LIST (Accumulates items 1-by-1) */}
-              <div className="space-y-2">
+              {/* 4. ADDED ITEMS (Strict sequence 01, 02, 03... + Edit & Accidental Delete confirmation) */}
+              <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                     <span>Added Items</span>
-                    <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-[10px]">
+                    <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-black text-[10px]">
                       {addedItems.length}
                     </span>
                   </h4>
                   {addedItems.length > 0 && (
                     <span className="text-[11px] text-slate-500 font-medium">
-                      Subtotal: <strong className="text-slate-900 dark:text-slate-100">{currentBusiness.currency}{subtotalValue.toLocaleString('en-IN')}</strong>
+                      Subtotal: <strong className="text-slate-900 dark:text-slate-100 font-mono">{currentBusiness.currency}{subtotalValue.toLocaleString('en-IN')}</strong>
                     </span>
                   )}
                 </div>
@@ -981,67 +1151,70 @@ export const QuotationsView: React.FC = () => {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-60 overflow-y-auto pr-0.5">
-                    {addedItems.map((item, index) => (
-                      <div
-                        key={item.id}
-                        className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
-                          editingItemId === item.id
-                            ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800'
-                            : 'bg-white dark:bg-slate-800/80 border-slate-200/80 dark:border-slate-700/80 hover:border-slate-300'
-                        }`}
-                      >
-                        {/* Item Details */}
-                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                          <span className="shrink-0 w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-black flex items-center justify-center">
-                            #{index + 1}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate">
-                              {item.description}
-                            </p>
-                            <p className="text-[11px] text-slate-500">
-                              Qty: <strong>{item.quantity}</strong> × {currentBusiness.currency}
-                              {item.rate.toLocaleString('en-IN')}
-                            </p>
-                          </div>
-                        </div>
+                  <div className="space-y-2.5 max-h-64 overflow-y-auto pr-0.5">
+                    {addedItems.map((item, index) => {
+                      const itemNumber = String(index + 1).padStart(2, '0');
+                      const isBeingEdited = editingItemId === item.id;
 
-                        {/* Amount & Actions */}
-                        <div className="flex items-center gap-3 shrink-0">
-                          <div className="text-right">
-                            <span className="text-[10px] text-slate-400 uppercase block">Amount</span>
-                            <span className="font-black text-xs text-slate-900 dark:text-slate-100">
-                              {currentBusiness.currency}{item.amount.toLocaleString('en-IN')}
-                            </span>
+                      return (
+                        <div
+                          key={item.id}
+                          className={`p-3 sm:p-3.5 rounded-2xl border transition-all space-y-2 ${
+                            isBeingEdited
+                              ? 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 shadow-xs'
+                              : 'bg-white dark:bg-slate-800/80 border-slate-200/80 dark:border-slate-700/80 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                              <span className="shrink-0 font-mono text-[11px] font-black px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                {itemNumber}.
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <h5 className="font-extrabold text-xs sm:text-sm text-slate-900 dark:text-slate-100 break-words leading-snug">
+                                  {item.description}
+                                </h5>
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-medium flex items-center gap-1.5 flex-wrap">
+                                  <span>Qty: <strong className="text-slate-800 dark:text-slate-200">{item.quantity}</strong></span>
+                                  <span className="text-slate-300">•</span>
+                                  <span>Rate: <strong className="text-slate-800 dark:text-slate-200 font-mono">{currentBusiness.currency}{item.rate.toLocaleString('en-IN')}</strong></span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <span className="text-[10px] text-slate-400 uppercase font-bold block">Amount</span>
+                              <span className="font-black text-xs sm:text-sm text-slate-900 dark:text-slate-100 font-mono">
+                                {currentBusiness.currency}{item.amount.toLocaleString('en-IN')}
+                              </span>
+                            </div>
                           </div>
 
-                          <div className="flex items-center gap-1 border-l border-slate-200 dark:border-slate-700 pl-2">
+                          {/* Action Buttons: Edit & Delete */}
+                          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/60">
                             <button
                               type="button"
                               onClick={() => handleStartEdit(item)}
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors cursor-pointer"
-                              title="Edit item"
+                              className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 dark:text-slate-300 transition-colors flex items-center gap-1 cursor-pointer"
                             >
-                              <Pencil className="w-3.5 h-3.5" />
+                              <Pencil className="w-3 h-3" /> Edit
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDeleteItem(item.id)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                              title="Delete item"
+                              onClick={() => setItemToDelete(item)}
+                              className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 dark:text-slate-400 transition-colors flex items-center gap-1 cursor-pointer"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-3 h-3" /> Delete
                             </button>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
 
-              {/* 4. GST & Notes Configuration */}
+              {/* 5. GST / TAX CONFIGURATION */}
               <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 space-y-2.5 text-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -1064,9 +1237,9 @@ export const QuotationsView: React.FC = () => {
                   )}
                 </div>
 
-                {isGstApplicable && (
+                {isGstApplicable ? (
                   <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex flex-wrap items-center gap-1.5">
-                    <span className="text-slate-500 text-[11px] font-semibold">Rate:</span>
+                    <span className="text-slate-500 text-[11px] font-semibold">Tax Rate:</span>
                     {GST_PRESET_RATES.map((rate) => {
                       const isSelected = !isCustomGst && gstRate === rate;
                       return (
@@ -1116,45 +1289,59 @@ export const QuotationsView: React.FC = () => {
                       </div>
                     )}
                   </div>
+                ) : (
+                  <div className="pt-1.5 border-t border-slate-200/60 dark:border-slate-700/60 text-[11px] text-slate-500 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600" />
+                    <span>GST / Tax is turned OFF (Exempt / Nil - ₹0.00).</span>
+                  </div>
                 )}
-
-                <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
-                  <input
-                    type="text"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Quotation terms & notes (optional)"
-                    className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100"
-                  />
-                </div>
               </div>
 
-              {/* 5. FINANCIAL TOTALS SUMMARY */}
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/70 rounded-2xl text-xs space-y-1.5 text-right font-semibold border border-slate-200/80 dark:border-slate-700/80">
-                <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                  <span>Subtotal ({addedItems.length} items):</span>
-                  <span className="font-bold text-slate-900 dark:text-slate-100">
-                    {currentBusiness.currency}{subtotalValue.toLocaleString('en-IN')}
+              {/* 6. PAYMENT TERMS (Editable Textarea, mobile friendly wrapping, preserved in PDF/Print) */}
+              <div className="p-3.5 sm:p-4 bg-slate-50/80 dark:bg-slate-800/40 rounded-2xl border border-slate-200/80 dark:border-slate-700/60 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-indigo-600" /> Payment Terms & Notes
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-normal">Editable</span>
+                </div>
+                <textarea
+                  rows={3}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Enter payment terms, delivery terms, or validity notes..."
+                  className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:outline-none resize-y break-words whitespace-pre-wrap leading-relaxed transition-colors"
+                />
+              </div>
+
+              {/* 7. FINANCIAL TOTALS SUMMARY (Right-aligned, Subtotal, GST/Tax, Grand Total) */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 space-y-2">
+                <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
+                  <span>Subtotal ({addedItems.length} {addedItems.length === 1 ? 'item' : 'items'}):</span>
+                  <span className="font-bold text-sm text-slate-900 dark:text-slate-100 font-mono">
+                    {currentBusiness.currency}{subtotalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
-                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+
+                <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
                   <span>
                     {isGstApplicable && effectiveGstRate > 0
-                      ? `Estimated GST (${effectiveGstRate}%):`
+                      ? `GST / Tax (${effectiveGstRate}%):`
                       : 'GST / Tax:'}
                   </span>
-                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                  <span className="font-semibold text-xs text-slate-900 dark:text-slate-100 font-mono">
                     {isGstApplicable && effectiveGstRate > 0
                       ? `${currentBusiness.currency}${taxValue.toLocaleString('en-IN', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}`
-                      : 'Exempt / Nil'}
+                      : 'Exempt / Nil (₹0.00)'}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm font-black text-indigo-600 pt-1.5 border-t border-slate-200 dark:border-slate-700">
-                  <span>Grand Total:</span>
-                  <span>
+
+                <div className="flex justify-between items-center text-sm sm:text-base font-black text-indigo-600 dark:text-indigo-400 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  <span className="text-slate-900 dark:text-slate-100 font-extrabold">Grand Total:</span>
+                  <span className="font-mono">
                     {currentBusiness.currency}{grandTotalValue.toLocaleString('en-IN', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
@@ -1163,168 +1350,44 @@ export const QuotationsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Bottom Actions */}
+              {/* 8. BOTTOM ACTION BUTTONS (Cancel and Confirm & Save in the same row) */}
               <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={handleAttemptClose}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                  className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-center"
+                  id="btn-quotation-cancel"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  onClick={handleProceedToReview}
-                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-                >
-                  <span>Confirm & Save Quotation</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: REVIEW / CONFIRMATION MODAL */}
-          {createStep === 'REVIEW' && (
-            <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-5 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto my-auto animate-in fade-in">
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-                <div>
-                  <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">
-                    Review Quotation Before Saving
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Please verify customer details, items, and total amount
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setCreateStep('FORM')}
-                  className="p-1 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Review Card */}
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 space-y-3.5 text-xs">
-                {/* Customer & Date */}
-                <div className="flex justify-between items-start border-b border-slate-200/80 dark:border-slate-700/80 pb-3">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Customer</span>
-                    <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                      {activeCustomer?.name || 'Customer'}
-                    </h4>
-                    {activeCustomer?.companyName && (
-                      <p className="text-slate-500 font-medium">{activeCustomer.companyName}</p>
-                    )}
-                    <p className="text-slate-500 font-semibold">{activeCustomer?.mobile}</p>
-                    {activeCustomer?.gstNumber && (
-                      <p className="text-[10px] text-slate-500 mt-0.5">GSTIN: {activeCustomer.gstNumber}</p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Quotation Period</span>
-                    <p className="text-slate-600 dark:text-slate-400">Date: {formatIndiaDate(todayIndia)}</p>
-                    <p className="font-bold text-indigo-600">Valid Until: {formatIndiaDate(validUntil)}</p>
-                  </div>
-                </div>
-
-                {/* Items Table */}
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1.5">
-                    Line Items ({addedItems.length})
-                  </span>
-                  <table className="w-full text-left border-collapse">
-                    <thead className="border-b border-slate-200 dark:border-slate-700 text-slate-400 text-[10px] uppercase">
-                      <tr>
-                        <th className="py-1.5">#</th>
-                        <th className="py-1.5">Description</th>
-                        <th className="py-1.5 text-center">Qty</th>
-                        <th className="py-1.5 text-right">Rate</th>
-                        <th className="py-1.5 text-right">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200/60 dark:divide-slate-700/60">
-                      {addedItems.map((item, idx) => (
-                        <tr key={item.id}>
-                          <td className="py-1.5 text-slate-400">{idx + 1}</td>
-                          <td className="py-1.5 font-medium text-slate-900 dark:text-slate-100">
-                            {item.description}
-                          </td>
-                          <td className="py-1.5 text-center">{item.quantity}</td>
-                          <td className="py-1.5 text-right">
-                            {currentBusiness.currency}{item.rate.toLocaleString('en-IN')}
-                          </td>
-                          <td className="py-1.5 text-right font-bold text-slate-900 dark:text-slate-100">
-                            {currentBusiness.currency}{item.amount.toLocaleString('en-IN')}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Totals Summary */}
-                <div className="border-t border-slate-200 dark:border-slate-700 pt-2.5 flex justify-end">
-                  <div className="space-y-1 w-56 text-right">
-                    <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                      <span>Subtotal:</span>
-                      <span className="font-semibold text-slate-900 dark:text-slate-100">
-                        {currentBusiness.currency}{subtotalValue.toLocaleString('en-IN')}
-                      </span>
-                    </div>
-                    {taxValue > 0 && (
-                      <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                        <span>GST ({effectiveGstRate}%):</span>
-                        <span className="font-semibold text-slate-900 dark:text-slate-100">
-                          {currentBusiness.currency}{taxValue.toLocaleString('en-IN', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex justify-between font-black text-sm text-indigo-600 pt-1 border-t border-slate-300 dark:border-slate-600">
-                      <span>Total Amount:</span>
-                      <span>
-                        {currentBusiness.currency}{grandTotalValue.toLocaleString('en-IN', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {notes && (
-                  <div className="border-t border-slate-200 dark:border-slate-700 pt-2 text-[11px] text-slate-500">
-                    <span className="font-bold text-slate-700 dark:text-slate-300">Notes: </span>
-                    {notes}
-                  </div>
-                )}
-              </div>
-
-              {/* Review Actions */}
-              <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setCreateStep('FORM')}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-1.5 cursor-pointer"
-                >
-                  <ArrowLeft className="w-4 h-4" /> Back to Edit
-                </button>
-                <button
-                  type="button"
                   onClick={handleConfirmAndSaveQuotation}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                  disabled={isSaving}
+                  className={`flex-1 sm:flex-initial px-6 py-2.5 rounded-xl font-bold text-xs shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer text-white ${
+                    isSaving
+                      ? 'bg-indigo-400 dark:bg-indigo-800 cursor-not-allowed'
+                      : 'bg-indigo-600 hover:bg-indigo-700'
+                  }`}
+                  id="btn-confirm-save-quotation"
                 >
-                  <CheckCircle2 className="w-4 h-4" /> Confirm & Save Quotation
+                  {isSaving ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Saving Quotation...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Confirm & Save Quotation</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
           )}
 
-          {/* STEP 3: SUCCESS MODAL (Quotation Saved Successfully! + WhatsApp | PDF | Print) */}
+          {/* STEP 3: SUCCESS MODAL */}
           {createStep === 'SUCCESS' && savedQuotation && (
             <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl text-center space-y-5 my-auto animate-in zoom-in-95">
               {/* Success Icon */}
@@ -1363,7 +1426,7 @@ export const QuotationsView: React.FC = () => {
                 <div className="flex justify-between">
                   <span className="text-slate-500">Validity (IST):</span>
                   <span className="font-semibold text-slate-700 dark:text-slate-300">
-                    {formatIndiaDate(savedQuotation.validUntil)}
+                    {formatIndiaDateDDMMYYYY(savedQuotation.validUntil)}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -1445,7 +1508,42 @@ export const QuotationsView: React.FC = () => {
             </div>
           )}
 
-          {/* Unsaved Changes Confirmation Dialog */}
+          {/* ACCIDENTAL DELETE CONFIRMATION DIALOG */}
+          {itemToDelete && (
+            <div className="fixed inset-0 z-60 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-sm w-full p-5 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 text-center animate-in zoom-in-95">
+                <div className="w-12 h-12 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 mx-auto flex items-center justify-center">
+                  <Trash2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
+                    Delete Item from Quotation?
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-1.5">
+                    Are you sure you want to remove <strong className="text-slate-800 dark:text-slate-200">"{itemToDelete.description}"</strong> ({currentBusiness.currency}{itemToDelete.amount.toLocaleString('en-IN')}) from this quotation?
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setItemToDelete(null)}
+                    className="py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmDeleteItem}
+                    className="py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+                  >
+                    Yes, Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* UNSAVED CHANGES CONFIRMATION DIALOG */}
           {showDiscardConfirm && (
             <div className="fixed inset-0 z-60 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
               <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-sm w-full p-5 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 text-center animate-in zoom-in-95">

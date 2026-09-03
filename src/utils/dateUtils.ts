@@ -126,3 +126,35 @@ export function formatIndiaDateTime(dateInput?: string | Date | null): string {
     return String(dateInput);
   }
 }
+
+/**
+ * Formats a date into standard India format: DD/MM/YYYY in India Standard Time.
+ * Example: "03/09/2026"
+ */
+export function formatIndiaDateDDMMYYYY(dateInput?: string | Date | null): string {
+  if (!dateInput) return '-';
+  try {
+    let dateObj: Date;
+    if (typeof dateInput === 'string') {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+        const [y, m, d] = dateInput.split('-').map(Number);
+        dateObj = new Date(Date.UTC(y, m - 1, d, 6, 0, 0));
+      } else {
+        dateObj = new Date(dateInput);
+      }
+    } else {
+      dateObj = dateInput;
+    }
+
+    if (isNaN(dateObj.getTime())) return String(dateInput);
+
+    return new Intl.DateTimeFormat('en-IN', {
+      timeZone: TIMEZONE_INDIA,
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(dateObj);
+  } catch {
+    return String(dateInput);
+  }
+}
