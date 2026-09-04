@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { InventoryItem } from '../types';
 import { CsvImportModal, CsvColumnMapping } from '../components/CsvImportModal';
-import { Package, Plus, AlertTriangle, Search, ArrowUpRight, ArrowDownRight, X, Edit2, Upload } from 'lucide-react';
+import { Package, Plus, AlertTriangle, Search, ArrowUpRight, ArrowDownRight, X, Edit2, Upload, MoreVertical } from 'lucide-react';
 
 export const InventoryView: React.FC = () => {
   const {
@@ -150,68 +150,156 @@ export const InventoryView: React.FC = () => {
         />
       </div>
 
-      {/* Inventory Table */}
+      {/* Inventory List / Table */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-semibold uppercase tracking-wider">
-              <tr>
-                <th className="p-3.5">Part Name & SKU</th>
-                <th className="p-3.5">Category</th>
-                <th className="p-3.5">Current Stock</th>
-                <th className="p-3.5">Cost Price</th>
-                <th className="p-3.5">Selling Price</th>
-                <th className="p-3.5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+        {filtered.length === 0 ? (
+          <div className="text-center py-12 px-4 space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-500 flex items-center justify-center mx-auto shadow-2xs">
+              <Package className="w-6 h-6" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              No inventory items found
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+              {search
+                ? `No parts match "${search}". Try adjusting your search query.`
+                : 'No inventory parts added yet. Click "Add Inventory Item" or "Import CSV" to get started.'}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* 1. Mobile Cards View (md:hidden) */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80 p-2.5 space-y-2">
               {filtered.map((item) => {
                 const isLow = item.currentStock <= item.minStock;
 
                 return (
-                  <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
-                    <td className="p-3.5">
-                      <div className="font-bold text-slate-900 dark:text-slate-100">{item.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">SKU: {item.sku}</div>
-                    </td>
-                    <td className="p-3.5">
-                      <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 font-semibold">{item.category}</span>
-                    </td>
-                    <td className="p-3.5">
-                      <div className="flex items-center gap-2">
-                        <span className={`font-black text-sm ${isLow ? 'text-rose-600' : 'text-slate-900 dark:text-slate-100'}`}>
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      setSelectedItem(item);
+                      setIsStockAdjustOpen(true);
+                    }}
+                    className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-indigo-400 dark:hover:border-indigo-500 transition-all cursor-pointer space-y-2 active:scale-[0.99]"
+                  >
+                    {/* Top Row: Fixed height h-7 for exact vertical center alignment */}
+                    <div className="h-7 flex items-center justify-between gap-1.5 min-w-0">
+                      {/* Left: Item Name + Category badge */}
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1 h-7">
+                        <span className="font-extrabold text-xs text-slate-900 dark:text-slate-100 truncate">
+                          {item.name}
+                        </span>
+                        <span className="h-5 inline-flex items-center px-2 rounded-md text-[9.5px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
+                          {item.category}
+                        </span>
+                      </div>
+
+                      {/* Right: Stock + Low Badge + Adjust Button */}
+                      <div className="flex items-center gap-1.5 shrink-0 h-7">
+                        <span
+                          className={`h-5 inline-flex items-center px-2 rounded-md text-[10px] font-black ${
+                            isLow
+                              ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60'
+                              : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                          }`}
+                        >
                           {item.currentStock} {item.unit}
                         </span>
-                        {isLow && (
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 text-rose-700 flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" /> Low Stock
-                          </span>
-                        )}
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedItem(item);
+                            setIsStockAdjustOpen(true);
+                          }}
+                          className="h-7 px-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 font-bold text-[11px] inline-flex items-center gap-1 shrink-0 cursor-pointer transition-colors"
+                        >
+                          <Edit2 className="w-3 h-3" /> Adjust
+                        </button>
                       </div>
-                    </td>
-                    <td className="p-3.5 font-semibold text-slate-600">
-                      {currentBusiness.currency}{item.purchasePrice}
-                    </td>
-                    <td className="p-3.5 font-extrabold text-slate-900 dark:text-slate-100">
-                      {currentBusiness.currency}{item.sellingPrice}
-                    </td>
-                    <td className="p-3.5 text-right">
-                      <button
-                        onClick={() => {
-                          setSelectedItem(item);
-                          setIsStockAdjustOpen(true);
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-600 font-bold hover:bg-indigo-100 transition-colors"
-                      >
-                        Adjust Stock
-                      </button>
-                    </td>
-                  </tr>
+                    </div>
+
+                    {/* Row 2: SKU and Pricing */}
+                    <div className="flex items-center justify-between text-[11.5px] text-slate-500 dark:text-slate-400 min-w-0 pt-0.5">
+                      <span className="font-mono text-[10px] text-slate-400 truncate">
+                        SKU: {item.sku}
+                      </span>
+                      <div className="flex items-center gap-3 font-semibold shrink-0 ml-2">
+                        <span>Cost: {currentBusiness.currency}{item.purchasePrice}</span>
+                        <span className="font-black text-slate-900 dark:text-slate-100">
+                          Sell: {currentBusiness.currency}{item.sellingPrice}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+            </div>
+
+            {/* 2. Desktop Table View (hidden md:block) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-semibold uppercase tracking-wider">
+                  <tr>
+                    <th className="p-3.5">Part Name & SKU</th>
+                    <th className="p-3.5">Category</th>
+                    <th className="p-3.5">Current Stock</th>
+                    <th className="p-3.5">Cost Price</th>
+                    <th className="p-3.5">Selling Price</th>
+                    <th className="p-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filtered.map((item) => {
+                    const isLow = item.currentStock <= item.minStock;
+
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                        <td className="p-3.5">
+                          <div className="font-bold text-slate-900 dark:text-slate-100">{item.name}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">SKU: {item.sku}</div>
+                        </td>
+                        <td className="p-3.5">
+                          <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 font-semibold">{item.category}</span>
+                        </td>
+                        <td className="p-3.5">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-black text-sm ${isLow ? 'text-rose-600' : 'text-slate-900 dark:text-slate-100'}`}>
+                              {item.currentStock} {item.unit}
+                            </span>
+                            {isLow && (
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" /> Low Stock
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3.5 font-semibold text-slate-600 dark:text-slate-400">
+                          {currentBusiness.currency}{item.purchasePrice}
+                        </td>
+                        <td className="p-3.5 font-extrabold text-slate-900 dark:text-slate-100">
+                          {currentBusiness.currency}{item.sellingPrice}
+                        </td>
+                        <td className="p-3.5 text-right">
+                          <button
+                            onClick={() => {
+                              setSelectedItem(item);
+                              setIsStockAdjustOpen(true);
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold hover:bg-indigo-100 transition-colors cursor-pointer"
+                          >
+                            Adjust Stock
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Stock Adjustment Modal */}

@@ -17,6 +17,10 @@ import {
   MessageSquare,
   Send,
   Sparkles,
+  MoreVertical,
+  Phone,
+  Calendar,
+  AlertCircle,
 } from 'lucide-react';
 import { sendInvoiceWhatsAppReminder } from '../utils/whatsappHelper';
 
@@ -44,6 +48,13 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMenuId(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (initialFilter?.statusFilter !== undefined) {
@@ -215,83 +226,220 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-semibold uppercase tracking-wider">
-                <tr>
-                  <th className="p-3.5">Invoice No</th>
-                  <th className="p-3.5">Customer</th>
-                  <th className="p-3.5">Issue Date</th>
-                  <th className="p-3.5">Due Date</th>
-                  <th className="p-3.5">Total</th>
-                  <th className="p-3.5">Paid</th>
-                  <th className="p-3.5">Balance</th>
-                  <th className="p-3.5">Status</th>
-                  <th className="p-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filtered.map((inv) => {
-                  const customer = (customers || []).find((c) => c.id === inv.customerId);
+          <>
+            {/* 1. Mobile Cards View (md:hidden) - Clean, compact, perfectly aligned */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80 p-2.5 space-y-2">
+              {filtered.map((inv) => {
+                const customer = (customers || []).find((c) => c.id === inv.customerId);
+                const isMenuOpen = openMenuId === inv.id;
 
-                  return (
-                    <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="p-3.5 font-extrabold text-indigo-600">{inv.invoiceNumber}</td>
-                      <td className="p-3.5 font-bold text-slate-900 dark:text-slate-100">{customer?.name}</td>
-                      <td className="p-3.5 text-slate-500">{inv.date}</td>
-                      <td className="p-3.5 text-slate-500">{inv.dueDate}</td>
-                      <td className="p-3.5 font-bold">{currentBusiness.currency}{inv.grandTotal}</td>
-                      <td className="p-3.5 text-emerald-600 font-bold">{currentBusiness.currency}{inv.paidAmount}</td>
-                      <td className="p-3.5 text-rose-600 font-extrabold">{currentBusiness.currency}{inv.balanceAmount}</td>
-                      <td className="p-3.5">
+                return (
+                  <div
+                    key={inv.id}
+                    onClick={() => setSelectedInvoice(inv)}
+                    className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-indigo-400 dark:hover:border-indigo-500 transition-all cursor-pointer space-y-2 active:scale-[0.99] relative"
+                  >
+                    {/* Top Row: Fixed height h-7 for exact vertical center alignment */}
+                    <div className="h-7 flex items-center justify-between gap-1.5 min-w-0">
+                      {/* Left: Invoice ID + Status Badge */}
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1 h-7">
+                        <span className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 font-mono truncate">
+                          {inv.invoiceNumber}
+                        </span>
                         <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                          className={`h-5 inline-flex items-center px-2 rounded-md text-[9.5px] font-black uppercase shrink-0 ${
                             inv.status === 'paid'
-                              ? 'bg-emerald-100 text-emerald-700'
+                              ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                               : inv.status === 'partial'
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-rose-100 text-rose-700'
+                              ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                              : 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
                           }`}
                         >
                           {inv.status}
                         </span>
-                      </td>
-                      <td className="p-3.5 text-right space-x-1.5">
-                        <button
-                          onClick={() => {
-                            const cust = (customers || []).find((c) => c.id === inv.customerId);
-                            sendInvoiceWhatsAppReminder(inv, cust, currentBusiness);
-                          }}
-                          className="px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 text-[11px] inline-flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-                          title="Send invoice & UPI link on WhatsApp"
+                      </div>
+
+                      {/* Right: Amount + 3-Dot Action Menu */}
+                      <div className="flex items-center gap-2 shrink-0 h-7">
+                        <span
+                          className={`h-5 inline-flex items-center text-xs font-mono font-black ${
+                            inv.balanceAmount > 0
+                              ? 'text-rose-600 dark:text-rose-400'
+                              : 'text-emerald-600 dark:text-emerald-400'
+                          }`}
                         >
-                          <MessageSquare className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
-                        </button>
-                        <button
-                          onClick={() => setSelectedInvoice(inv)}
-                          className="px-3 py-1.5 rounded-xl bg-slate-100 font-bold text-slate-700 hover:bg-slate-200 text-[11px]"
-                        >
-                          View
-                        </button>
-                        {inv.balanceAmount > 0 && (
+                          {inv.balanceAmount > 0 ? (
+                            <>Due: {currentBusiness.currency}{inv.balanceAmount}</>
+                          ) : (
+                            <>{currentBusiness.currency}{inv.grandTotal}</>
+                          )}
+                        </span>
+
+                        {/* 3-Dot Action Menu */}
+                        <div className="relative shrink-0 flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(isMenuOpen ? null : inv.id);
+                            }}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                            aria-label="Invoice options"
+                          >
+                            <MoreVertical className="w-3.5 h-3.5" />
+                          </button>
+
+                          {isMenuOpen && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute right-0 top-8 z-30 w-52 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 animate-in fade-in zoom-in-95 text-xs text-slate-700 dark:text-slate-200"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuId(null);
+                                  setSelectedInvoice(inv);
+                                }}
+                                className="w-full px-3.5 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-700/60 font-semibold flex items-center gap-2"
+                              >
+                                <Receipt className="w-3.5 h-3.5 text-indigo-500" />
+                                <span>View Full Invoice</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuId(null);
+                                  sendInvoiceWhatsAppReminder(inv, customer, currentBusiness);
+                                }}
+                                className="w-full px-3.5 py-2 text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-2"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Send on WhatsApp</span>
+                              </button>
+
+                              {inv.balanceAmount > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuId(null);
+                                    setSelectedInvoice(inv);
+                                    setPayAmount(inv.balanceAmount);
+                                    setIsPaymentModalOpen(true);
+                                  }}
+                                  className="w-full px-3.5 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-700/60 font-semibold flex items-center gap-2 text-indigo-600 dark:text-indigo-400"
+                                >
+                                  <CreditCard className="w-3.5 h-3.5" />
+                                  <span>Record Payment</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Row 2: Customer Name + Phone */}
+                    <div className="flex items-center justify-between text-xs min-w-0">
+                      <span className="font-extrabold text-slate-800 dark:text-slate-200 truncate">
+                        {customer?.name || 'Customer'}
+                      </span>
+                      {customer?.mobile && (
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono shrink-0 ml-2">
+                          {customer.mobile}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Row 3: Dates & Quick Total Summary */}
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
+                      <span>Due: <strong className="text-slate-700 dark:text-slate-300">{inv.dueDate}</strong></span>
+                      <span>Total: <strong className="font-mono text-slate-800 dark:text-slate-200">{currentBusiness.currency}{inv.grandTotal}</strong></span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 2. Desktop Table View (hidden md:block) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-semibold uppercase tracking-wider">
+                  <tr>
+                    <th className="p-3.5">Invoice No</th>
+                    <th className="p-3.5">Customer</th>
+                    <th className="p-3.5">Issue Date</th>
+                    <th className="p-3.5">Due Date</th>
+                    <th className="p-3.5">Total</th>
+                    <th className="p-3.5">Paid</th>
+                    <th className="p-3.5">Balance</th>
+                    <th className="p-3.5">Status</th>
+                    <th className="p-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filtered.map((inv) => {
+                    const customer = (customers || []).find((c) => c.id === inv.customerId);
+
+                    return (
+                      <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <td className="p-3.5 font-extrabold text-indigo-600 font-mono">{inv.invoiceNumber}</td>
+                        <td className="p-3.5 font-bold text-slate-900 dark:text-slate-100">{customer?.name}</td>
+                        <td className="p-3.5 text-slate-500">{inv.date}</td>
+                        <td className="p-3.5 text-slate-500">{inv.dueDate}</td>
+                        <td className="p-3.5 font-bold font-mono">{currentBusiness.currency}{inv.grandTotal}</td>
+                        <td className="p-3.5 text-emerald-600 font-bold font-mono">{currentBusiness.currency}{inv.paidAmount}</td>
+                        <td className="p-3.5 text-rose-600 font-extrabold font-mono">{currentBusiness.currency}{inv.balanceAmount}</td>
+                        <td className="p-3.5">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                              inv.status === 'paid'
+                                ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                                : inv.status === 'partial'
+                                ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
+                                : 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
+                            }`}
+                          >
+                            {inv.status}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-right space-x-1.5">
                           <button
                             onClick={() => {
-                              setSelectedInvoice(inv);
-                              setPayAmount(inv.balanceAmount);
-                              setIsPaymentModalOpen(true);
+                              const cust = (customers || []).find((c) => c.id === inv.customerId);
+                              sendInvoiceWhatsAppReminder(inv, cust, currentBusiness);
                             }}
-                            className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-xs text-[11px]"
+                            className="px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 text-[11px] inline-flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                            title="Send invoice & UPI link on WhatsApp"
                           >
-                            Record Pay
+                            <MessageSquare className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
                           </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                          <button
+                            onClick={() => setSelectedInvoice(inv)}
+                            className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 text-[11px] cursor-pointer"
+                          >
+                            View
+                          </button>
+                          {inv.balanceAmount > 0 && (
+                            <button
+                              onClick={() => {
+                                setSelectedInvoice(inv);
+                                setPayAmount(inv.balanceAmount);
+                                setIsPaymentModalOpen(true);
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-xs text-[11px] cursor-pointer"
+                            >
+                              Record Pay
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
