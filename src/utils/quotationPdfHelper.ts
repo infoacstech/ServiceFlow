@@ -106,19 +106,19 @@ export const printQuotationDocument = (
           ${escapeHtml(item.description)}
         </td>
         <td style="padding: 10px 12px; text-align: center; border-bottom: 1px solid #e2e8f0; color: #334155;">${item.quantity}</td>
-        <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #e2e8f0; color: #334155;">${currency}${item.rate.toLocaleString('en-IN')}</td>
-        <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">${currency}${item.amount.toLocaleString('en-IN')}</td>
+        <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #e2e8f0; color: #334155;">${currency}${(item.rate || 0).toLocaleString('en-IN')}</td>
+        <td style="padding: 10px 12px; text-align: right; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #0f172a;">${currency}${(item.amount || 0).toLocaleString('en-IN')}</td>
       </tr>
     `
     )
     .join('');
 
   const taxRow =
-    quotation.taxTotal > 0
+    (quotation.taxTotal || 0) > 0
       ? `
       <tr>
         <td style="padding: 6px 12px; text-align: right; color: #64748b; font-weight: 500;">${labels.tax}</td>
-        <td style="padding: 6px 12px; text-align: right; font-weight: 600; color: #1e293b; width: 140px;">${currency}${quotation.taxTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="padding: 6px 12px; text-align: right; font-weight: 600; color: #1e293b; width: 140px;">${currency}${(quotation.taxTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       </tr>
     `
       : '';
@@ -338,12 +338,12 @@ export const printQuotationDocument = (
           <table class="totals-table">
             <tr>
               <td style="padding: 6px 12px; text-align: right; color: #64748b; font-weight: 500;">${labels.subtotal}</td>
-              <td style="padding: 6px 12px; text-align: right; font-weight: 600; color: #1e293b; width: 140px;">${currency}${quotation.subtotal.toLocaleString('en-IN')}</td>
+              <td style="padding: 6px 12px; text-align: right; font-weight: 600; color: #1e293b; width: 140px;">${currency}${(quotation.subtotal || 0).toLocaleString('en-IN')}</td>
             </tr>
             ${taxRow}
             <tr class="grand-total-row">
               <td style="text-align: right;">${labels.grandTotal}</td>
-              <td style="text-align: right;">${currency}${quotation.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td style="text-align: right;">${currency}${(quotation.grandTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
             </tr>
           </table>
         </div>

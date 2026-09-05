@@ -317,8 +317,9 @@ export const sendInvoiceWhatsAppReminder = (
 
   // UPI Link format: upi://pay?pa=...&pn=...&am=...&cu=INR
   const upiId = business?.email ? business.email.split('@')[0] + '@upi' : '';
+  const balanceToPay = invoice.balanceAmount !== undefined ? invoice.balanceAmount : (invoice.grandTotal || 0);
   const upiLink = upiId
-    ? `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(business?.name || 'Merchant')}&am=${invoice.balanceAmount}&cu=INR&tn=${encodeURIComponent('Invoice ' + invoice.invoiceNumber)}`
+    ? `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(business?.name || 'Merchant')}&am=${balanceToPay}&cu=INR&tn=${encodeURIComponent('Invoice ' + invoice.invoiceNumber)}`
     : '';
 
   let message = '';

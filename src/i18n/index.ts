@@ -51,7 +51,8 @@ export function translate(
       text = fallbackText;
     } else {
       // In dev mode, log missing translation key
-      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      const isDev = Boolean(import.meta.env?.DEV || (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development'));
+      if (typeof window !== 'undefined' && isDev) {
         console.warn(`[i18n] Missing translation for key: "${key}" in language: "${lang}"`);
       }
       text = key.split('.').pop() || key;
