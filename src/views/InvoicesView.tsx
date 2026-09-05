@@ -41,6 +41,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
     recordPayment,
     addInvoice,
     currentBusiness,
+    t,
   } = useApp();
 
   const [search, setSearch] = useState('');
@@ -148,16 +149,16 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
         <div>
           <h1 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Receipt className="w-5 h-5 text-indigo-600" /> Invoices & Billing ({invoices.length})
+            <Receipt className="w-5 h-5 text-indigo-600" /> {t('invoices.title', undefined, 'Invoices & Billing')} ({invoices.length})
           </h1>
-          <p className="text-xs text-slate-500">Tax invoices, due balance tracking, payment receipts, & PDF generation</p>
+          <p className="text-xs text-slate-500">{t('invoices.subtitle', undefined, 'Tax invoices, due balance tracking, payment receipts, & PDF generation')}</p>
         </div>
 
         <button
           onClick={() => setIsCreateInvoiceOpen(true)}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-all shadow-md active:scale-95"
         >
-          <Plus className="w-4 h-4" /> Create New Invoice
+          <Plus className="w-4 h-4" /> {t('invoices.createInvoice', undefined, 'Create New Invoice')}
         </button>
       </div>
 
@@ -169,7 +170,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by invoice number (INV-2026-089), customer, mobile, items..."
+            placeholder={t('invoices.searchPlaceholder', undefined, 'Search by invoice number (INV-2026-089), customer, mobile, items...')}
             className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
           />
           {search && (
@@ -189,10 +190,10 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl font-semibold text-xs border border-slate-200 dark:border-slate-700 cursor-pointer"
           >
-            <option value="all">All Invoices</option>
-            <option value="pending">Pending Balance Due</option>
-            <option value="paid">Fully Paid</option>
-            <option value="overdue">Overdue</option>
+            <option value="all">{t('invoices.allInvoices', undefined, 'All Invoices')}</option>
+            <option value="pending">{t('invoices.pendingBalance', undefined, 'Pending Balance Due')}</option>
+            <option value="paid">{t('invoices.fullyPaid', undefined, 'Fully Paid')}</option>
+            <option value="overdue">{t('invoices.overdue', undefined, 'Overdue')}</option>
           </select>
         </div>
       </div>
@@ -366,15 +367,15 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-semibold uppercase tracking-wider">
                   <tr>
-                    <th className="p-3.5">Invoice No</th>
-                    <th className="p-3.5">Customer</th>
-                    <th className="p-3.5">Issue Date</th>
-                    <th className="p-3.5">Due Date</th>
-                    <th className="p-3.5">Total</th>
-                    <th className="p-3.5">Paid</th>
-                    <th className="p-3.5">Balance</th>
-                    <th className="p-3.5">Status</th>
-                    <th className="p-3.5 text-right">Actions</th>
+                    <th className="p-3.5">{t('invoices.invoiceNumber', undefined, 'Invoice No')}</th>
+                    <th className="p-3.5">{t('common.customer', undefined, 'Customer')}</th>
+                    <th className="p-3.5">{t('invoices.invoiceDate', undefined, 'Issue Date')}</th>
+                    <th className="p-3.5">{t('invoices.dueDate', undefined, 'Due Date')}</th>
+                    <th className="p-3.5">{t('common.total', undefined, 'Total')}</th>
+                    <th className="p-3.5">{t('common.paid', undefined, 'Paid')}</th>
+                    <th className="p-3.5">{t('common.balance', undefined, 'Balance')}</th>
+                    <th className="p-3.5">{t('common.status', undefined, 'Status')}</th>
+                    <th className="p-3.5 text-right">{t('common.actions', undefined, 'Actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">

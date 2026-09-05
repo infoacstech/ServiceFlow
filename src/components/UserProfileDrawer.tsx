@@ -28,6 +28,7 @@ import {
   Upload,
   Trash2,
   Info,
+  Globe,
 } from 'lucide-react';
 import { clearAppCache } from '../utils/cacheUtils';
 import {
@@ -51,7 +52,7 @@ interface UserProfileDrawerProps {
   onSignOut?: () => void;
 }
 
-type TabKey = 'profile' | 'security' | 'appearance' | 'role';
+type TabKey = 'profile' | 'security' | 'appearance' | 'role' | 'language';
 
 interface TabItem {
   id: TabKey;
@@ -78,6 +79,10 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
     setIsActivityLogOpen,
     logoutUser,
     showToast,
+    language,
+    setLanguage,
+    t,
+    supportedLanguages,
   } = useApp();
 
   const [activeSection, setActiveSection] = useState<TabKey>('profile');
@@ -290,6 +295,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
 
   const tabs: TabItem[] = [
     { id: 'profile', label: 'Profile Info', icon: <User className="w-3.5 h-3.5 shrink-0" /> },
+    { id: 'language', label: t('settings.language', undefined, 'Language / भाषा'), icon: <Globe className="w-3.5 h-3.5 shrink-0" /> },
     { id: 'security', label: 'Security & Password', icon: <KeyRound className="w-3.5 h-3.5 shrink-0" /> },
     { id: 'appearance', label: 'Theme & Alerts', icon: <Sparkles className="w-3.5 h-3.5 shrink-0" /> },
     { id: 'role', label: 'Role & Permissions', icon: <Shield className="w-3.5 h-3.5 shrink-0" /> },
@@ -844,6 +850,68 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* TAB 5: LANGUAGE PREFERENCES */}
+            {activeSection === 'language' && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-sm">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <Globe className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                        {t('settings.language', undefined, 'Application Language')}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {t('settings.languageSubtitle', undefined, 'Select your preferred display language')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {supportedLanguages.map((l) => {
+                      const isSel = language === l.code;
+                      return (
+                        <button
+                          key={l.code}
+                          type="button"
+                          onClick={() => setLanguage(l.code)}
+                          className={`w-full flex items-center justify-between p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                            isSel
+                              ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40 ring-2 ring-indigo-600/20'
+                              : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">{l.flag}</span>
+                            <div>
+                              <div className="text-xs font-black text-slate-900 dark:text-slate-100">
+                                {l.nativeName}
+                              </div>
+                              <div className="text-[10px] text-slate-500 font-medium">
+                                {l.name} • {l.tagline}
+                              </div>
+                            </div>
+                          </div>
+                          <div
+                            className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                              isSel
+                                ? 'bg-indigo-600 text-white'
+                                : 'border-2 border-slate-300 dark:border-slate-700'
+                            }`}
+                          >
+                            {isSel && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800">
+                    Saved specifically for profile: <strong className="text-slate-800 dark:text-slate-200">{currentUser?.name}</strong>. Selection updates immediately across the whole app.
+                  </div>
+                </div>
               </div>
             )}
 

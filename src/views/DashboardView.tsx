@@ -99,6 +99,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     pendingSyncQueue,
     showToast,
     systemSettings,
+    t,
   } = useApp();
 
   // Quick Action Modal States
@@ -354,11 +355,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-xs bg-indigo-500/20 text-indigo-300 font-bold px-2.5 py-0.5 rounded-full border border-indigo-500/30 truncate max-w-full">
               {currentBusiness.type || "Service Business"}
             </span>
-            <span className="text-xs text-slate-400 font-medium">Today's Operations</span>
+            <span className="text-xs text-slate-400 font-medium">{t('dashboard.overviewSubtitle', undefined, "Today's Operations")}</span>
           </div>
           <h1 className="text-lg sm:text-xl lg:text-2xl font-black tracking-tight break-words">{currentBusiness.name}</h1>
           <p className="text-xs text-slate-300 mt-0.5 max-w-3xl">
-            Overview of jobs, enquiries, technician activity & business performance for today.
+            {t('dashboard.subtitle', undefined, 'Overview of jobs, enquiries, technician activity & business performance for today.')}
           </p>
         </div>
 
@@ -367,13 +368,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             onClick={() => setIsActivityLogOpen(true)}
             className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs border border-white/20 transition-all active:scale-95 cursor-pointer"
           >
-            <History className="w-4 h-4 text-indigo-300" /> Activity Log
+            <History className="w-4 h-4 text-indigo-300" /> {t('common.activityLog', undefined, 'Activity Log')}
           </button>
           <button
             onClick={() => navigate('jobs', { datePreset: 'today' })}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer"
           >
-            <Calendar className="w-4 h-4" /> Today's Schedule
+            <Calendar className="w-4 h-4" /> {t('dashboard.todayJobs', undefined, "Today's Schedule")}
           </button>
         </div>
       </div>
@@ -584,10 +585,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <div>
               <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                Quick Actions
+                {t('dashboard.quickActions', undefined, 'Quick Actions')}
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Direct access to core field service & administrative tasks
+                {t('dashboard.quickActionsSubtitle', undefined, 'Direct access to core field service & administrative tasks')}
               </p>
             </div>
           </div>
@@ -608,8 +609,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 mb-1 flex items-center justify-center group-hover:scale-110 transition-transform">
               <HelpCircle className="w-4 h-4" />
             </div>
-            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">New Enquiry</span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">Capture intake</span>
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{t('enquiries.newEnquiry', undefined, 'New Enquiry')}</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">{t('dashboard.captureIntake', undefined, 'Capture intake')}</span>
           </button>
 
           {/* Action 2: Add Customer */}
@@ -620,8 +621,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 mb-1 flex items-center justify-center group-hover:scale-110 transition-transform">
               <UserPlus className="w-4 h-4" />
             </div>
-            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">Add Customer</span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">Create CRM entry</span>
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{t('customers.addCustomer', undefined, 'Add Customer')}</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">{t('dashboard.createCrmEntry', undefined, 'Create CRM entry')}</span>
           </button>
 
           {/* Action 3: Schedule Job */}
@@ -632,8 +633,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 mb-1 flex items-center justify-center group-hover:scale-110 transition-transform">
               <Plus className="w-4 h-4" />
             </div>
-            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">Schedule Job</span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">Dispatch technician</span>
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{t('jobs.createJob', undefined, 'Schedule Job')}</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">{t('dashboard.dispatchTechnician', undefined, 'Dispatch technician')}</span>
           </button>
 
           {/* Action 4: Quick Quote */}
@@ -644,8 +645,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 mb-1 flex items-center justify-center group-hover:scale-110 transition-transform">
               <FileText className="w-4 h-4" />
             </div>
-            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">Quick Quote</span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">Generate estimate</span>
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{t('quotations.createQuotation', undefined, 'Quick Quote')}</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">{t('dashboard.generateEstimate', undefined, 'Generate estimate')}</span>
           </button>
         </div>
       </div>
@@ -867,14 +868,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           title="Click to view Today's Jobs"
         >
           <div className="flex items-center justify-between text-slate-500 mb-1.5">
-            <span className="text-xs font-semibold group-hover:text-indigo-600 transition-colors truncate">Today's Jobs</span>
+            <span className="text-xs font-semibold group-hover:text-indigo-600 transition-colors truncate">{t('dashboard.todayJobs', undefined, "Today's Jobs")}</span>
             <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all shrink-0">
               <Briefcase className="w-3.5 h-3.5" />
             </div>
           </div>
           <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">{todaysJobs.length}</div>
           <div className="text-[10px] text-indigo-600 font-medium mt-0.5 flex items-center justify-between">
-            <span className="truncate">Scheduled</span>
+            <span className="truncate">{t('dashboard.scheduled', undefined, 'Scheduled')}</span>
             <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
           </div>
         </div>
@@ -886,14 +887,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           title="Click to view Pending Jobs"
         >
           <div className="flex items-center justify-between text-slate-500 mb-1.5">
-            <span className="text-xs font-semibold group-hover:text-amber-600 transition-colors truncate">Pending Jobs</span>
+            <span className="text-xs font-semibold group-hover:text-amber-600 transition-colors truncate">{t('dashboard.pendingJobs', undefined, 'Pending Jobs')}</span>
             <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-all shrink-0">
               <Clock className="w-3.5 h-3.5" />
             </div>
           </div>
           <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">{pendingJobs.length}</div>
           <div className="text-[10px] text-amber-600 font-medium mt-0.5 flex items-center justify-between">
-            <span className="truncate">In progress</span>
+            <span className="truncate">{t('dashboard.inProgress', undefined, 'In progress')}</span>
             <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
           </div>
         </div>
@@ -905,14 +906,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           title="Click to view Completed Jobs"
         >
           <div className="flex items-center justify-between text-slate-500 mb-1.5">
-            <span className="text-xs font-semibold group-hover:text-emerald-600 transition-colors truncate">Completed</span>
+            <span className="text-xs font-semibold group-hover:text-emerald-600 transition-colors truncate">{t('dashboard.completedJobs', undefined, 'Completed')}</span>
             <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-all shrink-0">
               <CheckCircle2 className="w-3.5 h-3.5" />
             </div>
           </div>
           <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">{completedJobs.length}</div>
           <div className="text-[10px] text-emerald-600 font-medium mt-0.5 flex items-center justify-between">
-            <span className="truncate">Resolved</span>
+            <span className="truncate">{t('dashboard.resolved', undefined, 'Resolved')}</span>
             <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
           </div>
         </div>
@@ -924,7 +925,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           title="Click to view Invoices & Total Revenue"
         >
           <div className="flex items-center justify-between text-slate-500 mb-1.5">
-            <span className="text-xs font-semibold group-hover:text-blue-600 transition-colors truncate">Total Revenue</span>
+            <span className="text-xs font-semibold group-hover:text-blue-600 transition-colors truncate">{t('dashboard.totalSales', undefined, 'Total Revenue')}</span>
             <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0">
               <TrendingUp className="w-3.5 h-3.5" />
             </div>
@@ -933,7 +934,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {curr}{totalSales.toLocaleString()}
           </div>
           <div className="text-[10px] text-blue-600 font-medium mt-0.5 flex items-center justify-between">
-            <span className="truncate">Invoiced</span>
+            <span className="truncate">{t('dashboard.invoiced', undefined, 'Invoiced')}</span>
             <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
           </div>
         </div>
@@ -945,7 +946,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           title="Click to view Pending Payments & Unpaid Invoices"
         >
           <div className="flex items-center justify-between text-slate-500 mb-1.5">
-            <span className="text-xs font-semibold group-hover:text-rose-600 transition-colors truncate">Pending Due</span>
+            <span className="text-xs font-semibold group-hover:text-rose-600 transition-colors truncate">{t('dashboard.pendingPayments', undefined, 'Pending Due')}</span>
             <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-all shrink-0">
               <DollarSign className="w-3.5 h-3.5" />
             </div>
@@ -954,7 +955,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {curr}{pendingPayments.toLocaleString()}
           </div>
           <div className="text-[10px] text-rose-600 font-medium mt-0.5 flex items-center justify-between">
-            <span className="truncate">Awaiting collection</span>
+            <span className="truncate">{t('dashboard.awaitingCollection', undefined, 'Awaiting collection')}</span>
             <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
           </div>
         </div>
@@ -966,14 +967,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           title="Click to view Active Customers CRM"
         >
           <div className="flex items-center justify-between text-slate-500 mb-1.5">
-            <span className="text-xs font-semibold group-hover:text-purple-600 transition-colors truncate">Customers</span>
+            <span className="text-xs font-semibold group-hover:text-purple-600 transition-colors truncate">{t('dashboard.totalCustomers', undefined, 'Customers')}</span>
             <div className="p-1.5 rounded-lg bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-all shrink-0">
               <Users className="w-3.5 h-3.5" />
             </div>
           </div>
           <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">{customers.length}</div>
           <div className="text-[10px] text-purple-600 font-medium mt-0.5 flex items-center justify-between">
-            <span className="truncate">CRM Database</span>
+            <span className="truncate">{t('dashboard.crmDatabase', undefined, 'CRM Database')}</span>
             <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
           </div>
         </div>

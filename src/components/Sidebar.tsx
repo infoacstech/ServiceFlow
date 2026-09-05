@@ -56,6 +56,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
     activeSupportSession,
     attendanceIssues,
     logoutUser,
+    t,
+    language,
+    setLanguage,
+    supportedLanguages,
   } = useApp();
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
   const permissions = getRolePermissions(currentUser?.role);
@@ -94,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
       items: [
         {
           id: 'super_admin_dashboard',
-          label: 'Platform Dashboard',
+          label: t('nav.platformDashboard', undefined, 'Platform Dashboard'),
           icon: LayoutDashboard,
           badge: null,
           badgeColor: '',
@@ -106,14 +110,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
       items: [
         {
           id: 'super_admin_tenants',
-          label: 'Tenant Businesses',
+          label: t('nav.tenantBusinesses', undefined, 'Tenant Businesses'),
           icon: Building2,
           badge: businesses.length > 0 ? String(businesses.length) : null,
           badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
         },
         {
           id: 'super_admin_pending',
-          label: 'Pending Approvals',
+          label: t('nav.pendingApprovals', undefined, 'Pending Approvals'),
           icon: Clock,
           badge: pendingApprovalsCount > 0 ? String(pendingApprovalsCount) : null,
           badgeColor: 'bg-amber-500 text-slate-950 font-black animate-pulse',
@@ -153,7 +157,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
         },
         {
           id: 'super_admin_notifications',
-          label: 'System Notifications',
+          label: t('nav.notifications', undefined, 'System Notifications'),
           icon: Bell,
           badge: null,
           badgeColor: '',
@@ -165,7 +169,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
       items: [
         {
           id: 'super_admin_audit',
-          label: 'Security Audit Logs',
+          label: t('nav.securityAudit', undefined, 'Security Audit Logs'),
           icon: FileCode,
           badge: null,
           badgeColor: '',
@@ -198,7 +202,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
         },
         {
           id: 'super_admin_data_maintenance',
-          label: 'Data & Maintenance',
+          label: t('nav.dataMaintenance', undefined, 'Data & Maintenance'),
           icon: Trash2,
           badge: 'Clean State',
           badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
@@ -210,7 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
       items: [
         {
           id: 'settings',
-          label: 'Profile Settings',
+          label: t('nav.settings', undefined, 'Profile Settings'),
           icon: Settings,
           badge: null,
           badgeColor: '',
@@ -228,43 +232,45 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
       items: [
         {
           id: 'dashboard',
-          label: 'Dashboard',
+          label: t('nav.dashboard', undefined, 'Dashboard'),
           icon: LayoutDashboard,
           visible: !isTech && (permissions.canManageJobs || permissions.canViewFinancials),
         },
         {
           id: 'enquiries',
-          label: 'Enquiries & Intake',
+          label: t('nav.enquiries', undefined, 'Enquiries & Intake'),
           icon: HelpCircle,
           visible: !isTech && (permissions.canManageJobs || permissions.canManageStaff),
         },
         {
           id: 'jobs',
-          label: isTech ? 'My Assigned Jobs' : 'Job Management',
+          label: isTech ? t('nav.myJobs', undefined, 'My Assigned Jobs') : t('nav.jobs', undefined, 'Job Management'),
           icon: Briefcase,
           visible: permissions.canManageJobs,
         },
         {
           id: 'customers',
-          label: 'Customers CRM',
+          label: t('nav.customers', undefined, 'Customers CRM'),
           icon: Users,
           visible: permissions.canManageJobs || permissions.canManageStaff,
         },
         {
           id: 'services',
-          label: 'Service Catalog',
+          label: t('nav.services', undefined, 'Service Catalog'),
           icon: Wrench,
           visible: permissions.canManageServices,
         },
         {
           id: 'staff',
-          label: 'Staff & Techs',
+          label: t('nav.staff', undefined, 'Staff & Techs'),
           icon: UserCheck,
           visible: permissions.canManageStaff,
         },
         {
           id: 'attendance',
-          label: permissions.canManageStaff ? 'Attendance & GPS' : 'My Attendance',
+          label: permissions.canManageStaff
+            ? t('nav.attendance', undefined, 'Attendance & GPS')
+            : t('nav.myAttendance', undefined, 'My Attendance'),
           icon: Clock,
           visible: true,
           badge:
@@ -275,7 +281,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
         },
         {
           id: 'inventory',
-          label: 'Inventory & Parts',
+          label: t('nav.inventory', undefined, 'Inventory & Parts'),
           icon: Package,
           visible: permissions.canManageInventory,
         },
@@ -286,31 +292,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
       items: [
         {
           id: 'quotations',
-          label: 'Quotations',
+          label: t('nav.quotations', undefined, 'Quotations'),
           icon: FileText,
           visible: permissions.canViewFinancials,
         },
         {
           id: 'invoices',
-          label: 'Invoices',
+          label: t('nav.invoices', undefined, 'Invoices'),
           icon: Receipt,
           visible: permissions.canViewFinancials,
         },
         {
           id: 'payments',
-          label: 'Payment Ledger',
+          label: t('nav.payments', undefined, 'Payment Ledger'),
           icon: CreditCard,
           visible: permissions.canViewFinancials,
         },
         {
           id: 'contracts',
-          label: 'Recurring Contracts',
+          label: t('nav.contracts', undefined, 'Recurring Contracts'),
           icon: Repeat,
           visible: permissions.canManageContracts,
         },
         {
           id: 'expenses',
-          label: 'Expense Tracker',
+          label: t('nav.expenses', undefined, 'Expense Tracker'),
           icon: DollarSign,
           visible: true,
         },
@@ -321,25 +327,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
       items: [
         {
           id: 'reports',
-          label: 'Reports & Analytics',
+          label: t('nav.reports', undefined, 'Reports & Analytics'),
           icon: BarChart3,
           visible: permissions.canViewFinancials,
         },
         {
           id: 'ai_assistant',
-          label: 'AI Business Assistant',
+          label: t('nav.aiAssistant', undefined, 'AI Business Assistant'),
           icon: Sparkles,
           visible: permissions.canManageJobs || permissions.canViewFinancials,
         },
         {
           id: 'customer_portal',
-          label: 'Customer Portal',
+          label: t('nav.customerPortal', undefined, 'Customer Portal'),
           icon: Globe,
           visible: permissions.canAccessCustomerPortal,
         },
         {
           id: 'notifications',
-          label: 'Notifications',
+          label: t('nav.notifications', undefined, 'Notifications'),
           icon: Bell,
           visible: true,
         },
@@ -350,7 +356,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
       items: [
         {
           id: 'settings',
-          label: isTech ? 'Profile & Security' : 'Profile Settings',
+          label: isTech ? t('nav.settings', undefined, 'Profile & Security') : t('nav.settings', undefined, 'Profile Settings'),
           icon: Settings,
           visible: true,
         },
@@ -476,7 +482,37 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
       </nav>
 
       {/* Bottom Footer Area */}
-      <div className="mt-auto pt-3 border-t border-slate-850">
+      <div className="mt-auto pt-3 border-t border-slate-850 space-y-2">
+        {/* Quick Language Toggle */}
+        <div className="px-1">
+          <div className="flex items-center justify-between px-1.5 mb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <span className="flex items-center gap-1">
+              <Globe className="w-3 h-3 text-indigo-400" />
+              {t('common.language', undefined, 'Language')}
+            </span>
+            <span className="text-[9px] text-indigo-400 font-mono">
+              {language === 'hi' ? 'हिन्दी' : language === 'mr' ? 'मराठी' : 'EN'}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+            {supportedLanguages.map((l) => (
+              <button
+                key={l.code}
+                type="button"
+                onClick={() => setLanguage(l.code)}
+                className={`py-1 text-center rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                  language === l.code
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+                title={l.name}
+              >
+                {l.code === 'en' ? 'EN' : l.code === 'hi' ? 'हिन्दी' : 'मराठी'}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {isSuperAdmin ? (
           /* Super Admin System Status Widget */
           <div className="p-3 rounded-2xl bg-gradient-to-br from-slate-900 to-purple-950/30 border border-purple-500/20 text-xs">

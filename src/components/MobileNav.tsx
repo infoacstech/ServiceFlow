@@ -31,6 +31,8 @@ import {
   Trash2,
   ShieldAlert,
   HelpCircle,
+  Globe,
+  Check,
 } from 'lucide-react';
 
 interface MobileNavProps {
@@ -46,6 +48,10 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
     referralPayoutRequests,
     activeSupportSession,
     attendanceIssues,
+    t,
+    language,
+    setLanguage,
+    supportedLanguages,
   } = useApp();
   const permissions = getRolePermissions(currentUser?.role);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -59,81 +65,81 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
 
   // Super Admin Bottom Bar Items
   const superAdminBottomItems = [
-    { id: 'super_admin_dashboard', label: 'Platform', icon: LayoutDashboard },
-    { id: 'super_admin_tenants', label: 'Tenants', icon: Building2 },
-    { id: 'super_admin_pending', label: 'Approvals', icon: CheckCircle2 },
+    { id: 'super_admin_dashboard', label: t('nav.platformDashboard', undefined, 'Platform'), icon: LayoutDashboard },
+    { id: 'super_admin_tenants', label: t('nav.tenantBusinesses', undefined, 'Tenants'), icon: Building2 },
+    { id: 'super_admin_pending', label: t('nav.pendingApprovals', undefined, 'Approvals'), icon: CheckCircle2 },
     { id: 'super_admin_support', label: 'Support', icon: Headphones },
-    { id: 'more', label: 'Console', icon: Grid },
+    { id: 'more', label: t('nav.more', undefined, 'Console'), icon: Grid },
   ];
 
   // Tenant Bottom Bar Items
   const tenantBottomItems = isTech
     ? [
-        { id: 'jobs', label: 'My Jobs', icon: Briefcase },
-        { id: 'customers', label: 'Customers', icon: Users },
-        { id: 'notifications', label: 'Alerts', icon: Bell },
-        { id: 'settings', label: 'Profile', icon: Settings },
-        { id: 'more', label: 'More', icon: Grid },
+        { id: 'jobs', label: t('nav.myJobs', undefined, 'My Jobs'), icon: Briefcase },
+        { id: 'customers', label: t('nav.customers', undefined, 'Customers'), icon: Users },
+        { id: 'notifications', label: t('nav.notifications', undefined, 'Alerts'), icon: Bell },
+        { id: 'settings', label: t('nav.settings', undefined, 'Profile'), icon: Settings },
+        { id: 'more', label: t('nav.more', undefined, 'More'), icon: Grid },
       ]
     : [
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'jobs', label: 'Jobs', icon: Briefcase },
-        { id: 'customers', label: 'Customers', icon: Users },
-        { id: 'invoices', label: 'Invoices', icon: Receipt },
-        { id: 'more', label: 'Modules', icon: Grid },
+        { id: 'dashboard', label: t('nav.dashboard', undefined, 'Dashboard'), icon: LayoutDashboard },
+        { id: 'jobs', label: t('nav.jobs', undefined, 'Jobs'), icon: Briefcase },
+        { id: 'customers', label: t('nav.customers', undefined, 'Customers'), icon: Users },
+        { id: 'invoices', label: t('nav.invoices', undefined, 'Invoices'), icon: Receipt },
+        { id: 'more', label: t('nav.modules', undefined, 'Modules'), icon: Grid },
       ];
 
   const bottomItems = isSuperAdmin ? superAdminBottomItems : tenantBottomItems;
 
   // Super Admin Drawer Modules
   const superAdminModules = [
-    { id: 'super_admin_dashboard', label: 'Platform Dashboard', icon: LayoutDashboard },
-    { id: 'super_admin_tenants', label: 'Tenant Businesses', icon: Building2 },
-    { id: 'super_admin_pending', label: 'Pending Approvals', icon: Clock },
+    { id: 'super_admin_dashboard', label: t('nav.platformDashboard', undefined, 'Platform Dashboard'), icon: LayoutDashboard },
+    { id: 'super_admin_tenants', label: t('nav.tenantBusinesses', undefined, 'Tenant Businesses'), icon: Building2 },
+    { id: 'super_admin_pending', label: t('nav.pendingApprovals', undefined, 'Pending Approvals'), icon: Clock },
     { id: 'super_admin_suspended', label: 'Suspended Businesses', icon: Ban },
     { id: 'super_admin_analytics', label: 'Platform Analytics', icon: BarChart3 },
     { id: 'super_admin_referrals', label: 'Referral Analytics', icon: Gift },
     { id: 'super_admin_support', label: 'Support Access', icon: Headphones },
-    { id: 'super_admin_notifications', label: 'System Notifications', icon: Bell },
-    { id: 'super_admin_audit', label: 'Security Audit Logs', icon: FileCode },
+    { id: 'super_admin_notifications', label: t('nav.notifications', undefined, 'System Notifications'), icon: Bell },
+    { id: 'super_admin_audit', label: t('nav.securityAudit', undefined, 'Security Audit Logs'), icon: FileCode },
     { id: 'super_admin_security', label: 'Security & Access', icon: ShieldAlert },
     { id: 'super_admin_settings', label: 'Global Settings & MFA', icon: Sliders },
     { id: 'super_admin_plans', label: 'Plans & Subscriptions', icon: Layers },
-    { id: 'super_admin_data_maintenance', label: 'Data & Maintenance', icon: Trash2 },
-    { id: 'settings', label: 'Profile Settings', icon: Settings },
+    { id: 'super_admin_data_maintenance', label: t('nav.dataMaintenance', undefined, 'Data & Maintenance'), icon: Trash2 },
+    { id: 'settings', label: t('nav.settings', undefined, 'Profile Settings'), icon: Settings },
   ];
 
   // Tenant Module Groups
   const coreOperationsModules = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, visible: !isTech && (permissions.canManageJobs || permissions.canViewFinancials) },
-    { id: 'enquiries', label: 'Enquiries & Intake', icon: HelpCircle, visible: !isTech && (permissions.canManageJobs || permissions.canManageStaff) },
-    { id: 'jobs', label: 'Jobs & Field Work', icon: Briefcase, visible: permissions.canManageJobs },
-    { id: 'customers', label: 'Customers CRM', icon: Users, visible: permissions.canManageJobs || permissions.canManageStaff },
-    { id: 'staff', label: 'Staff & Techs', icon: UserCheck, visible: permissions.canManageStaff },
-    { id: 'attendance', label: permissions.canManageStaff ? 'Attendance & GPS' : 'My Attendance', icon: Clock, visible: true },
+    { id: 'dashboard', label: t('nav.dashboard', undefined, 'Dashboard'), icon: LayoutDashboard, visible: !isTech && (permissions.canManageJobs || permissions.canViewFinancials) },
+    { id: 'enquiries', label: t('nav.enquiries', undefined, 'Enquiries & Intake'), icon: HelpCircle, visible: !isTech && (permissions.canManageJobs || permissions.canManageStaff) },
+    { id: 'jobs', label: isTech ? t('nav.myJobs', undefined, 'My Assigned Jobs') : t('nav.jobs', undefined, 'Jobs & Field Work'), icon: Briefcase, visible: permissions.canManageJobs },
+    { id: 'customers', label: t('nav.customers', undefined, 'Customers CRM'), icon: Users, visible: permissions.canManageJobs || permissions.canManageStaff },
+    { id: 'staff', label: t('nav.staff', undefined, 'Staff & Techs'), icon: UserCheck, visible: permissions.canManageStaff },
+    { id: 'attendance', label: permissions.canManageStaff ? t('nav.attendance', undefined, 'Attendance & GPS') : t('nav.myAttendance', undefined, 'My Attendance'), icon: Clock, visible: true },
   ].filter((m) => m.visible);
 
   const businessFinanceModules = [
-    { id: 'services', label: 'Service Catalog', icon: Wrench, visible: permissions.canManageServices },
-    { id: 'inventory', label: 'Inventory & Parts', icon: Package, visible: permissions.canManageInventory },
-    { id: 'quotations', label: 'Quotations', icon: FileText, visible: permissions.canViewFinancials },
-    { id: 'invoices', label: 'Invoices', icon: Receipt, visible: permissions.canViewFinancials },
-    { id: 'payments', label: 'Payment Ledger', icon: CreditCard, visible: permissions.canViewFinancials },
-    { id: 'contracts', label: 'Recurring Contracts', icon: Repeat, visible: permissions.canManageContracts },
-    { id: 'expenses', label: 'Expenses', icon: DollarSign, visible: true },
+    { id: 'services', label: t('nav.services', undefined, 'Service Catalog'), icon: Wrench, visible: permissions.canManageServices },
+    { id: 'inventory', label: t('nav.inventory', undefined, 'Inventory & Parts'), icon: Package, visible: permissions.canManageInventory },
+    { id: 'quotations', label: t('nav.quotations', undefined, 'Quotations'), icon: FileText, visible: permissions.canViewFinancials },
+    { id: 'invoices', label: t('nav.invoices', undefined, 'Invoices'), icon: Receipt, visible: permissions.canViewFinancials },
+    { id: 'payments', label: t('nav.payments', undefined, 'Payment Ledger'), icon: CreditCard, visible: permissions.canViewFinancials },
+    { id: 'contracts', label: t('nav.contracts', undefined, 'Recurring Contracts'), icon: Repeat, visible: permissions.canManageContracts },
+    { id: 'expenses', label: t('nav.expenses', undefined, 'Expenses'), icon: DollarSign, visible: true },
   ].filter((m) => m.visible);
 
   const managementModules = [
-    { id: 'reports', label: 'Reports & Analytics', icon: BarChart3, visible: permissions.canViewFinancials },
-    { id: 'notifications', label: 'Notifications', icon: Bell, visible: true },
-    { id: 'ai_assistant', label: 'AI Assistant', icon: Sparkles, visible: permissions.canManageJobs || permissions.canViewFinancials },
+    { id: 'reports', label: t('nav.reports', undefined, 'Reports & Analytics'), icon: BarChart3, visible: permissions.canViewFinancials },
+    { id: 'notifications', label: t('nav.notifications', undefined, 'Notifications'), icon: Bell, visible: true },
+    { id: 'ai_assistant', label: t('nav.aiAssistant', undefined, 'AI Assistant'), icon: Sparkles, visible: permissions.canManageJobs || permissions.canViewFinancials },
   ].filter((m) => m.visible);
 
   const accountSettingsItems = [
-    { id: 'settings', label: 'Profile & Business', icon: Settings, desc: 'Company & user info' },
+    { id: 'settings', label: t('settings.myProfile', undefined, 'Profile & Business'), icon: Settings, desc: 'Company & user info' },
+    { id: 'settings', label: t('settings.language', undefined, 'Language / भाषा'), icon: Globe, desc: language === 'hi' ? 'हिन्दी सक्रिय' : language === 'mr' ? 'मराठी सक्रिय' : 'English Active' },
+    { id: 'settings', label: t('settings.passwordSecurity', undefined, 'Security & Access'), icon: ShieldCheck, desc: 'PIN & credentials' },
     { id: 'settings', label: 'Subscription & Plans', icon: Layers, desc: 'Billing & upgrades' },
-    { id: 'settings', label: 'Security & Access', icon: ShieldCheck, desc: 'PIN & credentials' },
-    { id: 'settings', label: 'Help & Support', icon: Headphones, desc: 'Assistance & docs' },
   ];
 
   const handleTabClick = (id: string) => {
@@ -364,6 +370,39 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
                     </div>
                   </div>
                 )}
+
+                {/* QUICK LANGUAGE SELECTOR FOR MOBILE */}
+                <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200/80 dark:border-indigo-850 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-extrabold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                      {t('settings.language', undefined, 'Language / भाषा')}
+                    </span>
+                    <span className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400">
+                      {language === 'hi' ? 'हिन्दी' : language === 'mr' ? 'मराठी' : 'English'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {supportedLanguages.map((l) => {
+                      const isSel = language === l.code;
+                      return (
+                        <button
+                          key={l.code}
+                          type="button"
+                          onClick={() => setLanguage(l.code)}
+                          className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                            isSel
+                              ? 'bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-600/30'
+                              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <span>{l.nativeName}</span>
+                          {isSel && <Check className="w-3 h-3 stroke-[3]" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
                 {/* 4. ACCOUNT & SETTINGS (Visually Separate Bottom Section) */}
                 <div className="space-y-2 pt-3 border-t border-slate-200/80 dark:border-slate-800">

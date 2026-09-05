@@ -67,6 +67,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
     currentUser,
     showToast,
     logActivity,
+    t,
   } = useApp();
 
   const currencySymbol = currentBusiness?.currency || '₹';
@@ -384,10 +385,10 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
           </div>
           <div className="min-w-0">
             <h1 className="text-base font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
-              Customer CRM <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full font-mono">({customers.length})</span>
+              {t('customers.title', undefined, 'Customer CRM')} <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full font-mono">({customers.length})</span>
             </h1>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-              Manage client contacts, direct phone dialer, service sites, and history
+              {t('customers.subtitle', undefined, 'Manage client contacts, direct phone dialer, service sites, and history')}
             </p>
           </div>
         </div>
@@ -399,7 +400,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
             className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs transition-all active:scale-95 cursor-pointer shadow-2xs"
           >
             <Upload className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-            <span>Import CSV</span>
+            <span>{t('common.importCsv', undefined, 'Import CSV')}</span>
           </button>
           <button
             type="button"
@@ -407,7 +408,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
             className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all shadow-xs active:scale-95 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>+ Add New Customer</span>
+            <span>{t('customers.addCustomer', undefined, '+ Add New Customer')}</span>
           </button>
         </div>
       </div>
@@ -420,7 +421,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search customer..."
+            placeholder={t('customers.searchPlaceholder', undefined, 'Search customer...')}
             className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200 placeholder:text-slate-400 border border-transparent focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
           />
           {search && (
@@ -437,18 +438,22 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end">
           {/* Customer Category Filters */}
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0">
-            {(['all', 'commercial', 'individual'] as const).map((t) => (
+            {[
+              { id: 'all', label: t('common.all', undefined, 'All') },
+              { id: 'commercial', label: t('customers.commercial', undefined, 'Commercial') },
+              { id: 'individual', label: t('customers.individual', undefined, 'Individual') },
+            ].map((tab) => (
               <button
-                key={t}
+                key={tab.id}
                 type="button"
-                onClick={() => setFilterType(t)}
+                onClick={() => setFilterType(tab.id as any)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize whitespace-nowrap transition-all cursor-pointer ${
-                  filterType === t
+                  filterType === tab.id
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
-                {t}
+                {tab.label}
               </button>
             ))}
             {archivedCount > 0 && (
@@ -461,7 +466,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
                     : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/80 dark:border-amber-900/60 hover:bg-amber-100'
                 }`}
               >
-                <Archive className="w-3.5 h-3.5" /> ({archivedCount})
+                <Archive className="w-3.5 h-3.5" /> {t('customers.archived', undefined, 'Archived')} ({archivedCount})
               </button>
             )}
           </div>
@@ -475,9 +480,9 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
               onChange={(e) => setSortBy(e.target.value as any)}
               className="bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none cursor-pointer pr-1"
             >
-              <option value="recent">Recent Added</option>
-              <option value="name">Name A–Z</option>
-              <option value="jobs">Most Jobs</option>
+              <option value="recent">{t('customers.recentAdded', undefined, 'Recent Added')}</option>
+              <option value="name">{t('customers.nameAZ', undefined, 'Name A–Z')}</option>
+              <option value="jobs">{t('customers.mostJobs', undefined, 'Most Jobs')}</option>
             </select>
           </div>
         </div>
@@ -606,7 +611,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
                             className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 cursor-pointer"
                           >
                             <Eye className="w-3.5 h-3.5 text-indigo-500" />
-                            <span>View Customer Details</span>
+                            <span>{t('customers.viewProfile', undefined, 'View Customer Details')}</span>
                           </button>
 
                           {canEditCustomers && (
@@ -619,7 +624,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
                               className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 cursor-pointer"
                             >
                               <Edit2 className="w-3.5 h-3.5 text-amber-500" />
-                              <span>Edit Customer</span>
+                              <span>{t('common.edit', undefined, 'Edit Customer')}</span>
                             </button>
                           )}
 
@@ -636,7 +641,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
                             className="w-full text-left px-3.5 py-2 hover:bg-indigo-50/70 dark:hover:bg-indigo-950/50 flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold cursor-pointer"
                           >
                             <Briefcase className="w-3.5 h-3.5" />
-                            <span>Add Job</span>
+                            <span>{t('customers.addJob', undefined, 'Add Job')}</span>
                           </button>
 
                           <button
@@ -648,7 +653,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
                             className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 cursor-pointer"
                           >
                             <FileText className="w-3.5 h-3.5 text-emerald-500" />
-                            <span>Customer Statement</span>
+                            <span>{t('customers.statement', undefined, 'Customer Statement')}</span>
                           </button>
 
                           <button
@@ -660,7 +665,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
                             className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2 cursor-pointer"
                           >
                             <QrCode className="w-3.5 h-3.5 text-indigo-500" />
-                            <span>Share Customer Link</span>
+                            <span>{t('customers.shareLink', undefined, 'Share Customer Link')}</span>
                           </button>
 
                           {cleanPhone && (

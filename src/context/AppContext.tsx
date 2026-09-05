@@ -43,7 +43,14 @@ import type {
   AttendanceVerificationStatus,
   AttendanceIssue,
   AttendanceIssueType,
+  AppLanguage,
 } from '../types';
+import {
+  SUPPORTED_APP_LANGUAGES,
+  translate,
+  resolveUserLanguage,
+  persistUserLanguageLocally,
+} from '../i18n';
 import {
   getCurrentGpsPosition,
   verifyLocationAgainstRules,
@@ -96,6 +103,7 @@ import {
   playCustomVoiceNotification,
   sendBackgroundSystemNotification,
   requestBrowserNotificationPermission,
+  setSelectedVoiceLanguage,
 } from '../utils/audioNotification';
 import {
   calculateNextVisitDate,
@@ -256,6 +264,10 @@ interface AppContextType {
   resetDemoData: () => void;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
+  language: AppLanguage;
+  setLanguage: (lang: AppLanguage) => Promise<void>;
+  t: (key: string, params?: Record<string, string | number>, fallbackText?: string) => string;
+  supportedLanguages: typeof SUPPORTED_APP_LANGUAGES;
   logActivity: (action: string, entityType: ActivityLog['entityType'], entityId: string, description: string) => void;
 
   firestoreService: typeof FirestoreService;
@@ -658,6 +670,49 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
   });
+
+  // User-specific multi-language state
+  const [language, setLanguageState] = useState<AppLanguage>(() => {
+    try {
+      const savedSession = localStorage.getItem('serviflow_user_session');
+      if (savedSession) {
+        const u = JSON.parse(savedSession) as User;
+        return resolveUserLanguage(u?.id, u?.language);
+      }
+    } catch (e) {
+      console.warn('Could not parse stored session for language:', e);
+    }
+    return 'en';
+  });
+
+  // Keep language in sync when authenticated user changes
+  useEffect(() => {
+    if (currentUser) {
+      const resolved = resolveUserLanguage(currentUser.id, currentUser.language);
+      setLanguageState(resolved);
+    }
+  }, [currentUser?.id, currentUser?.language]);
+
+  const setLanguage = async (newLang: AppLanguage) => {
+    setLanguageState(newLang);
+    persistUserLanguageLocally(currentUser?.id, newLang);
+
+    if (currentUser?.id) {
+      try {
+        await updateUserProfile(currentUser.id, { language: newLang });
+      } catch (err) {
+        console.warn('Could not sync user language preference to cloud:', err);
+      }
+    }
+
+    // Align voice alerts default language with UI language
+    setSelectedVoiceLanguage(newLang === 'hi' ? 'hi-IN' : newLang === 'mr' ? 'mr-IN' : 'en-IN');
+    showToast(translate(newLang, 'settings.languageChangedToast', undefined, 'Language updated successfully!'), 'success');
+  };
+
+  const t = (key: string, params?: Record<string, string | number>, fallbackText?: string) => {
+    return translate(language, key, params, fallbackText);
+  };
 
   const [enquiries, setEnquiries] = useState<Enquiry[]>(() =>
     loadCache('serviflow_enquiries_cache', [])
@@ -6150,6 +6205,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateAttendanceWorkingRules,
         reportAttendanceIssue,
         resolveAttendanceIssue,
+        language,
+        setLanguage,
+        t,
+        supportedLanguages: SUPPORTED_APP_LANGUAGES,
       }}
     >
       {children}

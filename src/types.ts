@@ -22,6 +22,8 @@ export interface Role {
   permissions: RolePermission;
 }
 
+export type AppLanguage = 'en' | 'hi' | 'mr';
+
 export interface User {
   id: string;
   name: string;
@@ -38,6 +40,7 @@ export interface User {
   requestedDate?: string;
   referralCode?: string;
   employeeCode?: string; // e.g. EMP-0001
+  language?: AppLanguage;
 }
 
 export interface Business {

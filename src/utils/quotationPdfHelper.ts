@@ -1,14 +1,17 @@
 import { Business, Customer, Quotation } from '../types';
 import { formatIndiaDate } from './dateUtils';
+import { getActiveAppLanguage } from './whatsappHelper';
 
 /**
  * Generates and triggers the native browser print / Save as PDF dialogue
  * with a clean, high-resolution, professional A4 Quotation layout.
+ * Supports English, Hindi, and Marathi based on the user's active language.
  */
 export const printQuotationDocument = (
   quotation: Quotation,
   customer?: Customer | null,
-  business?: Business
+  business?: Business,
+  lang: string = getActiveAppLanguage()
 ) => {
   const currency = business?.currency || '₹';
   const formattedDate = formatIndiaDate(quotation.date);
@@ -20,6 +23,79 @@ export const printQuotationDocument = (
     window.print();
     return;
   }
+
+  // Localized headers and labels
+  const labels = {
+    en: {
+      docType: 'Quotation / Estimate',
+      docNum: 'Quotation No:',
+      billTo: 'Quotation For:',
+      details: 'Quotation Details:',
+      date: 'Quotation Date (IST):',
+      validUntil: 'Valid Until Date (IST):',
+      status: 'Status:',
+      colNum: '#',
+      colDesc: 'Item Description',
+      colQty: 'Qty',
+      colRate: 'Rate',
+      colAmount: 'Amount',
+      subtotal: 'Subtotal:',
+      tax: 'Estimated GST / Tax:',
+      grandTotal: 'Grand Total:',
+      notes: 'Terms & Conditions / Notes:',
+      generatedBy: 'Generated via ServiFlow • Timezone: India Standard Time (Asia/Kolkata)',
+      thanks: 'Thank you for your business!',
+      authorizedSign: 'Authorized Signatory',
+      phone: 'Phone',
+      email: 'Email',
+    },
+    hi: {
+      docType: 'कोटेशन / अनुमान (Quotation)',
+      docNum: 'कोटेशन संख्या:',
+      billTo: 'ग्राहक विवरण (Quotation For):',
+      details: 'कोटेशन विवरण:',
+      date: 'कोटेशन दिनांक (IST):',
+      validUntil: 'वैधता तिथि (IST):',
+      status: 'स्थिति:',
+      colNum: '#',
+      colDesc: 'विवरण (Item Description)',
+      colQty: 'मात्रा',
+      colRate: 'दर',
+      colAmount: 'राशि',
+      subtotal: 'उप-योग (Subtotal):',
+      tax: 'अनुमानित GST / Tax:',
+      grandTotal: 'कुल योग (Grand Total):',
+      notes: 'नियम व शर्तें / नोट्स:',
+      generatedBy: 'ServiFlow द्वारा निर्मित • समय क्षेत्र: भारतीय मानक समय (IST)',
+      thanks: 'हमारे साथ व्यापार करने के लिए धन्यवाद!',
+      authorizedSign: 'अधिकृत हस्ताक्षरकर्ता (Authorized Signatory)',
+      phone: 'फोन',
+      email: 'ईमेल',
+    },
+    mr: {
+      docType: 'कोटेशन / अंदाजपत्रक (Quotation)',
+      docNum: 'कोटेशन क्रमांक:',
+      billTo: 'ग्राहक तपशील (Quotation For):',
+      details: 'कोटेशन तपशील:',
+      date: 'कोटेशन तारीख (IST):',
+      validUntil: 'वैधता मुदत (IST):',
+      status: 'स्थिती:',
+      colNum: '#',
+      colDesc: 'तपशील (Item Description)',
+      colQty: 'नग (Qty)',
+      colRate: 'दर (Rate)',
+      colAmount: 'रक्कम',
+      subtotal: 'उप-एकूण (Subtotal):',
+      tax: 'अंदाजे GST / Tax:',
+      grandTotal: 'एकूण रक्कम (Grand Total):',
+      notes: 'अटी व शर्ती / टीप:',
+      generatedBy: 'ServiFlow द्वारे तयार • भारतीय मानक वेळ (IST)',
+      thanks: 'आपल्या सहकार्याबद्दल मनःपूर्वक धन्यवाद!',
+      authorizedSign: 'अधिकृत स्वाक्षरी (Authorized Signatory)',
+      phone: 'फोन',
+      email: 'ईमेल',
+    },
+  }[lang === 'hi' ? 'hi' : lang === 'mr' ? 'mr' : 'en'];
 
   const itemsRows = (quotation.items || [])
     .map(
@@ -41,7 +117,7 @@ export const printQuotationDocument = (
     quotation.taxTotal > 0
       ? `
       <tr>
-        <td style="padding: 6px 12px; text-align: right; color: #64748b; font-weight: 500;">Estimated GST / Tax:</td>
+        <td style="padding: 6px 12px; text-align: right; color: #64748b; font-weight: 500;">${labels.tax}</td>
         <td style="padding: 6px 12px; text-align: right; font-weight: 600; color: #1e293b; width: 140px;">${currency}${quotation.taxTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       </tr>
     `
@@ -49,7 +125,7 @@ export const printQuotationDocument = (
 
   const htmlContent = `
     <!DOCTYPE html>
-    <html lang="en">
+    <html lang="${lang}">
     <head>
       <meta charset="UTF-8">
       <title>Quotation_${quotation.quotationNumber}</title>
@@ -100,7 +176,7 @@ export const printQuotationDocument = (
           text-align: right;
         }
         .doc-type {
-          font-size: 20px;
+          font-size: 18px;
           font-weight: 900;
           color: #4f46e5;
           letter-spacing: 0.5px;
@@ -158,7 +234,7 @@ export const printQuotationDocument = (
           margin-bottom: 30px;
         }
         .totals-table {
-          width: 320px;
+          width: 340px;
           border-collapse: collapse;
         }
         .grand-total-row td {
@@ -195,7 +271,7 @@ export const printQuotationDocument = (
           color: #64748b;
         }
         .sig-line {
-          width: 180px;
+          width: 200px;
           border-top: 1px solid #94a3b8;
           text-align: center;
           padding-top: 6px;
@@ -212,13 +288,13 @@ export const printQuotationDocument = (
             <h1 class="biz-title">${escapeHtml(business?.name || 'ServiFlow Services')}</h1>
             <div class="biz-sub">
               ${escapeHtml(business?.address || '')}${business?.city ? `, ${escapeHtml(business.city)}` : ''}<br>
-              ${business?.mobile ? `Phone: <strong>${escapeHtml(business.mobile)}</strong>` : ''} 
-              ${business?.email ? ` | Email: ${escapeHtml(business.email)}` : ''}<br>
+              ${business?.mobile ? `${labels.phone}: <strong>${escapeHtml(business.mobile)}</strong>` : ''} 
+              ${business?.email ? ` | ${labels.email}: ${escapeHtml(business.email)}` : ''}<br>
               ${business?.gstNumber ? `GSTIN: <strong>${escapeHtml(business.gstNumber)}</strong>` : ''}
             </div>
           </div>
           <div class="doc-badge">
-            <div class="doc-type">Quotation / Estimate</div>
+            <div class="doc-type">${labels.docType}</div>
             <div class="doc-num">${escapeHtml(quotation.quotationNumber)}</div>
           </div>
         </div>
@@ -226,18 +302,18 @@ export const printQuotationDocument = (
         <!-- Meta Grid -->
         <div class="meta-grid">
           <div class="meta-col">
-            <h4>Quotation For:</h4>
+            <h4>${labels.billTo}</h4>
             <p><strong>${escapeHtml(customer?.name || 'Customer')}</strong></p>
             ${customer?.companyName ? `<p style="color: #475569; font-weight: 500;">${escapeHtml(customer.companyName)}</p>` : ''}
-            ${customer?.mobile ? `<p>Mobile: ${escapeHtml(customer.mobile)}</p>` : ''}
+            ${customer?.mobile ? `<p>${labels.phone}: ${escapeHtml(customer.mobile)}</p>` : ''}
             ${customer?.address ? `<p>${escapeHtml(customer.address)}</p>` : ''}
             ${customer?.gstNumber ? `<p>GSTIN: <strong>${escapeHtml(customer.gstNumber)}</strong></p>` : ''}
           </div>
           <div class="meta-col" style="text-align: right;">
-            <h4>Quotation Details:</h4>
-            <p>Quotation Date (IST): <strong>${formattedDate}</strong></p>
-            <p>Valid Until Date (IST): <strong style="color: #4f46e5;">${formattedValidUntil}</strong></p>
-            <p>Status: <span style="text-transform: uppercase; font-weight: 700; color: #16a34a;">${escapeHtml(quotation.status)}</span></p>
+            <h4>${labels.details}</h4>
+            <p>${labels.date} <strong>${formattedDate}</strong></p>
+            <p>${labels.validUntil} <strong style="color: #4f46e5;">${formattedValidUntil}</strong></p>
+            <p>${labels.status} <span style="text-transform: uppercase; font-weight: 700; color: #16a34a;">${escapeHtml(quotation.status)}</span></p>
           </div>
         </div>
 
@@ -245,11 +321,11 @@ export const printQuotationDocument = (
         <table class="items-table">
           <thead>
             <tr>
-              <th style="width: 45px; text-align: center;">#</th>
-              <th style="text-align: left;">Item Description</th>
-              <th style="width: 70px; text-align: center;">Qty</th>
-              <th style="width: 120px; text-align: right;">Rate (${currency})</th>
-              <th style="width: 130px; text-align: right;">Amount (${currency})</th>
+              <th style="width: 45px; text-align: center;">${labels.colNum}</th>
+              <th style="text-align: left;">${labels.colDesc}</th>
+              <th style="width: 70px; text-align: center;">${labels.colQty}</th>
+              <th style="width: 120px; text-align: right;">${labels.colRate} (${currency})</th>
+              <th style="width: 130px; text-align: right;">${labels.colAmount} (${currency})</th>
             </tr>
           </thead>
           <tbody>
@@ -261,12 +337,12 @@ export const printQuotationDocument = (
         <div class="totals-section">
           <table class="totals-table">
             <tr>
-              <td style="padding: 6px 12px; text-align: right; color: #64748b; font-weight: 500;">Subtotal:</td>
+              <td style="padding: 6px 12px; text-align: right; color: #64748b; font-weight: 500;">${labels.subtotal}</td>
               <td style="padding: 6px 12px; text-align: right; font-weight: 600; color: #1e293b; width: 140px;">${currency}${quotation.subtotal.toLocaleString('en-IN')}</td>
             </tr>
             ${taxRow}
             <tr class="grand-total-row">
-              <td style="text-align: right;">Grand Total:</td>
+              <td style="text-align: right;">${labels.grandTotal}</td>
               <td style="text-align: right;">${currency}${quotation.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
             </tr>
           </table>
@@ -277,7 +353,7 @@ export const printQuotationDocument = (
           quotation.notes
             ? `
           <div class="notes-box">
-            <strong>Terms & Conditions / Notes:</strong>
+            <strong>${labels.notes}</strong>
             ${escapeHtml(quotation.notes)}
           </div>
         `
@@ -287,11 +363,11 @@ export const printQuotationDocument = (
         <!-- Footer -->
         <div class="footer-sign">
           <div>
-            Generated via ServiFlow &bull; Timezone: India Standard Time (Asia/Kolkata)<br>
-            Thank you for your business!
+            ${labels.generatedBy}<br>
+            ${labels.thanks}
           </div>
           <div class="sig-line">
-            Authorized Signatory<br>
+            ${labels.authorizedSign}<br>
             <span style="font-size: 10px; font-weight: 400; color: #94a3b8;">${escapeHtml(business?.name || '')}</span>
           </div>
         </div>
