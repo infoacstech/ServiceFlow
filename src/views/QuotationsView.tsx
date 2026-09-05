@@ -27,6 +27,9 @@ import {
   Calendar,
   Tag,
   HelpCircle,
+  MoreVertical,
+  MessageSquare,
+  Eye,
 } from 'lucide-react';
 import {
   getIndiaTodayDateString,
@@ -80,6 +83,13 @@ export const QuotationsView: React.FC = () => {
 
   const [search, setSearch] = useState('');
   const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMenuId(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
 
   // Modal Control States
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -508,96 +518,243 @@ export const QuotationsView: React.FC = () => {
         />
       </div>
 
-      {/* Quotations Table */}
+      {/* Quotations List & Table */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-semibold uppercase tracking-wider">
-              <tr>
-                <th className="p-3.5">Quotation No</th>
-                <th className="p-3.5">Customer</th>
-                <th className="p-3.5">Date Created (IST)</th>
-                <th className="p-3.5">Valid Until (IST)</th>
-                <th className="p-3.5">Grand Total</th>
-                <th className="p-3.5">Status</th>
-                <th className="p-3.5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-400">
-                    No quotations found. Click <strong className="text-indigo-600">Create Quotation</strong> to generate one.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((qt) => {
-                  const customer = (customers || []).find((c) => c.id === qt.customerId);
-                  const isExpired = isPastIndiaDate(qt.validUntil) && qt.status !== 'approved';
+        {filtered.length === 0 ? (
+          <div className="p-10 text-center text-slate-400 space-y-2">
+            <FileText className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
+            <p className="text-xs">
+              No quotations found. Click <strong className="text-indigo-600">Create Quotation</strong> to generate one.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* 1. Mobile Cards View (md:hidden) - Ultra-compact, clean, perfectly aligned */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/80 p-2.5 space-y-2">
+              {filtered.map((qt) => {
+                const customer = (customers || []).find((c) => c.id === qt.customerId);
+                const isExpired = isPastIndiaDate(qt.validUntil) && qt.status !== 'approved';
+                const isMenuOpen = openMenuId === qt.id;
 
-                  return (
-                    <tr key={qt.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                      <td className="p-3.5 font-extrabold text-indigo-600">
-                        {qt.quotationNumber}
-                      </td>
-                      <td className="p-3.5 font-bold text-slate-900 dark:text-slate-100">
-                        {customer?.name || 'Customer'}
-                        {customer?.companyName && (
-                          <span className="block text-[10px] text-slate-400 font-normal">
-                            {customer.companyName}
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3.5 text-slate-500 font-medium">
-                        {formatIndiaDateDDMMYYYY(qt.date)}
-                      </td>
-                      <td className="p-3.5">
-                        <span className={`font-medium ${isExpired ? 'text-amber-600 font-bold' : 'text-slate-600 dark:text-slate-300'}`}>
-                          {formatIndiaDateDDMMYYYY(qt.validUntil)}
+                return (
+                  <div
+                    key={qt.id}
+                    onClick={() => setSelectedQuotation(qt)}
+                    className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-indigo-400 dark:hover:border-indigo-500 transition-all cursor-pointer space-y-2 active:scale-[0.99] relative"
+                  >
+                    {/* Top Row: Fixed height h-7 for exact vertical center alignment */}
+                    <div className="h-7 flex items-center justify-between gap-1.5 min-w-0">
+                      {/* Left: Quotation No + Status Badge + Expired Badge */}
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1 h-7">
+                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 font-mono truncate">
+                          {qt.quotationNumber}
                         </span>
-                        {isExpired && (
-                          <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300">
-                            Expired
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3.5 font-black text-slate-900 dark:text-slate-100">
-                        {currentBusiness.currency}{qt.grandTotal.toLocaleString('en-IN')}
-                      </td>
-                      <td className="p-3.5">
+
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                          className={`h-5 inline-flex items-center px-2 rounded-md text-[9.5px] font-black uppercase shrink-0 ${
                             qt.status === 'approved'
-                              ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
+                              ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                               : qt.status === 'sent'
-                              ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300'
+                              ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
                               : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                           }`}
                         >
                           {qt.status}
                         </span>
-                      </td>
-                      <td className="p-3.5 text-right space-x-2 whitespace-nowrap">
-                        <button
-                          onClick={() => setSelectedQuotation(qt)}
-                          className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-                        >
-                          Preview / Share
-                        </button>
-                        <button
-                          onClick={() => convertQuotationToInvoice(qt.id)}
-                          className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-colors shadow-xs cursor-pointer"
-                        >
-                          Convert to Invoice →
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+
+                        {isExpired && (
+                          <span className="h-5 inline-flex items-center px-1.5 rounded-md text-[9px] font-black uppercase shrink-0 bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900/60">
+                            Expired
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Right: Grand Total + 3-Dot Action Menu */}
+                      <div className="flex items-center gap-1.5 shrink-0 h-7">
+                        <span className="h-5 inline-flex items-center text-xs font-mono font-black text-slate-800 dark:text-slate-200">
+                          {currentBusiness.currency}{qt.grandTotal.toLocaleString('en-IN')}
+                        </span>
+
+                        {/* 3-Dot Action Menu */}
+                        <div className="relative shrink-0 flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(isMenuOpen ? null : qt.id);
+                            }}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                            aria-label="Quotation options"
+                          >
+                            <MoreVertical className="w-3.5 h-3.5" />
+                          </button>
+
+                          {isMenuOpen && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute right-0 top-8 z-30 w-52 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 animate-in fade-in zoom-in-95 text-xs text-slate-700 dark:text-slate-200"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuId(null);
+                                  setSelectedQuotation(qt);
+                                }}
+                                className="w-full px-3.5 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-700/60 font-semibold flex items-center gap-2"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-indigo-500" />
+                                <span>Preview & Print</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuId(null);
+                                  sendQuotationWhatsApp(qt, customer, currentBusiness);
+                                }}
+                                className="w-full px-3.5 py-2 text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-2"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Share on WhatsApp</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuId(null);
+                                  convertQuotationToInvoice(qt.id);
+                                }}
+                                className="w-full px-3.5 py-2 text-left hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-2"
+                              >
+                                <ArrowRight className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>Convert to Invoice</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Row 2: Customer Name + Company */}
+                    <div className="flex items-center justify-between text-xs min-w-0">
+                      <span className="font-extrabold text-slate-800 dark:text-slate-200 truncate">
+                        {customer?.name || 'Customer'}
+                      </span>
+                      {customer?.companyName && (
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[50%] shrink-0 ml-2">
+                          {customer.companyName}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Row 3: Valid Until Date & Items Count */}
+                    <div className="pt-1 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="w-3 h-3 text-slate-400" />
+                        <span>Valid: {formatIndiaDateDDMMYYYY(qt.validUntil)}</span>
+                      </div>
+                      <span className="font-semibold text-slate-600 dark:text-slate-400">
+                        {qt.items?.length || 0} item{(qt.items?.length || 0) > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 2. Desktop Table View (hidden md:block) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 font-semibold uppercase tracking-wider">
+                  <tr>
+                    <th className="p-3.5">Quotation No</th>
+                    <th className="p-3.5">Customer</th>
+                    <th className="p-3.5">Date Created (IST)</th>
+                    <th className="p-3.5">Valid Until (IST)</th>
+                    <th className="p-3.5">Grand Total</th>
+                    <th className="p-3.5">Status</th>
+                    <th className="p-3.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filtered.map((qt) => {
+                    const customer = (customers || []).find((c) => c.id === qt.customerId);
+                    const isExpired = isPastIndiaDate(qt.validUntil) && qt.status !== 'approved';
+
+                    return (
+                      <tr key={qt.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <td className="p-3.5 font-extrabold text-indigo-600 font-mono">
+                          {qt.quotationNumber}
+                        </td>
+                        <td className="p-3.5 font-bold text-slate-900 dark:text-slate-100">
+                          {customer?.name || 'Customer'}
+                          {customer?.companyName && (
+                            <span className="block text-[10px] text-slate-400 font-normal">
+                              {customer.companyName}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3.5 text-slate-500 font-medium">
+                          {formatIndiaDateDDMMYYYY(qt.date)}
+                        </td>
+                        <td className="p-3.5">
+                          <span className={`font-medium ${isExpired ? 'text-amber-600 font-bold' : 'text-slate-600 dark:text-slate-300'}`}>
+                            {formatIndiaDateDDMMYYYY(qt.validUntil)}
+                          </span>
+                          {isExpired && (
+                            <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300">
+                              Expired
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3.5 font-black text-slate-900 dark:text-slate-100 font-mono">
+                          {currentBusiness.currency}{qt.grandTotal.toLocaleString('en-IN')}
+                        </td>
+                        <td className="p-3.5">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                              qt.status === 'approved'
+                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
+                                : qt.status === 'sent'
+                                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                            }`}
+                          >
+                            {qt.status}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-right space-x-2 whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => sendQuotationWhatsApp(qt, customer, currentBusiness)}
+                            className="px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 text-[11px] inline-flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                            title="Share quotation with customer via WhatsApp"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedQuotation(qt)}
+                            className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer text-[11px]"
+                          >
+                            Preview
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => convertQuotationToInvoice(qt.id)}
+                            className="px-3 py-1.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-colors shadow-xs cursor-pointer text-[11px]"
+                          >
+                            Convert to Invoice →
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Existing Quotation Preview & Share Modal */}

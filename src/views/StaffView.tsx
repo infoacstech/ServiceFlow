@@ -25,7 +25,10 @@ import {
   Search,
   Filter,
   RotateCcw,
+  MoreVertical,
+  MessageSquare,
 } from 'lucide-react';
+import { openWhatsApp } from '../utils/whatsappHelper';
 
 export const StaffView: React.FC = () => {
   const { users, staff, jobs, currentBusiness, currentUser, roles, addStaff, deleteStaff, updateUserStatus, showToast } = useApp();
@@ -36,6 +39,13 @@ export const StaffView: React.FC = () => {
   // Directory Search & Filter state
   const [staffSearchQuery, setStaffSearchQuery] = useState('');
   const [staffRoleFilter, setStaffRoleFilter] = useState('all');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = () => setOpenMenuId(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
 
   // Form states
   const [name, setName] = useState('');
@@ -431,145 +441,334 @@ export const StaffView: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredBusinessUsers.map((st) => {
-                const assignedJobs = jobs.filter((j) => j.assignedStaffId === st.id);
-                const completedJobs = assignedJobs.filter((j) => j.status === 'completed' || j.status === 'closed');
+            <>
+              {/* 1. Mobile Compact Cards (md:hidden) */}
+              <div className="md:hidden space-y-2">
+                {filteredBusinessUsers.map((st) => {
+                  const assignedJobs = jobs.filter((j) => j.assignedStaffId === st.id);
+                  const completedJobs = assignedJobs.filter((j) => j.status === 'completed' || j.status === 'closed');
+                  const isPending = st.approvalStatus === 'pending';
+                  const isBlocked = st.approvalStatus === 'blocked';
+                  const isRejected = st.approvalStatus === 'rejected';
+                  const isMenuOpen = openMenuId === st.id;
 
-                const isPending = st.approvalStatus === 'pending';
-                const isBlocked = st.approvalStatus === 'blocked';
-                const isRejected = st.approvalStatus === 'rejected';
+                  return (
+                    <div
+                      key={st.id}
+                      className={`p-3 rounded-2xl bg-white dark:bg-slate-900 border transition-all space-y-1.5 shadow-2xs ${
+                        isBlocked
+                          ? 'border-rose-200 dark:border-rose-900/50 bg-rose-50/10 dark:bg-rose-950/10'
+                          : isPending
+                          ? 'border-amber-200 dark:border-amber-900/50 bg-amber-50/10 dark:bg-amber-950/10'
+                          : 'border-slate-200/80 dark:border-slate-800'
+                      }`}
+                    >
+                      {/* Top Row: Fixed height h-7 for exact vertical center alignment */}
+                      <div className="h-7 flex items-center justify-between gap-1.5 min-w-0">
+                        {/* Left: Name + Role + Status */}
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1 h-7">
+                          <span className="text-xs font-black text-slate-900 dark:text-slate-100 truncate">
+                            {st?.name || st?.email || 'Staff'}
+                          </span>
+                          <span className="h-5 inline-flex items-center px-1.5 rounded-md text-[9px] font-bold uppercase bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 shrink-0">
+                            {(st?.role || 'staff').replace('_', ' ')}
+                          </span>
+                          {isBlocked ? (
+                            <span className="h-5 inline-flex items-center px-1.5 rounded-md text-[9px] font-extrabold uppercase bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 shrink-0">
+                              Blocked
+                            </span>
+                          ) : isPending ? (
+                            <span className="h-5 inline-flex items-center px-1.5 rounded-md text-[9px] font-extrabold uppercase bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 shrink-0">
+                              Pending
+                            </span>
+                          ) : isRejected ? (
+                            <span className="h-5 inline-flex items-center px-1.5 rounded-md text-[9px] font-extrabold uppercase bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-400 shrink-0">
+                              Rejected
+                            </span>
+                          ) : (
+                            <span className="h-5 inline-flex items-center px-1.5 rounded-md text-[9px] font-extrabold uppercase bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 shrink-0">
+                              Active
+                            </span>
+                          )}
+                        </div>
 
-                return (
-                  <div
-                    key={st.id}
-                    className={`p-5 rounded-3xl bg-white dark:bg-slate-900 border shadow-xs flex flex-col justify-between space-y-4 ${
-                      isBlocked
-                        ? 'border-rose-200 dark:border-rose-900/50 bg-rose-50/20 dark:bg-rose-950/10'
-                        : isPending
-                        ? 'border-amber-200 dark:border-amber-900/50 bg-amber-50/20 dark:bg-amber-950/10'
-                        : 'border-slate-200/80 dark:border-slate-800'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-2xl bg-slate-200 dark:bg-slate-800 overflow-hidden ring-2 ring-indigo-500/30 shrink-0">
-                            {st.avatar ? (
-                              <img src={st.avatar} alt={st.name || 'Staff'} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center font-bold text-slate-700 dark:text-slate-200">
-                                {(st?.name || st?.email || 'US').substring(0, 2).toUpperCase()}
+                        {/* Right: Jobs Count + 3-Dot Action Menu */}
+                        <div className="flex items-center gap-1.5 shrink-0 h-7">
+                          <span className="h-5 inline-flex items-center px-2 rounded-md text-[9.5px] font-extrabold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                            Jobs: {assignedJobs.length}
+                          </span>
+
+                          {/* 3-Dot Action Menu */}
+                          <div className="relative shrink-0 flex items-center justify-center">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(isMenuOpen ? null : st.id);
+                              }}
+                              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                              aria-label="Staff actions"
+                            >
+                              <MoreVertical className="w-3.5 h-3.5" />
+                            </button>
+
+                            {isMenuOpen && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute right-0 top-8 z-30 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 animate-in fade-in zoom-in-95 text-xs text-slate-700 dark:text-slate-200"
+                              >
+                                {st.phone && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenMenuId(null);
+                                        openWhatsApp(st.phone || '', `Hello ${st.name || ''}, regarding your jobs at ${currentBusiness.name}`);
+                                      }}
+                                      className="w-full px-3.5 py-2 text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-2"
+                                    >
+                                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                                      <span>Chat on WhatsApp</span>
+                                    </button>
+                                    <a
+                                      href={`tel:${st.phone}`}
+                                      onClick={() => setOpenMenuId(null)}
+                                      className="w-full px-3.5 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-700/60 font-semibold flex items-center gap-2 block"
+                                    >
+                                      <Phone className="w-3.5 h-3.5 text-slate-500" />
+                                      <span>Call Staff</span>
+                                    </a>
+                                  </>
+                                )}
+
+                                {isOwnerOrAdmin && st.id !== currentUser?.id && st.role !== 'super_admin' && (
+                                  <>
+                                    <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
+                                    {isPending ? (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setOpenMenuId(null);
+                                            updateUserStatus(st.id, 'active');
+                                          }}
+                                          className="w-full px-3.5 py-2 text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-2"
+                                        >
+                                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                          <span>Approve Account</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setOpenMenuId(null);
+                                            updateUserStatus(st.id, 'rejected');
+                                          }}
+                                          className="w-full px-3.5 py-2 text-left hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-2"
+                                        >
+                                          <XCircle className="w-3.5 h-3.5 text-rose-500" />
+                                          <span>Reject Request</span>
+                                        </button>
+                                      </>
+                                    ) : isBlocked ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setOpenMenuId(null);
+                                          updateUserStatus(st.id, 'active');
+                                        }}
+                                        className="w-full px-3.5 py-2 text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-2"
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                        <span>Unblock Access</span>
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setOpenMenuId(null);
+                                          updateUserStatus(st.id, 'blocked');
+                                        }}
+                                        className="w-full px-3.5 py-2 text-left hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-2"
+                                      >
+                                        <Ban className="w-3.5 h-3.5 text-rose-500" />
+                                        <span>Block Access</span>
+                                      </button>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenMenuId(null);
+                                        setDeletingStaffUser(st);
+                                      }}
+                                      className="w-full px-3.5 py-2 text-left hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-2"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                      <span>Delete Account</span>
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             )}
                           </div>
+                        </div>
+                      </div>
 
-                          <div>
-                            <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                              {st?.name || st?.email || 'Staff'}
-                            </h3>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
-                                {(st?.role || 'staff').replace('_', ' ')}
-                              </span>
+                      {/* Row 2: Contact info & Completed stats */}
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                        <span className="truncate max-w-[60%]">
+                          {st.phone || st.email}
+                        </span>
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          {completedJobs.length} Completed
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 2. Desktop Grid (hidden md:grid) */}
+              <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredBusinessUsers.map((st) => {
+                  const assignedJobs = jobs.filter((j) => j.assignedStaffId === st.id);
+                  const completedJobs = assignedJobs.filter((j) => j.status === 'completed' || j.status === 'closed');
+
+                  const isPending = st.approvalStatus === 'pending';
+                  const isBlocked = st.approvalStatus === 'blocked';
+                  const isRejected = st.approvalStatus === 'rejected';
+
+                  return (
+                    <div
+                      key={st.id}
+                      className={`p-5 rounded-3xl bg-white dark:bg-slate-900 border shadow-xs flex flex-col justify-between space-y-4 ${
+                        isBlocked
+                          ? 'border-rose-200 dark:border-rose-900/50 bg-rose-50/20 dark:bg-rose-950/10'
+                          : isPending
+                          ? 'border-amber-200 dark:border-amber-900/50 bg-amber-50/20 dark:bg-amber-950/10'
+                          : 'border-slate-200/80 dark:border-slate-800'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-2xl bg-slate-200 dark:bg-slate-800 overflow-hidden ring-2 ring-indigo-500/30 shrink-0">
+                              {st.avatar ? (
+                                <img src={st.avatar} alt={st.name || 'Staff'} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center font-bold text-slate-700 dark:text-slate-200">
+                                  {(st?.name || st?.email || 'US').substring(0, 2).toUpperCase()}
+                                </div>
+                              )}
                             </div>
+
+                            <div>
+                              <h3 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                {st?.name || st?.email || 'Staff'}
+                              </h3>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
+                                  {(st?.role || 'staff').replace('_', ' ')}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Status Badge */}
+                          <div>
+                            {isBlocked ? (
+                              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 flex items-center gap-1">
+                                <Ban className="w-3 h-3" /> Blocked
+                              </span>
+                            ) : isPending ? (
+                              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> Pending
+                              </span>
+                            ) : isRejected ? (
+                              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-400 flex items-center gap-1">
+                                <XCircle className="w-3 h-3" /> Rejected
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> Active
+                              </span>
+                            )}
                           </div>
                         </div>
 
-                        {/* Status Badge */}
-                        <div>
-                          {isBlocked ? (
-                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300 flex items-center gap-1">
-                              <Ban className="w-3 h-3" /> Blocked
-                            </span>
-                          ) : isPending ? (
-                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 flex items-center gap-1">
-                              <Clock className="w-3 h-3" /> Pending
-                            </span>
-                          ) : isRejected ? (
-                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-400 flex items-center gap-1">
-                              <XCircle className="w-3 h-3" /> Rejected
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> Active
-                            </span>
-                          )}
+                        <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400">
+                          <div className="flex items-center gap-2">
+                            <Mail className="w-3.5 h-3.5 text-slate-400" />
+                            <span className="truncate">{st.email}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Phone className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{st.phone || '+91 98765 00000'}</span>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400">
-                        <div className="flex items-center gap-2">
-                          <Mail className="w-3.5 h-3.5 text-slate-400" />
-                          <span className="truncate">{st.email}</span>
+                      <div className="space-y-3">
+                        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-center text-xs">
+                          <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                            <div className="text-[10px] text-slate-400">Assigned Jobs</div>
+                            <div className="font-bold text-slate-900 dark:text-slate-100">{assignedJobs.length}</div>
+                          </div>
+                          <div className="p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl">
+                            <div className="text-[10px] text-emerald-700 dark:text-emerald-400">Completed</div>
+                            <div className="font-bold text-emerald-800 dark:text-emerald-300">{completedJobs.length}</div>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Phone className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{st.phone || '+91 98765 00000'}</span>
-                        </div>
-                      </div>
-                    </div>
 
-                    <div className="space-y-3">
-                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-2 text-center text-xs">
-                        <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                          <div className="text-[10px] text-slate-400">Assigned Jobs</div>
-                          <div className="font-bold text-slate-900 dark:text-slate-100">{assignedJobs.length}</div>
-                        </div>
-                        <div className="p-2 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl">
-                          <div className="text-[10px] text-emerald-700 dark:text-emerald-400">Completed</div>
-                          <div className="font-bold text-emerald-800 dark:text-emerald-300">{completedJobs.length}</div>
-                        </div>
-                      </div>
-
-                      {/* Owner Controls (Block / Unblock / Approve / Delete) */}
-                      {isOwnerOrAdmin && st.id !== currentUser?.id && st.role !== 'super_admin' && (
-                        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
-                          {isPending ? (
-                            <>
+                        {/* Owner Controls (Block / Unblock / Approve / Delete) */}
+                        {isOwnerOrAdmin && st.id !== currentUser?.id && st.role !== 'super_admin' && (
+                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                            {isPending ? (
+                              <>
+                                <button
+                                  onClick={() => updateUserStatus(st.id, 'active')}
+                                  className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-xs transition-all"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                                </button>
+                                <button
+                                  onClick={() => updateUserStatus(st.id, 'rejected')}
+                                  className="py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-600 font-bold text-xs transition-all"
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            ) : isBlocked ? (
                               <button
                                 onClick={() => updateUserStatus(st.id, 'active')}
-                                className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-xs transition-all"
+                                className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all"
                               >
-                                <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Unblock Access
                               </button>
+                            ) : (
                               <button
-                                onClick={() => updateUserStatus(st.id, 'rejected')}
-                                className="py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-600 font-bold text-xs transition-all"
+                                onClick={() => updateUserStatus(st.id, 'blocked')}
+                                className="flex-1 py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 dark:bg-slate-800 dark:hover:bg-rose-950/60 dark:hover:text-rose-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
                               >
-                                Reject
+                                <Ban className="w-3.5 h-3.5 text-rose-500" /> Block Access
                               </button>
-                            </>
-                          ) : isBlocked ? (
-                            <button
-                              onClick={() => updateUserStatus(st.id, 'active')}
-                              className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Unblock Access
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => updateUserStatus(st.id, 'blocked')}
-                              className="flex-1 py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 dark:bg-slate-800 dark:hover:bg-rose-950/60 dark:hover:text-rose-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
-                            >
-                              <Ban className="w-3.5 h-3.5 text-rose-500" /> Block Access
-                            </button>
-                          )}
+                            )}
 
-                          <button
-                            onClick={() => setDeletingStaffUser(st)}
-                            className="py-1.5 px-2.5 rounded-xl bg-slate-100 hover:bg-rose-100 dark:bg-slate-800 dark:hover:bg-rose-950/60 text-slate-500 hover:text-rose-600 transition-all"
-                            title="Delete staff account permanently"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                          </button>
-                        </div>
-                      )}
+                            <button
+                              onClick={() => setDeletingStaffUser(st)}
+                              className="py-1.5 px-2.5 rounded-xl bg-slate-100 hover:bg-rose-100 dark:bg-slate-800 dark:hover:bg-rose-950/60 text-slate-500 hover:text-rose-600 transition-all"
+                              title="Delete staff account permanently"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       )}

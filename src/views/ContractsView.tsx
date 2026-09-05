@@ -28,6 +28,7 @@ import {
   Layers,
   HardHat,
   Cpu,
+  MoreVertical,
 } from 'lucide-react';
 import {
   sendContractRenewalWhatsApp,
@@ -57,6 +58,13 @@ export const ContractsView: React.FC = () => {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'due_visits' | 'expiring' | 'expired' | 'active'>('all');
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = () => setOpenMenuId(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
 
   // Modals
   const [isNewContractOpen, setIsNewContractOpen] = useState(false);
@@ -716,10 +724,10 @@ export const ContractsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Contracts Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Contracts Grid / Mobile List */}
+      <div>
         {filteredContracts.length === 0 ? (
-          <div className="col-span-full p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 text-slate-400 space-y-3">
+          <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 text-slate-400 space-y-3">
             <Repeat className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600" />
             <div className="text-sm font-bold text-slate-700 dark:text-slate-300">
               No AMC contracts found matching your filters
@@ -747,233 +755,403 @@ export const ContractsView: React.FC = () => {
             </div>
           </div>
         ) : (
-          filteredContracts.map((contract) => {
-            const customer = (customers || []).find((c) => c.id === contract.customerId);
-            const assignedTech = (users || []).find((u) => u.id === contract.assignedTechnicianId);
-            const percentUsed = (contract.visitsUsed / contract.visitsAllowed) * 100;
-            const daysLeft = getDaysRemaining(contract.endDate);
-            const isExpired = daysLeft < 0;
-            const isExpiringSoon = daysLeft >= 0 && daysLeft <= 30;
-            const visitStatus = getAmcVisitStatus(contract);
-            const milestones = generateVisitScheduleMilestones(contract);
+          <>
+            {/* 1. Mobile Compact Cards (md:hidden) - Ultra-compact, clean, perfectly aligned */}
+            <div className="md:hidden space-y-2">
+              {filteredContracts.map((contract) => {
+                const customer = (customers || []).find((c) => c.id === contract.customerId);
+                const daysLeft = getDaysRemaining(contract.endDate);
+                const isExpired = daysLeft < 0;
+                const isExpiringSoon = daysLeft >= 0 && daysLeft <= 30;
+                const visitStatus = getAmcVisitStatus(contract);
+                const isMenuOpen = openMenuId === contract.id;
 
-            return (
-              <div
-                key={contract.id}
-                className={`p-5 rounded-3xl bg-white dark:bg-slate-900 border transition-all flex flex-col justify-between space-y-4 shadow-xs ${
-                  visitStatus.isOverdue
-                    ? 'border-rose-300 dark:border-rose-900/60 ring-2 ring-rose-500/20'
-                    : visitStatus.isDueSoon
-                    ? 'border-amber-300 dark:border-amber-900/60 ring-2 ring-amber-500/20'
-                    : isExpiringSoon
-                    ? 'border-orange-300 dark:border-orange-900/60'
-                    : 'border-slate-200/80 dark:border-slate-800'
-                }`}
-              >
-                <div>
-                  {/* Top Bar: Contract # & Badges */}
-                  <div className="flex items-center justify-between mb-2 flex-wrap gap-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-black text-indigo-600 font-mono">
-                        {contract.contractNumber}
-                      </span>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 capitalize">
-                        {contract.visitFrequency}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border uppercase ${visitStatus.badgeClass}`}>
-                        {visitStatus.statusLabel}
-                      </span>
-
-                      {isExpired ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
-                          Expired
+                return (
+                  <div
+                    key={contract.id}
+                    onClick={() => openEditContract(contract)}
+                    className={`p-3 rounded-2xl bg-white dark:bg-slate-900 border transition-all cursor-pointer space-y-2 active:scale-[0.99] relative shadow-2xs ${
+                      visitStatus.isOverdue
+                        ? 'border-rose-300 dark:border-rose-900/60'
+                        : visitStatus.isDueSoon
+                        ? 'border-amber-300 dark:border-amber-900/60'
+                        : 'border-slate-200/80 dark:border-slate-800'
+                    }`}
+                  >
+                    {/* Top Row: Fixed height h-7 for exact vertical center alignment */}
+                    <div className="h-7 flex items-center justify-between gap-1.5 min-w-0">
+                      {/* Left: Contract # + Frequency + Visit Status */}
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1 h-7">
+                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 font-mono truncate">
+                          {contract.contractNumber}
                         </span>
-                      ) : isExpiringSoon ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300">
-                          {daysLeft}d left
+                        <span className="h-5 inline-flex items-center px-1.5 rounded-md text-[9px] font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
+                          {contract.visitFrequency}
                         </span>
-                      ) : null}
+                        <span className={`h-5 inline-flex items-center px-2 rounded-md text-[9.5px] font-black uppercase shrink-0 border ${visitStatus.badgeClass}`}>
+                          {visitStatus.statusLabel}
+                        </span>
+                        {isExpired && (
+                          <span className="h-5 inline-flex items-center px-1.5 rounded-md text-[9px] font-black uppercase shrink-0 bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                            Expired
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Right: Contract Amount + 3-Dot Action Menu */}
+                      <div className="flex items-center gap-1.5 shrink-0 h-7">
+                        <span className="h-5 inline-flex items-center text-xs font-mono font-black text-slate-800 dark:text-slate-200">
+                          {currentBusiness.currency}{contract.contractAmount || 0}
+                        </span>
+
+                        {/* 3-Dot Action Menu */}
+                        <div className="relative shrink-0 flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(isMenuOpen ? null : contract.id);
+                            }}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                            aria-label="Contract options"
+                          >
+                            <MoreVertical className="w-3.5 h-3.5" />
+                          </button>
+
+                          {isMenuOpen && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute right-0 top-8 z-30 w-52 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 animate-in fade-in zoom-in-95 text-xs text-slate-700 dark:text-slate-200"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuId(null);
+                                  sendAmcVisitReminderWhatsApp(contract, customer, currentBusiness);
+                                  showToast(`WhatsApp reminder prepared for ${customer?.name || 'customer'}`, 'success');
+                                }}
+                                className="w-full px-3.5 py-2 text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-2"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>WhatsApp Visit Reminder</span>
+                              </button>
+
+                              {contract.visitsRemaining > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuId(null);
+                                    openSingleDispatchModal(contract);
+                                  }}
+                                  className="w-full px-3.5 py-2 text-left hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-2"
+                                >
+                                  <Wrench className="w-3.5 h-3.5 text-indigo-600" />
+                                  <span>Dispatch Next Visit</span>
+                                </button>
+                              )}
+
+                              {(isExpiringSoon || isExpired) && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuId(null);
+                                    sendContractRenewalWhatsApp(contract, customer, currentBusiness);
+                                    showToast(`WhatsApp renewal reminder sent to ${customer?.name || 'customer'}`, 'success');
+                                  }}
+                                  className="w-full px-3.5 py-2 text-left hover:bg-orange-50 dark:hover:bg-orange-950/40 text-orange-600 dark:text-orange-400 font-bold flex items-center gap-2"
+                                >
+                                  <Repeat className="w-3.5 h-3.5 text-orange-600" />
+                                  <span>Send Renewal Quote</span>
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuId(null);
+                                  openEditContract(contract);
+                                }}
+                                className="w-full px-3.5 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-700/60 font-semibold flex items-center gap-2"
+                              >
+                                <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+                                <span>Edit AMC Details</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuId(null);
+                                  if (window.confirm(`Are you sure you want to remove contract ${contract.contractNumber}?`)) {
+                                    deleteContract(contract.id);
+                                  }
+                                }}
+                                className="w-full px-3.5 py-2 text-left hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-2"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                <span>Delete Contract</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Plan Name & Customer */}
-                  <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">
-                    {contract.name}
-                  </h3>
-
-                  <div className="flex items-center justify-between text-xs font-semibold text-indigo-600 mt-1 flex-wrap gap-1">
-                    <span>
-                      {customer?.name} {customer?.companyName ? `(${customer.companyName})` : ''}
-                    </span>
-                    {customer?.mobile && (
-                      <a
-                        href={`tel:${customer.mobile}`}
-                        className="text-[11px] text-slate-500 hover:text-indigo-600 flex items-center gap-1"
-                      >
-                        <Phone className="w-3 h-3" /> {customer.mobile}
-                      </a>
-                    )}
-                  </div>
-
-                  {/* Equipment / Machine Details */}
-                  {contract.equipmentDetails && (
-                    <div className="mt-2.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 text-[11px] text-slate-700 dark:text-slate-300 flex items-start gap-1.5">
-                      <Cpu className="w-3.5 h-3.5 text-indigo-500 shrink-0 mt-0.5" />
-                      <span className="line-clamp-2">{contract.equipmentDetails}</span>
-                    </div>
-                  )}
-
-                  {/* Progress bar of visits */}
-                  <div className="mt-3.5 space-y-1.5">
-                    <div className="flex justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
-                      <span>Maintenance Visits Quota</span>
-                      <span className="font-bold text-slate-900 dark:text-slate-100">
-                        {contract.visitsUsed} of {contract.visitsAllowed} rendered ({contract.visitsRemaining} remaining)
+                    {/* Row 2: Customer Name + Plan */}
+                    <div className="flex items-center justify-between text-xs min-w-0">
+                      <span className="font-extrabold text-slate-800 dark:text-slate-200 truncate">
+                        {customer?.name || 'Customer'}
+                      </span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[50%] shrink-0 ml-2">
+                        {contract.name}
                       </span>
                     </div>
-                    <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-indigo-600 rounded-full transition-all"
-                        style={{ width: `${Math.min(100, percentUsed)}%` }}
-                      />
+
+                    {/* Row 3: Visits Quota & Next Visit Date */}
+                    <div className="pt-1 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                      <div className="flex items-center gap-1.5">
+                        <Check className="w-3 h-3 text-emerald-500" />
+                        <span>Visits: {contract.visitsUsed}/{contract.visitsAllowed} done ({contract.visitsRemaining} left)</span>
+                      </div>
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">
+                        Next: {visitStatus.nextVisitDate || '-'}
+                      </span>
                     </div>
                   </div>
+                );
+              })}
+            </div>
 
-                  {/* Visual Milestones / Steps */}
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                      Preventive Visit Milestones
+            {/* 2. Desktop Expanded Grid View (hidden md:grid) */}
+            <div className="hidden md:grid md:grid-cols-2 gap-4">
+              {filteredContracts.map((contract) => {
+                const customer = (customers || []).find((c) => c.id === contract.customerId);
+                const assignedTech = (users || []).find((u) => u.id === contract.assignedTechnicianId);
+                const percentUsed = (contract.visitsUsed / contract.visitsAllowed) * 100;
+                const daysLeft = getDaysRemaining(contract.endDate);
+                const isExpired = daysLeft < 0;
+                const isExpiringSoon = daysLeft >= 0 && daysLeft <= 30;
+                const visitStatus = getAmcVisitStatus(contract);
+                const milestones = generateVisitScheduleMilestones(contract);
+
+                return (
+                  <div
+                    key={contract.id}
+                    className={`p-5 rounded-3xl bg-white dark:bg-slate-900 border transition-all flex flex-col justify-between space-y-4 shadow-xs ${
+                      visitStatus.isOverdue
+                        ? 'border-rose-300 dark:border-rose-900/60 ring-2 ring-rose-500/20'
+                        : visitStatus.isDueSoon
+                        ? 'border-amber-300 dark:border-amber-900/60 ring-2 ring-amber-500/20'
+                        : isExpiringSoon
+                        ? 'border-orange-300 dark:border-orange-900/60'
+                        : 'border-slate-200/80 dark:border-slate-800'
+                    }`}
+                  >
+                    <div>
+                      {/* Top Bar: Contract # & Badges */}
+                      <div className="flex items-center justify-between mb-2 flex-wrap gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-indigo-600 font-mono">
+                            {contract.contractNumber}
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 capitalize">
+                            {contract.visitFrequency}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border uppercase ${visitStatus.badgeClass}`}>
+                            {visitStatus.statusLabel}
+                          </span>
+
+                          {isExpired ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                              Expired
+                            </span>
+                          ) : isExpiringSoon ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300">
+                              {daysLeft}d left
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Plan Name & Customer */}
+                      <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">
+                        {contract.name}
+                      </h3>
+
+                      <div className="flex items-center justify-between text-xs font-semibold text-indigo-600 mt-1 flex-wrap gap-1">
+                        <span>
+                          {customer?.name} {customer?.companyName ? `(${customer.companyName})` : ''}
+                        </span>
+                        {customer?.mobile && (
+                          <a
+                            href={`tel:${customer.mobile}`}
+                            className="text-[11px] text-slate-500 hover:text-indigo-600 flex items-center gap-1"
+                          >
+                            <Phone className="w-3 h-3" /> {customer.mobile}
+                          </a>
+                        )}
+                      </div>
+
+                      {/* Equipment / Machine Details */}
+                      {contract.equipmentDetails && (
+                        <div className="mt-2.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60 text-[11px] text-slate-700 dark:text-slate-300 flex items-start gap-1.5">
+                          <Cpu className="w-3.5 h-3.5 text-indigo-500 shrink-0 mt-0.5" />
+                          <span className="line-clamp-2">{contract.equipmentDetails}</span>
+                        </div>
+                      )}
+
+                      {/* Progress bar of visits */}
+                      <div className="mt-3.5 space-y-1.5">
+                        <div className="flex justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
+                          <span>Maintenance Visits Quota</span>
+                          <span className="font-bold text-slate-900 dark:text-slate-100">
+                            {contract.visitsUsed} of {contract.visitsAllowed} rendered ({contract.visitsRemaining} remaining)
+                          </span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-600 rounded-full transition-all"
+                            style={{ width: `${Math.min(100, percentUsed)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Visual Milestones / Steps */}
+                      <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                          Preventive Visit Milestones
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                          {milestones.map((m) => (
+                            <div
+                              key={m.visitNumber}
+                              className={`p-1.5 rounded-lg border text-center transition-all ${
+                                m.status === 'completed'
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                                  : m.status === 'due' || m.status === 'overdue'
+                                  ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 font-bold'
+                                  : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 text-slate-500'
+                              }`}
+                            >
+                              <div className="flex items-center justify-center gap-1 text-[10px]">
+                                {m.status === 'completed' ? (
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                ) : m.status === 'due' || m.status === 'overdue' ? (
+                                  <Wrench className="w-3 h-3 text-amber-600" />
+                                ) : (
+                                  <Calendar className="w-3 h-3 text-slate-400" />
+                                )}
+                                <span className="font-bold">V{m.visitNumber}</span>
+                              </div>
+                              <div className="text-[9px] truncate mt-0.5">{m.date}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                      {milestones.map((m) => (
-                        <div
-                          key={m.visitNumber}
-                          className={`p-1.5 rounded-lg border text-center transition-all ${
-                            m.status === 'completed'
-                              ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
-                              : m.status === 'due' || m.status === 'overdue'
-                              ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 font-bold'
-                              : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 text-slate-500'
+
+                    {/* Footer Details & Action Buttons */}
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <div>
+                          <div className="text-[10px] text-slate-400">Coverage Period</div>
+                          <div className="font-bold text-slate-800 dark:text-slate-200 text-[11px]">
+                            {contract.startDate} → {contract.endDate}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[10px] text-slate-400">Annual Value</div>
+                          <div className="font-black text-slate-900 dark:text-slate-100">
+                            {currentBusiness.currency}{contract.contractAmount || 0}
+                          </div>
+                        </div>
+                      </div>
+
+                      {assignedTech && (
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                          <HardHat className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>Preferred Tech: <strong className="text-slate-700 dark:text-slate-300">{assignedTech.name}</strong></span>
+                        </div>
+                      )}
+
+                      {/* Action Buttons: WhatsApp Reminder & Dispatch Next Visit */}
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sendAmcVisitReminderWhatsApp(contract, customer, currentBusiness);
+                            showToast(`WhatsApp reminder prepared for ${customer?.name || 'customer'}`, 'success');
+                          }}
+                          className="px-2.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
+                          title="Send WhatsApp Preventive Maintenance Alert"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" /> Visit Reminder
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => openSingleDispatchModal(contract)}
+                          disabled={contract.visitsRemaining <= 0}
+                          className={`px-2.5 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer ${
+                            contract.visitsRemaining > 0
+                              ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                           }`}
                         >
-                          <div className="flex items-center justify-center gap-1 text-[10px]">
-                            {m.status === 'completed' ? (
-                              <Check className="w-3 h-3 text-emerald-600" />
-                            ) : m.status === 'due' || m.status === 'overdue' ? (
-                              <Wrench className="w-3 h-3 text-amber-600" />
-                            ) : (
-                              <Calendar className="w-3 h-3 text-slate-400" />
-                            )}
-                            <span className="font-bold">V{m.visitNumber}</span>
-                          </div>
-                          <div className="text-[9px] truncate mt-0.5">{m.date}</div>
+                          <Wrench className="w-3.5 h-3.5" /> Dispatch Visit
+                        </button>
+                      </div>
+
+                      {/* Secondary Row: WhatsApp Renewal & Edit/Delete */}
+                      <div className="flex items-center justify-between pt-1 text-xs">
+                        {(isExpiringSoon || isExpired) ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sendContractRenewalWhatsApp(contract, customer, currentBusiness);
+                              showToast(`WhatsApp renewal reminder sent to ${customer?.name || 'customer'}`, 'success');
+                            }}
+                            className="text-[11px] font-bold text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1"
+                          >
+                            <Repeat className="w-3 h-3" /> Send Renewal Quote
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">
+                            Next Due: <strong className="text-slate-700 dark:text-slate-300">{visitStatus.nextVisitDate}</strong>
+                          </span>
+                        )}
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openEditContract(contract)}
+                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
+                            title="Edit Contract"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to remove contract ${contract.contractNumber}?`)) {
+                                deleteContract(contract.id);
+                              }
+                            }}
+                            className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Delete Contract"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer Details & Action Buttons */}
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <div>
-                      <div className="text-[10px] text-slate-400">Coverage Period</div>
-                      <div className="font-bold text-slate-800 dark:text-slate-200 text-[11px]">
-                        {contract.startDate} → {contract.endDate}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[10px] text-slate-400">Annual Value</div>
-                      <div className="font-black text-slate-900 dark:text-slate-100">
-                        {currentBusiness.currency}{contract.contractAmount || 0}
                       </div>
                     </div>
                   </div>
-
-                  {assignedTech && (
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                      <HardHat className="w-3.5 h-3.5 text-indigo-500" />
-                      <span>Preferred Tech: <strong className="text-slate-700 dark:text-slate-300">{assignedTech.name}</strong></span>
-                    </div>
-                  )}
-
-                  {/* Action Buttons: WhatsApp Reminder & Dispatch Next Visit */}
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        sendAmcVisitReminderWhatsApp(contract, customer, currentBusiness);
-                        showToast(`WhatsApp reminder prepared for ${customer?.name || 'customer'}`, 'success');
-                      }}
-                      className="px-2.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
-                      title="Send WhatsApp Preventive Maintenance Alert"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" /> Visit Reminder
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => openSingleDispatchModal(contract)}
-                      disabled={contract.visitsRemaining <= 0}
-                      className={`px-2.5 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer ${
-                        contract.visitsRemaining > 0
-                          ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
-                      }`}
-                    >
-                      <Wrench className="w-3.5 h-3.5" /> Dispatch Visit
-                    </button>
-                  </div>
-
-                  {/* Secondary Row: WhatsApp Renewal & Edit/Delete */}
-                  <div className="flex items-center justify-between pt-1 text-xs">
-                    {(isExpiringSoon || isExpired) ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          sendContractRenewalWhatsApp(contract, customer, currentBusiness);
-                          showToast(`WhatsApp renewal reminder sent to ${customer?.name || 'customer'}`, 'success');
-                        }}
-                        className="text-[11px] font-bold text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1"
-                      >
-                        <Repeat className="w-3 h-3" /> Send Renewal Quote
-                      </button>
-                    ) : (
-                      <span className="text-[10px] text-slate-400">
-                        Next Due: <strong className="text-slate-700 dark:text-slate-300">{visitStatus.nextVisitDate}</strong>
-                      </span>
-                    )}
-
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => openEditContract(contract)}
-                        className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
-                        title="Edit Contract"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (window.confirm(`Are you sure you want to remove contract ${contract.contractNumber}?`)) {
-                            deleteContract(contract.id);
-                          }
-                        }}
-                        className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
-                        title="Delete Contract"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
