@@ -47,7 +47,7 @@ export const PrivacyPolicyView: React.FC<PrivacyPolicyViewProps> = ({ onBack }) 
               <h2>1. Introduction & Overview</h2>
             </div>
             <p className="text-slate-600 dark:text-slate-400">
-              ServiFlow (operated and developed by <strong>Unique Solutions</strong>) is an enterprise field service operations and job workflow management platform designed for service companies, contractors, technicians, and business managers across CCTV, Solar, HVAC, Electrical, Plumbing, and Equipment Repair sectors.
+              ServiFlow (operated and developed by <strong>Expert Technologies</strong>) is an enterprise field service operations and job workflow management platform designed for service companies, contractors, technicians, and business managers across CCTV, Solar, HVAC, Electrical, Plumbing, and Equipment Repair sectors.
             </p>
             <p className="text-slate-600 dark:text-slate-400">
               We respect your privacy and are committed to safeguarding personal and operational business data. This Privacy Policy details how our mobile application and web portal collect, use, store, and protect your information in compliance with the Google Play Developer Program Policies and international data privacy regulations.
@@ -167,7 +167,8 @@ export const PrivacyPolicyView: React.FC<PrivacyPolicyViewProps> = ({ onBack }) 
               If you have any questions, feedback, or privacy-related requests concerning this policy or the ServiFlow mobile app, please contact:
             </p>
             <div className="text-xs font-medium text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl space-y-1">
-              <div><strong>Developer:</strong> Unique Solutions</div>
+              <div><strong>Developer:</strong> Expert Technologies</div>
+              <div><strong>Website:</strong> <a href="https://experttechnologies.in" target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 underline">https://experttechnologies.in</a></div>
               <div><strong>Email:</strong> <a href="mailto:uniquesolutions108@gmail.com" className="text-indigo-600 dark:text-indigo-400 underline">uniquesolutions108@gmail.com</a></div>
               <div><strong>Product:</strong> ServiFlow — Field Operations & Workforce Management</div>
               <div><strong>Hosting:</strong> Google Cloud & Firebase (serviceflow-969f5.web.app)</div>
@@ -178,7 +179,7 @@ export const PrivacyPolicyView: React.FC<PrivacyPolicyViewProps> = ({ onBack }) 
 
         {/* Footer */}
         <div className="text-center text-xs text-slate-400 pb-8">
-          © {new Date().getFullYear()} Unique Solutions • ServiFlow. All rights reserved.
+          © {new Date().getFullYear()} Expert Technologies • ServiFlow. All rights reserved.
         </div>
 
       </div>

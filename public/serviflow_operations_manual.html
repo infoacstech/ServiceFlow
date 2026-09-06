@@ -311,9 +311,10 @@
         <div class="brand-subtitle">Field Operations & Service ERP Platform</div>
       </div>
       <div class="header-meta">
-        <div><strong>Organization:</strong> Unique Solutions</div>
+        <div><strong>Organization:</strong> Expert Technologies</div>
+        <div><strong>Official Website:</strong> https://experttechnologies.in</div>
         <div><strong>Owner Email:</strong> uniquesolutions108@gmail.com</div>
-        <div><strong>Application ID:</strong> com.uniquesolutions.serviflow</div>
+        <div><strong>Application ID:</strong> com.experttechnologies.serviflow</div>
         <div><strong>Version:</strong> 1.0.0 Production Release</div>
         <div><strong>Date of Issuance:</strong> September 2026</div>
       </div>
@@ -349,7 +350,7 @@
       <tbody>
         <tr>
           <td><strong>Super Admin</strong></td>
-          <td>Platform Owner (Unique Solutions)</td>
+          <td>Platform Owner (Expert Technologies)</td>
           <td><code>uniquesolutions108@gmail.com</code> / Master Password</td>
           <td>Approve new tenant business signups, global billing plans, commission payouts, database reset.</td>
         </tr>
@@ -449,12 +450,12 @@
       <tbody>
         <tr>
           <td><strong>Package ID / Application ID</strong></td>
-          <td><span class="code-pill">com.uniquesolutions.serviflow</span></td>
+          <td><span class="code-pill">com.experttechnologies.serviflow</span></td>
           <td>Primary identifier in Google Play Console. Never change this name once published.</td>
         </tr>
         <tr>
           <td><strong>Developer Name</strong></td>
-          <td>Unique Solutions</td>
+          <td>Expert Technologies</td>
           <td>Displayed under app title on Google Play Store.</td>
         </tr>
         <tr>
@@ -464,8 +465,13 @@
         </tr>
         <tr>
           <td><strong>Live Web Application</strong></td>
-          <td>https://serviceflow-969f5.web.app</td>
+          <td>https://serviceflow-969f5.web.app (or custom: <code>app.experttechnologies.in</code>)</td>
           <td>Target domain where continuous updates are deployed.</td>
+        </tr>
+        <tr>
+          <td><strong>Company Main Website</strong></td>
+          <td>https://experttechnologies.in</td>
+          <td>Developer organization public website for Google Play Console.</td>
         </tr>
         <tr>
           <td><strong>Mandatory Privacy Policy URL</strong></td>
@@ -476,7 +482,18 @@
     </table>
 
     <!-- Section 6: Emergency Troubleshooting & Data Recovery -->
-    <h2>6. Emergency Operations & Disaster Recovery</h2>
+    <h2>6. Custom Domain & Subdomain Configuration (experttechnologies.in)</h2>
+    <div class="info-card" style="margin-bottom: 20px;">
+      <h4>Connecting App Without Disturbing Existing Website:</h4>
+      <p>Aapki main website (<code>experttechnologies.in</code>) jaise chal rahi hai waise hi chalti rahegi. ServiFlow ERP ke liye aap <strong>Free Subdomain</strong> (e.g. <code>app.experttechnologies.in</code> ya <code>serviflow.experttechnologies.in</code>) connect kar sakte hain:</p>
+      <ul style="margin-top: 10px; margin-bottom: 0;">
+        <li>Firebase Console &gt; Hosting &gt; <em>Add Custom Domain</em> &gt; Enter <code>app.experttechnologies.in</code></li>
+        <li>Apne Domain DNS (GoDaddy / Hostinger / Cloudflare) me sirf ek <strong>CNAME</strong> record point karein: Name = <code>app</code>, Value = <code>serviceflow-969f5.web.app</code></li>
+        <li>SSL Certificate Google automatically 100% free issue karega. Aapki main website par 0% effect padega!</li>
+      </ul>
+    </div>
+
+    <h2>7. Emergency Operations & Disaster Recovery</h2>
     <ol>
       <li>
         <strong>How to issue updates without re-uploading to Play Store?</strong><br>
@@ -494,7 +511,7 @@
 
     <!-- Footer -->
     <div class="footer">
-      <div>© 2026 Unique Solutions. All rights reserved.</div>
+      <div>© 2026 Expert Technologies. All rights reserved.</div>
       <div>ServiFlow Master Operating Manual • Confidential Internal Guide</div>
     </div>
 

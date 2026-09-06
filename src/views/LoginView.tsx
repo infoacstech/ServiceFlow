@@ -1055,7 +1055,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
               </a>
             </div>
             <p className="text-[10px] text-slate-400/80">
-              © {new Date().getFullYear()} Unique Solutions • ServiFlow Field Ops
+              © {new Date().getFullYear()} Expert Technologies • ServiFlow Field Ops
             </p>
           </div>
         )}
