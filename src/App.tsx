@@ -22,31 +22,32 @@ import { PwaInstallPrompt } from './components/PwaInstallPrompt';
 
 import type { JobInitialFilter } from './views/JobsView';
 import type { InvoiceInitialFilter } from './views/InvoicesView';
+import { lazyWithRetry } from './utils/lazyWithRetry';
 
-// Route-based Code Splitting: Lazy load views on demand to drastically optimize initial bundle load
-const DashboardView = React.lazy(() => import('./views/DashboardView').then(m => ({ default: m.DashboardView })));
-const EnquiriesView = React.lazy(() => import('./views/EnquiriesView').then(m => ({ default: m.EnquiriesView })));
-const CustomersView = React.lazy(() => import('./views/CustomersView').then(m => ({ default: m.CustomersView })));
-const ServicesView = React.lazy(() => import('./views/ServicesView').then(m => ({ default: m.ServicesView })));
-const JobsView = React.lazy(() => import('./views/JobsView').then(m => ({ default: m.JobsView })));
-const TechnicianView = React.lazy(() => import('./views/TechnicianView').then(m => ({ default: m.TechnicianView })));
-const InventoryView = React.lazy(() => import('./views/InventoryView').then(m => ({ default: m.InventoryView })));
-const QuotationsView = React.lazy(() => import('./views/QuotationsView').then(m => ({ default: m.QuotationsView })));
-const InvoicesView = React.lazy(() => import('./views/InvoicesView').then(m => ({ default: m.InvoicesView })));
-const PaymentsView = React.lazy(() => import('./views/PaymentsView').then(m => ({ default: m.PaymentsView })));
-const ContractsView = React.lazy(() => import('./views/ContractsView').then(m => ({ default: m.ContractsView })));
-const StaffView = React.lazy(() => import('./views/StaffView').then(m => ({ default: m.StaffView })));
-const ExpensesView = React.lazy(() => import('./views/ExpensesView').then(m => ({ default: m.ExpensesView })));
-const ReportsView = React.lazy(() => import('./views/ReportsView').then(m => ({ default: m.ReportsView })));
-const AIAssistantView = React.lazy(() => import('./views/AIAssistantView').then(m => ({ default: m.AIAssistantView })));
-const CustomerPortalView = React.lazy(() => import('./views/CustomerPortalView').then(m => ({ default: m.CustomerPortalView })));
-const SuperAdminView = React.lazy(() => import('./views/SuperAdminView').then(m => ({ default: m.SuperAdminView })));
-const SettingsView = React.lazy(() => import('./views/SettingsView').then(m => ({ default: m.SettingsView })));
-const NotificationsView = React.lazy(() => import('./views/NotificationsView').then(m => ({ default: m.NotificationsView })));
-const AttendanceView = React.lazy(() => import('./views/AttendanceView').then(m => ({ default: m.AttendanceView })));
-const EmployeeAttendanceView = React.lazy(() => import('./views/EmployeeAttendanceView').then(m => ({ default: m.EmployeeAttendanceView })));
-const LoginView = React.lazy(() => import('./views/LoginView').then(m => ({ default: m.LoginView })));
-const PrivacyPolicyView = React.lazy(() => import('./views/PrivacyPolicyView').then(m => ({ default: m.PrivacyPolicyView })));
+// Route-based Code Splitting with Auto-Retry: Resilient to Vite deployment hash shifts
+const DashboardView = lazyWithRetry(() => import('./views/DashboardView').then(m => ({ default: m.DashboardView })), 'DashboardView');
+const EnquiriesView = lazyWithRetry(() => import('./views/EnquiriesView').then(m => ({ default: m.EnquiriesView })), 'EnquiriesView');
+const CustomersView = lazyWithRetry(() => import('./views/CustomersView').then(m => ({ default: m.CustomersView })), 'CustomersView');
+const ServicesView = lazyWithRetry(() => import('./views/ServicesView').then(m => ({ default: m.ServicesView })), 'ServicesView');
+const JobsView = lazyWithRetry(() => import('./views/JobsView').then(m => ({ default: m.JobsView })), 'JobsView');
+const TechnicianView = lazyWithRetry(() => import('./views/TechnicianView').then(m => ({ default: m.TechnicianView })), 'TechnicianView');
+const InventoryView = lazyWithRetry(() => import('./views/InventoryView').then(m => ({ default: m.InventoryView })), 'InventoryView');
+const QuotationsView = lazyWithRetry(() => import('./views/QuotationsView').then(m => ({ default: m.QuotationsView })), 'QuotationsView');
+const InvoicesView = lazyWithRetry(() => import('./views/InvoicesView').then(m => ({ default: m.InvoicesView })), 'InvoicesView');
+const PaymentsView = lazyWithRetry(() => import('./views/PaymentsView').then(m => ({ default: m.PaymentsView })), 'PaymentsView');
+const ContractsView = lazyWithRetry(() => import('./views/ContractsView').then(m => ({ default: m.ContractsView })), 'ContractsView');
+const StaffView = lazyWithRetry(() => import('./views/StaffView').then(m => ({ default: m.StaffView })), 'StaffView');
+const ExpensesView = lazyWithRetry(() => import('./views/ExpensesView').then(m => ({ default: m.ExpensesView })), 'ExpensesView');
+const ReportsView = lazyWithRetry(() => import('./views/ReportsView').then(m => ({ default: m.ReportsView })), 'ReportsView');
+const AIAssistantView = lazyWithRetry(() => import('./views/AIAssistantView').then(m => ({ default: m.AIAssistantView })), 'AIAssistantView');
+const CustomerPortalView = lazyWithRetry(() => import('./views/CustomerPortalView').then(m => ({ default: m.CustomerPortalView })), 'CustomerPortalView');
+const SuperAdminView = lazyWithRetry(() => import('./views/SuperAdminView').then(m => ({ default: m.SuperAdminView })), 'SuperAdminView');
+const SettingsView = lazyWithRetry(() => import('./views/SettingsView').then(m => ({ default: m.SettingsView })), 'SettingsView');
+const NotificationsView = lazyWithRetry(() => import('./views/NotificationsView').then(m => ({ default: m.NotificationsView })), 'NotificationsView');
+const AttendanceView = lazyWithRetry(() => import('./views/AttendanceView').then(m => ({ default: m.AttendanceView })), 'AttendanceView');
+const EmployeeAttendanceView = lazyWithRetry(() => import('./views/EmployeeAttendanceView').then(m => ({ default: m.EmployeeAttendanceView })), 'EmployeeAttendanceView');
+const LoginView = lazyWithRetry(() => import('./views/LoginView').then(m => ({ default: m.LoginView })), 'LoginView');
+const PrivacyPolicyView = lazyWithRetry(() => import('./views/PrivacyPolicyView').then(m => ({ default: m.PrivacyPolicyView })), 'PrivacyPolicyView');
 
 const ViewLoadingFallback: React.FC = () => (
   <div className="p-4 sm:p-6 space-y-4 animate-pulse">

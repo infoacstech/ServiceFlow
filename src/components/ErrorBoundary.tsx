@@ -30,11 +30,36 @@ export class ErrorBoundary extends React.Component<Props, State> {
     this.setState({ errorInfo });
   }
 
-  private handleReload = () => {
+  private handleReload = async () => {
+    // Clear Service Worker caches if dynamic import failed
+    if ('caches' in window) {
+      try {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map((name) => caches.delete(name)));
+      } catch (e) {
+        console.warn('Error clearing caches:', e);
+      }
+    }
     window.location.reload();
   };
 
-  private handleClearStorageAndReload = () => {
+  private handleClearStorageAndReload = async () => {
+    if ('caches' in window) {
+      try {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map((name) => caches.delete(name)));
+      } catch (e) {
+        console.warn('Error clearing caches:', e);
+      }
+    }
+    if ('serviceWorker' in navigator) {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((r) => r.unregister()));
+      } catch (e) {
+        console.warn('Error unregistering service workers:', e);
+      }
+    }
     localStorage.clear();
     sessionStorage.clear();
     window.location.reload();
