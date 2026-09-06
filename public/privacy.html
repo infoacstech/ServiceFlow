@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - ServiFlow by Unique Solutions</title>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --border: #e2e8f0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #020617;
+        --card-bg: #0f172a;
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+        --border: #1e293b;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      line-height: 1.6;
+      margin: 0;
+      padding: 24px 16px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+    h1 {
+      font-size: 26px;
+      font-weight: 800;
+      margin: 0 0 6px 0;
+      color: var(--text-main);
+    }
+    .subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+    h2 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 28px;
+      margin-bottom: 12px;
+      color: var(--primary);
+    }
+    p, li {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+    ul {
+      padding-left: 20px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+    @media (max-width: 600px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      .card {
+        padding: 20px;
+      }
+    }
+    .box {
+      background: rgba(79, 70, 229, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .box strong {
+      display: block;
+      color: var(--text-main);
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .box p {
+      font-size: 12px;
+      margin: 0;
+    }
+    .notice {
+      background-color: rgba(79, 70, 229, 0.08);
+      border-left: 4px solid var(--primary);
+      padding: 16px;
+      border-radius: 8px;
+      margin: 16px 0;
+    }
+    .notice strong {
+      color: var(--text-main);
+      display: block;
+      margin-bottom: 4px;
+    }
+    a {
+      color: var(--primary);
+      text-decoration: underline;
+    }
+    footer {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 32px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>ServiFlow — Privacy Policy</h1>
+      <div class="subtitle">Effective Date: September 2026 • Product of Unique Solutions • Google Play Compliant</div>
+
+      <h2>1. Overview</h2>
+      <p>ServiFlow is an enterprise field operations and service workforce management software developed by <strong>Unique Solutions</strong>. We provide tools for field service businesses (CCTV, Solar, HVAC, Electrical, Plumbing, and Equipment Repair) to dispatch technicians, manage recurring AMC contracts, issue invoices, and record job completion proofs.</p>
+
+      <h2>2. Information Collection & Device Permissions</h2>
+      <p>To provide core mobile workforce and service tracking functionality, ServiFlow requests specific device permissions:</p>
+      
+      <div class="grid">
+        <div class="box">
+          <strong>Location Data (GPS)</strong>
+          <p>Captured during technician check-in, attendance geofence verification, and work order completion. Location is only accessed during active user interaction and is not tracked continuously when the app is closed.</p>
+        </div>
+        <div class="box">
+          <strong>Camera & Images</strong>
+          <p>Used by technicians on site to capture installation proof photos, equipment serial barcodes, and customer digital signatures on service sheets.</p>
+        </div>
+        <div class="box">
+          <strong>Microphone / Audio</strong>
+          <p>Optional speech-to-text recording allowing technicians to dictate job notes and diagnostic details hands-free while servicing hardware.</p>
+        </div>
+        <div class="box">
+          <strong>Customer & Contact Records</strong>
+          <p>Customer contact names, phone numbers, and job site addresses entered by users are strictly used for dispatching technicians, issuing estimates, and sending billing notices.</p>
+        </div>
+      </div>
+
+      <h2>3. Data Protection & Security</h2>
+      <p>All data is transmitted via secure HTTPS (TLS 1.3 encryption) and stored in Google Cloud Firestore with strict multi-tenant isolation. No cross-tenant access is permitted.</p>
+
+      <h2>4. Third-Party Services & Non-Disclosure</h2>
+      <p>We do not sell, license, or monetize any user or customer data to third-party data brokers or marketing firms. We only rely on trusted cloud infrastructure (Google Firebase / Google Cloud Platform) and WhatsApp Web deep links to facilitate client communication.</p>
+
+      <h2>5. Data Retention & Account Deletion Rights</h2>
+      <div class="notice">
+        <strong>Google Play Account Deletion Compliance:</strong>
+        <p>You have full authority to request deletion of your account and all stored business records. You can initiate a deletion directly in the app via <em>Settings &gt; System Maintenance &gt; Reset Data</em> or by emailing <a href="mailto:uniquesolutions108@gmail.com">uniquesolutions108@gmail.com</a>. Records will be permanently deleted within 48 hours.</p>
+      </div>
+
+      <h2>6. Developer & Support Contact</h2>
+      <p>For inquiries, support, or privacy requests, contact:</p>
+      <ul>
+        <li><strong>Organization:</strong> Unique Solutions</li>
+        <li><strong>Developer Contact Email:</strong> <a href="mailto:uniquesolutions108@gmail.com">uniquesolutions108@gmail.com</a></li>
+        <li><strong>Hosting & Backend:</strong> Google Cloud Platform & Firebase</li>
+      </ul>
+    </div>
+    <footer>
+      &copy; 2026 Unique Solutions • ServiFlow. All rights reserved.
+    </footer>
+  </div>
+</body>
+</html>

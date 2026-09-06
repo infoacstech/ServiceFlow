@@ -353,28 +353,6 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
   const [deleteAllConfirmText, setDeleteAllConfirmText] = useState('');
   const [isDeletingAllTenants, setIsDeletingAllTenants] = useState(false);
 
-  // Quick Simulation of Test Registration Request
-  const handleSimulateTestRegistration = () => {
-    const timestamp = Date.now().toString().slice(-4);
-    const testBiz = createBusiness(
-      {
-        name: `Apex Smart Security ${timestamp}`,
-        type: 'CCTV & Security',
-        email: `contact${timestamp}@apexsmart.com`,
-        mobile: `987654${timestamp}`,
-      },
-      'CCTV Installation',
-      true,
-      {
-        name: `Ramesh Sharma ${timestamp}`,
-        email: `ramesh${timestamp}@apexsmart.com`,
-        phone: `987654${timestamp}`,
-        password: '1234',
-      }
-    );
-    showToast(`Test registration for "${testBiz.name}" created and pending approval!`, 'success');
-  };
-
   // Execute Payout Decision (Mark as Paid, Approve, or Reject & Refund)
   const handleExecutePayoutAction = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -395,79 +373,6 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
     } finally {
       setIsProcessingPayoutAction(false);
     }
-  };
-
-  // Quick Simulation of a Referral Signup for Testing
-  const handleSimulateTestReferral = async () => {
-    if (businesses.length === 0) {
-      showToast('Please onboard at least 1 business tenant first.', 'error');
-      return;
-    }
-
-    const referrerBiz = businesses[0];
-    const cleanRefCode = referrerBiz.referralCode || `SF-${referrerBiz.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase()}10`;
-    const timestamp = Date.now().toString().slice(-4);
-    const planPrice = 1299;
-    const discountAmount = 130;
-    const bonusEarned = 130;
-
-    const testRecord: ReferralRecord = {
-      id: `ref-tx-${Date.now()}`,
-      referrerBusinessId: referrerBiz.id,
-      referrerCode: cleanRefCode,
-      referrerBusinessName: referrerBiz.name,
-      referredBusinessId: `biz-ref-${timestamp}`,
-      referredBusinessName: `Smart Solar Power ${timestamp}`,
-      referredOwnerName: `Ajay Deshmukh ${timestamp}`,
-      referredOwnerPhone: `+91 98450${timestamp}`,
-      planId: 'plan-pro',
-      planName: 'Professional Plan (10% Referral Discount)',
-      planPrice,
-      discountPercent: 10,
-      discountAmount,
-      bonusPercent: 10,
-      bonusEarned,
-      status: 'credited',
-      createdAt: new Date().toISOString(),
-      notes: `10% discount (-₹${discountAmount}) applied. 10% referral bonus (+₹${bonusEarned}) credited to ${referrerBiz.name}.`,
-    };
-
-    await FirestoreService.saveDocument('referrals', testRecord.id, testRecord);
-
-    // Update referrer balance & earnings in Firestore
-    const updatedEarnings = (referrerBiz.referralEarnings || 0) + bonusEarned;
-    const updatedBalance = (referrerBiz.referralBalance || 0) + bonusEarned;
-    await FirestoreService.saveDocument<Business>('businesses', referrerBiz.id, {
-      referralCode: cleanRefCode,
-      referralEarnings: updatedEarnings,
-      referralBalance: updatedBalance,
-    });
-
-    showToast(`Test Referral Simulated: "${referrerBiz.name}" referred "Smart Solar Power ${timestamp}" and earned +₹${bonusEarned} bonus!`, 'success');
-  };
-
-  // Quick Simulation of a Payout Request for Testing
-  const handleSimulatePayoutRequest = async () => {
-    if (businesses.length === 0) {
-      showToast('Please onboard at least 1 business tenant first.', 'error');
-      return;
-    }
-    const biz = businesses[0];
-    const testReq: ReferralPayoutRequest = {
-      id: `payout-${Date.now()}`,
-      businessId: biz.id,
-      businessName: biz.name,
-      ownerName: 'Ramesh Sharma',
-      ownerPhone: '+91 9876543210',
-      amount: 260,
-      payoutMethod: 'upi',
-      upiId: 'ramesh.sharma@okaxis',
-      status: 'pending',
-      requestedAt: new Date().toISOString(),
-      notes: 'Sample bonus payout request via UPI for testing',
-    };
-    await FirestoreService.saveDocument('referralPayouts', testReq.id, testReq);
-    showToast(`Sample payout request of ₹260 submitted for ${biz.name}!`, 'success');
   };
 
   const handleOnboardTenantSubmit = (e: React.FormEvent) => {
@@ -916,16 +821,6 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                 <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
                   <button
                     type="button"
-                    onClick={handleSimulateTestRegistration}
-                    className="flex-1 sm:flex-none justify-center px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:hover:bg-amber-900/60 dark:text-amber-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-amber-200/80 dark:border-amber-800"
-                    title="Simulate a new incoming business owner signup request"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                    <span>Simulate Test Request</span>
-                  </button>
-
-                  <button
-                    type="button"
                     onClick={() => handleSwitchTabSection('notifications')}
                     className="flex-1 sm:flex-none justify-center px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-slate-200/70 dark:border-slate-700"
                   >
@@ -934,19 +829,16 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                   </button>
                 </div>
 
-                {/* Visually Separated Danger / Demo Function */}
+                {/* Database Maintenance */}
                 <div className="pt-2 sm:pt-0 sm:pl-2 sm:border-l border-t sm:border-t-0 border-slate-200 dark:border-slate-800 w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={() => handleSwitchTabSection('cleanup')}
                     className="w-full sm:w-auto justify-center px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 dark:text-rose-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all border border-rose-200/80 dark:border-rose-900/50"
-                    title="Development/Demo only: Wipe database records except Super Admin"
+                    title="Platform Database Maintenance & Operational Data Reset"
                   >
                     <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
-                    <span>Reset Demo Data</span>
-                    <span className="text-[9px] px-1 py-0.2 rounded bg-rose-200/70 dark:bg-rose-900 text-rose-900 dark:text-rose-200 font-extrabold uppercase">
-                      Dev
-                    </span>
+                    <span>Database Maintenance</span>
                   </button>
                 </div>
               </div>
@@ -1173,16 +1065,6 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleSimulateTestRegistration}
-                className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 dark:bg-amber-900/80 dark:hover:bg-amber-800 dark:text-amber-100 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs border border-amber-200 dark:border-amber-800"
-                title="Create a sample pending registration request to test approval flow"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300" />
-                <span>Simulate Test Request</span>
-              </button>
-
               <button
                 type="button"
                 onClick={() => {

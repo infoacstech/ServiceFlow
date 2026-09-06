@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ServiFlow - Master Operations Manual & Technical Handbook</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+    :root {
+      --primary: #4338ca;
+      --primary-light: #eef2ff;
+      --slate-900: #0f172a;
+      --slate-800: #1e293b;
+      --slate-700: #334155;
+      --slate-600: #475569;
+      --slate-200: #e2e8f0;
+      --slate-100: #f1f5f9;
+      --emerald: #059669;
+      --amber: #d97706;
+      --rose: #e11d48;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--slate-800);
+      background-color: #f8fafc;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Print & Screen Toolbar */
+    .toolbar {
+      position: sticky;
+      top: 0;
+      background: #ffffff;
+      border-bottom: 1px solid var(--slate-200);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 100;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+
+    .toolbar-title {
+      font-weight: 800;
+      font-size: 15px;
+      color: var(--slate-900);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-print {
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 2px 4px rgba(67, 56, 202, 0.3);
+      transition: all 0.2s ease;
+    }
+
+    .btn-print:hover {
+      background: #3730a3;
+      transform: translateY(-1px);
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 32px auto;
+      background: #ffffff;
+      border: 1px solid var(--slate-200);
+      border-radius: 20px;
+      padding: 56px 64px;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
+    }
+
+    /* Header & Branding */
+    .manual-header {
+      border-bottom: 2px solid var(--slate-200);
+      padding-bottom: 32px;
+      margin-bottom: 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .brand-title {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--slate-900);
+      letter-spacing: -0.5px;
+    }
+
+    .brand-subtitle {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 4px;
+    }
+
+    .header-meta {
+      text-align: right;
+      font-size: 12px;
+      color: var(--slate-600);
+      line-height: 1.8;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      background: var(--primary-light);
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+
+    /* Document Sections */
+    h2 {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--slate-900);
+      margin: 36px 0 16px 0;
+      padding-bottom: 8px;
+      border-bottom: 1.5px solid var(--slate-200);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--slate-800);
+      margin: 20px 0 8px 0;
+    }
+
+    p, li {
+      font-size: 13.5px;
+      color: var(--slate-600);
+      line-height: 1.7;
+    }
+
+    ul, ol {
+      padding-left: 22px;
+      margin-bottom: 16px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    strong {
+      color: var(--slate-900);
+    }
+
+    /* Information Grids & Callouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+
+    .info-card {
+      background: var(--slate-100);
+      border: 1px solid var(--slate-200);
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .info-card h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--slate-900);
+      margin-bottom: 6px;
+    }
+
+    .info-card p {
+      font-size: 12.5px;
+      margin: 0;
+    }
+
+    .callout {
+      background: var(--primary-light);
+      border-left: 4px solid var(--primary);
+      padding: 16px 20px;
+      border-radius: 0 12px 12px 0;
+      margin: 20px 0;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      font-size: 13.5px;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+
+    .callout-desc {
+      font-size: 12.5px;
+      color: var(--slate-700);
+      margin: 0;
+    }
+
+    /* Data Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 24px 0;
+      font-size: 12.5px;
+    }
+
+    th, td {
+      padding: 10px 14px;
+      border: 1px solid var(--slate-200);
+      text-align: left;
+    }
+
+    th {
+      background: var(--slate-100);
+      color: var(--slate-900);
+      font-weight: 700;
+    }
+
+    td {
+      color: var(--slate-700);
+    }
+
+    .code-pill {
+      font-family: monospace;
+      font-size: 11px;
+      background: var(--slate-200);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--slate-900);
+      font-weight: 600;
+    }
+
+    .footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--slate-200);
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--slate-600);
+    }
+
+    /* Print Formatting Rules */
+    @media print {
+      body {
+        background: #ffffff;
+      }
+      .toolbar {
+        display: none;
+      }
+      .container {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        margin: 0;
+        max-width: 100%;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+      h2 {
+        margin-top: 28px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sticky Print Bar for User -->
+  <div class="toolbar">
+    <div class="toolbar-title">
+      <span>📄 ServiFlow Official Operations & Technical Manual</span>
+    </div>
+    <button class="btn-print" onclick="window.print()">
+      <span>🖨️ Save as PDF / Print Manual</span>
+    </button>
+  </div>
+
+  <div class="container">
+    
+    <!-- Title & Metadata -->
+    <div class="manual-header">
+      <div>
+        <div class="badge">Master Documentation</div>
+        <div class="brand-title">ServiFlow</div>
+        <div class="brand-subtitle">Field Operations & Service ERP Platform</div>
+      </div>
+      <div class="header-meta">
+        <div><strong>Organization:</strong> Unique Solutions</div>
+        <div><strong>Owner Email:</strong> uniquesolutions108@gmail.com</div>
+        <div><strong>Application ID:</strong> com.uniquesolutions.serviflow</div>
+        <div><strong>Version:</strong> 1.0.0 Production Release</div>
+        <div><strong>Date of Issuance:</strong> September 2026</div>
+      </div>
+    </div>
+
+    <!-- Section 1: Executive Overview -->
+    <h2>1. Executive Summary & Product Architecture</h2>
+    <p>
+      <strong>ServiFlow</strong> is a cloud-native, multi-tenant Field Service Operations and Enterprise Resource Planning (ERP) platform designed specifically for service contractors, installation specialists, and engineering agencies (including CCTV, Solar, HVAC, Electrical, Plumbing, and Equipment Repair).
+    </p>
+    <div class="grid-2">
+      <div class="info-card">
+        <h4>Core Infrastructure</h4>
+        <p>Built with React 18, TypeScript, Tailwind CSS, Google Cloud Firestore, and PWA/TWA Service Worker caching for instant offline availability.</p>
+      </div>
+      <div class="info-card">
+        <h4>Live Cloud Sync</h4>
+        <p>Continuous OTA (Over-The-Air) deployment via Firebase Hosting (<code>serviceflow-969f5.web.app</code>) allowing real-time feature updates without repeated app-store submissions.</p>
+      </div>
+    </div>
+
+    <!-- Section 2: Account Hierarchy & Access Credentials -->
+    <h2>2. System Access, Roles & Credentials</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>Purpose & Scope</th>
+          <th>Access Mechanism</th>
+          <th>Key Capabilities</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Super Admin</strong></td>
+          <td>Platform Owner (Unique Solutions)</td>
+          <td><code>uniquesolutions108@gmail.com</code> / Master Password</td>
+          <td>Approve new tenant business signups, global billing plans, commission payouts, database reset.</td>
+        </tr>
+        <tr>
+          <td><strong>Business Owner</strong></td>
+          <td>Service Agency Owner</td>
+          <td>Registered Email/Mobile + Password</td>
+          <td>Full company financials, customer base, invoice creation, technician attendance, P&L reports.</td>
+        </tr>
+        <tr>
+          <td><strong>Field Technician</strong></td>
+          <td>On-site engineers</td>
+          <td>Technician Portal Login</td>
+          <td>Assigned work orders, spare part logs, GPS geotagged check-ins, customer digital signatures.</td>
+        </tr>
+        <tr>
+          <td><strong>Customer</strong></td>
+          <td>End Client / Homeowner</td>
+          <td>No login (Direct QR / Secure Link)</td>
+          <td>View job cards, download GST invoices, track scheduled AMC visits.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Section 3: Step-by-Step Operations Manual -->
+    <h2>3. Step-by-Step Operational Workflow</h2>
+
+    <h3>Step 3.1: Creating Customers & Registering Assets</h3>
+    <ul>
+      <li>Navigate to <strong>Customers</strong> tab &gt; click <strong>Add Customer</strong>.</li>
+      <li>Enter Name, Mobile Number (with WhatsApp capability), full Address, and GPS Landmark.</li>
+      <li>Under <em>Customer Assets</em>, record equipment details (e.g. <em>"Daikin 1.5T Inverter AC - Outdoor S/N 84729"</em>).</li>
+      <li>Bulk import existing lists using the built-in CSV template (<code>serviflow_customer_sample.csv</code>).</li>
+    </ul>
+
+    <h3>Step 3.2: Preparing Estimates & Quotations</h3>
+    <ul>
+      <li>Open <strong>Quotations</strong> tab &gt; click <strong>Create Quotation</strong>.</li>
+      <li>Select the customer; line items will automatically calculate Rate × Qty with applicable GST slabs (0%, 5%, 12%, 18%, 28%).</li>
+      <li>Click <strong>Share via WhatsApp</strong> to generate a formatted message or click <strong>Print / PDF</strong> to render a clean A4 quote.</li>
+      <li>Once the client approves, click <strong>Convert to Invoice</strong> or <strong>Convert to Job</strong> in 1 click.</li>
+    </ul>
+
+    <h3>Step 3.3: Dispatching Service Jobs to Technicians</h3>
+    <ul>
+      <li>Open <strong>Jobs</strong> tab &gt; click <strong>New Job</strong>.</li>
+      <li>Select Service Category, Customer, Priority (Emergency, High, Medium, Low), and assign a Field Technician.</li>
+      <li>The assigned technician instantly receives the job in their mobile portal.</li>
+    </ul>
+
+    <h3>Step 3.4: Field Execution (Technician Mobile View)</h3>
+    <ul>
+      <li>Technician logs in &gt; opens <strong>Technician Portal</strong>.</li>
+      <li>Taps <strong>Navigate (Google Maps)</strong> to reach the client address.</li>
+      <li>Taps <strong>Check In (GPS Punch)</strong> to verify on-site arrival.</li>
+      <li>Takes <strong>Job Proof Photos</strong> (before/after), records parts used from truck inventory, and captures the client's <strong>Digital Signature</strong>.</li>
+      <li>Marks job as <strong>Completed</strong>; an automated WhatsApp completion summary is prepared for the customer.</li>
+    </ul>
+
+    <h3>Step 3.5: Billing, Invoicing & UPI Payments</h3>
+    <ul>
+      <li>Open <strong>Invoices</strong> tab &gt; view balance due amounts.</li>
+      <li>Click <strong>Record Payment</strong>: enter amount received (supports Partial or Full), choose method (UPI, Cash, Bank Transfer, Cheque), and input transaction UTR number.</li>
+      <li>Customer balance is instantly updated with real-time zero-clamping safeguards.</li>
+    </ul>
+
+    <!-- Section 4: AMC & Maintenance Scheduler -->
+    <div class="page-break"></div>
+    <h2>4. Annual Maintenance Contract (AMC) Management</h2>
+    <p>
+      ServiFlow contains an automated recurring service engine for multi-year contracts:
+    </p>
+    <ul>
+      <li><strong>Contract Creation:</strong> Set Start Date, Expiry Date, and Visit Frequency (Monthly = 12 visits, Quarterly = 4 visits, Bi-Annual = 2 visits).</li>
+      <li><strong>Automated Reminder Engine:</strong> In the AMC tab, upcoming visits are highlighted as <em>Due Today</em>, <em>Due in 7 Days</em>, or <em>Overdue</em>.</li>
+      <li><strong>Single-Click Dispatch:</strong> Tap <em>"Schedule Visit"</em> to spawn an operational job card for your field engineer without re-typing customer address or equipment specs.</li>
+      <li><strong>WhatsApp Renewal Notices:</strong> Send pre-configured renewal quotation links 30 days prior to contract expiration.</li>
+    </ul>
+
+    <!-- Section 5: Play Store & Deployment Reference -->
+    <h2>5. Google Play Store & Cloud Deployment Reference</h2>
+    <div class="callout">
+      <div class="callout-title">Production Credentials & Identifiers</div>
+      <p class="callout-desc">
+        Keep these official parameters on record for all future app store updates and developer console settings.
+      </p>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Configuration Item</th>
+          <th>Assigned Production Value</th>
+          <th>Usage Instructions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Package ID / Application ID</strong></td>
+          <td><span class="code-pill">com.uniquesolutions.serviflow</span></td>
+          <td>Primary identifier in Google Play Console. Never change this name once published.</td>
+        </tr>
+        <tr>
+          <td><strong>Developer Name</strong></td>
+          <td>Unique Solutions</td>
+          <td>Displayed under app title on Google Play Store.</td>
+        </tr>
+        <tr>
+          <td><strong>Support & Grievance Email</strong></td>
+          <td>uniquesolutions108@gmail.com</td>
+          <td>Mandatory developer contact for store compliance and account deletion requests.</td>
+        </tr>
+        <tr>
+          <td><strong>Live Web Application</strong></td>
+          <td>https://serviceflow-969f5.web.app</td>
+          <td>Target domain where continuous updates are deployed.</td>
+        </tr>
+        <tr>
+          <td><strong>Mandatory Privacy Policy URL</strong></td>
+          <td>https://serviceflow-969f5.web.app/privacy.html</td>
+          <td>Submit this exact link in Play Console under "App Content &gt; Privacy Policy".</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Section 6: Emergency Troubleshooting & Data Recovery -->
+    <h2>6. Emergency Operations & Disaster Recovery</h2>
+    <ol>
+      <li>
+        <strong>How to issue updates without re-uploading to Play Store?</strong><br>
+        Make your changes in AI Studio. When the build succeeds, Firebase Hosting automatically updates. When users next open the app on Android, the local service worker fetches the updated files automatically.
+      </li>
+      <li>
+        <strong>Offline Operation for Field Engineers:</strong><br>
+        If a technician has no cellular network on an underground site, they can still view their active job cards, capture notes, and complete checklist steps. Data is safely cached in browser IndexedDB and syncs to Firestore the moment connection returns.
+      </li>
+      <li>
+        <strong>Account Deletion Request (Play Store Compliance):</strong><br>
+        If a business owner requests data deletion, navigate to <strong>Settings &gt; System Maintenance</strong> and execute operational reset, or process via email request to <code>uniquesolutions108@gmail.com</code> within 48 hours.
+      </li>
+    </ol>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div>© 2026 Unique Solutions. All rights reserved.</div>
+      <div>ServiFlow Master Operating Manual • Confidential Internal Guide</div>
+    </div>
+
+  </div>
+
+</body>
+</html>

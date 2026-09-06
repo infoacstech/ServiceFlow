@@ -36,9 +36,10 @@ import {
 
 interface LoginViewProps {
   onLoginSuccess?: () => void;
+  onOpenPrivacy?: () => void;
 }
 
-export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
+export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPrivacy }) => {
   const {
     users,
     loginUser,
@@ -1020,7 +1021,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </div>
 
         {/* Bottom Footer Links */}
-        {authTab === 'super_admin' && (
+        {authTab === 'super_admin' ? (
           <div className="text-center pt-1 animate-in fade-in">
             <button
               onClick={() => setAuthTab('login')}
@@ -1028,6 +1029,34 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             >
               <span>← Back to Business Sign In</span>
             </button>
+          </div>
+        ) : (
+          <div className="text-center pt-3 pb-2 text-xs text-slate-400 dark:text-slate-500 space-y-1 animate-in fade-in">
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenPrivacy) {
+                    onOpenPrivacy();
+                  } else {
+                    window.open('/privacy.html', '_blank');
+                  }
+                }}
+                className="hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors cursor-pointer"
+              >
+                Privacy Policy (गोपनीयता नीति)
+              </button>
+              <span>•</span>
+              <a
+                href="mailto:uniquesolutions108@gmail.com"
+                className="hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors"
+              >
+                Support & Terms
+              </a>
+            </div>
+            <p className="text-[10px] text-slate-400/80">
+              © {new Date().getFullYear()} Unique Solutions • ServiFlow Field Ops
+            </p>
           </div>
         )}
       </div>

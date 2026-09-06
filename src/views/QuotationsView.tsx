@@ -236,16 +236,16 @@ export const QuotationsView: React.FC = () => {
 
   // Financial Calculations based on Added Items
   const subtotalValue = useMemo(() => {
-    return addedItems.reduce((sum, item) => sum + item.amount, 0);
+    return Math.round(addedItems.reduce((sum, item) => sum + item.amount, 0) * 100) / 100;
   }, [addedItems]);
 
   const taxValue = useMemo(() => {
     if (!isGstApplicable || effectiveGstRate <= 0) return 0;
-    return (subtotalValue * effectiveGstRate) / 100;
+    return Math.round(((subtotalValue * effectiveGstRate) / 100) * 100) / 100;
   }, [isGstApplicable, effectiveGstRate, subtotalValue]);
 
   const grandTotalValue = useMemo(() => {
-    return subtotalValue + taxValue;
+    return Math.round((subtotalValue + taxValue) * 100) / 100;
   }, [subtotalValue, taxValue]);
 
   // Common Line Item Entry Validation

@@ -1,0 +1,50 @@
+{
+  "packageId": "com.uniquesolutions.serviflow",
+  "host": "serviceflow-969f5.web.app",
+  "name": "ServiFlow",
+  "launcherName": "ServiFlow",
+  "themeColor": "#4F46E5",
+  "themeColorDark": "#0F172A",
+  "navigationColor": "#0F172A",
+  "navigationColorDark": "#0F172A",
+  "navigationDividerColor": "#1E293B",
+  "navigationDividerColorDark": "#1E293B",
+  "backgroundColor": "#0F172A",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://serviceflow-969f5.web.app/icon-512.png",
+  "maskableIconUrl": "https://serviceflow-969f5.web.app/icon-512.png",
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Jobs",
+      "shortName": "Jobs",
+      "url": "/?tab=jobs",
+      "icon": "https://serviceflow-969f5.web.app/icon-192.png"
+    },
+    {
+      "name": "Invoices",
+      "shortName": "Invoices",
+      "url": "/?tab=invoices",
+      "icon": "https://serviceflow-969f5.web.app/icon-192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://serviceflow-969f5.web.app/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": true
+    },
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false
+}

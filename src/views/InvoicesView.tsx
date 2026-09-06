@@ -23,6 +23,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { sendInvoiceWhatsAppReminder } from '../utils/whatsappHelper';
+import { getIndiaDatePlusDays } from '../utils/dateUtils';
 
 export interface InvoiceInitialFilter {
   statusFilter?: string;
@@ -66,13 +67,13 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
   // Record Payment Form
   const [payAmount, setPayAmount] = useState(0);
   const [payMethod, setPayMethod] = useState<PaymentMethod>('upi');
-  const [payRef, setPayRef] = useState('UPI-TXN-98421');
+  const [payRef, setPayRef] = useState('');
 
   // Create Invoice Form
   const [customerId, setCustomerId] = useState(customers[0]?.id || '');
-  const [dueDate, setDueDate] = useState('2026-08-30');
+  const [dueDate, setDueDate] = useState(() => getIndiaDatePlusDays(15));
   const [items, setItems] = useState([
-    { description: 'Annual CCTV & DVR Service Charge', quantity: 1, rate: 2500, taxPercent: 18, amount: 2950 },
+    { description: '', quantity: 1, rate: 0, taxPercent: 18, amount: 0 },
   ]);
 
   const handleRecordPaymentSubmit = (e: React.FormEvent) => {
@@ -84,7 +85,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
       amount: Number(payAmount),
       date: new Date().toISOString().split('T')[0],
       method: payMethod as PaymentMethod,
-      referenceNumber: payRef,
+      referenceNumber: payRef.trim() || undefined,
     });
     setIsPaymentModalOpen(false);
     setSelectedInvoice(null);
@@ -94,9 +95,9 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
     e.preventDefault();
     if (!customerId || items.length === 0) return;
 
-    const sub = items.reduce((s, i) => s + i.quantity * i.rate, 0);
-    const tax = items.reduce((s, i) => s + (i.quantity * i.rate * i.taxPercent) / 100, 0);
-    const grand = sub + tax;
+    const sub = Math.round(items.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.rate) || 0), 0) * 100) / 100;
+    const tax = Math.round(items.reduce((s, i) => s + ((Number(i.quantity) || 0) * (Number(i.rate) || 0) * (Number(i.taxPercent) || 0)) / 100, 0) * 100) / 100;
+    const grand = Math.round((sub + tax) * 100) / 100;
 
     addInvoice({
       customerId,

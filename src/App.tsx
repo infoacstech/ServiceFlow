@@ -46,6 +46,7 @@ const NotificationsView = React.lazy(() => import('./views/NotificationsView').t
 const AttendanceView = React.lazy(() => import('./views/AttendanceView').then(m => ({ default: m.AttendanceView })));
 const EmployeeAttendanceView = React.lazy(() => import('./views/EmployeeAttendanceView').then(m => ({ default: m.EmployeeAttendanceView })));
 const LoginView = React.lazy(() => import('./views/LoginView').then(m => ({ default: m.LoginView })));
+const PrivacyPolicyView = React.lazy(() => import('./views/PrivacyPolicyView').then(m => ({ default: m.PrivacyPolicyView })));
 
 const ViewLoadingFallback: React.FC = () => (
   <div className="p-4 sm:p-6 space-y-4 animate-pulse">
@@ -95,6 +96,15 @@ const MainContent: React.FC = () => {
     }
     return false;
   });
+  const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('page') === 'privacy' || params.get('privacy') !== null || window.location.pathname.startsWith('/privacy');
+    }
+    return false;
+  });
+
+  useBackHandler(isPrivacyPolicyOpen, () => setIsPrivacyPolicyOpen(false), 'app-privacy-policy');
 
   const prevUserIdRef = React.useRef<string | null>(null);
 
@@ -190,6 +200,17 @@ const MainContent: React.FC = () => {
     );
   }
 
+  if (isPrivacyPolicyOpen) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased">
+        <React.Suspense fallback={<ViewLoadingFallback />}>
+          <PrivacyPolicyView onBack={() => setIsPrivacyPolicyOpen(false)} />
+        </React.Suspense>
+        <ToastContainer />
+      </div>
+    );
+  }
+
   // 2. Unauthenticated State (Logged Out or No Active Session)
   if (!currentUser) {
     if (isPublicCustomerPortal) {
@@ -228,7 +249,7 @@ const MainContent: React.FC = () => {
       <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased overflow-x-hidden">
         <main className="flex-1 max-w-7xl mx-auto w-full min-h-screen overflow-y-auto">
           <PullToRefresh className="p-3 sm:p-6 lg:p-8">
-            <LoginView onLoginSuccess={() => {}} />
+            <LoginView onLoginSuccess={() => {}} onOpenPrivacy={() => setIsPrivacyPolicyOpen(true)} />
           </PullToRefresh>
         </main>
         <ToastContainer />
@@ -450,6 +471,10 @@ const MainContent: React.FC = () => {
         }}
         onSignOut={() => {
           handleTabChange('login');
+        }}
+        onOpenPrivacy={() => {
+          setIsPrivacyPolicyOpen(true);
+          setIsProfileDrawerOpen(false);
         }}
       />
 

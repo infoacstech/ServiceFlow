@@ -557,30 +557,7 @@ const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   },
 };
 
-const DEMO_SECURITY_LOGS: SecurityAuditLog[] = [
-  {
-    id: 'sec-log-1',
-    timestamp: new Date().toISOString(),
-    actorId: 'usr-admin',
-    actorName: 'SaaS Platform Admin',
-    actorRole: 'super_admin',
-    action: 'MFA_POLICY_ENFORCED',
-    category: 'SECURITY_POLICY',
-    details: 'Enforced MFA security policy for all Super Admin platform console accounts.',
-  },
-  {
-    id: 'sec-log-2',
-    timestamp: new Date(Date.now() - 3600000).toISOString(),
-    actorId: 'usr-admin',
-    actorName: 'SaaS Platform Admin',
-    actorRole: 'super_admin',
-    action: 'TENANT_APPROVAL',
-    category: 'TENANT_ACCESS',
-    targetBusinessId: 'biz-1',
-    targetBusinessName: 'Apex Security & CCTV Systems',
-    details: 'Approved Business Owner signup and activated tenant operational workspace.',
-  },
-];
+const INITIAL_SECURITY_LOGS: SecurityAuditLog[] = [];
 
 // LocalStorage cache helpers for instant load & offline resiliency
 const loadCache = <T,>(key: string, fallback: T): T => {
@@ -791,7 +768,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     loadCache('serviflow_system_settings_cache', DEFAULT_SYSTEM_SETTINGS)
   );
   const [securityAuditLogs, setSecurityAuditLogs] = useState<SecurityAuditLog[]>(() =>
-    loadCache('serviflow_security_logs_cache', DEMO_SECURITY_LOGS)
+    loadCache('serviflow_security_logs_cache', INITIAL_SECURITY_LOGS)
   );
 
   // Offline Technician Sync States

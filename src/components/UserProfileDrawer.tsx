@@ -50,6 +50,7 @@ interface UserProfileDrawerProps {
   onNavigateToSettings: () => void;
   onOpenInstallModal: () => void;
   onSignOut?: () => void;
+  onOpenPrivacy?: () => void;
 }
 
 type TabKey = 'profile' | 'security' | 'appearance' | 'role' | 'language';
@@ -66,6 +67,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
   onNavigateToSettings,
   onOpenInstallModal,
   onSignOut,
+  onOpenPrivacy,
 }) => {
   const {
     currentUser,
@@ -982,6 +984,29 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                     <div className="text-left min-w-0">
                       <div className="truncate">Clear App Cache & Reload (कैश साफ़ करें)</div>
                       <div className="text-[10px] text-slate-500 font-normal truncate">Unregister service workers & reload latest version</div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400 shrink-0 ml-2" />
+                </button>
+
+                <button
+                  id="profile-action-privacy-policy"
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    if (onOpenPrivacy) {
+                      onOpenPrivacy();
+                    } else {
+                      window.open('/privacy.html', '_blank');
+                    }
+                  }}
+                  className="mt-2 w-full flex items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all shadow-xs cursor-pointer group min-h-[44px]"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Shield className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 group-hover:scale-110 transition-transform" />
+                    <div className="text-left min-w-0">
+                      <div className="truncate">Privacy Policy & Data Safety</div>
+                      <div className="text-[10px] text-slate-500 font-normal truncate">गोपनीयता नीति और डेटा सुरक्षा (Google Play Compliant)</div>
                     </div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-400 shrink-0 ml-2" />

@@ -370,84 +370,6 @@ export const ContractsView: React.FC = () => {
     setEditingContract(null);
   };
 
-  // Seed Sample Contracts if empty
-  const handleSeedDemoContracts = () => {
-    const cust1 = customers[0]?.id || 'cust-1';
-    const cust2 = customers[1]?.id || cust1;
-    const cust3 = customers[2]?.id || cust1;
-
-    const today = new Date();
-    const pastDate = new Date();
-    pastDate.setDate(today.getDate() - 3); // Overdue by 3 days
-    const pastDateStr = pastDate.toISOString().split('T')[0];
-
-    const todayStr = today.toISOString().split('T')[0];
-
-    const futureExp = new Date();
-    futureExp.setFullYear(today.getFullYear() + 1);
-    const expStr = futureExp.toISOString().split('T')[0];
-
-    const expiringEnd = new Date();
-    expiringEnd.setDate(today.getDate() + 14); // Expiring in 14 days
-    const expiringEndStr = expiringEnd.toISOString().split('T')[0];
-
-    addContract({
-      customerId: cust1,
-      serviceId: 'srv-1',
-      name: 'Comprehensive HVAC Annual Maintenance',
-      contractAmount: 18500,
-      visitFrequency: 'quarterly',
-      visitsAllowed: 4,
-      visitsUsed: 1,
-      visitsRemaining: 3,
-      startDate: '2026-01-15',
-      endDate: expStr,
-      renewalDate: expStr,
-      nextVisitDate: pastDateStr, // Overdue visit
-      equipmentDetails: 'Daikin 2.0T Inverter AC x 3, Voltas Cassette x 1',
-      assignedTechnicianId: technicians[0]?.id || 'user-tech-1',
-      status: 'active',
-    });
-
-    addContract({
-      customerId: cust2,
-      serviceId: 'srv-1',
-      name: 'Commercial Water Purifier & RO System AMC',
-      contractAmount: 12000,
-      visitFrequency: 'bi_annual',
-      visitsAllowed: 2,
-      visitsUsed: 0,
-      visitsRemaining: 2,
-      startDate: todayStr,
-      endDate: expStr,
-      renewalDate: expStr,
-      nextVisitDate: todayStr, // Due today
-      equipmentDetails: 'Kent 50 LPH Industrial RO Plant + Pre-filtration Candle',
-      assignedTechnicianId: technicians[1]?.id || technicians[0]?.id || 'user-tech-1',
-      status: 'active',
-    });
-
-    addContract({
-      customerId: cust3,
-      serviceId: 'srv-1',
-      name: 'Corporate Electrical Safety & DG Set Warranty',
-      contractAmount: 35000,
-      visitFrequency: 'monthly',
-      visitsAllowed: 12,
-      visitsUsed: 10,
-      visitsRemaining: 2,
-      startDate: '2025-09-15',
-      endDate: expiringEndStr,
-      renewalDate: expiringEndStr,
-      nextVisitDate: todayStr,
-      equipmentDetails: 'Kirloskar 40kVA Silent DG Genset + Schneider APFC Panel',
-      assignedTechnicianId: technicians[0]?.id || 'user-tech-1',
-      status: 'expiring_soon',
-    });
-
-    showToast('Loaded 3 realistic sample AMC contracts with scheduled visits!', 'success');
-  };
-
   return (
     <div className="space-y-6 pb-24 animate-in fade-in">
       {/* Header */}
@@ -733,18 +655,9 @@ export const ContractsView: React.FC = () => {
               No AMC contracts found matching your filters
             </div>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Create your first AMC contract or load sample data to test the preventive visit scheduler and WhatsApp reminder bot.
+              Create your first AMC contract to automate preventive visits, schedule equipment services, and send automated WhatsApp reminders.
             </p>
             <div className="flex items-center justify-center gap-2 pt-2">
-              {contracts.length === 0 && (
-                <button
-                  type="button"
-                  onClick={handleSeedDemoContracts}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs cursor-pointer"
-                >
-                  Load Sample Contracts
-                </button>
-              )}
               <button
                 type="button"
                 onClick={openNewContractModal}

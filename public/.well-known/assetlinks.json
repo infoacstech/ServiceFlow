@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.uniquesolutions.serviflow",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:7D:0C:5E:EA:71:1A:E4:38:76:37:7D:B5:D6:8E:34:36:EE:FE:AE:32:CD:83:E8:07:3D:29:3B:5B:67"
+      ]
+    }
+  }
+]

@@ -36,6 +36,7 @@ import {
   ArrowRight,
   Headphones,
   FileText,
+  ExternalLink,
   Gift,
   Tag,
   Copy,
@@ -2581,8 +2582,34 @@ export const SettingsView: React.FC = () => {
 
       {/* TAB 6: DANGER ZONE RESET */}
       {activeSettingsTab === 'reset' && (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-rose-200/80 dark:border-rose-900/60 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-6">
+          {/* Operations Manual & PDF Documentation Banner */}
+          <div className="bg-gradient-to-r from-indigo-900 to-slate-900 text-white p-6 rounded-3xl border border-indigo-700/50 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-extrabold text-[10px] tracking-wider uppercase border border-indigo-400/30">
+                Official Documentation
+              </div>
+              <h3 className="text-base font-black text-white flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-400" />
+                ServiFlow Master Operations Manual & Technical PDF
+              </h3>
+              <p className="text-xs text-indigo-200/80 max-w-xl leading-relaxed">
+                Download the complete handbook with operations procedures, role permissions, billing workflows, Play Store credentials, and disaster recovery guidelines.
+              </p>
+            </div>
+            <a
+              href="/serviflow_operations_manual.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2.5 rounded-xl bg-white text-indigo-950 font-black text-xs hover:bg-indigo-50 transition-all flex items-center gap-2 shadow-sm shrink-0 cursor-pointer"
+            >
+              <ExternalLink className="w-4 h-4 text-indigo-600" />
+              <span>Open & Save PDF</span>
+            </a>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-rose-200/80 dark:border-rose-900/60 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Trash2 className="w-4 h-4 text-rose-600" /> Workspace Clean Testing Data Reset
@@ -2604,6 +2631,7 @@ export const SettingsView: React.FC = () => {
             </button>
           </div>
         </div>
+      </div>
       )}
 
       {/* Tenant Reset Confirmation Modal */}
@@ -2641,7 +2669,7 @@ export const SettingsView: React.FC = () => {
               className="space-y-4 text-xs"
             >
               <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-                This will delete all test customers, jobs, orders, invoices, and payments for <strong>{currentBusiness.name}</strong>.
+                This will permanently delete all operational customers, jobs, orders, quotations, invoices, and payments for <strong>{currentBusiness.name}</strong>.
               </p>
 
               <div>

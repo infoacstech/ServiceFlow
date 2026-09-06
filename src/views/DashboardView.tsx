@@ -1156,7 +1156,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <Briefcase className="w-5 h-5" />
                   </div>
                   <p className="text-xs font-bold text-slate-700 dark:text-slate-300">0 Active Jobs</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">All test/dummy data has been cleaned</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">No active service jobs recorded yet</p>
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
