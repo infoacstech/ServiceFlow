@@ -407,7 +407,7 @@ export const hi = {
     title: 'सेटिंग्स व प्राथमिकताएं',
     companyProfile: 'कंपनी प्रोफाइल व लोगो',
     myProfile: 'मेरी प्रोफाइल',
-    language: 'भाषा / Language / भाषा',
+    language: 'भाषा / Language',
     languageSubtitle: 'अपनी पसंदीदा एप्लिकेशन डिस्प्ले भाषा चुनें',
     languageChangedToast: 'भाषा सफलतापूर्वक बदल दी गई है',
     audioPreferences: 'ध्वनि व आवाज़ अलर्ट',

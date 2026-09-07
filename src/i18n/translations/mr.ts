@@ -407,7 +407,7 @@ export const mr = {
     title: 'सेटिंग्ज व प्राधान्ये',
     companyProfile: 'कंपनी प्रोफाइल व लोगो',
     myProfile: 'माझे प्रोफाइल',
-    language: 'भाषा / Language / भाषा',
+    language: 'भाषा / Language',
     languageSubtitle: 'आपली पसंतीची ॲप्लिकेशन डिस्प्ले भाषा निवडा',
     languageChangedToast: 'भाषा यशस्वीरीत्या बदलण्यात आली आहे',
     audioPreferences: 'आवाज व ध्वनी सूचना',

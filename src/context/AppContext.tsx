@@ -4661,6 +4661,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updatedUser = { ...currentUser, ...updates };
       setCurrentUser(updatedUser);
       localStorage.setItem('serviflow_user_session', JSON.stringify(updatedUser));
+      if (updates.email) {
+        localStorage.setItem('serviflow_logged_in_email', updates.email.trim().toLowerCase());
+      }
     }
 
     logActivity('Profile Updated', 'staff', userId, `Updated user profile details for ${updates.name || currentUser?.name}`);

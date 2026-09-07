@@ -29,6 +29,7 @@ import {
   Trash2,
   Info,
   Globe,
+  ShieldCheck,
 } from 'lucide-react';
 import { clearAppCache } from '../utils/cacheUtils';
 import {
@@ -73,6 +74,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
     currentUser,
     currentBusiness,
     businesses,
+    users,
     switchBusiness,
     theme,
     toggleTheme,
@@ -96,6 +98,14 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Email Security Update States
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailVerifyPassword, setEmailVerifyPassword] = useState('');
+  const [showVerifyPassword, setShowVerifyPassword] = useState(false);
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+  const [emailUpdateError, setEmailUpdateError] = useState('');
 
   // Password Change States
   const [newPassword, setNewPassword] = useState('');
@@ -261,6 +271,72 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
     }
   };
 
+  const handleOpenEmailModal = () => {
+    setNewEmail('');
+    setEmailVerifyPassword('');
+    setEmailUpdateError('');
+    setIsEmailModalOpen(true);
+  };
+
+  const handleCloseEmailModal = () => {
+    setIsEmailModalOpen(false);
+    setNewEmail('');
+    setEmailVerifyPassword('');
+    setEmailUpdateError('');
+  };
+
+  const handleUpdateEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser?.id) return;
+
+    const cleanNewEmail = newEmail.trim().toLowerCase();
+    const currentCleanEmail = (currentUser.email || '').trim().toLowerCase();
+
+    if (!cleanNewEmail || !cleanNewEmail.includes('@') || !cleanNewEmail.includes('.')) {
+      setEmailUpdateError('Please provide a valid email address.');
+      return;
+    }
+
+    if (cleanNewEmail === currentCleanEmail) {
+      setEmailUpdateError('The new email address is identical to your current email address.');
+      return;
+    }
+
+    if (cleanNewEmail === 'admin@serviflow.io' || cleanNewEmail === 'superadmin@serviflow.io') {
+      setEmailUpdateError('This email is reserved for Platform Super Administrator.');
+      return;
+    }
+
+    // Check duplicate in users list
+    const isDuplicate = (users || []).some(
+      (u) => u.id !== currentUser.id && (u.email || '').trim().toLowerCase() === cleanNewEmail
+    );
+    if (isDuplicate) {
+      setEmailUpdateError('This email is already associated with another account on this system.');
+      return;
+    }
+
+    // Verify current password
+    const expectedPassword = currentUser.password || 'ServiFlow@123';
+    if (currentUser.password && emailVerifyPassword !== expectedPassword) {
+      setEmailUpdateError('Incorrect current password. Identity verification failed.');
+      return;
+    }
+
+    setIsUpdatingEmail(true);
+    setEmailUpdateError('');
+
+    try {
+      await updateUserProfile(currentUser.id, { email: cleanNewEmail });
+      showToast(`Sign-in email updated to ${cleanNewEmail}! Active session preserved.`, 'success');
+      handleCloseEmailModal();
+    } catch (err: any) {
+      setEmailUpdateError(err.message || 'Failed to update email. Please try again.');
+    } finally {
+      setIsUpdatingEmail(false);
+    }
+  };
+
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
@@ -321,9 +397,9 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
         >
           
           {/* Header */}
-          <div className="p-3.5 sm:p-4.5 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-md shrink-0">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-md overflow-hidden ring-2 ring-indigo-500/30 shrink-0">
+          <div className="py-2.5 px-3.5 sm:px-4 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-md shrink-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-sm overflow-hidden ring-2 ring-indigo-500/20 shrink-0">
                 {currentUser?.avatar ? (
                   <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
                 ) : (
@@ -331,23 +407,23 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100 truncate">
+                <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100 truncate leading-tight">
                   {currentUser?.name || 'User Profile & Settings'}
                 </h2>
-                <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold truncate flex items-center gap-1">
+                <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold truncate flex items-center gap-1 mt-0.5">
                   <Building2 className="w-3 h-3 shrink-0" />
-                  <span className="truncate">{currentBusiness?.name || 'ServiFlow'}</span>
+                  <span className="truncate">{currentBusiness?.name || 'ServiFlow Workspace'}</span>
                 </p>
               </div>
             </div>
             <button
               id="profile-drawer-close-btn"
               onClick={onClose}
-              className="p-2 sm:p-2.5 rounded-xl hover:bg-slate-200/80 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors cursor-pointer shrink-0 min-w-[40px] min-h-[40px] flex items-center justify-center"
+              className="p-1.5 sm:p-2 rounded-xl hover:bg-slate-200/80 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors cursor-pointer shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center"
               title="Close Panel"
               aria-label="Close Profile Drawer"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
 
@@ -387,18 +463,18 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
           {/* 2. SCROLLABLE CONTENT BODY: Optimized Mobile Spacing & Bottom Padding */}
           <div
             id="profile-drawer-scroll-container"
-            className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-5 sm:py-5 space-y-4 sm:space-y-4.5 overscroll-contain"
+            className="flex-1 overflow-y-auto px-3.5 py-3.5 sm:px-5 sm:py-4 pb-28 sm:pb-32 space-y-3.5 sm:space-y-4 overscroll-contain"
           >
             
             {/* SECTION 1: PROFILE INFO */}
             {activeSection === 'profile' && (
               <div className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-150">
-                {/* Profile Photo & Quick Overview Card */}
-                <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-indigo-50/80 via-slate-50 to-indigo-50/40 dark:from-indigo-950/40 dark:via-slate-900 dark:to-indigo-950/20 border border-indigo-100 dark:border-indigo-900/60 shadow-xs">
-                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3.5 sm:gap-4">
+                {/* Profile Photo & Quick Overview Card - Compact, Clean & Balanced */}
+                <div className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-indigo-50/70 via-slate-50 to-indigo-50/30 dark:from-indigo-950/30 dark:via-slate-900 dark:to-indigo-950/20 border border-indigo-100/90 dark:border-indigo-900/40 shadow-xs">
+                  <div className="flex items-center gap-3 sm:gap-3.5">
                     {/* Interactive Avatar Container */}
                     <div className="relative group shrink-0">
-                      <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-md overflow-hidden ring-4 ring-white dark:ring-slate-800 shrink-0">
+                      <div className="w-13 h-13 sm:w-15 sm:h-15 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-lg shadow-md overflow-hidden ring-2 ring-white dark:ring-slate-800 shrink-0">
                         {avatar || currentUser?.avatar ? (
                           <img src={avatar || currentUser?.avatar} alt={name} className="w-full h-full object-cover" />
                         ) : (
@@ -408,36 +484,36 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="absolute -bottom-1 -right-1 p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md border-2 border-white dark:border-slate-800 cursor-pointer transition-transform group-hover:scale-110 flex items-center justify-center"
+                        className="absolute -bottom-1 -right-1 p-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-md border border-white dark:border-slate-800 cursor-pointer transition-transform group-hover:scale-110 flex items-center justify-center"
                         title="Upload Photo"
                         aria-label="Upload profile photo"
                       >
-                        <Camera className="w-3.5 h-3.5" />
+                        <Camera className="w-3 h-3" />
                       </button>
                     </div>
 
-                    <div className="flex-1 min-w-0 text-center sm:text-left w-full">
-                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 mb-1">
-                        <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100 truncate max-w-full">
-                          {currentUser?.name || 'Guest User'}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                        <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100 truncate">
+                          {currentUser?.name || 'User Profile'}
                         </h3>
-                        <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 shrink-0">
-                          {currentUser?.role?.replace('_', ' ')}
+                        <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 shrink-0">
+                          {currentUser?.role?.replace('_', ' ') || 'Staff'}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate flex items-center justify-center sm:justify-start gap-1">
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-1">
                         <Mail className="w-3 h-3 text-slate-400 shrink-0" />
                         <span className="truncate">{currentUser?.email || 'No email attached'}</span>
                       </p>
                       {currentUser?.phone && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate flex items-center justify-center sm:justify-start gap-1 mt-0.5">
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate flex items-center gap-1 mt-0.5">
                           <Phone className="w-3 h-3 text-slate-400 shrink-0" />
                           <span className="truncate">{currentUser.phone}</span>
                         </p>
                       )}
 
                       {/* Photo Upload Actions */}
-                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2.5">
+                      <div className="flex items-center gap-1.5 mt-1.5">
                         <input
                           ref={fileInputRef}
                           type="file"
@@ -449,9 +525,9 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-800 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition-colors flex items-center gap-1.5 cursor-pointer min-h-[36px]"
+                          className="px-2 py-1 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-800 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition-colors flex items-center gap-1 cursor-pointer"
                         >
-                          <Upload className="w-3.5 h-3.5" /> Upload Photo
+                          <Upload className="w-3 h-3" /> Change Photo
                         </button>
                         {(avatar || currentUser?.avatar) && (
                           <button
@@ -460,9 +536,9 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                               setAvatar('');
                               showToast('Photo removed. Click Save Profile to apply.', 'info');
                             }}
-                            className="px-2.5 py-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors flex items-center gap-1 cursor-pointer min-h-[36px]"
+                            className="px-2 py-1 text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                           >
-                            <Trash2 className="w-3.5 h-3.5" /> Remove
+                            <Trash2 className="w-3 h-3" /> Remove
                           </button>
                         )}
                       </div>
@@ -503,16 +579,35 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                     />
                   </div>
 
+                  {/* Protected Sign-in Email with Secure Change Option */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Email Address (Sign-In Identifier)
-                    </label>
-                    <input
-                      type="email"
-                      value={currentUser?.email || ''}
-                      disabled
-                      className="w-full text-xs p-2.5 sm:p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/40 text-slate-500 font-medium cursor-not-allowed min-h-[42px]"
-                    />
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        Email Address (Sign-In Identifier)
+                      </label>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-semibold flex items-center gap-1 border border-slate-200 dark:border-slate-700">
+                        <Shield className="w-3 h-3 text-indigo-600 dark:text-indigo-400" /> Protected Credential
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="email"
+                        value={currentUser?.email || ''}
+                        disabled
+                        className="flex-1 text-xs p-2.5 sm:p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400 font-medium cursor-not-allowed min-h-[42px]"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleOpenEmailModal}
+                        className="px-3 py-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer min-h-[42px] shrink-0"
+                        title="Change Sign-In Email Address"
+                      >
+                        <KeyRound className="w-3.5 h-3.5" /> Change
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
+                      Primary sign-in credential. Requires password verification to modify.
+                    </p>
                   </div>
 
                   <button
@@ -534,12 +629,22 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                   </button>
                 </form>
 
-                {/* Company Information Overview */}
+                {/* Company Information Overview: Distinct from App System Settings */}
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-2.5">
-                  <div className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-1.5 truncate">
-                      <Building2 className="w-4 h-4 text-indigo-600 shrink-0" /> Business Profile
-                    </span>
+                  <div className="flex items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded-lg bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
+                        <Building2 className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block">
+                          Business Profile (व्यावसायिक प्रोफ़ाइल)
+                        </span>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                          Company entity, logo, address & invoice branding
+                        </span>
+                      </div>
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
@@ -548,7 +653,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                       }}
                       className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer shrink-0"
                     >
-                      Manage Settings →
+                      Edit Company Info →
                     </button>
                   </div>
                   
@@ -919,6 +1024,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
 
             {/* Quick Action Navigation Links - Clean Card Stack */}
             <div className="space-y-2 pt-2 border-t border-slate-200/80 dark:border-slate-800">
+              {/* Distinct System Configurations vs Business Profile */}
               <button
                 id="profile-action-system-settings"
                 onClick={() => {
@@ -927,11 +1033,21 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                 }}
                 className="w-full flex items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-indigo-50/70 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 border border-indigo-200/80 dark:border-indigo-800/80 text-indigo-900 dark:text-indigo-200 text-xs font-bold transition-all shadow-xs group cursor-pointer min-h-[44px]"
               >
-                <div className="flex items-center gap-2.5">
-                  <Sliders className="w-4 h-4 text-indigo-600 shrink-0 group-hover:rotate-45 transition-transform" />
-                  <span className="text-left">Open Full System Settings (Company, Tax, GST)</span>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Sliders className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 group-hover:rotate-45 transition-transform" />
+                  <div className="text-left min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold truncate">Open System Settings (सिस्टम सेटिंग्स)</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-200/80 dark:bg-indigo-900/80 text-indigo-800 dark:text-indigo-200 font-bold uppercase shrink-0">
+                        App Config
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-normal truncate">
+                      Taxation (GST), notifications, invoice templates & app preferences
+                    </div>
+                  </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-indigo-500 shrink-0" />
+                <ChevronRight className="w-4 h-4 text-indigo-500 shrink-0 ml-2" />
               </button>
 
               <button
@@ -1015,13 +1131,13 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
             </div>
 
             {/* Generous bottom spacing spacer so last card is never flush or hidden behind bottom sticky footer */}
-            <div className="h-6 sm:h-8" aria-hidden="true" />
+            <div className="h-10 sm:h-12 shrink-0" aria-hidden="true" />
           </div>
 
           {/* 3. FOOTER: Fixed / Sticky Bottom Logout Bar with Safe-Area Inset Support */}
           <div
             id="profile-drawer-footer"
-            className="sticky bottom-0 z-20 shrink-0 p-3.5 sm:p-4 border-t border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md pb-[max(0.875rem,env(safe-area-inset-bottom,16px))]"
+            className="sticky bottom-0 z-20 shrink-0 p-3 sm:p-4 border-t border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md pb-[max(0.875rem,env(safe-area-inset-bottom,16px))]"
           >
             <button
               id="profile-drawer-logout-btn"
@@ -1037,6 +1153,127 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
 
         </div>
       </div>
+
+      {/* Email Change Security Verification Modal */}
+      {isEmailModalOpen && (
+        <div className="fixed inset-0 z-[100005] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-4 sm:p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">
+                    Change Sign-In Email Address
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    सुरक्षित ईमेल सत्यापन (Identity Verification)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseEmailModal}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                aria-label="Close Email Verification Modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateEmailSubmit} className="space-y-3.5">
+              <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 text-xs text-indigo-900 dark:text-indigo-200 space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-xs">
+                  <Lock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                  Primary Authentication Credential
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Changing your sign-in email updates the email address used to log into your account. Your active session and company records will be preserved seamlessly.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                  Current Sign-In Email
+                </label>
+                <div className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-xs text-slate-600 dark:text-slate-400 font-mono">
+                  {currentUser?.email || 'None'}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  New Sign-In Email Address *
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={newEmail}
+                  onChange={(e) => {
+                    setNewEmail(e.target.value);
+                    if (emailUpdateError) setEmailUpdateError('');
+                  }}
+                  placeholder="name@company.com"
+                  className="w-full text-xs p-2.5 sm:p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium focus:ring-2 focus:ring-indigo-500 outline-hidden min-h-[42px]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Current Account Password (for verification) *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showVerifyPassword ? 'text' : 'password'}
+                    required
+                    value={emailVerifyPassword}
+                    onChange={(e) => {
+                      setEmailVerifyPassword(e.target.value);
+                      if (emailUpdateError) setEmailUpdateError('');
+                    }}
+                    placeholder="Enter your current password"
+                    className="w-full text-xs p-2.5 sm:p-3 pr-10 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium focus:ring-2 focus:ring-indigo-500 outline-hidden min-h-[42px]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowVerifyPassword(!showVerifyPassword)}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+                    aria-label={showVerifyPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showVerifyPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {emailUpdateError && (
+                <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-300 text-xs font-medium">
+                  {emailUpdateError}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={handleCloseEmailModal}
+                  disabled={isUpdatingEmail}
+                  className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer min-h-[40px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingEmail}
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-60 flex items-center gap-1.5 min-h-[40px]"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  {isUpdatingEmail ? 'Verifying & Updating...' : 'Confirm & Update Email'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

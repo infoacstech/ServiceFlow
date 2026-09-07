@@ -407,7 +407,7 @@ export const en = {
     title: 'Settings & Preferences',
     companyProfile: 'Company Profile & Logo',
     myProfile: 'My Profile',
-    language: 'Language / भाषा / भाषा',
+    language: 'Language / भाषा',
     languageSubtitle: 'Select your preferred application display language',
     languageChangedToast: 'Language updated successfully',
     audioPreferences: 'Sound & Voice Alerts',
