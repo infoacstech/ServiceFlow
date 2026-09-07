@@ -592,23 +592,36 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
           </p>
         </div>
 
-        {activeSupportSession && (
-          <div className="relative z-10 bg-amber-500/20 border border-amber-400/40 p-3 sm:p-3.5 rounded-2xl flex flex-col gap-1 text-xs">
-            <span className="font-extrabold text-amber-300 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
-              <ShieldAlert className="w-4 h-4 text-amber-400" />
-              Active Support Mode
-            </span>
-            <span className="font-bold text-white">
-              {activeSupportSession.targetBusinessName}
-            </span>
-            <button
-              onClick={() => endSupportSession('Super Admin ended session from master console')}
-              className="mt-1 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-[11px] transition-all cursor-pointer shadow-xs"
-            >
-              End Support Access
-            </button>
-          </div>
-        )}
+        <div className="relative z-10 flex flex-wrap items-center gap-3">
+          <a
+            href="/serviflow_operations_manual.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl border border-white/20 text-xs backdrop-blur-md transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+          >
+            <FileText className="w-4 h-4 text-purple-300" />
+            <span>Master Operations PDF</span>
+            <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+          </a>
+
+          {activeSupportSession && (
+            <div className="bg-amber-500/20 border border-amber-400/40 p-3 sm:p-3.5 rounded-2xl flex flex-col gap-1 text-xs">
+              <span className="font-extrabold text-amber-300 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
+                <ShieldAlert className="w-4 h-4 text-amber-400" />
+                Active Support Mode
+              </span>
+              <span className="font-bold text-white">
+                {activeSupportSession.targetBusinessName}
+              </span>
+              <button
+                onClick={() => endSupportSession('Super Admin ended session from master console')}
+                className="mt-1 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-[11px] transition-all cursor-pointer shadow-xs"
+              >
+                End Support Access
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 2. DASHBOARD TABS - High-Value Platform Views */}

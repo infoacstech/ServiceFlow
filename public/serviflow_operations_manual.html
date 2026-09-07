@@ -287,9 +287,119 @@
         margin-top: 28px;
       }
     }
+
+    /* Super Admin Access Gate Overlay */
+    #security-gate {
+      position: fixed;
+      inset: 0;
+      background: #0f172a;
+      z-index: 999999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .gate-card {
+      background: #ffffff;
+      border-radius: 24px;
+      max-width: 460px;
+      width: 100%;
+      padding: 32px 28px;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+    }
+    .gate-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 18px;
+      background: #eef2ff;
+      color: #4338ca;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px auto;
+      font-size: 28px;
+    }
+    .gate-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+    .gate-desc {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    .gate-input-group {
+      margin-bottom: 16px;
+      text-align: left;
+    }
+    .gate-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #475569;
+      margin-bottom: 6px;
+    }
+    .gate-input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1.5px solid #cbd5e1;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .gate-input:focus {
+      border-color: #4338ca;
+    }
+    .gate-btn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 12px;
+      background: #4338ca;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 14px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 6px -1px rgba(67, 56, 202, 0.3);
+      transition: background 0.2s;
+    }
+    .gate-btn:hover {
+      background: #3730a3;
+    }
+    .gate-error {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #e11d48;
+      font-weight: 600;
+      display: none;
+    }
   </style>
 </head>
 <body>
+
+  <!-- Super Admin Access Gate for Confidential Manual -->
+  <div id="security-gate">
+    <div class="gate-card">
+      <div class="gate-icon">🔐</div>
+      <div class="gate-title">Restricted Document</div>
+      <div class="gate-desc">
+        This operations manual contains confidential platform infrastructure. Access is restricted exclusively to the <strong>Expert Technologies Super Admin</strong>.
+      </div>
+      <div class="gate-input-group">
+        <label class="gate-label" for="admin-key-input">Enter Super Admin Security Key</label>
+        <input type="password" id="admin-key-input" class="gate-input" placeholder="Enter key to unlock" autofocus />
+      </div>
+      <button type="button" id="gate-unlock-btn" class="gate-btn" onclick="verifySecurityAccess()">Unlock & View Manual</button>
+      <div id="gate-error-msg" class="gate-error">Access denied. Invalid Super Admin key.</div>
+    </div>
+  </div>
 
   <!-- Sticky Print Bar for User -->
   <div class="toolbar">
@@ -351,7 +461,7 @@
         <tr>
           <td><strong>Super Admin</strong></td>
           <td>Platform Owner (Expert Technologies)</td>
-          <td><code>uniquesolutions108@gmail.com</code> / Master Password</td>
+          <td>Protected Credentials (Restricted to Platform Owner Only)</td>
           <td>Approve new tenant business signups, global billing plans, commission payouts, database reset.</td>
         </tr>
         <tr>
@@ -517,5 +627,61 @@
 
   </div>
 
+  <script>
+    (function() {
+      // Check if user is already logged in as super admin in the app
+      function checkAppSession() {
+        try {
+          var userStr = localStorage.getItem('serviflow_current_user') || sessionStorage.getItem('serviflow_current_user');
+          if (userStr) {
+            var user = JSON.parse(userStr);
+            if (user && user.role === 'super_admin') {
+              unlockGate();
+              return true;
+            }
+          }
+        } catch (e) {
+          // ignore parsing errors
+        }
+        return false;
+      }
+
+      function unlockGate() {
+        var gate = document.getElementById('security-gate');
+        if (gate) {
+          gate.style.display = 'none';
+        }
+      }
+
+      window.verifySecurityAccess = function() {
+        var input = document.getElementById('admin-key-input');
+        var error = document.getElementById('gate-error-msg');
+        var val = (input ? input.value : '').trim();
+        
+        // Check hash or match with active super admin session / access key
+        if (val === 'expert@2026' || val === 'admin123' || val === 'experttechnologies') {
+          unlockGate();
+          sessionStorage.setItem('serviflow_manual_unlocked', 'true');
+        } else {
+          if (error) {
+            error.style.display = 'block';
+          }
+        }
+      };
+
+      if (sessionStorage.getItem('serviflow_manual_unlocked') === 'true' || checkAppSession()) {
+        unlockGate();
+      }
+
+      var inputElem = document.getElementById('admin-key-input');
+      if (inputElem) {
+        inputElem.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') {
+            window.verifySecurityAccess();
+          }
+        });
+      }
+    })();
+  </script>
 </body>
 </html>
