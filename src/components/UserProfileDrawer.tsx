@@ -30,6 +30,7 @@ import {
   Info,
   Globe,
   ShieldCheck,
+  MapPin,
 } from 'lucide-react';
 import { clearAppCache } from '../utils/cacheUtils';
 import {
@@ -393,7 +394,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
       <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-6 md:pl-10 z-[100000] pointer-events-auto">
         <div
           id="profile-drawer-panel"
-          className="w-screen max-w-full sm:max-w-md md:max-w-lg h-full max-h-[100dvh] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col justify-between overflow-hidden"
+          className="w-screen max-w-full sm:max-w-md md:max-w-lg h-full h-[100dvh] max-h-[100dvh] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col justify-between overflow-hidden relative"
         >
           
           {/* Header */}
@@ -463,7 +464,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
           {/* 2. SCROLLABLE CONTENT BODY: Optimized Mobile Spacing & Bottom Padding */}
           <div
             id="profile-drawer-scroll-container"
-            className="flex-1 overflow-y-auto px-3.5 py-3.5 sm:px-5 sm:py-4 pb-28 sm:pb-32 space-y-3.5 sm:space-y-4 overscroll-contain"
+            className="flex-1 min-h-0 overflow-y-auto px-3.5 py-3.5 sm:px-5 sm:py-4 space-y-3.5 sm:space-y-4 overscroll-contain pb-6 sm:pb-8"
           >
             
             {/* SECTION 1: PROFILE INFO */}
@@ -630,17 +631,21 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                 </form>
 
                 {/* Company Information Overview: Distinct from App System Settings */}
-                <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-2.5">
-                  <div className="flex items-center justify-between gap-2 border-b border-slate-200/60 dark:border-slate-700/60 pb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1 rounded-lg bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
-                        <Building2 className="w-3.5 h-3.5" />
+                <div
+                  id="profile-business-card"
+                  className="w-full h-auto min-h-0 overflow-visible p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-3 shadow-2xs transition-all"
+                >
+                  {/* Card Header with Responsive Wrapping so Edit Link and Subtitle Never Clip */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/70 dark:border-slate-700/70 pb-2.5">
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      <div className="p-1.5 rounded-lg bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 shrink-0 mt-0.5">
+                        <Building2 className="w-4 h-4" />
                       </div>
-                      <div>
-                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block">
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 block leading-tight break-words">
                           Business Profile (व्यावसायिक प्रोफ़ाइल)
                         </span>
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block leading-normal mt-0.5 break-words">
                           Company entity, logo, address & invoice branding
                         </span>
                       </div>
@@ -651,26 +656,68 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                         onNavigateToSettings();
                         onClose();
                       }}
-                      className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer shrink-0"
+                      className="inline-flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors cursor-pointer self-start sm:self-auto shrink-0 py-0.5"
+                      title="Edit Company Profile in Settings"
                     >
-                      Edit Company Info →
+                      <span>Edit Company Info</span>
+                      <span aria-hidden="true">→</span>
                     </button>
                   </div>
                   
-                  <div className="flex items-center gap-3 pt-1">
+                  {/* Card Body: Company Details, Logo, and Address with Natural Line Wrapping */}
+                  <div className="flex items-start gap-3 pt-0.5 overflow-visible">
                     {currentBusiness?.logo ? (
-                      <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1 flex items-center justify-center shrink-0 shadow-2xs">
                         <img src={currentBusiness.logo} alt="Company Logo" className="w-full h-full object-contain" />
                       </div>
                     ) : (
-                      <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900 flex items-center justify-center shrink-0 text-indigo-600 dark:text-indigo-400 font-bold text-base">
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900 flex items-center justify-center shrink-0 text-indigo-600 dark:text-indigo-400 font-bold text-base sm:text-lg shadow-2xs">
                         {(currentBusiness?.name || 'S').charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <div className="text-xs text-slate-600 dark:text-slate-300 space-y-0.5 min-w-0 flex-1">
-                      <div className="font-bold text-slate-900 dark:text-slate-100 truncate">{currentBusiness?.name || 'ServiFlow'}</div>
-                      <div className="text-slate-500 text-[11px] truncate">{currentBusiness?.type || 'Field Services'}</div>
-                      {currentBusiness?.mobile && <div className="text-[11px] truncate">📞 {currentBusiness.mobile}</div>}
+                    <div className="text-xs text-slate-600 dark:text-slate-300 space-y-1 min-w-0 flex-1 overflow-visible">
+                      {/* Business Name with natural wrapping */}
+                      <div className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm leading-snug break-words">
+                        {currentBusiness?.name || 'ServiFlow'}
+                      </div>
+                      
+                      {/* Business Service Domain / Category */}
+                      <div className="text-slate-500 dark:text-slate-400 text-[11px] leading-snug break-words">
+                        {currentBusiness?.type || 'Field Services'}
+                      </div>
+
+                      {/* Complete Physical Address (Multi-line text wrapping cleanly) */}
+                      {(currentBusiness?.address || currentBusiness?.city || currentBusiness?.state) && (
+                        <div className="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed break-words flex items-start gap-1.5 pt-0.5">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                          <span className="flex-1 break-words">
+                            {[currentBusiness.address, currentBusiness.city, currentBusiness.state, currentBusiness.pin].filter(Boolean).join(', ')}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Mobile / WhatsApp Contact */}
+                      {currentBusiness?.mobile && (
+                        <div className="text-slate-600 dark:text-slate-300 text-[11px] leading-snug break-words flex items-center gap-1.5 pt-0.5">
+                          <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span>{currentBusiness.mobile}</span>
+                        </div>
+                      )}
+
+                      {/* Email Address */}
+                      {currentBusiness?.email && (
+                        <div className="text-slate-600 dark:text-slate-300 text-[11px] leading-snug break-words flex items-center gap-1.5 pt-0.5">
+                          <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span className="break-all">{currentBusiness.email}</span>
+                        </div>
+                      )}
+
+                      {/* GSTIN / Tax Identification */}
+                      {currentBusiness?.gstNumber && (
+                        <div className="text-slate-500 dark:text-slate-400 text-[10px] font-mono break-words pt-0.5">
+                          GSTIN: {currentBusiness.gstNumber}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1130,14 +1177,14 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
               </div>
             </div>
 
-            {/* Generous bottom spacing spacer so last card is never flush or hidden behind bottom sticky footer */}
-            <div className="h-10 sm:h-12 shrink-0" aria-hidden="true" />
+            {/* Generous bottom spacing spacer ensuring 100% of content and cards remain clearly visible above the fixed/sticky logout footer */}
+            <div className="h-28 sm:h-32 w-full shrink-0" aria-hidden="true" />
           </div>
 
           {/* 3. FOOTER: Fixed / Sticky Bottom Logout Bar with Safe-Area Inset Support */}
           <div
             id="profile-drawer-footer"
-            className="sticky bottom-0 z-20 shrink-0 p-3 sm:p-4 border-t border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md pb-[max(0.875rem,env(safe-area-inset-bottom,16px))]"
+            className="sticky bottom-0 z-20 shrink-0 p-3.5 sm:p-4 border-t border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md pb-[max(1rem,calc(env(safe-area-inset-bottom,16px)+8px))]"
           >
             <button
               id="profile-drawer-logout-btn"
