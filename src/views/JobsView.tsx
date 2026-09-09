@@ -33,6 +33,8 @@ import {
   Edit2,
   Check,
   MoreVertical,
+  Receipt,
+  FileText,
 } from 'lucide-react';
 import { playJobVoiceNotification, speakText } from '../utils/audioNotification';
 import {
@@ -73,6 +75,8 @@ export const JobsView: React.FC<JobsViewProps> = ({
     services,
     staff,
     inventory,
+    invoices,
+    addInvoice,
     addJob,
     addCustomer,
     addService,
@@ -291,6 +295,85 @@ export const JobsView: React.FC<JobsViewProps> = ({
       return job.createdAt.slice(0, 10);
     }
     return getLocalDateString();
+  };
+
+  /**
+   * P0-3: Job -> Invoice Bridge
+   * Generates a tax invoice from a completed job, calculates totals from services and materials used,
+   * links the invoice to the job, and credits any on-site payments collected by technicians.
+   */
+  const handleGenerateInvoiceForJob = (jobToInvoice: Job) => {
+    if (jobToInvoice.invoiceId) {
+      showToast(`Job ${jobToInvoice.jobId} already has invoice ${jobToInvoice.invoiceNumber || ''}`, 'info');
+      return;
+    }
+
+    const cust = (customers || []).find((c) => c.id === jobToInvoice.customerId);
+    const primaryService = (services || []).find((s) => s.id === jobToInvoice.serviceId);
+
+    const items: import('../types').LineItem[] = [];
+
+    const baseServicePrice =
+      typeof jobToInvoice.estimatedAmount === 'number'
+        ? jobToInvoice.estimatedAmount
+        : parseFloat(String(jobToInvoice.estimatedAmount)) || 500;
+
+    items.push({
+      id: `item-${Date.now()}-1`,
+      description: jobToInvoice.description || primaryService?.name || 'Service Call Charges',
+      quantity: 1,
+      rate: baseServicePrice,
+      taxPercent: currentBusiness.gstNumber ? 18 : 0,
+      amount: baseServicePrice,
+    });
+
+    if (jobToInvoice.materialsUsed && jobToInvoice.materialsUsed.length > 0) {
+      jobToInvoice.materialsUsed.forEach((m, idx) => {
+        items.push({
+          id: `item-${Date.now()}-${idx + 2}`,
+          description: `Part: ${m.name}`,
+          quantity: m.quantity,
+          rate: m.unitPrice,
+          taxPercent: currentBusiness.gstNumber ? 18 : 0,
+          amount: m.quantity * m.unitPrice,
+        });
+      });
+    }
+
+    const subtotal = items.reduce((acc, it) => acc + it.amount, 0);
+    const gstRate = currentBusiness.gstNumber ? 18 : 0;
+    const taxTotal = Math.round((subtotal * gstRate) / 100);
+    const grandTotal = subtotal + taxTotal;
+
+    const collectedOnSite = jobToInvoice.paymentCollected?.amount || 0;
+    const paidAmount = Math.min(grandTotal, collectedOnSite);
+    const balanceAmount = Math.max(0, grandTotal - paidAmount);
+    const invoiceStatus = balanceAmount === 0 ? 'paid' : paidAmount > 0 ? 'partial' : 'pending';
+
+    const newInv = addInvoice({
+      customerId: jobToInvoice.customerId,
+      date: new Date().toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      items,
+      subtotal,
+      taxTotal,
+      discountTotal: 0,
+      grandTotal,
+      paidAmount,
+      balanceAmount,
+      status: invoiceStatus,
+      jobId: jobToInvoice.jobId,
+      notes: `Invoice generated for Job ${jobToInvoice.jobId}. Location: ${jobToInvoice.location || 'Client site'}.`,
+    });
+
+    if (newInv && selectedJob && selectedJob.id === jobToInvoice.id) {
+      setSelectedJob({
+        ...selectedJob,
+        invoiceId: newInv.id,
+        invoiceNumber: newInv.invoiceNumber,
+        billingStatus: newInv.status === 'paid' ? 'paid' : newInv.status === 'partial' ? 'partial' : 'invoiced',
+      });
+    }
   };
 
   /**
@@ -884,6 +967,29 @@ export const JobsView: React.FC<JobsViewProps> = ({
                           >
                             {job.priority}
                           </span>
+
+                          {/* P0-3: Billing Status Badge */}
+                          {(job.status === 'completed' || job.status === 'verified' || job.status === 'closed' || job.invoiceId || job.billingStatus) && (
+                            <span
+                              className={`h-5 inline-flex items-center px-1.5 rounded-md text-[9px] font-black uppercase shrink-0 ${
+                                job.billingStatus === 'paid'
+                                  ? 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                                  : job.billingStatus === 'partial'
+                                  ? 'bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-300 border border-blue-300 dark:border-blue-800'
+                                  : job.billingStatus === 'invoiced' || job.invoiceId
+                                  ? 'bg-purple-100 dark:bg-purple-950/70 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-800'
+                                  : 'bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                              }`}
+                            >
+                              {job.billingStatus === 'paid'
+                                ? 'Paid'
+                                : job.billingStatus === 'partial'
+                                ? 'Part-Paid'
+                                : job.billingStatus === 'invoiced' || job.invoiceId
+                                ? 'Invoiced'
+                                : 'Unbilled'}
+                            </span>
+                          )}
                         </div>
 
                         {/* Right: Amount + Voice Alert + 3-Dot Menu */}
@@ -964,18 +1070,39 @@ export const JobsView: React.FC<JobsViewProps> = ({
                                   <span>Alert Customer: On The Way</span>
                                 </button>
 
-                                {job.status === 'completed' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenJobMenuId(null);
-                                      sendJobCompletionSummaryToCustomer(job, cust, tech, currentBusiness);
-                                    }}
-                                    className="w-full px-3.5 py-2 text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-2"
-                                  >
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                    <span>Send Completion Report</span>
-                                  </button>
+                                {(job.status === 'completed' || job.status === 'verified' || job.status === 'closed') && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenJobMenuId(null);
+                                        sendJobCompletionSummaryToCustomer(job, cust, tech, currentBusiness);
+                                      }}
+                                      className="w-full px-3.5 py-2 text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-2"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                      <span>Send Completion Report</span>
+                                    </button>
+
+                                    {!job.invoiceId ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setOpenJobMenuId(null);
+                                          handleGenerateInvoiceForJob(job);
+                                        }}
+                                        className="w-full px-3.5 py-2 text-left hover:bg-amber-50 dark:hover:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-bold flex items-center gap-2"
+                                      >
+                                        <Receipt className="w-3.5 h-3.5 text-amber-600" />
+                                        <span>Generate Tax Invoice</span>
+                                      </button>
+                                    ) : (
+                                      <div className="px-3.5 py-2 text-[11px] font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2 bg-purple-50/50 dark:bg-purple-950/30">
+                                        <Receipt className="w-3.5 h-3.5 text-purple-600" />
+                                        <span>Invoice: {job.invoiceNumber || 'Linked'}</span>
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             )}
@@ -1069,25 +1196,63 @@ export const JobsView: React.FC<JobsViewProps> = ({
                           <td className="p-3.5 text-slate-700 dark:text-slate-300 font-medium">{tech?.name || 'Unassigned'}</td>
                           <td className="p-3.5 text-slate-500">{job.scheduledDate} {job.scheduledTimeSlot || job.scheduledTime || ''}</td>
                           <td className="p-3.5">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 uppercase">
-                              {job.status.replace('_', ' ')}
-                            </span>
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 uppercase">
+                                {job.status.replace('_', ' ')}
+                              </span>
+                              {(job.status === 'completed' || job.status === 'verified' || job.status === 'closed' || job.invoiceId || job.billingStatus) && (
+                                <span
+                                  className={`px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase ${
+                                    job.billingStatus === 'paid'
+                                      ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300'
+                                      : job.billingStatus === 'partial'
+                                      ? 'bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300'
+                                      : job.billingStatus === 'invoiced' || job.invoiceId
+                                      ? 'bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-300'
+                                      : 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300'
+                                  }`}
+                                >
+                                  {job.billingStatus === 'paid'
+                                    ? 'Paid'
+                                    : job.billingStatus === 'partial'
+                                    ? 'Part-Paid'
+                                    : job.billingStatus === 'invoiced' || job.invoiceId
+                                    ? 'Invoiced'
+                                    : 'Unbilled'}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="p-3.5 font-bold text-slate-900 dark:text-slate-100 font-mono">
                             {currentBusiness.currency}{job.estimatedAmount}
                           </td>
                           <td className="p-3.5 text-right">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                sendJobDispatchToTechnician(job, cust, tech, currentBusiness);
-                              }}
-                              className="px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 text-[11px] inline-flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-                              title="Dispatch job details to technician on WhatsApp"
-                            >
-                              <MessageSquare className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              {(job.status === 'completed' || job.status === 'verified' || job.status === 'closed') && !job.invoiceId && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleGenerateInvoiceForJob(job);
+                                  }}
+                                  className="px-2 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-bold border border-amber-300 dark:border-amber-800 text-[10px] inline-flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                                  title="Generate Tax Invoice"
+                                >
+                                  <Receipt className="w-3 h-3 text-amber-600" /> Invoice
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  sendJobDispatchToTechnician(job, cust, tech, currentBusiness);
+                                }}
+                                className="px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 text-[11px] inline-flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                                title="Dispatch job details to technician on WhatsApp"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1487,6 +1652,82 @@ export const JobsView: React.FC<JobsViewProps> = ({
                   )}
                 </div>
               )}
+
+              {/* P0-3: Invoice & Billing Status Hub */}
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <Receipt className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    Billing & Tax Invoice
+                  </span>
+                  <span
+                    className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                      selectedJob.billingStatus === 'paid'
+                        ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                        : selectedJob.billingStatus === 'partial'
+                        ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
+                        : selectedJob.billingStatus === 'invoiced' || selectedJob.invoiceId
+                        ? 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300'
+                        : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
+                    }`}
+                  >
+                    {selectedJob.billingStatus === 'paid'
+                      ? 'Paid'
+                      : selectedJob.billingStatus === 'partial'
+                      ? 'Partially Paid'
+                      : selectedJob.billingStatus === 'invoiced' || selectedJob.invoiceId
+                      ? 'Invoiced'
+                      : 'Unbilled'}
+                  </span>
+                </div>
+
+                {/* On-Site Payment info if recorded */}
+                {selectedJob.paymentCollected && (
+                  <div className="p-2.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-emerald-800 dark:text-emerald-300 block">
+                        On-Site Payment Collected
+                      </span>
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                        Via {selectedJob.paymentCollected.method.toUpperCase()} • Recorded by {selectedJob.paymentCollected.collectedByName || selectedJob.paymentCollected.collectedBy || 'Staff'}
+                      </span>
+                    </div>
+                    <span className="font-mono font-black text-emerald-700 dark:text-emerald-300 text-sm">
+                      {currentBusiness.currency}{selectedJob.paymentCollected.amount}
+                    </span>
+                  </div>
+                )}
+
+                {selectedJob.invoiceId ? (
+                  <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-semibold">Linked Tax Invoice</span>
+                      <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                        {selectedJob.invoiceNumber || selectedJob.invoiceId}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md">
+                        Tax Invoice Active
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-1">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                      This job is completed. Create a GST-ready tax invoice with labor and parts breakdown.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateInvoiceForJob(selectedJob)}
+                      className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 transition-all active:scale-95 cursor-pointer"
+                    >
+                      <Receipt className="w-3.5 h-3.5" />
+                      <span>Generate Invoice</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center justify-end pt-3 border-t">

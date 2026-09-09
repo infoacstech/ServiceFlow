@@ -84,6 +84,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     jobs,
     customers,
     invoices,
+    payments,
     inventory,
     contracts,
     batchScheduleDueAmcVisits,
@@ -223,9 +224,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const pendingJobs = jobs.filter((j) => isJobActive(j.status));
   const completedJobs = jobs.filter((j) => isJobCompleted(j.status));
   
-  const todayPayments = invoices
-    .filter((inv) => inv.status === 'paid')
-    .reduce((sum, inv) => sum + inv.paidAmount, 0);
+  // P0-6: Real Today's Collection (payments collected today via recorded receipts or technician on-site collections)
+  const todayPaymentsFromRecords = (payments || [])
+    .filter((p) => {
+      const pDate = p.date || p.paymentDate;
+      return pDate === todayStr;
+    })
+    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+  const todayJobCollections = (jobs || [])
+    .filter((j) => {
+      if (!j.paymentCollected || !j.paymentCollected.amount) return false;
+      const collectedDate = (j.paymentCollected.collectedAt || '').split('T')[0];
+      const isToday = collectedDate === todayStr;
+      const alreadyInPayments = (payments || []).some(
+        (p) => p.jobId === j.jobId && ((p.date || p.paymentDate) === todayStr)
+      );
+      return isToday && !alreadyInPayments;
+    })
+    .reduce((sum, j) => sum + (Number(j.paymentCollected?.amount) || 0), 0);
+
+  const todayPayments = todayPaymentsFromRecords + todayJobCollections;
 
   const totalSales = invoices.reduce((sum, inv) => sum + inv.grandTotal, 0);
   const pendingPayments = invoices.reduce((sum, inv) => sum + inv.balanceAmount, 0);
@@ -320,9 +339,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       .filter((inv) => (inv.date || '').startsWith(prefix))
       .reduce((sum, inv) => sum + (Number(inv.grandTotal) || 0), 0);
 
-    const monthCollections = invoices
-      .filter((inv) => (inv.date || '').startsWith(prefix))
-      .reduce((sum, inv) => sum + (Number(inv.paidAmount) || 0), 0);
+    const monthPaymentsSum = (payments || [])
+      .filter((p) => (p.date || p.paymentDate || '').startsWith(prefix))
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    const monthCollections = monthPaymentsSum > 0
+      ? monthPaymentsSum
+      : invoices
+          .filter((inv) => (inv.date || '').startsWith(prefix))
+          .reduce((sum, inv) => sum + (Number(inv.paidAmount) || 0), 0);
 
     return {
       month: monthLabel,

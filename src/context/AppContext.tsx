@@ -324,6 +324,12 @@ interface AppContextType {
       customerRating?: number;
       customerFeedback?: string;
       materialsUsed?: JobMaterialUsed[];
+      paymentCollected?: {
+        amount: number;
+        method: 'cash' | 'upi' | 'card' | 'cheque' | 'bank_transfer';
+        transactionReference?: string;
+        notes?: string;
+      };
     }
   ) => void;
 
@@ -341,7 +347,7 @@ interface AppContextType {
 
   addInvoice: (inv: Omit<Invoice, 'id' | 'businessId' | 'invoiceNumber'>) => Invoice;
   deleteInvoice: (id: string) => void;
-  recordPayment: (p: Omit<Payment, 'id' | 'businessId'>) => Payment;
+  recordPayment: (p: Omit<Payment, 'id' | 'businessId'>) => Payment | null;
 
   addContract: (c: Omit<RecurringContract, 'id' | 'businessId' | 'contractNumber'>) => RecurringContract;
   updateContract: (id: string, updates: Partial<RecurringContract>) => void;
@@ -774,7 +780,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Offline Technician Sync States
   const [isOffline, setIsOffline] = useState<boolean>(!navigator.onLine);
   const [isSimulatedOffline, setIsSimulatedOffline] = useState<boolean>(false);
-  const [pendingSyncQueue, setPendingSyncQueue] = useState<OfflineSyncItem[]>([]);
+  const [pendingSyncQueue, setPendingSyncQueue] = useState<OfflineSyncItem[]>(() =>
+    loadCache('serviflow_sync_queue_cache', [])
+  );
   const [manualSyncLogs, setManualSyncLogs] = useState<ManualSyncLog[]>(() =>
     loadCache('serviflow_manual_sync_logs_cache', [])
   );
@@ -800,6 +808,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isInitialJobsLoadRef = React.useRef(true);
   const isInitialNotifsLoadRef = React.useRef(true);
   const seenNotifIdsRef = React.useRef<Set<string>>(new Set());
+  const completingJobIdsRef = React.useRef<Set<string>>(new Set());
 
   // Auto request browser notification permission on mount/user interaction
   useEffect(() => {
@@ -1772,7 +1781,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       payload,
       description,
     };
-    setPendingSyncQueue((prev) => [...prev, newItem]);
+    setPendingSyncQueue((prev) => {
+      const next = [...prev, newItem];
+      saveCache('serviflow_sync_queue_cache', next);
+      return next;
+    });
   };
 
   const triggerManualSync = (
@@ -1837,6 +1850,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       saveToFirestore('manualSyncLogs', logEntry.id, logEntry);
       setPendingSyncQueue([]);
+      saveCache('serviflow_sync_queue_cache', []);
       if (showToastNotification) {
         showToast('Data refreshed & cloud-synced!', 'success');
       }
@@ -3890,80 +3904,204 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       customerRating?: number;
       customerFeedback?: string;
       materialsUsed?: JobMaterialUsed[];
+      paymentCollected?: {
+        amount: number;
+        method: 'cash' | 'upi' | 'card' | 'cheque' | 'bank_transfer';
+        referenceNumber?: string;
+        transactionReference?: string;
+        notes?: string;
+      };
     }
   ) => {
     if (checkReadOnlySupportGuard()) return;
     const existingJob = jobs.find((j) => j.id === id);
-    if (existingJob && existingJob.businessId !== currentBusiness.id && !isSuperAdminUser) {
+    if (!existingJob) {
+      showToast('Job not found.', 'error');
+      return;
+    }
+    if (existingJob.businessId !== currentBusiness.id && !isSuperAdminUser) {
       showToast('Unauthorized: Cannot complete job belonging to another tenant business.', 'error');
       return;
     }
-    if (data.materialsUsed && data.materialsUsed.length > 0) {
-      data.materialsUsed.forEach((used) => {
-        const item = inventory.find((i) => i.id === used.inventoryItemId);
-        if (item) {
-          const newStock = Math.max(0, item.currentStock - used.quantity);
-          firestoreService.saveDocument<InventoryItem>('inventory', item.id, { currentStock: newStock });
-        }
-      });
+
+    // FIX 1: Idempotency check - if job is already completed, closed or verified, do not re-run side effects
+    if (existingJob.status === 'completed' || existingJob.status === 'closed' || existingJob.status === 'verified') {
+      showToast('Notice: This job has already been marked as completed.', 'info');
+      return;
     }
 
-    const completionData = {
-      status: 'completed' as const,
-      completionTime: new Date().toISOString(),
-      problemFound: data.problemFound,
-      solutionProvided: data.solutionProvided,
-      beforePhotos: data.beforePhotos || existingJob?.beforePhotos || [],
-      afterPhotos: data.afterPhotos,
-      customerSignature: data.customerSignature || '',
-      customerRating: data.customerRating || 5,
-      customerFeedback: data.customerFeedback || '',
-      materialsUsed: data.materialsUsed || [],
-    };
+    // Guard against concurrent execution in flight
+    if (completingJobIdsRef.current.has(id)) {
+      showToast('Job completion is already processing.', 'info');
+      return;
+    }
+    completingJobIdsRef.current.add(id);
 
-    setJobs((prev) => {
-      const next = prev.map((j) => (j.id === id ? { ...j, ...completionData } : j));
-      saveCache('serviflow_jobs_cache', next);
-      return next;
-    });
+    try {
+      const jobIdentifier = existingJob.jobId || id;
+      const assignedTech = (users || []).find((u) => u.id === existingJob.assignedStaffId) || currentUser;
+      const techName = assignedTech?.name || currentUser?.name || 'Staff Member';
+      const customer = (customers || []).find((c) => c.id === existingJob.customerId);
 
-    const assignedTech = (users || []).find((u) => u.id === existingJob?.assignedStaffId) || currentUser;
-    const techName = assignedTech?.name || currentUser?.name || 'Staff Member';
-    const customer = (customers || []).find((c) => c.id === existingJob?.customerId);
+      // FIX 1 & FIX 4: Process materials with deterministic transaction IDs & shortage tracking
+      if (data.materialsUsed && data.materialsUsed.length > 0) {
+        data.materialsUsed.forEach((used) => {
+          const item = inventory.find((i) => i.id === used.inventoryItemId);
+          if (item) {
+            // Deterministic transaction ID based on job identifier and inventory item ID
+            const txId = `tx-job-${jobIdentifier}-${item.id}`;
 
-    // Create Notification doc in Firestore for Business Owner & Managers
-    const completeNotif: Notification = {
-      id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
-      businessId: currentBusiness.id,
-      title: `Job Completed: ${existingJob?.jobId || id}`,
-      message: `Staff ${techName} has completed job ${existingJob?.jobId || id} (${existingJob?.description || 'Service'}). Customer rating: ${data.customerRating || 5}★.`,
-      type: 'job',
-      read: false,
-      createdAt: new Date().toISOString(),
-      senderUserId: currentUser?.id,
-      senderRoleId: currentUser?.role,
-      authorName: techName,
-      targetRoleId: 'business_owner',
-      jobId: existingJob?.jobId || id,
-      jobTitle: existingJob?.description,
-      jobLocation: existingJob?.location || customer?.address,
-      customerName: customer?.name,
-      customerPhone: customer?.mobile,
-      scheduledDate: existingJob?.scheduledDate,
-      scheduledTime: existingJob?.scheduledTimeSlot || existingJob?.scheduledTime,
-      priority: existingJob?.priority,
-      actionType: 'completed',
-    };
-    saveToFirestore('notifications', completeNotif.id, completeNotif);
-    seenNotifIdsRef.current.add(completeNotif.id);
+            // Check if this material consumption was already processed for this job
+            const alreadyProcessedTx = inventoryTransactions.some(
+              (t) => t.id === txId || (t.jobId === jobIdentifier && (t.inventoryItemId === item.id || t.itemId === item.id))
+            );
 
-    if (isActuallyOffline) {
-      addToSyncQueue('complete_job', id, data, 'Technician completed job & recorded customer report/signature');
-      showToast('Offline Mode: Job report saved locally & queued for sync!', 'success');
-    } else {
-      firestoreService.saveDocument<Job>('jobs', id, completionData);
-      logActivity('Job Completed', 'job', id, `Technician ${techName} completed job work & obtained customer signature`);
-      showToast('Job completed successfully', 'success');
+            if (!alreadyProcessedTx) {
+              const shortage = Math.max(0, used.quantity - item.currentStock);
+              if (shortage > 0) {
+                showToast(
+                  `Inventory Shortage Alert: ${used.name || item.name} consumed ${used.quantity} units (only ${item.currentStock} in stock, shortage of ${shortage} units).`,
+                  'info'
+                );
+              }
+
+              // Retain zero-clamping business rule while recording shortage audit trail
+              const newStock = Math.max(0, item.currentStock - used.quantity);
+              firestoreService.saveDocument<InventoryItem>('inventory', item.id, { currentStock: newStock });
+              setInventory((prev) => prev.map((inv) => (inv.id === item.id ? { ...inv, currentStock: newStock } : inv)));
+
+              const txRecord: InventoryTransaction = {
+                id: txId,
+                businessId: currentBusiness.id,
+                inventoryItemId: item.id,
+                itemId: item.id,
+                itemName: item.name,
+                itemSku: item.sku,
+                type: 'job_use',
+                quantity: used.quantity,
+                date: new Date().toISOString().split('T')[0],
+                createdBy: currentUser?.id || 'system',
+                unitCost: item.purchasePrice || (used.unitPrice * 0.65),
+                totalCost: (item.purchasePrice || (used.unitPrice * 0.65)) * used.quantity,
+                shortageQuantity: shortage > 0 ? shortage : undefined,
+                availableStockBefore: item.currentStock,
+                notes: shortage > 0
+                  ? `Consumed during service completion for Job ${jobIdentifier}. [SHORTAGE AUDIT: Requested ${used.quantity}, Available ${item.currentStock}, Shortage of ${shortage} units consumed beyond stock]`
+                  : `Consumed during service completion for Job ${jobIdentifier}`,
+                referenceNumber: jobIdentifier,
+                jobId: jobIdentifier,
+                customerId: existingJob.customerId,
+                technicianId: existingJob.assignedStaffId || currentUser?.id,
+              };
+
+              // Use exact collection 'inventoryTransactions' aligned with firestore.rules and FirestoreService
+              firestoreService.saveDocument<InventoryTransaction>('inventoryTransactions', txRecord.id, txRecord);
+              setInventoryTransactions((prev) => [txRecord, ...prev]);
+            }
+          }
+        });
+      }
+
+      const paymentCollectedRecord = data.paymentCollected && data.paymentCollected.amount > 0 ? {
+        amount: data.paymentCollected.amount,
+        method: data.paymentCollected.method,
+        collectedAt: new Date().toISOString(),
+        collectedBy: currentUser?.id,
+        collectedByName: techName,
+        transactionReference: data.paymentCollected.referenceNumber || data.paymentCollected.transactionReference || '',
+        referenceNumber: data.paymentCollected.referenceNumber || data.paymentCollected.transactionReference || '',
+        notes: data.paymentCollected.notes || '',
+      } : undefined;
+
+      // FIX 2: Structured completionData with full schema compliance
+      const completionData = {
+        status: 'completed' as const,
+        completionTime: new Date().toISOString(),
+        problemFound: data.problemFound,
+        solutionProvided: data.solutionProvided,
+        beforePhotos: data.beforePhotos || existingJob.beforePhotos || [],
+        afterPhotos: data.afterPhotos,
+        customerSignature: data.customerSignature || '',
+        customerRating: data.customerRating || 5,
+        customerFeedback: data.customerFeedback || '',
+        materialsUsed: data.materialsUsed || [],
+        billingStatus: existingJob.billingStatus || (existingJob.invoiceId ? ('invoiced' as const) : ('unbilled' as const)),
+        ...(paymentCollectedRecord ? { paymentCollected: paymentCollectedRecord } : {}),
+      };
+
+      setJobs((prev) => {
+        const next = prev.map((j) => (j.id === id ? { ...j, ...completionData } : j));
+        saveCache('serviflow_jobs_cache', next);
+        return next;
+      });
+
+      // FIX 1: If job already has invoice, record payment idempotently
+      if (paymentCollectedRecord && existingJob.invoiceId) {
+        const pmtRef = paymentCollectedRecord.transactionReference || `On-site payment for Job ${existingJob.jobId}`;
+        const alreadyHasPmt = payments.some(
+          (p) =>
+            p.invoiceId === existingJob.invoiceId &&
+            p.amount === paymentCollectedRecord.amount &&
+            (p.jobId === existingJob.jobId || p.referenceNumber === pmtRef || p.reference === pmtRef)
+        );
+
+        if (!alreadyHasPmt) {
+          recordPayment({
+            invoiceId: existingJob.invoiceId,
+            customerId: existingJob.customerId,
+            amount: paymentCollectedRecord.amount,
+            date: new Date().toISOString().split('T')[0],
+            method: paymentCollectedRecord.method,
+            referenceNumber: pmtRef,
+            jobId: existingJob.jobId,
+            collectedBy: currentUser?.id,
+            collectedByName: techName,
+            isAdvance: false,
+            notes: `On-site payment collected by ${techName} during job completion`,
+          });
+        }
+      }
+
+      // FIX 1: Deterministic notification ID to prevent duplicate completion notifications
+      const completeNotifId = `notif-complete-${jobIdentifier}`;
+      if (!seenNotifIdsRef.current.has(completeNotifId)) {
+        const completeNotif: Notification = {
+          id: completeNotifId,
+          businessId: currentBusiness.id,
+          title: `Job Completed: ${jobIdentifier}`,
+          message: `Staff ${techName} has completed job ${jobIdentifier} (${existingJob.description || 'Service'}). Customer rating: ${data.customerRating || 5}★.`,
+          type: 'job',
+          read: false,
+          createdAt: new Date().toISOString(),
+          senderUserId: currentUser?.id,
+          senderRoleId: currentUser?.role,
+          authorName: techName,
+          targetRoleId: 'business_owner',
+          jobId: jobIdentifier,
+          jobTitle: existingJob.description,
+          jobLocation: existingJob.location || customer?.address,
+          customerName: customer?.name,
+          customerPhone: customer?.mobile,
+          scheduledDate: existingJob.scheduledDate,
+          scheduledTime: existingJob.scheduledTimeSlot || existingJob.scheduledTime,
+          priority: existingJob.priority,
+          actionType: 'completed',
+        };
+        saveToFirestore('notifications', completeNotif.id, completeNotif);
+        seenNotifIdsRef.current.add(completeNotifId);
+      }
+
+      // FIX 2: Queue completionData (NOT raw data) when offline
+      if (isActuallyOffline) {
+        addToSyncQueue('complete_job', id, completionData, 'Technician completed job & recorded customer report/signature');
+        showToast('Offline Mode: Job report saved locally & queued for sync!', 'success');
+      } else {
+        firestoreService.saveDocument<Job>('jobs', id, completionData);
+        logActivity('Job Completed', 'job', id, `Technician ${techName} completed job work & obtained customer signature`);
+        showToast('Job completed successfully', 'success');
+      }
+    } finally {
+      completingJobIdsRef.current.delete(id);
     }
   };
 
@@ -4100,12 +4238,25 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Invoice Actions
   const addInvoice = (data: Omit<Invoice, 'id' | 'businessId' | 'invoiceNumber'>) => {
-    if (checkReadOnlySupportGuard()) return;
+    if (checkReadOnlySupportGuard()) return {} as Invoice;
     const perm = canCreateRecord(currentUser, 'invoice');
     if (!perm.allowed) {
       showToast(perm.reason || 'Permission Denied: Cannot create invoices.', 'error');
-      return;
+      return {} as Invoice;
     }
+
+    // FIX 1: Prevent duplicate invoice creation for the same job
+    let targetJob = data.jobId ? jobs.find((j) => j.jobId === data.jobId || j.id === data.jobId) : undefined;
+    if (data.jobId) {
+      const existingJobInv = invoices.find(
+        (inv) => inv.jobId === data.jobId || (targetJob && targetJob.invoiceId === inv.id)
+      );
+      if (existingJobInv) {
+        showToast(`Notice: Job ${data.jobId} already has Invoice ${existingJobInv.invoiceNumber}.`, 'info');
+        return existingJobInv;
+      }
+    }
+
     const num = `INV-${new Date().getFullYear()}-${filteredInvoices.length + 101}`;
     const id = `invc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newInv: Invoice = {
@@ -4114,8 +4265,80 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       businessId: currentBusiness.id,
       invoiceNumber: num,
     };
+
+    let paymentCreatedFromAdvance = false;
+
+    if (targetJob) {
+      // If job has payment collected on-site by technician, link it
+      if (targetJob.paymentCollected && targetJob.paymentCollected.amount > 0) {
+        const advAmount = targetJob.paymentCollected.amount;
+        if (newInv.paidAmount <= 0) {
+          newInv.paidAmount = advAmount;
+          newInv.balanceAmount = Math.max(0, newInv.grandTotal - advAmount);
+          newInv.status = newInv.balanceAmount <= 0 ? 'paid' : 'partial';
+        }
+
+        const autoPmt: Payment = {
+          id: `pmt-${Date.now()}-advance`,
+          businessId: currentBusiness.id,
+          invoiceId: newInv.id,
+          customerId: newInv.customerId,
+          amount: advAmount,
+          date: targetJob.paymentCollected.collectedAt ? targetJob.paymentCollected.collectedAt.split('T')[0] : new Date().toISOString().split('T')[0],
+          paymentDate: targetJob.paymentCollected.collectedAt ? targetJob.paymentCollected.collectedAt.split('T')[0] : new Date().toISOString().split('T')[0],
+          method: targetJob.paymentCollected.method,
+          paymentMethod: targetJob.paymentCollected.method,
+          referenceNumber: targetJob.paymentCollected.transactionReference || targetJob.paymentCollected.referenceNumber || `Collected on-site for Job ${targetJob.jobId}`,
+          reference: targetJob.paymentCollected.transactionReference || targetJob.paymentCollected.referenceNumber || `Collected on-site for Job ${targetJob.jobId}`,
+          jobId: targetJob.jobId,
+          collectedByName: targetJob.paymentCollected.collectedByName,
+          isAdvance: true,
+          notes: `On-site payment collected during Job ${targetJob.jobId}`,
+        };
+        firestoreService.saveDocument<Payment>('payments', autoPmt.id, autoPmt);
+        setPayments((prev) => [...prev, autoPmt]);
+        paymentCreatedFromAdvance = true;
+      }
+
+      const jobBillingStatus = newInv.status === 'paid' ? 'paid' : newInv.status === 'partial' ? 'partial' : 'invoiced';
+      firestoreService.saveDocument<Job>('jobs', targetJob.id, {
+        invoiceId: newInv.id,
+        invoiceNumber: num,
+        billingStatus: jobBillingStatus,
+      });
+      setJobs((prev) =>
+        prev.map((j) =>
+          j.id === targetJob!.id
+            ? { ...j, invoiceId: newInv.id, invoiceNumber: num, billingStatus: jobBillingStatus }
+            : j
+        )
+      );
+    }
+
+    // P0-5: Ensure any invoice marked paid/partial has a corresponding Payment record
+    if (newInv.paidAmount > 0 && !paymentCreatedFromAdvance) {
+      const pmtRecord: Payment = {
+        id: `pmt-${Date.now()}-init`,
+        businessId: currentBusiness.id,
+        invoiceId: newInv.id,
+        customerId: newInv.customerId,
+        amount: newInv.paidAmount,
+        date: newInv.date || new Date().toISOString().split('T')[0],
+        paymentDate: newInv.date || new Date().toISOString().split('T')[0],
+        method: 'cash',
+        paymentMethod: 'cash',
+        referenceNumber: `Initial payment on ${num}`,
+        reference: `Initial payment on ${num}`,
+        jobId: newInv.jobId,
+        notes: `Payment recorded upon invoice creation ${num}`,
+      };
+      firestoreService.saveDocument<Payment>('payments', pmtRecord.id, pmtRecord);
+      setPayments((prev) => [...prev, pmtRecord]);
+    }
+
     firestoreService.saveDocument<Invoice>('invoices', newInv.id, newInv);
-    logActivity('Invoice Created', 'invoice', newInv.id, `Created invoice ${num}`);
+    setInvoices((prev) => [newInv, ...prev]);
+    logActivity('Invoice Created', 'invoice', newInv.id, `Created invoice ${num}${data.jobId ? ` for Job ${data.jobId}` : ''}`);
     showToast(`Invoice ${num} generated & synced to Firestore`, 'success');
     return newInv;
   };
@@ -4133,31 +4356,70 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     firestoreService.deleteInvoice(id);
+    setInvoices((prev) => prev.filter((i) => i.id !== id));
     logActivity('Invoice Deleted', 'invoice', id, 'Deleted invoice record from Firestore');
     showToast('Invoice deleted from Firestore', 'info');
   };
 
-  const recordPayment = (data: Omit<Payment, 'id' | 'businessId'>) => {
-    if (checkReadOnlySupportGuard()) return;
+  const recordPayment = (data: Omit<Payment, 'id' | 'businessId'>): Payment | null => {
+    if (checkReadOnlySupportGuard()) return null;
     const perm = canCreateRecord(currentUser, 'payment');
     if (!perm.allowed) {
       showToast(perm.reason || 'Permission Denied: Cannot record payment.', 'error');
-      return;
+      return null;
     }
+
+    const inv = invoices.find((i) => i.id === data.invoiceId);
+    if (inv && inv.businessId !== currentBusiness.id && !isSuperAdminUser) {
+      showToast('Unauthorized: Cannot record payment for invoice belonging to another tenant business.', 'error');
+      return null;
+    }
+
+    // FIX 3: Strict duplicate payment guard - abort operation immediately if identical payment exists
+    const targetDate = (data.date || data.paymentDate || '').trim();
+    const targetRef = (data.referenceNumber || data.reference || '').trim();
+
+    const isDuplicate = payments.some((p) => {
+      if (p.invoiceId !== data.invoiceId || Number(p.amount) !== Number(data.amount)) {
+        return false;
+      }
+      const pDate = (p.date || p.paymentDate || '').trim();
+      if (targetDate && pDate && pDate !== targetDate) {
+        return false;
+      }
+      const pRef = (p.referenceNumber || p.reference || '').trim();
+
+      // If either record has a reference number, require exact match (case-insensitive)
+      // This preserves separate legitimate split payments with different transaction references
+      if (targetRef || pRef) {
+        return targetRef.toLowerCase() === pRef.toLowerCase();
+      }
+
+      // If neither has a reference number, matching invoice + amount + date is treated as duplicate
+      return true;
+    });
+
+    if (isDuplicate) {
+      showToast('Payment rejected: An identical payment record (same invoice, amount, date, and reference) was already recorded.', 'error');
+      return null;
+    }
+
     const newPmt: Payment = {
       ...data,
-      id: `pmt-${Date.now()}`,
+      id: `pmt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       businessId: currentBusiness.id,
+      date: targetDate || new Date().toISOString().split('T')[0],
+      paymentDate: targetDate || new Date().toISOString().split('T')[0],
+      referenceNumber: targetRef || undefined,
+      reference: targetRef || undefined,
+      method: data.method || data.paymentMethod || 'cash',
+      paymentMethod: data.method || data.paymentMethod || 'cash',
     };
 
     firestoreService.saveDocument<Payment>('payments', newPmt.id, newPmt);
+    setPayments((prev) => [...prev, newPmt]);
 
-    const inv = invoices.find((i) => i.id === data.invoiceId);
     if (inv) {
-      if (inv.businessId !== currentBusiness.id && !isSuperAdminUser) {
-        showToast('Unauthorized: Cannot record payment for invoice belonging to another tenant business.', 'error');
-        return;
-      }
       const newPaid = inv.paidAmount + data.amount;
       const newBalance = Math.max(0, inv.grandTotal - newPaid);
       const newStatus: Invoice['status'] =
@@ -4167,6 +4429,26 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         balanceAmount: newBalance,
         status: newStatus,
       });
+
+      setInvoices((prev) =>
+        prev.map((i) =>
+          i.id === inv.id
+            ? { ...i, paidAmount: newPaid, balanceAmount: newBalance, status: newStatus }
+            : i
+        )
+      );
+
+      // P0-3 & P0-5: Update linked job billing status if applicable
+      const linkedJob = jobs.find(
+        (j) => j.invoiceId === inv.id || (inv.jobId && (j.jobId === inv.jobId || j.id === inv.jobId))
+      );
+      if (linkedJob) {
+        const jobBillingStatus = newStatus === 'paid' ? 'paid' : newStatus === 'partial' ? 'partial' : 'invoiced';
+        firestoreService.saveDocument<Job>('jobs', linkedJob.id, { billingStatus: jobBillingStatus });
+        setJobs((prev) =>
+          prev.map((j) => (j.id === linkedJob.id ? { ...j, billingStatus: jobBillingStatus } : j))
+        );
+      }
     }
 
     logActivity('Payment Recorded', 'payment', newPmt.id, `Recorded payment of ${currentBusiness.currency}${data.amount}`);

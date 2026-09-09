@@ -23,6 +23,11 @@ import {
   Check,
   Send,
   Building,
+  KeyRound,
+  Lock,
+  LogOut,
+  RefreshCw,
+  UserCheck,
 } from 'lucide-react';
 import { CustomerSearchSelect } from '../components/CustomerSearchSelect';
 
@@ -43,8 +48,19 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ onBackTo
     showToast,
   } = useApp();
 
-  // Read URL parameters for direct link access: ?portal=customer&cid=... or ?customer=...
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(() => {
+  // Staff preview mode vs Customer portal authentication
+  const isStaffLoggedIn = Boolean(currentUser && currentUser.role);
+
+  // Authenticated/Verified customer session (stored securely in sessionStorage)
+  const [verifiedCustomerId, setVerifiedCustomerId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('serviflow_portal_customer_id');
+    }
+    return null;
+  });
+
+  // For staff preview, allow switching; for public user, only allowed verified ID
+  const [previewCustomerId, setPreviewCustomerId] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const urlCid = params.get('cid') || params.get('customer') || params.get('customerId');
@@ -55,6 +71,27 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ onBackTo
     }
     return customers?.[0]?.id || '';
   });
+
+  // Effective customer:
+  // If staff is logged in, use previewCustomerId
+  // If public user, ONLY use verifiedCustomerId (NEVER fallback to customers[0]!)
+  const effectiveCustomerId = isStaffLoggedIn ? previewCustomerId : verifiedCustomerId;
+
+  const customer: Customer | null = effectiveCustomerId
+    ? (customers || []).find((c) => c.id === effectiveCustomerId) || null
+    : null;
+
+  // Verification & Auth Gate States for unverified visitors
+  const [authStep, setAuthStep] = useState<'login' | 'otp' | 'guest_booking'>('login');
+  const [mobileInput, setMobileInput] = useState('');
+  const [enteredOtp, setEnteredOtp] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState('');
+  const [pendingCustomer, setPendingCustomer] = useState<Customer | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  // Guest booking fields
+  const [guestName, setGuestName] = useState('');
+  const [guestAddress, setGuestAddress] = useState('');
 
   const [activeTab, setActiveTab] = useState<'requests' | 'contracts' | 'invoices'>('requests');
   const [isBookModalOpen, setIsBookModalOpen] = useState(false);
@@ -69,34 +106,70 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ onBackTo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedJobId, setSubmittedJobId] = useState<string | null>(null);
 
-  const guestCustomer: Customer = {
-    id: 'guest',
-    name: 'Valued Client',
-    mobile: '',
-    email: '',
-    address: '',
-    city: currentBusiness?.city || '',
-    state: currentBusiness?.state || '',
-    pin: currentBusiness?.pin || '',
-    customerType: 'individual',
-    businessId: currentBusiness?.id || 'default',
-    createdAt: new Date().toISOString(),
-  };
-
-  const customer: Customer =
-    (customers || []).find((c) => c.id === selectedCustomerId) ||
-    customers?.[0] ||
-    guestCustomer;
-
   useEffect(() => {
     if (customer?.mobile) {
       setContactMobile(customer.mobile);
     }
   }, [customer?.id]);
 
-  const customerJobs = (jobs || []).filter((j) => j.customerId === customer?.id);
-  const customerInvoices = (invoices || []).filter((inv) => inv.customerId === customer?.id);
-  const customerContracts = (contracts || []).filter((c) => c.customerId === customer?.id);
+  const handleSendOtp = (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    const cleaned = mobileInput.replace(/[^0-9]/g, '');
+    if (cleaned.length < 10) {
+      setLoginError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    const last10 = cleaned.slice(-10);
+    const matched = (customers || []).find((c) => {
+      const cMobile = (c.mobile || '').replace(/[^0-9]/g, '').slice(-10);
+      return cMobile === last10;
+    });
+
+    if (!matched) {
+      setLoginError('No registered client account found for this mobile number. You can book a direct service call below without logging in.');
+      return;
+    }
+
+    const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+    setGeneratedOtp(otpCode);
+    setPendingCustomer(matched);
+    setAuthStep('otp');
+    showToast(`Verification code sent to ${matched.mobile}: ${otpCode}`, 'info');
+  };
+
+  const handleVerifyOtp = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!enteredOtp || enteredOtp.trim() !== generatedOtp) {
+      setLoginError('Invalid verification code. Please check and try again.');
+      return;
+    }
+    if (pendingCustomer) {
+      setVerifiedCustomerId(pendingCustomer.id);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('serviflow_portal_customer_id', pendingCustomer.id);
+      }
+      showToast(`Welcome back, ${pendingCustomer.name}!`, 'success');
+      setEnteredOtp('');
+      setGeneratedOtp('');
+      setPendingCustomer(null);
+    }
+  };
+
+  const handleCustomerLogout = () => {
+    setVerifiedCustomerId(null);
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('serviflow_portal_customer_id');
+    }
+    setAuthStep('login');
+    setMobileInput('');
+    setEnteredOtp('');
+    showToast('Signed out of Customer Portal successfully.', 'info');
+  };
+
+  const customerJobs = customer ? (jobs || []).filter((j) => j.customerId === customer.id) : [];
+  const customerInvoices = customer ? (invoices || []).filter((inv) => inv.customerId === customer.id) : [];
+  const customerContracts = customer ? (contracts || []).filter((c) => c.customerId === customer.id) : [];
 
   const activeJobs = customerJobs.filter(
     (j) => j.status !== 'completed' && j.status !== 'verified' && j.status !== 'cancelled'
@@ -114,30 +187,38 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ onBackTo
       return;
     }
 
+    // Determine target customer
+    const targetCustId = customer?.id || 'guest';
+    const targetAddress = customer?.address || guestAddress || 'Customer site address';
+    const targetPhone = contactMobile || customer?.mobile || 'N/A';
+
     setIsSubmitting(true);
     const selectedSvcObj = (services || []).find((s) => s.id === serviceCategory);
     const serviceTitle = selectedSvcObj ? selectedSvcObj.name : 'Service Call';
 
     const newJob = {
-      customerId: customer.id,
+      customerId: targetCustId,
       serviceId: serviceCategory || services?.[0]?.id || 'srv-1',
       description: `[Portal Booking] ${serviceTitle}: ${serviceNotes}`,
       priority: serviceType === 'emergency' ? ('urgent' as const) : ('high' as const),
       scheduledDate: preferredDate,
       scheduledTime: preferredTimeSlot.split(' - ')[0] || '10:00 AM',
-      location: customer.address || 'Customer site address',
+      location: targetAddress,
       estimatedAmount: selectedSvcObj?.price || 0,
       status: 'new' as const,
-      notes: `Booked via Customer Self-Service Portal. Preferred Slot: ${preferredTimeSlot}. Contact: ${contactMobile || customer.mobile}`,
+      notes: `Booked via Customer Self-Service Portal. Preferred Slot: ${preferredTimeSlot}. Contact: ${targetPhone}${guestName ? ` • Client: ${guestName}` : ''}`,
     };
 
     const createdJob = addJob(newJob, {
       isCustomerPortalRequest: true,
-      customerBusinessId: customer.businessId || currentBusiness.id,
+      customerBusinessId: customer?.businessId || currentBusiness.id,
       silentToast: false,
     });
     setIsSubmitting(false);
     setIsBookModalOpen(false);
+    if (authStep === 'guest_booking') {
+      setAuthStep('login');
+    }
     setSubmittedJobId(createdJob?.jobId || `REQ-${Date.now().toString().slice(-4)}`);
     showToast('Your service request has been submitted to the dispatch team!', 'success');
     setServiceNotes('');
@@ -222,8 +303,8 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ onBackTo
             <CustomerSearchSelect
               id="admin-portal-customer-switcher"
               customers={customers}
-              value={selectedCustomerId}
-              onChange={(id) => setSelectedCustomerId(id)}
+              value={previewCustomerId}
+              onChange={(id) => setPreviewCustomerId(id)}
               placeholder="Switch customer view..."
             />
           </div>
@@ -252,34 +333,315 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ onBackTo
         </div>
       )}
 
-      {/* Customer Overview Info Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-          <div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Client Profile</div>
-            <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100">
-              {customer.name}
-            </h2>
-            {customer.companyName && (
-              <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1 mt-0.5">
-                <Building className="w-3.5 h-3.5" /> {customer.companyName}
+      {/* Unauthenticated Security Gate vs Authenticated Customer Dashboard */}
+      {!customer ? (
+        <div className="space-y-6 animate-in fade-in">
+          {authStep === 'login' && (
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 border border-slate-200/80 dark:border-slate-800 shadow-sm max-w-md mx-auto space-y-5 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto shadow-xs">
+                <Lock className="w-7 h-7" />
               </div>
-            )}
-          </div>
 
-          <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-            {customer.mobile && (
-              <span className="px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 font-mono font-bold">
-                📱 {customer.mobile}
-              </span>
-            )}
-            {customer.city && (
-              <span className="px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 font-semibold">
-                📍 {customer.city}
-              </span>
-            )}
-          </div>
+              <div>
+                <h2 className="text-xl font-black text-slate-900 dark:text-slate-100">
+                  Client Portal Access
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                  Enter your registered 10-digit mobile number to view your service visits, AMC contracts, and GST invoices.
+                </p>
+              </div>
+
+              {loginError && (
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs font-semibold text-left">
+                  {loginError}
+                </div>
+              )}
+
+              <form onSubmit={handleSendOtp} className="space-y-4 text-left">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Registered Mobile Number
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
+                      +91
+                    </span>
+                    <input
+                      type="tel"
+                      required
+                      value={mobileInput}
+                      onChange={(e) => setMobileInput(e.target.value)}
+                      placeholder="9876543210"
+                      maxLength={10}
+                      className="w-full pl-12 pr-3 py-2.5 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm font-mono font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <KeyRound className="w-4 h-4" />
+                  <span>Send Verification Code (OTP)</span>
+                </button>
+              </form>
+
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col items-center gap-2">
+                <span className="text-[11px] text-slate-400">Need immediate repair or booking?</span>
+                <button
+                  type="button"
+                  onClick={() => setAuthStep('guest_booking')}
+                  className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Book Service as New Client / Guest
+                </button>
+              </div>
+            </div>
+          )}
+
+          {authStep === 'otp' && (
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 border border-slate-200/80 dark:border-slate-800 shadow-sm max-w-md mx-auto space-y-5 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-xs">
+                <KeyRound className="w-7 h-7" />
+              </div>
+
+              <div>
+                <h2 className="text-xl font-black text-slate-900 dark:text-slate-100">
+                  Verify Security Code
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Enter the 6-digit OTP code sent to <strong>+91 {mobileInput}</strong>
+                </p>
+              </div>
+
+              {loginError && (
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs font-semibold text-left">
+                  {loginError}
+                </div>
+              )}
+
+              <form onSubmit={handleVerifyOtp} className="space-y-4 text-left">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    6-Digit Verification Code
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={enteredOtp}
+                    onChange={(e) => setEnteredOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="Enter 6-digit code"
+                    maxLength={6}
+                    className="w-full px-3 py-2.5 text-center tracking-widest text-lg font-mono font-bold rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>Verify & Access Account</span>
+                </button>
+              </form>
+
+              <div className="pt-2 flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthStep('login');
+                    setLoginError(null);
+                    setEnteredOtp('');
+                  }}
+                  className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer"
+                >
+                  ← Change Mobile Number
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const otpCode = String(Math.floor(100000 + Math.random() * 900000));
+                    setGeneratedOtp(otpCode);
+                    showToast(`New verification code: ${otpCode}`, 'info');
+                  }}
+                  className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3" /> Resend Code
+                </button>
+              </div>
+            </div>
+          )}
+
+          {authStep === 'guest_booking' && (
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 border border-slate-200/80 dark:border-slate-800 shadow-sm max-w-lg mx-auto space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div>
+                  <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">
+                    Instant Service Booking
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Book a service visit directly without an existing account
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAuthStep('login')}
+                  className="text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
+                >
+                  ← Client Login
+                </button>
+              </div>
+
+              <form onSubmit={handleBookService} className="space-y-3.5 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Your Full Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={guestName}
+                      onChange={(e) => setGuestName(e.target.value)}
+                      placeholder="e.g. Ramesh Sharma"
+                      className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Mobile Number *</label>
+                    <input
+                      type="tel"
+                      required
+                      value={contactMobile}
+                      onChange={(e) => setContactMobile(e.target.value)}
+                      placeholder="10-digit mobile number"
+                      className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 font-mono font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Installation / Site Address *</label>
+                  <input
+                    type="text"
+                    required
+                    value={guestAddress}
+                    onChange={(e) => setGuestAddress(e.target.value)}
+                    placeholder="Shop/Flat no, building, locality, city"
+                    className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Service Required</label>
+                  <select
+                    value={serviceCategory}
+                    onChange={(e) => setServiceCategory(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 font-bold"
+                  >
+                    {(services || []).map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} {s.price ? `(${currencySymbol}${s.price})` : ''}
+                      </option>
+                    ))}
+                    <option value="other">Other Repair / Maintenance</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Problem Details *</label>
+                  <textarea
+                    required
+                    rows={2}
+                    value={serviceNotes}
+                    onChange={(e) => setServiceNotes(e.target.value)}
+                    placeholder="Describe equipment issue..."
+                    className="w-full p-2.5 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 font-medium"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Preferred Date</label>
+                    <input
+                      type="date"
+                      required
+                      value={preferredDate}
+                      onChange={(e) => setPreferredDate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Time Slot</label>
+                    <select
+                      value={preferredTimeSlot}
+                      onChange={(e) => setPreferredTimeSlot(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 font-bold"
+                    >
+                      <option value="09:00 AM - 12:00 PM">Morning (09:00 - 12:00)</option>
+                      <option value="12:00 PM - 03:00 PM">Afternoon (12:00 - 15:00)</option>
+                      <option value="03:00 PM - 06:00 PM">Evening (15:00 - 18:00)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>{isSubmitting ? 'Booking Technician...' : 'Confirm & Request Service'}</span>
+                </button>
+              </form>
+            </div>
+          )}
         </div>
+      ) : (
+        <>
+          {/* Customer Overview Info Card */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Client Profile</span>
+                  <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" /> Verified Account
+                  </span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 mt-0.5">
+                  {customer.name}
+                </h2>
+                {customer.companyName && (
+                  <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1 mt-0.5">
+                    <Building className="w-3.5 h-3.5" /> {customer.companyName}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {customer.mobile && (
+                  <span className="px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 font-mono font-bold text-xs text-slate-700 dark:text-slate-300">
+                    📱 {customer.mobile}
+                  </span>
+                )}
+                {customer.city && (
+                  <span className="px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 font-semibold text-xs text-slate-700 dark:text-slate-300">
+                    📍 {customer.city}
+                  </span>
+                )}
+
+                {/* Secure Sign Out Button */}
+                <button
+                  type="button"
+                  onClick={handleCustomerLogout}
+                  className="px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 text-rose-700 dark:text-rose-300 font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                  title="Sign out of customer portal"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Log Out</span>
+                </button>
+              </div>
+            </div>
 
         {/* Quick Tabs: Requests, AMC, Invoices */}
         <div className="flex items-center gap-2 overflow-x-auto pt-1">
@@ -520,6 +882,8 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ onBackTo
             </div>
           )}
         </div>
+      )}
+        </>
       )}
 
       {/* Service Request Booking Modal */}

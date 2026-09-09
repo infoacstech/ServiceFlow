@@ -287,6 +287,19 @@ export interface Job {
   customerFeedback?: string;
   materialsUsed?: JobMaterialUsed[];
   activityHistory?: JobActivityItem[];
+  invoiceId?: string;
+  invoiceNumber?: string;
+  billingStatus?: 'unbilled' | 'invoiced' | 'paid' | 'partial';
+  paymentCollected?: {
+    amount: number;
+    method: PaymentMethod;
+    referenceNumber?: string;
+    transactionReference?: string;
+    collectedAt: string;
+    collectedBy?: string;
+    collectedByName?: string;
+    notes?: string;
+  };
   createdAt: string;
 }
 
@@ -308,12 +321,23 @@ export interface InventoryTransaction {
   id: string;
   businessId: string;
   inventoryItemId: string;
+  itemId?: string;
+  itemName?: string;
+  itemSku?: string;
   type: 'stock_in' | 'stock_out' | 'job_use' | 'return' | 'adjustment';
   quantity: number;
+  unitCost?: number;
+  totalCost?: number;
   referenceId?: string;
+  referenceNumber?: string;
+  jobId?: string;
   notes?: string;
   date: string;
   createdBy: string;
+  customerId?: string;
+  technicianId?: string;
+  shortageQuantity?: number;
+  availableStockBefore?: number;
 }
 
 export interface LineItem {
@@ -376,9 +400,16 @@ export interface Payment {
   customerId: string;
   amount: number;
   date: string;
+  paymentDate?: string;
   method: PaymentMethod;
+  paymentMethod?: PaymentMethod;
   referenceNumber?: string;
+  reference?: string;
   notes?: string;
+  jobId?: string;
+  collectedBy?: string;
+  collectedByName?: string;
+  isAdvance?: boolean;
 }
 
 export type VisitFrequency = 'monthly' | 'quarterly' | 'bi_annual' | 'annual';

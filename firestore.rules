@@ -10,9 +10,8 @@ service cloud.firestore {
 
     function isSuperAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email == 'admin@serviflow.io' ||
-        request.auth.token.email == 'superadmin@serviflow.io' ||
-        request.auth.uid == 'usr-admin'
+        request.auth.token.super_admin == true ||
+        request.auth.token.role == 'super_admin'
       );
     }
 
@@ -45,16 +44,16 @@ service cloud.firestore {
       );
     }
 
-    // Businesses and Tenants collections (Modifications restricted to Business Owner / Super Admin)
+    // Businesses and Tenants collections (Restricted to Authenticated Tenant Members & Super Admin)
     match /businesses/{businessId} {
-      allow read: if isAuthenticated() || true; // Public read for tenant profile loading & discovery
-      allow create: if isAuthenticated() || true; // Self-registration allowed
+      allow read: if isAuthenticated() && (isTenantMember(businessId) || isSuperAdmin());
+      allow create: if isAuthenticated(); // Self-registration allowed for authenticated accounts
       allow update, delete: if isTenantOwner(businessId) || isSuperAdmin();
     }
 
     match /tenants/{tenantId} {
-      allow read: if isAuthenticated() || true;
-      allow create: if isAuthenticated() || true;
+      allow read: if isAuthenticated() && (isTenantMember(tenantId) || isSuperAdmin());
+      allow create: if isAuthenticated();
       allow update, delete: if isTenantOwner(tenantId) || isSuperAdmin();
     }
 
@@ -67,10 +66,12 @@ service cloud.firestore {
       );
     }
 
-    // Users Collection (Adding/Deleting/Modifying staff restricted to Business Owner & Super Admin)
+    // Users Collection (Strict Tenant Isolation & Self-Profile Protection)
     match /users/{userId} {
-      allow read: if isAuthenticated() || true; // Public read for lookup during login
-      allow create: if isAuthenticated() || true; // Tenant creation & owner-created staff
+      allow read: if isUserSelf(userId) || isSuperAdmin() || (
+        isAuthenticated() && resource.data.businessId != null && isTenantMember(resource.data.businessId)
+      );
+      allow create: if isAuthenticated(); // Registration and admin-invited staff creation
       allow update: if isSuperAdmin() || (
         isUserSelf(userId) && request.resource.data.role == resource.data.role
       ) || (
@@ -240,11 +241,35 @@ service cloud.firestore {
     }
 
     match /notifications/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        resource.data.businessId == null ||
+        isTenantMember(resource.data.businessId) ||
+        isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.businessId == null ||
+        isTenantMember(request.resource.data.businessId) ||
+        isSuperAdmin()
+      );
+      allow update, delete: if isAuthenticated() && (
+        resource.data.businessId == null ||
+        isTenantMember(resource.data.businessId) ||
+        isSuperAdmin()
+      );
     }
 
     match /activities/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        resource.data.businessId == null ||
+        isTenantMember(resource.data.businessId) ||
+        isSuperAdmin()
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.businessId == null ||
+        isTenantMember(request.resource.data.businessId) ||
+        isSuperAdmin()
+      );
+      allow update, delete: if isSuperAdmin();
     }
 
     match /manualSyncLogs/{docId} {
