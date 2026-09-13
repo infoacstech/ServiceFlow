@@ -32,6 +32,7 @@ import {
   Sparkles,
   Edit2,
   Check,
+  ChevronDown,
   MoreVertical,
   Receipt,
   FileText,
@@ -539,31 +540,34 @@ export const JobsView: React.FC<JobsViewProps> = ({
   };
 
   return (
-    <div className="space-y-3.5 sm:space-y-4 pb-8 animate-in fade-in">
-      {/* Compact Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 px-4 py-3.5 sm:px-5 sm:py-4 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100/60 dark:border-indigo-900/40 shadow-2xs">
+    <div className="space-y-3 sm:space-y-3.5 pb-24 sm:pb-8 animate-in fade-in">
+      {/* 1. Compact Header */}
+      <div className="bg-white dark:bg-slate-900 px-3.5 py-3 sm:px-5 sm:py-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-2.5 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-4">
+        {/* Left: Icon + Title + Description */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-100/60 dark:border-indigo-900/40 shadow-2xs">
             <Briefcase className="w-4 h-4" />
           </div>
-          <div>
-            <h1 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2 tracking-tight">
-              Job Management Board <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full font-mono">({jobs.length})</span>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-slate-100 tracking-tight leading-tight truncate">
+              Job Management Board
             </h1>
-            <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
-              Dispatch field technicians, track multi-stage status, & capture site reports
+            <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 leading-tight mt-0.5 truncate">
+              Dispatch technicians, track job status & capture site reports
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl shrink-0">
+        {/* Right: Board/List Toggle + Create Job Ticket CTA */}
+        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+          {/* Board/List Toggle */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl shrink-0 h-9">
             <button
               type="button"
               onClick={() => setViewMode('board')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`h-8 px-2.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 viewMode === 'board'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
                   : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
               }`}
             >
@@ -573,9 +577,9 @@ export const JobsView: React.FC<JobsViewProps> = ({
             <button
               type="button"
               onClick={() => setViewMode('list')}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`h-8 px-2.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 viewMode === 'list'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
                   : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
               }`}
             >
@@ -584,210 +588,231 @@ export const JobsView: React.FC<JobsViewProps> = ({
             </button>
           </div>
 
+          {/* Primary CTA: Create Job Ticket */}
           <button
             type="button"
             onClick={() => setIsCreateModalOpen(true)}
-            className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all shadow-xs active:scale-95 cursor-pointer"
+            className="flex-1 sm:flex-none h-9 justify-center flex items-center gap-1.5 px-3.5 sm:px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all shadow-xs active:scale-95 cursor-pointer whitespace-nowrap"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>{t('jobs.createJob', undefined, 'Create Job')}</span>
+            <Plus className="w-3.5 h-3.5 shrink-0" />
+            <span>Create Job Ticket</span>
           </button>
         </div>
       </div>
 
       {/* Compact Mobile-First Filters Section */}
       <div className="flex flex-col gap-2">
-        {/* 1. Date Filter Row - Single Horizontal Scrollable Row */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5 w-full flex-nowrap">
-          {[
-            { id: 'today', label: t('common.today', undefined, 'Today') },
-            { id: 'last_7_days', label: t('jobs.last7Days', undefined, 'Last 7 Days') },
-            { id: 'this_month', label: t('jobs.thisMonth', undefined, 'This Month') },
-            { id: 'all', label: t('jobs.allHistory', undefined, 'All History') },
-          ].map((preset) => {
-            const isActive = dateRange.preset === preset.id;
-            return (
-              <button
-                key={preset.id}
-                type="button"
-                onClick={() => setDateRange(getPresetDates(preset.id))}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
-                  isActive
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
-              >
-                {preset.label}
-              </button>
-            );
-          })}
+        {/* 2. Date Filter Row - Smooth Horizontal Scroll with edge padding */}
+        <div className="w-full overflow-hidden">
+          <div className="flex items-center gap-2 overflow-x-auto scroll-smooth scrollbar-none py-0.5 px-1 -mx-1 w-full flex-nowrap touch-pan-x">
+            {[
+              { id: 'today', label: t('common.today', undefined, 'Today') },
+              { id: 'last_7_days', label: t('jobs.last7Days', undefined, 'Last 7 Days') },
+              { id: 'this_month', label: t('jobs.thisMonth', undefined, 'This Month') },
+              { id: 'all', label: t('jobs.allHistory', undefined, 'All History') },
+            ].map((preset) => {
+              const isActive = dateRange.preset === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => setDateRange(getPresetDates(preset.id))}
+                  className={`h-8 px-3.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center justify-center whitespace-nowrap select-none ${
+                    isActive
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200/90 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
 
-          <div className="shrink-0">
-            <DateRangePicker value={dateRange} onChange={setDateRange} align="right" />
+            <div className="shrink-0 pr-1">
+              <DateRangePicker value={dateRange} onChange={setDateRange} align="right" compact />
+            </div>
           </div>
         </div>
 
-        {/* 2. Full Width Search Bar */}
+        {/* 3. Full Width Search Bar */}
         <div className="relative w-full">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('jobs.searchPlaceholder', undefined, 'Search Job ID, Customer Name, Mobile Number, Service...')}
-            className="w-full pl-9 pr-8 py-2 bg-white dark:bg-slate-900 rounded-xl font-medium text-slate-800 dark:text-slate-200 placeholder:text-slate-400 border border-slate-200/90 dark:border-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all text-xs shadow-2xs"
+            placeholder="Search jobs, customers, technicians..."
+            className="w-full h-9 pl-9 pr-8 bg-white dark:bg-slate-900 rounded-xl font-medium text-slate-800 dark:text-slate-200 placeholder:text-slate-400 border border-slate-200/90 dark:border-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all text-xs shadow-2xs"
           />
           {search && (
             <button
               type="button"
               onClick={() => setSearch('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
+              title="Clear search"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
 
-        {/* 3. Status, Priority & Staff Filter Row - Single Horizontal Scrollable Row */}
-        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none pb-0.5 w-full flex-nowrap">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className={`px-3 py-1.5 rounded-xl font-bold text-xs shrink-0 cursor-pointer shadow-2xs transition-all ${
-              statusFilter !== 'all'
-                ? 'bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-500 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500/30'
-                : 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-            }`}
-          >
-            <option value="all">{t('jobs.allStatus', undefined, 'All Statuses')}</option>
-            <option value="pending_active">{t('jobs.pendingActive', undefined, 'Pending / Active')}</option>
-            {statuses.map((s) => (
-              <option key={s} value={s}>
-                {s.replace('_', ' ').toUpperCase()}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            className={`px-3 py-1.5 rounded-xl font-bold text-xs shrink-0 cursor-pointer shadow-2xs transition-all ${
-              priorityFilter !== 'all'
-                ? 'bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-500 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500/30'
-                : 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-            }`}
-          >
-            <option value="all">{t('jobs.allPriorities', undefined, 'All Priorities')}</option>
-            <option value="urgent_high">{t('jobs.urgentHigh', undefined, 'Urgent & High')}</option>
-            <option value="urgent">{t('jobs.urgent', undefined, 'Urgent')}</option>
-            <option value="high">{t('jobs.high', undefined, 'High')}</option>
-            <option value="medium">{t('jobs.medium', undefined, 'Medium')}</option>
-            <option value="low">{t('jobs.low', undefined, 'Low')}</option>
-          </select>
-
-          <select
-            value={staffFilter}
-            onChange={(e) => setStaffFilter(e.target.value)}
-            className={`px-3 py-1.5 rounded-xl font-bold text-xs shrink-0 max-w-[150px] truncate cursor-pointer shadow-2xs transition-all ${
-              staffFilter !== 'all'
-                ? 'bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-500 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500/30'
-                : 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-            }`}
-          >
-            <option value="all">{t('jobs.allStaff', undefined, 'All Staff')}</option>
-            {staff.map((st) => (
-              <option key={st.id} value={st.id}>
-                {st.name}
-              </option>
-            ))}
-          </select>
-
-          {(statusFilter !== 'all' || priorityFilter !== 'all' || staffFilter !== 'all') && (
-            <button
-              type="button"
-              onClick={() => {
-                setStatusFilter('all');
-                setPriorityFilter('all');
-                setStaffFilter('all');
-              }}
-              className="px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 hover:bg-rose-100 dark:hover:bg-rose-900/40 shrink-0 cursor-pointer flex items-center gap-1 transition-all"
-              title="Reset Status, Priority & Staff filters"
+        {/* 4. Balanced 3-Column Filter Dropdowns */}
+        <div className="grid grid-cols-3 gap-2 w-full">
+          {/* Status Dropdown */}
+          <div className="relative w-full min-w-0">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className={`w-full h-8.5 pl-2.5 pr-6 rounded-xl font-semibold text-[11px] sm:text-xs appearance-none cursor-pointer shadow-2xs transition-all truncate ${
+                statusFilter !== 'all'
+                  ? 'bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-500 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500/30 font-bold'
+                  : 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+              }`}
             >
-              <X className="w-3 h-3" /> {t('common.reset', undefined, 'Reset')}
-            </button>
-          )}
+              <option value="all">{t('jobs.allStatus', undefined, 'All Statuses')}</option>
+              <option value="pending_active">{t('jobs.pendingActive', undefined, 'Pending / Active')}</option>
+              {statuses.map((s) => (
+                <option key={s} value={s}>
+                  {s.replace('_', ' ').toUpperCase()}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none shrink-0" />
+          </div>
+
+          {/* Priority Dropdown */}
+          <div className="relative w-full min-w-0">
+            <select
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value)}
+              className={`w-full h-8.5 pl-2.5 pr-6 rounded-xl font-semibold text-[11px] sm:text-xs appearance-none cursor-pointer shadow-2xs transition-all truncate ${
+                priorityFilter !== 'all'
+                  ? 'bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-500 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500/30 font-bold'
+                  : 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+              }`}
+            >
+              <option value="all">{t('jobs.allPriorities', undefined, 'All Priorities')}</option>
+              <option value="urgent_high">{t('jobs.urgentHigh', undefined, 'Urgent & High')}</option>
+              <option value="urgent">{t('jobs.urgent', undefined, 'Urgent')}</option>
+              <option value="high">{t('jobs.high', undefined, 'High')}</option>
+              <option value="medium">{t('jobs.medium', undefined, 'Medium')}</option>
+              <option value="low">{t('jobs.low', undefined, 'Low')}</option>
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none shrink-0" />
+          </div>
+
+          {/* Staff Dropdown */}
+          <div className="relative w-full min-w-0">
+            <select
+              value={staffFilter}
+              onChange={(e) => setStaffFilter(e.target.value)}
+              className={`w-full h-8.5 pl-2.5 pr-6 rounded-xl font-semibold text-[11px] sm:text-xs appearance-none cursor-pointer shadow-2xs transition-all truncate ${
+                staffFilter !== 'all'
+                  ? 'bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-500 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500/30 font-bold'
+                  : 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+              }`}
+            >
+              <option value="all">{t('jobs.allStaff', undefined, 'All Staff')}</option>
+              {staff.map((st) => (
+                <option key={st.id} value={st.id}>
+                  {st.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none shrink-0" />
+          </div>
         </div>
 
-        {/* 4. Active Date & Results Summary Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-indigo-50/60 dark:bg-slate-900/60 rounded-xl border border-indigo-100/80 dark:border-slate-800 text-xs">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              {dateRange.preset === 'today' || (dateRange.startDate && dateRange.startDate === getLocalDateString() && dateRange.endDate === getLocalDateString())
-                ? `Today’s Jobs (${formatDateDisplay(getLocalDateString())})`
-                : dateRange.preset === 'yesterday'
-                ? `Yesterday’s Jobs (${formatDateDisplay(dateRange.startDate)})`
-                : dateRange.startDate && dateRange.endDate && dateRange.startDate === dateRange.endDate
-                ? `Jobs on ${formatDateDisplay(dateRange.startDate)}`
-                : dateRange.preset === 'last_7_days'
-                ? 'Last 7 Days Jobs'
-                : dateRange.preset === 'this_month'
-                ? 'This Month Jobs'
-                : dateRange.preset === 'all' || (!dateRange.startDate && !dateRange.endDate)
-                ? 'All Historical Jobs'
-                : `Jobs (${formatDateDisplay(dateRange.startDate)} to ${formatDateDisplay(dateRange.endDate)})`}
-            </span>
+        {/* 5. Active Date & Results Summary Bar - Compact & Clear Hierarchy */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-indigo-50/70 dark:bg-slate-900/60 rounded-xl border border-indigo-100/80 dark:border-slate-800 text-xs">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-slate-100 min-w-0">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <span className="truncate">
+                {dateRange.preset === 'today' || (dateRange.startDate && dateRange.startDate === getLocalDateString() && dateRange.endDate === getLocalDateString())
+                  ? `Today’s Jobs (${formatDateDisplay(getLocalDateString())})`
+                  : dateRange.preset === 'yesterday'
+                  ? `Yesterday’s Jobs (${formatDateDisplay(dateRange.startDate)})`
+                  : dateRange.startDate && dateRange.endDate && dateRange.startDate === dateRange.endDate
+                  ? `Jobs on ${formatDateDisplay(dateRange.startDate)}`
+                  : dateRange.preset === 'last_7_days'
+                  ? 'Last 7 Days Jobs'
+                  : dateRange.preset === 'this_month'
+                  ? 'This Month Jobs'
+                  : dateRange.preset === 'all' || (!dateRange.startDate && !dateRange.endDate)
+                  ? 'All Historical Jobs'
+                  : `Jobs (${formatDateDisplay(dateRange.startDate)} to ${formatDateDisplay(dateRange.endDate)})`}
+              </span>
+            </div>
+
             <span className="text-slate-300 dark:text-slate-700">•</span>
-            <span className="text-slate-600 dark:text-slate-400 font-semibold">
-              <strong className="text-slate-900 dark:text-slate-100 font-mono">{filteredJobs.length}</strong> total
+
+            <span className="text-slate-600 dark:text-slate-400 font-medium">
+              <strong className="text-slate-900 dark:text-slate-100 font-mono font-bold">{filteredJobs.length}</strong> total
             </span>
-            <span className="text-emerald-700 dark:text-emerald-400 font-medium">
-              (<strong>{filteredJobs.filter((j) => j.status === 'completed' || j.status === 'verified' || j.status === 'closed').length}</strong> Completed)
+
+            <span className="inline-flex items-center text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200/60 dark:border-emerald-800/60 font-mono">
+              ({filteredJobs.filter((j) => j.status === 'completed' || j.status === 'verified' || j.status === 'closed').length} Completed)
             </span>
           </div>
 
-          {/* Prompt if user search has matches in other dates */}
-          {Boolean(search.trim() && dateRange.preset !== 'all' && allHistoryMatchCount > filteredJobs.length) && (
-            <button
-              type="button"
-              onClick={() => setDateRange(getPresetDates('all'))}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-bold shadow-2xs hover:bg-indigo-700 transition-all cursor-pointer shrink-0"
-            >
-              <History className="w-3 h-3" />
-              <span>
-                Found {allHistoryMatchCount} matches across All History — Show All
-              </span>
-            </button>
-          )}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {(statusFilter !== 'all' || priorityFilter !== 'all' || staffFilter !== 'all') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStatusFilter('all');
+                  setPriorityFilter('all');
+                  setStaffFilter('all');
+                }}
+                className="px-2 py-0.5 rounded-lg text-[11px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 hover:bg-rose-100 dark:hover:bg-rose-900/40 shrink-0 cursor-pointer flex items-center gap-1 transition-all"
+                title="Clear filters"
+              >
+                <X className="w-3 h-3" /> Reset
+              </button>
+            )}
+
+            {/* Prompt if user search has matches in other dates */}
+            {Boolean(search.trim() && dateRange.preset !== 'all' && allHistoryMatchCount > filteredJobs.length) && (
+              <button
+                type="button"
+                onClick={() => setDateRange(getPresetDates('all'))}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-600 text-white text-[11px] font-bold shadow-2xs hover:bg-indigo-700 transition-all cursor-pointer shrink-0"
+              >
+                <History className="w-3 h-3" />
+                <span>Show all {allHistoryMatchCount} in History</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
 
-      {/* Board View (Kanban style columns for key workflow stages) */}
+      {/* 6. Board View (Kanban style columns for key workflow stages) */}
       {viewMode === 'board' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5 items-start">
           {[
             {
               stage: 'assigned',
-              title: 'Assigned / Scheduled',
+              title: 'ASSIGNED / SCHEDULED',
               color: 'bg-amber-50 dark:bg-amber-950/50 border-amber-200/80 dark:border-amber-900/60 text-amber-800 dark:text-amber-300',
               dot: 'bg-amber-500',
             },
             {
               stage: 'started',
-              title: 'On Site / Started',
+              title: 'ON SITE / STARTED',
               color: 'bg-blue-50 dark:bg-blue-950/50 border-blue-200/80 dark:border-blue-900/60 text-blue-800 dark:text-blue-300',
               dot: 'bg-blue-500',
             },
             {
               stage: 'in_progress',
-              title: 'In Progress',
+              title: 'IN PROGRESS',
               color: 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-200/80 dark:border-indigo-900/60 text-indigo-800 dark:text-indigo-300',
               dot: 'bg-indigo-500',
             },
             {
               stage: 'completed',
-              title: 'Completed Work',
+              title: 'COMPLETED WORK',
               color: 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200/80 dark:border-emerald-900/60 text-emerald-800 dark:text-emerald-300',
               dot: 'bg-emerald-500',
             },
@@ -806,32 +831,32 @@ export const JobsView: React.FC<JobsViewProps> = ({
             return (
               <div
                 key={col.stage}
-                className={`bg-slate-100/70 dark:bg-slate-900/60 p-2.5 sm:p-3 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 transition-all ${
-                  isEmpty ? 'space-y-2' : 'space-y-2.5'
+                className={`bg-white dark:bg-slate-900 p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs transition-all ${
+                  isEmpty ? 'space-y-1.5' : 'space-y-2.5'
                 }`}
               >
                 {/* Stage Header */}
-                <div className="flex items-center justify-between px-1.5 py-0.5">
+                <div className="flex items-center justify-between px-0.5">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className={`w-2 h-2 rounded-full shrink-0 ${col.dot}`} />
                     <span
-                      className={`text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border truncate ${col.color}`}
+                      className={`text-[10.5px] sm:text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border truncate ${col.color}`}
                     >
                       {col.title}
                     </span>
                   </div>
-                  <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full shadow-2xs border border-slate-200/60 dark:border-slate-700/60">
+                  <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-200/60 dark:border-slate-700/60 shrink-0">
                     {colJobs.length}
                   </span>
                 </div>
 
-                {/* Compact Empty State or Job Cards */}
+                {/* Ultra-compact Empty State or Populated Job Cards */}
                 {isEmpty ? (
-                  <div className="py-3 px-2 text-center text-xs text-slate-400 dark:text-slate-500 font-medium bg-white/60 dark:bg-slate-800/40 rounded-xl sm:rounded-2xl border border-dashed border-slate-200/90 dark:border-slate-800/80 flex items-center justify-center min-h-[46px]">
+                  <div className="py-1.5 px-2 text-center text-[11px] text-slate-400 dark:text-slate-500 font-medium bg-slate-50/70 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-200/70 dark:border-slate-800/70 flex items-center justify-center">
                     No jobs in this stage
                   </div>
                 ) : (
-                  <div className="space-y-2.5">
+                  <div className="space-y-2">
                     {colJobs.map((job) => {
                       const customer = (customers || []).find((c) => c.id === job.customerId);
                       const tech = (staff || []).find((s) => s.id === job.assignedStaffId);
@@ -840,7 +865,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
                         <div
                           key={job.id}
                           onClick={() => setSelectedJob(job)}
-                          className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-md transition-all cursor-pointer space-y-2 group"
+                          className="p-3 sm:p-3.5 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-xs transition-all cursor-pointer space-y-1.5 group"
                         >
                           <div className="flex items-center justify-between gap-1.5">
                             <div className="flex items-center gap-1.5 min-w-0">
@@ -885,7 +910,7 @@ export const JobsView: React.FC<JobsViewProps> = ({
                             {job.description}
                           </div>
 
-                          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                          <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
                             <div className="flex items-center gap-1 min-w-0 max-w-[60%]">
                               <UserCheck className="w-3 h-3 text-indigo-500 shrink-0" />
                               <span className="font-semibold text-slate-700 dark:text-slate-300 truncate">

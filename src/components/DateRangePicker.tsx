@@ -142,6 +142,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   onChange,
   className = '',
   align = 'right',
+  compact = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -192,17 +193,17 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   }, [isOpen]);
 
   const formatDateLabel = (): string => {
+    // If compact mode and a standard preset is already selected in the parent chips bar
+    if (compact && value.preset && ['today', 'yesterday', 'last_7_days', 'this_month', 'all'].includes(value.preset)) {
+      return 'Custom';
+    }
+
     // If a single day is selected (startDate === endDate)
     if (value.startDate && value.endDate && value.startDate === value.endDate) {
       if (value.startDate === todayStr) {
-        return `📅 ${formatDateDisplay(todayStr)}`;
+        return compact ? 'Custom' : `📅 ${formatDateDisplay(todayStr)}`;
       }
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      if (value.startDate === getLocalDateString(yesterday)) {
-        return `📅 ${formatDateDisplay(value.startDate)}`;
-      }
-      return `📅 ${formatDateDisplay(value.startDate)}`;
+      return formatDateDisplay(value.startDate);
     }
 
     if (value.preset && value.preset !== 'custom') {
@@ -362,7 +363,9 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
     return days;
   }, [navYear, navMonth, todayStr, value.startDate, value.endDate]);
 
-  const hasFilter = Boolean(value.startDate || value.endDate || (value.preset && value.preset !== 'all'));
+  const isCustomActive = compact
+    ? Boolean(value.preset === 'custom' || (!['today', 'yesterday', 'last_7_days', 'this_month', 'all'].includes(value.preset || '') && (value.startDate || value.endDate)))
+    : Boolean(value.startDate || value.endDate || (value.preset && value.preset !== 'all'));
 
   return (
     <div className={`relative inline-block ${className}`} ref={dropdownRef}>
@@ -371,8 +374,8 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
         type="button"
         id="jobs-date-picker-trigger"
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold border transition-all shrink-0 cursor-pointer shadow-2xs select-none ${
-          hasFilter
+        className={`flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-bold border transition-all shrink-0 cursor-pointer shadow-2xs select-none ${
+          isCustomActive
             ? 'bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600'
             : 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
         }`}
@@ -380,7 +383,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
       >
         <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
         <span className="whitespace-nowrap font-bold tracking-tight">{formatDateLabel()}</span>
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-3 h-3 transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Calendar & Date Picker Dropdown Popover */}
