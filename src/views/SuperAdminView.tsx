@@ -56,9 +56,11 @@ import {
   Zap,
   Filter,
   Calendar,
+  Receipt,
 } from 'lucide-react';
-import { ReferralRecord, ReferralPayoutRequest } from '../types';
+import { ReferralRecord, ReferralPayoutRequest, SubscriptionPayment } from '../types';
 import { ReferralAnalytics } from '../components/ReferralAnalytics';
+import { SubscriptionReceiptModal } from '../components/SubscriptionReceiptModal';
 import { DateRangePicker, DateRange, getLocalDateString, getPresetDates } from '../components/DateRangePicker';
 
 export interface SuperAdminViewProps {
@@ -110,9 +112,18 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
     referralRecords,
     referralPayoutRequests,
     processReferralPayout,
+    subscriptionPayments,
+    verifySubscriptionPayment,
   } = useApp();
 
   const [isCleaningOrphans, setIsCleaningOrphans] = useState(false);
+
+  // SaaS Subscription Verification States
+  const [selectedReceiptPayment, setSelectedReceiptPayment] = useState<SubscriptionPayment | null>(null);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('all');
+  const [subscriptionSearchQuery, setSubscriptionSearchQuery] = useState('');
+  const [isVerifyingPaymentId, setIsVerifyingPaymentId] = useState<string | null>(null);
 
   // Exact registered tenant users who belong to active, existing businesses
   const registeredTenantUsers = useMemo(() => {
@@ -133,6 +144,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
   const [activeTabSection, setActiveTabSection] = useState<
     | 'overview'
     | 'approvals'
+    | 'subscriptions'
     | 'tenants'
     | 'analytics'
     | 'referrals'
@@ -171,6 +183,11 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         setActiveTabSection('tenants');
         setTenantStatusFilter('suspended');
         break;
+      case 'super_admin_subscriptions':
+      case 'super_admin_billing':
+      case 'super_admin_payments':
+        setActiveTabSection('subscriptions');
+        break;
       case 'super_admin_analytics':
         setActiveTabSection('analytics');
         break;
@@ -208,6 +225,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
     section:
       | 'overview'
       | 'approvals'
+      | 'subscriptions'
       | 'tenants'
       | 'analytics'
       | 'referrals'
@@ -227,6 +245,9 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
           break;
         case 'approvals':
           onNavigate('super_admin_pending');
+          break;
+        case 'subscriptions':
+          onNavigate('super_admin_subscriptions');
           break;
         case 'tenants':
           onNavigate('super_admin_tenants');
@@ -656,6 +677,23 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         </button>
 
         <button
+          onClick={() => handleSwitchTabSection('subscriptions')}
+          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
+            activeTabSection === 'subscriptions'
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Receipt className="w-4 h-4" />
+          <span>SaaS Payments & UTR</span>
+          {subscriptionPayments.filter((p) => p.status === 'pending').length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-amber-500 text-white animate-pulse">
+              {subscriptionPayments.filter((p) => p.status === 'pending').length}
+            </span>
+          )}
+        </button>
+
+        <button
           onClick={() => {
             handleSwitchTabSection('tenants');
             setTenantStatusFilter('all');
@@ -715,7 +753,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         </button>
 
         {/* Secondary section active indicator when navigated via sidebar */}
-        {!['overview', 'approvals', 'tenants', 'analytics', 'referrals', 'audit'].includes(activeTabSection) && (
+        {!['overview', 'approvals', 'subscriptions', 'tenants', 'analytics', 'referrals', 'audit'].includes(activeTabSection) && (
           <div className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-600/15 border border-purple-500/30 text-purple-700 dark:text-purple-300 font-bold text-xs shrink-0">
             <span className="capitalize">
               {activeTabSection === 'support' && 'Audited Support View'}
@@ -1786,6 +1824,297 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* SECTION: SaaS Tenant Subscription & Manual UTR Verification Console */}
+      {activeTabSection === 'subscriptions' && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* Header Banner */}
+          <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border border-indigo-700/40 shadow-xl relative overflow-hidden">
+            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-bold uppercase tracking-wider">
+                  <Receipt className="w-3.5 h-3.5" />
+                  <span>SaaS Billing & UTR Audit Console</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight">
+                  Tenant Subscription Payments & Approvals
+                </h2>
+                <p className="text-xs sm:text-sm text-indigo-200/80 max-w-2xl leading-relaxed">
+                  Review incoming UPI QR and Bank Transfer (NEFT/IMPS) UTR numbers submitted by business owners. Verifying a payment immediately upgrades the tenant’s subscription plan, unlocks quota capacities, and issues a formal tax receipt.
+                </p>
+              </div>
+
+              {/* Quick Metrics */}
+              <div className="flex flex-wrap items-center gap-3 shrink-0">
+                <div className="px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10 text-center min-w-[120px]">
+                  <div className="text-xs text-indigo-200 font-medium">Pending UTRs</div>
+                  <div className="text-2xl font-black text-amber-300">
+                    {subscriptionPayments.filter((p) => p.status === 'pending').length}
+                  </div>
+                </div>
+                <div className="px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10 text-center min-w-[120px]">
+                  <div className="text-xs text-indigo-200 font-medium">Verified Payments</div>
+                  <div className="text-2xl font-black text-emerald-300">
+                    {subscriptionPayments.filter((p) => p.status === 'verified').length}
+                  </div>
+                </div>
+                <div className="px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/10 text-center min-w-[130px]">
+                  <div className="text-xs text-indigo-200 font-medium">SaaS Revenue</div>
+                  <div className="text-2xl font-black text-white">
+                    ₹{subscriptionPayments
+                      .filter((p) => p.status === 'verified')
+                      .reduce((acc, curr) => acc + (curr.amount || 0), 0)
+                      .toLocaleString('en-IN')}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Filter Bar & Search */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 w-full sm:w-auto overflow-x-auto">
+              {(['all', 'pending', 'verified', 'rejected'] as const).map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setSubscriptionStatusFilter(st)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold capitalize transition-all cursor-pointer whitespace-nowrap ${
+                    subscriptionStatusFilter === st
+                      ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  {st === 'all' ? 'All Payments' : st}
+                  {st === 'pending' && subscriptionPayments.filter((p) => p.status === 'pending').length > 0 && (
+                    <span className="ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500 text-white font-black">
+                      {subscriptionPayments.filter((p) => p.status === 'pending').length}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search tenant, UTR, receipt..."
+                value={subscriptionSearchQuery}
+                onChange={(e) => setSubscriptionSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 rounded-2xl bg-slate-100 dark:bg-slate-800 border-transparent text-xs focus:bg-white dark:focus:bg-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-slate-900 dark:text-white placeholder-slate-400 outline-hidden transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Payments List */}
+          {(() => {
+            const filteredPayments = subscriptionPayments.filter((p) => {
+              if (subscriptionStatusFilter !== 'all' && p.status !== subscriptionStatusFilter) return false;
+              if (subscriptionSearchQuery.trim()) {
+                const q = subscriptionSearchQuery.toLowerCase();
+                const matchBiz = (p.businessName || '').toLowerCase().includes(q);
+                const matchUtr = (p.utrNumber || '').toLowerCase().includes(q);
+                const matchReceipt = (p.receiptNumber || '').toLowerCase().includes(q);
+                const matchSender = (p.ownerName || '').toLowerCase().includes(q) || (p.ownerPhone || '').includes(q);
+                if (!matchBiz && !matchUtr && !matchReceipt && !matchSender) return false;
+              }
+              return true;
+            });
+
+            if (filteredPayments.length === 0) {
+              return (
+                <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+                    <Receipt className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-black text-sm text-slate-900 dark:text-white">No Subscription Payments Found</h3>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    {subscriptionSearchQuery
+                      ? 'No records match your filter criteria.'
+                      : 'When business tenants upgrade their subscription or purchase add-ons via UPI/Bank Transfer, their UTR submissions will appear here for manual verification.'}
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-3">
+                {filteredPayments.map((p) => {
+                  const targetBiz = businesses.find((b) => b.id === p.businessId);
+                  const isProcessing = isVerifyingPaymentId === p.id;
+
+                  return (
+                    <div
+                      key={p.id}
+                      className={`p-5 rounded-3xl border transition-all bg-white dark:bg-slate-900 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4 ${
+                        p.status === 'pending'
+                          ? 'border-amber-300 dark:border-amber-800/60 bg-amber-50/20 dark:bg-amber-950/10'
+                          : p.status === 'verified'
+                          ? 'border-slate-200/80 dark:border-slate-800'
+                          : 'border-rose-200 dark:border-rose-900/40 bg-rose-50/10 dark:bg-rose-950/10 opacity-75'
+                      }`}
+                    >
+                      {/* Left: Tenant & Plan Info */}
+                      <div className="space-y-1.5 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-black text-base text-slate-900 dark:text-white">
+                            {p.businessName || targetBiz?.name || 'Tenant Business'}
+                          </span>
+                          <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold">
+                            {p.receiptNumber}
+                          </span>
+                          {p.status === 'pending' ? (
+                            <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 font-black text-[10px] uppercase tracking-wider border border-amber-500/30 flex items-center gap-1">
+                              <Clock className="w-3 h-3 animate-spin" /> Pending Verification
+                            </span>
+                          ) : p.status === 'verified' ? (
+                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-black text-[10px] uppercase tracking-wider border border-emerald-500/30 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" /> Verified & Active
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-300 font-black text-[10px] uppercase tracking-wider border border-rose-500/30 flex items-center gap-1">
+                              <X className="w-3 h-3" /> Rejected
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                          <span>
+                            Plan:{' '}
+                            <strong className="text-slate-800 dark:text-slate-200">
+                              {p.planName}
+                            </strong>{' '}
+                            ({p.isAddon ? 'Expansion Add-on' : `${p.billingCycle} billing`})
+                          </span>
+                          <span>•</span>
+                          <span>
+                            Submitted by:{' '}
+                            <strong className="text-slate-700 dark:text-slate-300">{p.ownerName || 'Owner'}</strong>
+                            {p.ownerPhone ? ` (${p.ownerPhone})` : ''}
+                          </span>
+                          <span>•</span>
+                          <span>
+                            {new Date(p.createdAt).toLocaleString('en-IN', {
+                              dateStyle: 'medium',
+                              timeStyle: 'short',
+                            })}
+                          </span>
+                        </div>
+
+                        {p.notes && (
+                          <div className="text-xs bg-slate-50 dark:bg-slate-800/60 p-2 rounded-xl text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
+                            <strong>Note:</strong> {p.notes}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Middle: UTR & Amount */}
+                      <div className="flex flex-wrap items-center gap-4 shrink-0 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-200/60 dark:border-slate-800">
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            UTR / Reference No.
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <code className="font-mono font-black text-sm text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-900/60">
+                              {p.utrNumber}
+                            </code>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(p.utrNumber);
+                                showToast('UTR copied to clipboard', 'success');
+                              }}
+                              className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 cursor-pointer"
+                              title="Copy UTR Number"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="border-l border-slate-200 dark:border-slate-700 pl-4 text-right">
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            Paid Amount
+                          </div>
+                          <div className="text-lg font-black text-slate-900 dark:text-white">
+                            ₹{p.amount.toLocaleString('en-IN')}
+                          </div>
+                          {p.discountAmount ? (
+                            <div className="text-[10px] text-emerald-600 font-bold">
+                              ₹{p.discountAmount} Off
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Right: Actions */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {p.status === 'pending' && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={isProcessing}
+                              onClick={async () => {
+                                setIsVerifyingPaymentId(p.id);
+                                try {
+                                  await verifySubscriptionPayment(p.id, 'verified');
+                                  showToast(`Payment verified! ${p.businessName} upgraded to ${p.planName}.`, 'success');
+                                } catch {
+                                  showToast('Failed to verify payment', 'error');
+                                } finally {
+                                  setIsVerifyingPaymentId(null);
+                                }
+                              }}
+                              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>{isProcessing ? 'Activating...' : 'Verify & Activate'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={isProcessing}
+                              onClick={async () => {
+                                if (!window.confirm(`Reject payment record with UTR ${p.utrNumber}?`)) return;
+                                setIsVerifyingPaymentId(p.id);
+                                try {
+                                  await verifySubscriptionPayment(p.id, 'rejected');
+                                  showToast('Payment rejected.', 'info');
+                                } catch {
+                                  showToast('Failed to reject payment', 'error');
+                                } finally {
+                                  setIsVerifyingPaymentId(null);
+                                }
+                              }}
+                              className="px-3 py-2 rounded-xl border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>Reject</span>
+                            </button>
+                          </>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedReceiptPayment(p);
+                            setIsReceiptModalOpen(true);
+                          }}
+                          className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <Receipt className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>Receipt</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -3584,6 +3913,13 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* SaaS Subscription Tax Receipt Modal */}
+      <SubscriptionReceiptModal
+        isOpen={isReceiptModalOpen}
+        onClose={() => setIsReceiptModalOpen(false)}
+        payment={selectedReceiptPayment}
+      />
     </div>
   );
 };

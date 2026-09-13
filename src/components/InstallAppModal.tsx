@@ -531,6 +531,35 @@ export const InstallAppModal: React.FC<InstallAppModalProps> = ({
                       The official ServiFlow app icon will be added to your Android home screen with pure fullscreen performance!
                     </div>
                   </div>
+
+                  {/* Play Store & TWA Certification Card */}
+                  <div className="mt-3 p-3.5 rounded-2xl bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/40 border border-indigo-200/80 dark:border-indigo-800/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-indigo-900 dark:text-indigo-200">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span>Google Play Store / TWA Certified</span>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-extrabold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                        AssetLinks Active
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                      Package Name: <code className="font-mono font-bold text-indigo-600 dark:text-indigo-400">com.experttechnologies.serviflow</code>. Fully pre-configured with Digital Asset Links (<code className="font-mono text-[10px]">/.well-known/assetlinks.json</code>) for seamless Play Store TWA deployment.
+                    </p>
+                    <div className="flex items-center gap-3 pt-1 border-t border-indigo-200/60 dark:border-indigo-800/60 text-[11px]">
+                      <a
+                        href="/privacy.html"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>Public Privacy Policy</span>
+                      </a>
+                      <span className="text-slate-400">•</span>
+                      <span className="text-slate-500 dark:text-slate-400">Google Play Compliant</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

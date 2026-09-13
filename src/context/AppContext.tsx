@@ -44,6 +44,7 @@ import type {
   AttendanceIssue,
   AttendanceIssueType,
   AppLanguage,
+  SubscriptionPayment,
 } from '../types';
 import {
   SUPPORTED_APP_LANGUAGES,
@@ -82,7 +83,7 @@ import {
   DEMO_REFERRALS,
   DEMO_REFERRAL_PAYOUTS,
 } from '../data/demoData';
-import { checkStaffCapacity, checkMonthlyJobCapacity, getPlanById } from '../utils/planUtils';
+import { checkStaffCapacity, checkMonthlyJobCapacity, getPlanById, getTrialStatus } from '../utils/planUtils';
 import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } from '../lib/firebase';
 import { AuthService } from '../services/AuthService';
 import {
@@ -226,6 +227,19 @@ interface AppContextType {
     transactionReference?: string;
     notes?: string;
   }) => Promise<ReferralPayoutRequest>;
+
+  // Subscription Billing & UTR Payment Engine
+  subscriptionPayments: SubscriptionPayment[];
+  submitSubscriptionPayment: (payment: SubscriptionPayment) => Promise<void>;
+  verifySubscriptionPayment: (paymentId: string, status: 'verified' | 'rejected', notes?: string) => Promise<void>;
+  trialStatus: {
+    isTrial: boolean;
+    isExpired: boolean;
+    daysRemaining: number;
+    trialEndsAt?: string;
+    isPaidActive: boolean;
+    statusLabel: string;
+  };
 
   // Data collections (filtered by current business when applicable)
   enquiries: Enquiry[];
@@ -763,6 +777,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
   const [referralPayoutRequests, setReferralPayoutRequests] = useState<ReferralPayoutRequest[]>(() =>
     loadCache('serviflow_ref_payouts_cache', DEMO_REFERRAL_PAYOUTS)
+  );
+
+  // Subscription Payments & UTR Audit State
+  const [subscriptionPayments, setSubscriptionPayments] = useState<SubscriptionPayment[]>(() =>
+    loadCache('serviflow_sub_payments_cache', [])
   );
 
   // Super Admin Support Access & Security States
@@ -1521,6 +1540,18 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (error) => handleFirestoreError(error, OperationType.GET, 'attendanceIssues')
     );
     unsubs.push(unsubAttendanceIssues);
+
+    // 27. Subscription Payments & UTR Submissions
+    const unsubSubPayments = onSnapshot(
+      getTenantQuery('subscriptionPayments'),
+      (snapshot) => {
+        const cloudItems = snapshot.docs.map((d) => d.data() as SubscriptionPayment);
+        setSubscriptionPayments(cloudItems);
+        saveCache('serviflow_sub_payments_cache', cloudItems);
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'subscriptionPayments')
+    );
+    unsubs.push(unsubSubPayments);
 
     return () => {
       unsubs.forEach((u) => u());
@@ -5427,6 +5458,92 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return payoutReq;
   };
 
+  // Subscription Billing & UTR Submission Handlers
+  const submitSubscriptionPayment = async (payment: SubscriptionPayment): Promise<void> => {
+    await saveToFirestore('subscriptionPayments', payment.id, payment);
+    setSubscriptionPayments((prev) => [payment, ...prev.filter((p) => p.id !== payment.id)]);
+    saveCache('serviflow_sub_payments_cache', [payment, ...subscriptionPayments]);
+
+    // Update business subscriptionStatus to pending_verification (so UI reflects submitted UTR)
+    if (currentBusiness?.id === payment.businessId) {
+      const updates: Partial<Business> = {
+        subscriptionStatus: 'pending_verification',
+      };
+      await saveToFirestore('businesses', payment.businessId, updates);
+      setCurrentBusiness((prev) => (prev ? { ...prev, ...updates } : null));
+    }
+
+    logActivity(
+      'Subscription Payment Submitted',
+      'financials',
+      payment.id,
+      `Tenant ${payment.businessName} submitted ₹${payment.netPayable} for ${payment.planName} (UTR: ${payment.utrNumber})`
+    );
+  };
+
+  const verifySubscriptionPayment = async (
+    paymentId: string,
+    status: 'verified' | 'rejected',
+    notes?: string
+  ): Promise<void> => {
+    const payment = subscriptionPayments.find((p) => p.id === paymentId);
+    if (!payment) return;
+
+    const now = new Date();
+    const updates: Partial<SubscriptionPayment> = {
+      status,
+      verifiedAt: now.toISOString(),
+      verifiedBy: currentUser?.name || 'Platform Super Admin',
+      notes: notes || payment.notes,
+    };
+
+    await saveToFirestore('subscriptionPayments', paymentId, updates);
+    setSubscriptionPayments((prev) =>
+      prev.map((p) => (p.id === paymentId ? { ...p, ...updates } : p))
+    );
+
+    if (status === 'verified') {
+      const targetBiz = businesses.find((b) => b.id === payment.businessId) || currentBusiness;
+      if (targetBiz) {
+        let bizUpdates: Partial<Business> = {};
+        if (payment.isAddon) {
+          if (payment.addonType === 'staff_pack') {
+            bizUpdates.addonStaff = (targetBiz.addonStaff || 0) + 5;
+          } else if (payment.addonType === 'whatsapp_pack') {
+            bizUpdates.addonWhatsappQuota = (targetBiz.addonWhatsappQuota || 0) + 1000;
+          }
+        } else {
+          // Plan Upgrade
+          const expiryDate = new Date();
+          if (payment.billingCycle === 'yearly') {
+            expiryDate.setDate(expiryDate.getDate() + 365);
+          } else {
+            expiryDate.setDate(expiryDate.getDate() + 30);
+          }
+          bizUpdates = {
+            planId: payment.planId,
+            plan: payment.planName.replace(' Plan', ''),
+            status: 'active',
+            subscriptionStatus: 'active',
+            billingCycle: payment.billingCycle,
+            subscriptionExpiresAt: expiryDate.toISOString(),
+          };
+        }
+
+        await saveToFirestore('businesses', targetBiz.id, bizUpdates);
+        setBusinesses((prev) =>
+          prev.map((b) => (b.id === targetBiz.id ? { ...b, ...bizUpdates } : b))
+        );
+        if (currentBusiness?.id === targetBiz.id) {
+          setCurrentBusiness((prev) => (prev ? { ...prev, ...bizUpdates } : null));
+        }
+      }
+      showToast(`Payment ${paymentId} verified and plan benefits activated!`, 'success');
+    } else {
+      showToast(`Payment ${paymentId} marked as rejected.`, 'info');
+    }
+  };
+
   const updateBusinessSettings = async (updates: Partial<Business>): Promise<void> => {
     const perm = canManageBusinessSettings(currentUser);
     if (!perm.allowed) {
@@ -6481,6 +6598,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createManualReferralLink,
         deleteReferralRecord,
         settleReferralBonusDirectly,
+
+        // Subscription Billing & UTR Engine
+        subscriptionPayments,
+        submitSubscriptionPayment,
+        verifySubscriptionPayment,
+        trialStatus: getTrialStatus(currentBusiness),
 
         // Attendance & GPS Verification Module
         attendanceRecords: filteredAttendanceRecords,

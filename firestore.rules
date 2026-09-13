@@ -354,5 +354,10 @@ service cloud.firestore {
     match /referralPayouts/{payoutId} {
       allow read, write: if isAuthenticated();
     }
+
+    // Subscription Billing & UTR Payments
+    match /subscriptionPayments/{paymentId} {
+      allow read, write: if isAuthenticated();
+    }
   }
 }

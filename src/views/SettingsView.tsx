@@ -62,10 +62,13 @@ import {
   Upload,
   Image as ImageIcon,
   Loader2,
+  Receipt,
 } from 'lucide-react';
 import { InstallAppModal } from '../components/InstallAppModal';
-import { calculateAnnualPricing } from '../utils/planUtils';
-import { Plan } from '../types';
+import { SubscriptionCheckoutModal } from '../components/SubscriptionCheckoutModal';
+import { SubscriptionReceiptModal } from '../components/SubscriptionReceiptModal';
+import { calculateAnnualPricing, ADDON_PACKS, AddonPack } from '../utils/planUtils';
+import { Plan, SubscriptionPayment } from '../types';
 import { clearAppCache } from '../utils/cacheUtils';
 import {
   isVoiceNotificationEnabled,
@@ -107,7 +110,15 @@ export const SettingsView: React.FC = () => {
     setLanguage,
     t,
     supportedLanguages,
+    trialStatus,
+    subscriptionPayments,
   } = useApp();
+
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [selectedCheckoutPlan, setSelectedCheckoutPlan] = useState<Plan | null>(null);
+  const [selectedCheckoutAddon, setSelectedCheckoutAddon] = useState<AddonPack | null>(null);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [selectedReceiptPayment, setSelectedReceiptPayment] = useState<SubscriptionPayment | null>(null);
 
   const isSuperAdmin = currentUser?.role === 'super_admin';
   const isOwner = currentUser?.role === 'business_owner';
@@ -447,14 +458,15 @@ export const SettingsView: React.FC = () => {
   };
 
   const handlePlanUpgrade = (plan: Plan) => {
-    setIsUpgradingPlan(true);
-    setTimeout(() => {
-      updateBusinessProfile({ planId: plan.id });
-      setIsUpgradingPlan(false);
-      playNotificationChime();
-      playCustomVoiceNotification(`Subscription updated to ${plan.name} plan.`);
-      showToast(`Subscription upgraded to ${plan.name} (${billingCycle === 'yearly' ? 'Annual' : 'Monthly'})!`, 'success');
-    }, 600);
+    setSelectedCheckoutPlan(plan);
+    setSelectedCheckoutAddon(null);
+    setIsCheckoutModalOpen(true);
+  };
+
+  const handleBuyAddon = (addon: AddonPack) => {
+    setSelectedCheckoutAddon(addon);
+    setSelectedCheckoutPlan(null);
+    setIsCheckoutModalOpen(true);
   };
 
   const currentPlan =
@@ -1125,14 +1137,28 @@ export const SettingsView: React.FC = () => {
           {/* Active Subscription Summary Card */}
           <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border border-indigo-900/60 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1.5">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-extrabold text-[10px] uppercase tracking-wider border border-emerald-500/30">
-                <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Active SaaS Subscription
-              </div>
+              {currentBusiness.subscriptionStatus === 'pending_verification' ? (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-extrabold text-[10px] uppercase tracking-wider border border-amber-500/30">
+                  <Clock className="w-3 h-3 text-amber-400 animate-spin" /> Payment Verification Pending
+                </div>
+              ) : trialStatus.isExpired ? (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-extrabold text-[10px] uppercase tracking-wider border border-rose-500/30">
+                  <AlertTriangle className="w-3 h-3 text-rose-400" /> 14-Day Trial Expired
+                </div>
+              ) : trialStatus.isTrial ? (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-extrabold text-[10px] uppercase tracking-wider border border-indigo-500/30">
+                  <Sparkles className="w-3 h-3 text-indigo-400" /> 14-Day Free Trial ({trialStatus.daysRemaining} days remaining)
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-extrabold text-[10px] uppercase tracking-wider border border-emerald-500/30">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Active Paid SaaS Subscription
+                </div>
+              )}
               <h2 className="text-xl font-black tracking-tight">
                 {currentBusiness.name} • {currentPlan.name} Tier
               </h2>
               <p className="text-xs text-indigo-200/80">
-                Capacity: Up to {currentPlan.maxStaff >= 999 ? 'Unlimited' : currentPlan.maxStaff} staff technicians & {currentPlan.maxJobs >= 9999 ? 'Unlimited' : currentPlan.maxJobs} jobs/month
+                Capacity: Up to {currentPlan.maxStaff + (currentBusiness.addonStaff || 0) >= 999 ? 'Unlimited' : currentPlan.maxStaff + (currentBusiness.addonStaff || 0)} staff technicians {currentBusiness.addonStaff ? `(${currentBusiness.addonStaff} add-on)` : ''} & {currentPlan.maxJobs >= 9999 ? 'Unlimited' : currentPlan.maxJobs} jobs/month
               </p>
             </div>
 
@@ -1382,6 +1408,108 @@ export const SettingsView: React.FC = () => {
                 );
               })}
             </div>
+          </div>
+
+          {/* Subscription Payment Receipts & UTR History Section */}
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h4 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  <Receipt className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>Subscription Invoices & Payment History</span>
+                </h4>
+                <p className="text-xs text-slate-500">
+                  Track your UTR payment verifications and download official tax receipts
+                </p>
+              </div>
+            </div>
+
+            {subscriptionPayments.filter((p) => p.businessId === currentBusiness.id).length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+                <Receipt className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                <p className="font-semibold">No payment history recorded yet.</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">When you upgrade your plan or purchase add-ons, your payment receipts will appear here.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 border-b border-slate-200 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-4">Receipt / Date</th>
+                      <th className="py-3 px-4">Plan / Addon</th>
+                      <th className="py-3 px-4">UTR Number</th>
+                      <th className="py-3 px-4 text-right">Amount</th>
+                      <th className="py-3 px-4 text-center">Status</th>
+                      <th className="py-3 px-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                    {subscriptionPayments
+                      .filter((p) => p.businessId === currentBusiness.id)
+                      .map((p) => (
+                        <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-slate-900 dark:text-white font-mono text-[11px]">
+                              {p.receiptNumber}
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              {new Date(p.createdAt).toLocaleDateString('en-IN', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-bold text-slate-800 dark:text-slate-200">
+                              {p.planName}
+                            </div>
+                            <div className="text-[10px] text-slate-400 capitalize">
+                              {p.isAddon ? 'Expansion Add-on' : `${p.billingCycle} Billing`}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold">
+                              {p.utrNumber}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right font-black text-slate-900 dark:text-white">
+                            ₹{p.amount.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {p.status === 'verified' ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-[10px] font-extrabold uppercase">
+                                <CheckCircle2 className="w-3 h-3" /> Verified
+                              </span>
+                            ) : p.status === 'rejected' ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-400 text-[10px] font-extrabold uppercase">
+                                <X className="w-3 h-3" /> Rejected
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 text-[10px] font-extrabold uppercase">
+                                <Clock className="w-3 h-3 animate-spin" /> Verifying
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedReceiptPayment(p);
+                                setIsReceiptModalOpen(true);
+                              }}
+                              className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
+                            >
+                              <Receipt className="w-3 h-3" />
+                              <span>Receipt</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2731,6 +2859,26 @@ export const SettingsView: React.FC = () => {
       <InstallAppModal
         isOpen={isInstallModalOpen}
         onClose={() => setIsInstallModalOpen(false)}
+      />
+
+      {/* SaaS Subscription Checkout Modal */}
+      <SubscriptionCheckoutModal
+        isOpen={isCheckoutModalOpen}
+        onClose={() => setIsCheckoutModalOpen(false)}
+        plan={selectedCheckoutPlan}
+        addon={selectedCheckoutAddon}
+        defaultBillingCycle={billingCycle}
+        onViewReceipt={(payment) => {
+          setSelectedReceiptPayment(payment);
+          setIsReceiptModalOpen(true);
+        }}
+      />
+
+      {/* Subscription Official Receipt Modal */}
+      <SubscriptionReceiptModal
+        isOpen={isReceiptModalOpen}
+        onClose={() => setIsReceiptModalOpen(false)}
+        payment={selectedReceiptPayment}
       />
     </div>
   );

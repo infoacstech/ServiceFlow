@@ -19,6 +19,7 @@ import { QuickActionFab } from './components/QuickActionFab';
 import { UserProfileDrawer } from './components/UserProfileDrawer';
 import { InstallAppModal } from './components/InstallAppModal';
 import { PwaInstallPrompt } from './components/PwaInstallPrompt';
+import { TrialStatusBanner } from './components/TrialStatusBanner';
 
 import type { JobInitialFilter } from './views/JobsView';
 import type { InvoiceInitialFilter } from './views/InvoicesView';
@@ -343,6 +344,11 @@ const MainContent: React.FC = () => {
         onOpenOnboarding={() => setIsOnboardingOpen(true)}
         activeTab={activeTab}
         setActiveTab={handleTabChange}
+      />
+
+      {/* SaaS Trial & Subscription Status Banner */}
+      <TrialStatusBanner
+        onUpgradeClick={() => handleTabChange('settings_subscription')}
       />
 
       {/* Main Workspace Layout */}

@@ -1,6 +1,49 @@
-import { Plan } from '../types';
+import { Plan, Business } from '../types';
 
 export const ANNUAL_DISCOUNT_PERCENT = 20;
+
+export interface AddonPack {
+  id: 'addon-staff-5' | 'addon-whatsapp-1000';
+  name: string;
+  type: 'staff_pack' | 'whatsapp_pack';
+  price: number;
+  yearlyPrice?: number;
+  description: string;
+  capacityIncrease: number;
+  badge?: string;
+}
+
+export const ADDON_PACKS: AddonPack[] = [
+  {
+    id: 'addon-staff-5',
+    name: '+5 Technicians Capacity Pack',
+    type: 'staff_pack',
+    price: 199,
+    yearlyPrice: 1910,
+    description: 'Add 5 extra technician & staff logins without upgrading to a higher plan tier',
+    capacityIncrease: 5,
+    badge: 'FLEXIBLE CAPACITY',
+  },
+  {
+    id: 'addon-whatsapp-1000',
+    name: '1,000 Automated WhatsApp Alerts Pack',
+    type: 'whatsapp_pack',
+    price: 299,
+    yearlyPrice: 2870,
+    description: '1,000 automated WhatsApp message credits for job bookings, status alerts & invoice PDFs',
+    capacityIncrease: 1000,
+    badge: 'CUSTOMER ENGAGEMENT',
+  },
+];
+
+export const SAAS_UPI_CONFIG = {
+  vpa: 'uniquesolutions108@okhdfcbank',
+  payeeName: 'ServiFlow SaaS Software',
+  bankName: 'HDFC Bank',
+  accountNumber: '50200084920194',
+  ifscCode: 'HDFC0001234',
+  accountHolder: 'Unique Solutions ServiFlow',
+};
 
 export const PLANS: Plan[] = [
   {
@@ -40,15 +83,13 @@ export const PLANS: Plan[] = [
     targetAudience: 'For growing service teams',
     features: [
       'Everything in Starter, plus:',
-      'Advanced Enquiry Management',
-      'Advanced Follow-up Management',
-      'Advanced Quotations',
-      'Customer Portal',
-      'Advanced Job Scheduling',
-      'Technician/Staff Management',
+      'AI Smart Dispatch & Routing Assistant',
+      'AMC & Preventive Maintenance Contracts',
+      'Automated WhatsApp Customer Alerts',
+      'Advanced Enquiry & Follow-up Pipeline',
+      'Customer Portal with Live Tracking',
+      'Advanced Scheduling & Priority Support',
       'Advanced Reports & Analytics',
-      'Customer Notifications',
-      'Priority Support',
     ],
   },
   {
@@ -63,12 +104,12 @@ export const PLANS: Plan[] = [
     targetAudience: 'For larger service operations',
     features: [
       'Everything in Professional, plus:',
-      'Multi-location support',
-      'Higher operational limits',
-      'Advanced staff controls',
-      'Advanced business reports',
-      'Priority support',
-      'Additional business-level controls',
+      'Multi-location & branch support',
+      'Enterprise Audit Trail & CSV Export',
+      'Unlimited WhatsApp automated queue',
+      'Higher operational quotas',
+      'Priority VIP Dedicated Support',
+      'Custom invoice letterheads & branding',
     ],
   },
 ];
@@ -108,19 +149,145 @@ export function calculateAnnualPricing(monthlyPrice: number) {
 }
 
 /**
- * Check if adding a staff member exceeds the plan limit
+ * Feature Gating Definition
  */
-export function checkStaffCapacity(currentStaffCount: number, planIdOrName?: string) {
+export type FeatureKey =
+  | 'ai_assistant'
+  | 'amc_contracts'
+  | 'customer_portal'
+  | 'whatsapp_automation'
+  | 'audit_export';
+
+/**
+ * Check if a specific feature is unlocked on the tenant's current plan
+ */
+export function isFeatureAllowed(feature: FeatureKey, planIdOrName?: string): boolean {
   const plan = getPlanById(planIdOrName);
-  const isAllowed = currentStaffCount < plan.maxStaff;
+  if (plan.id === 'plan-biz') return true;
+  if (plan.id === 'plan-pro') {
+    return feature !== 'audit_export';
+  }
+  // Starter tier features allowed:
+  return feature === 'customer_portal';
+}
+
+/**
+ * Get requirement description for locked features
+ */
+export function getFeatureRequirement(feature: FeatureKey): {
+  requiredPlan: 'Professional' | 'Business';
+  title: string;
+  description: string;
+} {
+  switch (feature) {
+    case 'ai_assistant':
+      return {
+        requiredPlan: 'Professional',
+        title: 'AI Smart Dispatch Assistant',
+        description: 'AI-driven technician dispatch, intelligent job notes, and voice assistance require the Professional or Business plan.',
+      };
+    case 'amc_contracts':
+      return {
+        requiredPlan: 'Professional',
+        title: 'AMC & Maintenance Contracts',
+        description: 'Manage recurring AMC contracts, scheduled visits, and automatic renewals with the Professional plan.',
+      };
+    case 'whatsapp_automation':
+      return {
+        requiredPlan: 'Professional',
+        title: 'Automated WhatsApp Customer Alerts',
+        description: 'Send automated invoice receipts, technician dispatch alerts, and job completion notices via WhatsApp.',
+      };
+    case 'audit_export':
+      return {
+        requiredPlan: 'Business',
+        title: 'Enterprise Audit Trail & CSV Export',
+        description: 'Complete compliance audit logs and full system CSV export require the Business plan.',
+      };
+    default:
+      return {
+        requiredPlan: 'Professional',
+        title: 'Premium SaaS Feature',
+        description: 'Upgrade your subscription to unlock this feature for your team.',
+      };
+  }
+}
+
+/**
+ * Calculate 14-Day Free Trial Status
+ */
+export function getTrialStatus(business?: Business | null): {
+  isTrial: boolean;
+  isExpired: boolean;
+  daysRemaining: number;
+  trialEndsAt?: string;
+  isPaidActive: boolean;
+  statusLabel: string;
+} {
+  if (!business) {
+    return {
+      isTrial: false,
+      isExpired: false,
+      daysRemaining: 0,
+      isPaidActive: true,
+      statusLabel: 'Active',
+    };
+  }
+
+  const isPaidActive = business.subscriptionStatus === 'active';
+
+  if (isPaidActive) {
+    return {
+      isTrial: false,
+      isExpired: false,
+      daysRemaining: 0,
+      isPaidActive: true,
+      statusLabel: 'Paid Active',
+    };
+  }
+
+  // Calculate 14-day trial window based on creation date or trialEndsAt
+  const createdAtMs = business.createdAt ? new Date(business.createdAt).getTime() : Date.now();
+  const trialEndsMs = business.trialEndsAt
+    ? new Date(business.trialEndsAt).getTime()
+    : createdAtMs + 14 * 24 * 60 * 60 * 1000;
+
+  const nowMs = Date.now();
+  const diffMs = trialEndsMs - nowMs;
+  const daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+  const isExpired = diffMs <= 0;
+
+  return {
+    isTrial: !isPaidActive && !isExpired,
+    isExpired,
+    daysRemaining,
+    trialEndsAt: new Date(trialEndsMs).toISOString(),
+    isPaidActive: false,
+    statusLabel: isExpired ? 'Trial Expired' : `Trial (${daysRemaining}d left)`,
+  };
+}
+
+/**
+ * Check if adding a staff member exceeds the plan limit (including purchased add-on staff)
+ */
+export function checkStaffCapacity(
+  currentStaffCount: number,
+  planIdOrName?: string,
+  addonStaff = 0
+) {
+  const plan = getPlanById(planIdOrName);
+  const totalMaxStaff = plan.maxStaff + (addonStaff || 0);
+  const isAllowed = currentStaffCount < totalMaxStaff;
   return {
     allowed: isAllowed,
     currentCount: currentStaffCount,
-    maxStaff: plan.maxStaff,
+    maxStaff: totalMaxStaff,
+    baseMaxStaff: plan.maxStaff,
+    addonStaff: addonStaff || 0,
     planName: plan.name,
     message: isAllowed
       ? undefined
-      : `You've reached your ${plan.name} plan limit of ${plan.maxStaff} technicians. Upgrade your plan to add more staff.`,
+      : `You've reached your ${plan.name} plan limit of ${totalMaxStaff} technicians (${plan.maxStaff} base + ${addonStaff} add-ons). Upgrade your plan or purchase an add-on pack to add more staff.`,
   };
 }
 
@@ -139,4 +306,18 @@ export function checkMonthlyJobCapacity(currentMonthlyJobs: number, planIdOrName
       ? undefined
       : `You've reached your ${plan.name} plan limit of ${plan.maxJobs} jobs this month. Upgrade your plan to create more jobs.`,
   };
+}
+
+/**
+ * Generate standard UPI Payment URL for QR Code and UPI Intent
+ */
+export function buildUpiPaymentUrl(params: {
+  amount: number;
+  note: string;
+  transactionRef?: string;
+}): string {
+  const amountStr = params.amount.toFixed(2);
+  const noteParam = encodeURIComponent(params.note.slice(0, 40));
+  const refParam = params.transactionRef ? `&tr=${encodeURIComponent(params.transactionRef)}` : '';
+  return `upi://pay?pa=${SAAS_UPI_CONFIG.vpa}&pn=${encodeURIComponent(SAAS_UPI_CONFIG.payeeName)}&am=${amountStr}&cu=INR&tn=${noteParam}${refParam}`;
 }

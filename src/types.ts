@@ -63,6 +63,12 @@ export interface Business {
   planId: string;
   plan?: string;
   status: 'active' | 'suspended' | 'pending' | 'rejected' | 'trial';
+  subscriptionStatus?: 'trial' | 'active' | 'past_due' | 'expired' | 'pending_verification';
+  trialEndsAt?: string;
+  subscriptionExpiresAt?: string;
+  billingCycle?: 'monthly' | 'yearly';
+  addonStaff?: number;
+  addonWhatsappQuota?: number;
   referralCode?: string; // Unique business referral code (e.g. SF-APEX10)
   referredBy?: string; // Code of the referrer who invited this business
   referralDiscountApplied?: boolean; // True if got 10% discount on registration
@@ -85,6 +91,32 @@ export interface Plan {
   popular?: boolean;
   targetAudience?: string;
   badge?: string;
+}
+
+export interface SubscriptionPayment {
+  id: string;
+  businessId: string;
+  businessName: string;
+  ownerName: string;
+  ownerEmail: string;
+  ownerPhone: string;
+  planId: string;
+  planName: string;
+  billingCycle: 'monthly' | 'yearly';
+  amount: number;
+  discountAmount?: number;
+  referralDiscountPercent?: number;
+  netPayable: number;
+  utrNumber: string;
+  paymentMethod: 'upi' | 'bank_transfer' | 'qr_code';
+  status: 'pending' | 'verified' | 'rejected';
+  createdAt: string;
+  verifiedAt?: string;
+  verifiedBy?: string;
+  notes?: string;
+  receiptNumber?: string;
+  isAddon?: boolean;
+  addonType?: 'staff_pack' | 'whatsapp_pack';
 }
 
 export interface Subscription {
