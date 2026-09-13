@@ -373,11 +373,11 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
   ];
 
   const tabs: TabItem[] = [
-    { id: 'profile', label: 'Profile Info', icon: <User className="w-3.5 h-3.5 shrink-0" /> },
-    { id: 'language', label: t('settings.language', undefined, 'Language / भाषा'), icon: <Globe className="w-3.5 h-3.5 shrink-0" /> },
-    { id: 'security', label: 'Security & Password', icon: <KeyRound className="w-3.5 h-3.5 shrink-0" /> },
-    { id: 'appearance', label: 'Theme & Alerts', icon: <Sparkles className="w-3.5 h-3.5 shrink-0" /> },
-    { id: 'role', label: 'Role & Permissions', icon: <Shield className="w-3.5 h-3.5 shrink-0" /> },
+    { id: 'profile', label: t('common.profile', undefined, 'Profile Info'), icon: <User className="w-3.5 h-3.5 shrink-0" /> },
+    { id: 'language', label: t('settings.language', undefined, 'Language'), icon: <Globe className="w-3.5 h-3.5 shrink-0" /> },
+    { id: 'security', label: t('settings.passwordSecurity', undefined, 'Security & Password'), icon: <KeyRound className="w-3.5 h-3.5 shrink-0" /> },
+    { id: 'appearance', label: t('settings.audioPreferences', undefined, 'Theme & Alerts'), icon: <Sparkles className="w-3.5 h-3.5 shrink-0" /> },
+    { id: 'role', label: t('common.security', undefined, 'Role & Permissions'), icon: <Shield className="w-3.5 h-3.5 shrink-0" /> },
   ];
 
   return (
@@ -643,10 +643,10 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                       </div>
                       <div className="min-w-0 flex-1">
                         <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 block leading-tight break-words">
-                          Business Profile (व्यावसायिक प्रोफ़ाइल)
+                          {t('settings.businessProfile', undefined, 'Business Profile')}
                         </span>
                         <span className="text-[11px] text-slate-500 dark:text-slate-400 block leading-normal mt-0.5 break-words">
-                          Company entity, logo, address & invoice branding
+                          {t('settings.businessProfileSubtitle', undefined, 'Company entity, logo, address & invoice branding')}
                         </span>
                       </div>
                     </div>
@@ -1063,7 +1063,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                   </div>
 
                   <div className="text-[11px] text-slate-500 dark:text-slate-400 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800">
-                    Saved specifically for profile: <strong className="text-slate-800 dark:text-slate-200">{currentUser?.name}</strong>. Selection updates immediately across the whole app.
+                    {t('settings.languageSavedNotice', { name: currentUser?.name || '' }, `Saved specifically for profile: ${currentUser?.name}. Selection updates immediately across the whole app.`)}
                   </div>
                 </div>
               </div>
@@ -1084,13 +1084,13 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                   <Sliders className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 group-hover:rotate-45 transition-transform" />
                   <div className="text-left min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold truncate">Open System Settings (सिस्टम सेटिंग्स)</span>
+                      <span className="font-bold truncate">{t('settings.openSystemSettings', undefined, 'Open System Settings')}</span>
                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-200/80 dark:bg-indigo-900/80 text-indigo-800 dark:text-indigo-200 font-bold uppercase shrink-0">
                         App Config
                       </span>
                     </div>
                     <div className="text-[10px] text-slate-500 dark:text-slate-400 font-normal truncate">
-                      Taxation (GST), notifications, invoice templates & app preferences
+                      {t('settings.systemSettingsSubtitle', undefined, 'Taxation (GST), notifications, invoice templates & app preferences')}
                     </div>
                   </div>
                 </div>
@@ -1107,7 +1107,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
               >
                 <div className="flex items-center gap-2.5">
                   <History className="w-4 h-4 text-slate-500 shrink-0" />
-                  <span className="text-left">View Activity & Audit Logs</span>
+                  <span className="text-left">{t('settings.activityLogs', undefined, 'View Activity & Audit Logs')}</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
               </button>
@@ -1123,8 +1123,8 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 group-hover:scale-110 transition-transform" />
                   <div className="text-left min-w-0">
-                    <div className="truncate">Install App on Mobile / Desktop</div>
-                    <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-normal truncate">ऐप इंस्टॉल करें (Android, iOS & PC)</div>
+                    <div className="truncate">{t('settings.installApp', undefined, 'Install App on Mobile / Desktop')}</div>
+                    <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-normal truncate">{t('settings.installAppSubtitle', undefined, 'Run standalone on Android, iOS & PC')}</div>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-emerald-500 shrink-0 ml-2" />
@@ -1133,7 +1133,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
               {/* Advanced & Troubleshooting Section */}
               <div className="pt-2">
                 <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1 pb-1.5">
-                  Advanced & Troubleshooting
+                  {t('settings.troubleshooting', undefined, 'Advanced & Troubleshooting')}
                 </div>
                 <button
                   id="profile-action-clear-cache"
@@ -1145,8 +1145,8 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                   <div className="flex items-center gap-2.5 min-w-0">
                     <RefreshCw className={`w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 ${isClearingCache ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
                     <div className="text-left min-w-0">
-                      <div className="truncate">Clear App Cache & Reload (कैश साफ़ करें)</div>
-                      <div className="text-[10px] text-slate-500 font-normal truncate">Unregister service workers & reload latest version</div>
+                      <div className="truncate">{t('settings.clearCache', undefined, 'Clear App Cache & Reload')}</div>
+                      <div className="text-[10px] text-slate-500 font-normal truncate">{t('settings.clearCacheSubtitle', undefined, 'Unregister service workers & reload latest version')}</div>
                     </div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-400 shrink-0 ml-2" />
@@ -1168,8 +1168,8 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                   <div className="flex items-center gap-2.5 min-w-0">
                     <Shield className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 group-hover:scale-110 transition-transform" />
                     <div className="text-left min-w-0">
-                      <div className="truncate">Privacy Policy & Data Safety</div>
-                      <div className="text-[10px] text-slate-500 font-normal truncate">गोपनीयता नीति और डेटा सुरक्षा (Google Play Compliant)</div>
+                      <div className="truncate">{t('settings.privacyPolicy', undefined, 'Privacy Policy & Data Safety')}</div>
+                      <div className="text-[10px] text-slate-500 font-normal truncate">{t('settings.privacyPolicySubtitle', undefined, 'Google Play Compliant Privacy & Data Protection')}</div>
                     </div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-400 shrink-0 ml-2" />
@@ -1194,7 +1194,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
               className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-rose-600/20 min-h-[44px] disabled:opacity-60"
             >
               <LogOut className={`w-4 h-4 shrink-0 ${isLoggingOut ? 'animate-pulse' : ''}`} />
-              <span>{isLoggingOut ? 'Logging out...' : 'Log Out from Account (लॉग आउट)'}</span>
+              <span>{isLoggingOut ? t('auth.loggingOut', undefined, 'Logging out...') : t('settings.logout', undefined, 'Log Out from Account')}</span>
             </button>
           </div>
 
@@ -1215,7 +1215,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
                     Change Sign-In Email Address
                   </h3>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    सुरक्षित ईमेल सत्यापन (Identity Verification)
+                    {t('settings.securityVerification', undefined, 'Identity Verification')}
                   </p>
                 </div>
               </div>

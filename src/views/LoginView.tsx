@@ -50,6 +50,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
     registerUser,
     updateUserPassword,
     validateReferralCode,
+    t,
   } = useApp();
 
   const [authTab, setAuthTab] = useState<'login' | 'register' | 'super_admin'>('login');
@@ -1044,7 +1045,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
                 }}
                 className="hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors cursor-pointer"
               >
-                Privacy Policy (गोपनीयता नीति)
+                {t('settings.privacyPolicy', undefined, 'Privacy Policy')}
               </button>
               <span>•</span>
               <a

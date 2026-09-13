@@ -129,7 +129,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
 
   const accountSettingsItems = [
     { id: 'settings', label: t('settings.myProfile', undefined, 'Profile & Business'), icon: Settings, desc: 'Company & user info' },
-    { id: 'settings', label: t('settings.language', undefined, 'Language / भाषा'), icon: Globe, desc: language === 'hi' ? 'हिन्दी सक्रिय' : language === 'mr' ? 'मराठी सक्रिय' : 'English Active' },
+    { id: 'settings', label: t('settings.language', undefined, 'Language'), icon: Globe, desc: language === 'hi' ? 'हिन्दी सक्रिय' : language === 'mr' ? 'मराठी सक्रिय' : 'English Active' },
     { id: 'settings', label: t('settings.passwordSecurity', undefined, 'Security & Access'), icon: ShieldCheck, desc: 'PIN & credentials' },
     { id: 'settings', label: 'Subscription & Plans', icon: Layers, desc: 'Billing & upgrades' },
   ];
@@ -390,7 +390,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-extrabold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
                       <Globe className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                      {t('settings.language', undefined, 'Language / भाषा')}
+                      {t('settings.language', undefined, 'Language')}
                     </span>
                     <span className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400">
                       {language === 'hi' ? 'हिन्दी' : language === 'mr' ? 'मराठी' : 'English'}

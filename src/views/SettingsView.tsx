@@ -517,7 +517,7 @@ export const SettingsView: React.FC = () => {
   const tabs = isSuperAdmin
     ? [
         { id: 'my_profile', label: 'Super Admin Profile', icon: UserCheck },
-        { id: 'language', label: t('settings.language', undefined, 'Language / भाषा'), icon: Globe, highlight: true },
+        { id: 'language', label: t('settings.language', undefined, 'Language'), icon: Globe, highlight: true },
         { id: 'security', label: 'Password & Security', icon: KeyRound },
         { id: 'appearance', label: 'Theme & Audio Preferences', icon: Sun },
         { id: 'sync', label: 'Offline Sync & Diagnostics', icon: RefreshCw },
@@ -527,7 +527,7 @@ export const SettingsView: React.FC = () => {
     ? [
         { id: 'profile', label: 'Company Profile & Logo', icon: Building2 },
         { id: 'my_profile', label: 'Owner Profile', icon: UserCheck },
-        { id: 'language', label: t('settings.language', undefined, 'Language / भाषा'), icon: Globe, highlight: true },
+        { id: 'language', label: t('settings.language', undefined, 'Language'), icon: Globe, highlight: true },
         { id: 'subscription', label: 'Subscription & Pricing Plans', icon: CreditCard, highlight: true },
         { id: 'referrals', label: 'Refer & Earn (10% Bonus)', icon: Gift, highlight: true, isReferral: true },
         { id: 'sync', label: 'Offline Sync & Logs', icon: RefreshCw },
@@ -537,7 +537,7 @@ export const SettingsView: React.FC = () => {
       ]
     : [
         { id: 'my_profile', label: isTech ? 'My Profile & Skills' : 'My Profile', icon: UserCheck },
-        { id: 'language', label: t('settings.language', undefined, 'Language / भाषा'), icon: Globe, highlight: true },
+        { id: 'language', label: t('settings.language', undefined, 'Language'), icon: Globe, highlight: true },
         { id: 'security', label: 'Password & Security', icon: KeyRound },
         { id: 'appearance', label: 'Audio & App Preferences', icon: Sun },
         { id: 'sync', label: 'Offline Sync Status', icon: RefreshCw },
@@ -2410,7 +2410,7 @@ export const SettingsView: React.FC = () => {
               </div>
               <div>
                 <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <span>Clear App Cache & Reload (ऐप कैश साफ़ करें)</span>
+                  <span>{t('settings.clearCache', undefined, 'Clear App Cache & Reload')}</span>
                   <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-200/80 dark:bg-amber-900/80 text-amber-900 dark:text-amber-200">
                     Latest Assets
                   </span>
@@ -2440,7 +2440,7 @@ export const SettingsView: React.FC = () => {
               </div>
               <div>
                 <h4 className="font-extrabold text-sm text-slate-900 dark:text-slate-100">
-                  Install App on Mobile & Desktop (ऐप इंस्टॉल करें)
+                  {t('settings.installApp', undefined, 'Install App on Mobile & Desktop')}
                 </h4>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Download fullscreen standalone application for Android, iPhone / iPad (iOS Safari), and Windows/Mac Chrome.
@@ -2467,7 +2467,7 @@ export const SettingsView: React.FC = () => {
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Globe className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                {t('settings.language', undefined, 'Language / भाषा')}
+                {t('settings.language', undefined, 'Language')}
               </h3>
               <p className="text-xs text-slate-500 mt-1">
                 {t('settings.languageSubtitle', undefined, 'Select your preferred application display language')}
@@ -2476,7 +2476,7 @@ export const SettingsView: React.FC = () => {
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-900 dark:text-indigo-200 font-bold">
               <span>{t('settings.selectedLanguage', undefined, 'Current Active Language')}:</span>
               <span className="uppercase font-black text-indigo-600 dark:text-indigo-400">
-                {language === 'hi' ? 'हिन्दी (Hindi)' : language === 'mr' ? 'मराठी (Marathi)' : 'English'}
+                {language === 'hi' ? 'हिन्दी' : language === 'mr' ? 'मराठी' : 'English'}
               </span>
             </div>
           </div>
@@ -2542,7 +2542,7 @@ export const SettingsView: React.FC = () => {
             <div className="mt-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 space-y-2">
               <div className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                <span>UI Preview / शब्दावली पूर्वावलोकन</span>
+                <span>{t('settings.vocabularyPreview', undefined, 'UI Vocabulary Preview')}</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">

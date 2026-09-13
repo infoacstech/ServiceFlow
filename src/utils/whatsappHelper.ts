@@ -482,8 +482,10 @@ export const sendAmcVisitReminderWhatsApp = (
   const scheduledDate = visitDate || contract.nextVisitDate || 'Upcoming';
   const slot = timeSlot || '10:00 AM - 01:00 PM';
   const visitNum = (contract.visitsUsed || 0) + 1;
-  const techText = technicianName ? `\n👷 *इंजीनियर / Engineer:* ${technicianName}` : '';
-  const equipText = contract.equipmentDetails ? `\n⚙️ *उपकरण / Equipment:* ${contract.equipmentDetails}` : '';
+  const techLabel = lang === 'hi' ? 'सर्विस इंजीनियर' : lang === 'mr' ? 'सेवा अभियंता' : 'Engineer';
+  const equipLabel = lang === 'hi' ? 'उपकरण' : lang === 'mr' ? 'उपकरण' : 'Equipment';
+  const techText = technicianName ? `\n👷 *${techLabel}:* ${technicianName}` : '';
+  const equipText = contract.equipmentDetails ? `\n⚙️ *${equipLabel}:* ${contract.equipmentDetails}` : '';
 
   let message = '';
   if (lang === 'hi') {
