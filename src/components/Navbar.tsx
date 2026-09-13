@@ -276,7 +276,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </div>
               <div className="text-left min-w-0">
-                <div className="text-xs sm:text-sm md:text-base font-black text-slate-900 dark:text-slate-100 tracking-tight leading-tight truncate max-w-[180px] xs:max-w-[260px] sm:max-w-xs md:max-w-md lg:max-w-lg">
+                <div className="text-xs sm:text-sm md:text-base font-black text-slate-900 dark:text-slate-100 tracking-tight leading-tight truncate max-w-[125px] xs:max-w-[180px] sm:max-w-xs md:max-w-md lg:max-w-lg">
                   {currentBusiness?.name || 'ServiFlow'}
                 </div>
                 <div className="text-[10px] sm:text-[11px] text-slate-500 font-semibold truncate leading-none mt-0.5 hidden xs:block">
@@ -299,8 +299,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           </kbd>
         </button>
 
-        {/* Right Action Controls & User Profile */}
-        <div className="flex items-center gap-1 sm:gap-2">
+        {/* Right Action Controls & User Profile - Vertically Balanced on Mobile */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* User Role Badge */}
           <div className={`hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border shadow-xs ${currentRoleObj.badgeColor}`}>
             <UserCheck className="w-3.5 h-3.5 shrink-0" />
@@ -321,10 +321,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {/* Language Switcher Dropdown */}
-          <div className="relative">
+          <div className="relative flex items-center">
             <button
               onClick={() => toggleMenu('language')}
-              className="flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-750 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-xs font-bold text-slate-700 dark:text-slate-200 transition-all cursor-pointer"
+              className="h-8.5 sm:h-9 px-2 sm:px-2.5 flex items-center justify-center gap-1 rounded-xl border border-slate-200 dark:border-slate-750 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-xs font-bold text-slate-700 dark:text-slate-200 transition-all cursor-pointer"
               title="Change Language / भाषा"
               aria-label="Language Selector"
             >
@@ -336,7 +336,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {activeMenu === 'language' && (
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-[100] animate-in fade-in zoom-in-95">
+              <div className="absolute right-0 mt-2 top-full w-48 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-[100] animate-in fade-in zoom-in-95">
                 <div className="px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
                   Language / भाषा
                 </div>
@@ -389,7 +389,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }
             }}
             disabled={isRefreshingPage}
-            className={`flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer ${
+            className={`h-8.5 sm:h-9 px-2 sm:px-2.5 flex items-center justify-center gap-1 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer ${
               pendingSyncQueue.length > 0
                 ? 'bg-amber-500 hover:bg-amber-600 text-stone-900 border-amber-600 shadow-xs animate-pulse'
                 : 'bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-blue-950/40 text-slate-700 dark:text-slate-200 border-slate-200/80 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600'
@@ -407,10 +407,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {/* Notifications Bell */}
-          <div className="relative">
+          <div className="relative flex items-center">
             <button
               onClick={() => toggleMenu('notif')}
-              className="relative p-1.5 sm:p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+              className="relative h-8.5 w-8.5 sm:h-9 sm:w-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700/80 transition-colors cursor-pointer"
               title="Notifications"
             >
               <Bell className="w-4 h-4" />
@@ -420,7 +420,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {activeMenu === 'notif' && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-3 z-[100] animate-in fade-in zoom-in-95 ring-1 ring-black/5">
+              <div className="absolute right-0 mt-2 top-full w-80 sm:w-96 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-3 z-[100] animate-in fade-in zoom-in-95 ring-1 ring-black/5">
                 <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2 mb-2">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold text-slate-900 dark:text-slate-100">Notifications</span>
@@ -491,11 +491,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Direct User Profile & Settings Drawer Trigger Button */}
           <button
             onClick={() => setIsProfileDrawerOpen(true)}
-            className="flex items-center gap-1.5 sm:gap-2 p-1 sm:px-2 sm:py-1 rounded-xl bg-slate-100/90 hover:bg-slate-200/90 dark:bg-slate-800/90 dark:hover:bg-slate-700/90 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 transition-all shrink-0 cursor-pointer active:scale-95 shadow-xs"
-            title="Click to Open Profile & Settings (लॉग आउट और सेटिंग्स)"
+            className="h-8.5 sm:h-9 flex items-center gap-1.5 p-0.5 sm:px-2 rounded-xl bg-slate-100/90 hover:bg-slate-200/90 dark:bg-slate-800/90 dark:hover:bg-slate-700/90 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 transition-all shrink-0 cursor-pointer active:scale-95 shadow-xs"
+            title="Click to Open Profile & Settings"
             aria-label="User Profile and Settings"
           >
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-600 text-white overflow-hidden ring-2 ring-indigo-500/30 flex items-center justify-center font-black text-xs shadow-xs shrink-0">
+            <div className="w-7 h-7 sm:w-7.5 sm:h-7.5 rounded-lg bg-indigo-600 text-white overflow-hidden ring-1 ring-indigo-500/30 flex items-center justify-center font-black text-xs shadow-xs shrink-0">
               {currentUser?.avatar ? (
                 <img src={currentUser.avatar} alt={currentUser?.name || 'User'} className="w-full h-full object-cover" />
               ) : (

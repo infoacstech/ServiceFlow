@@ -72,22 +72,14 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
     { id: 'more', label: t('nav.more', undefined, 'Console'), icon: Grid },
   ];
 
-  // Tenant Bottom Bar Items
-  const tenantBottomItems = isTech
-    ? [
-        { id: 'jobs', label: t('nav.myJobs', undefined, 'My Jobs'), icon: Briefcase },
-        { id: 'customers', label: t('nav.customers', undefined, 'Customers'), icon: Users },
-        { id: 'notifications', label: t('nav.notifications', undefined, 'Alerts'), icon: Bell },
-        { id: 'settings', label: t('nav.settings', undefined, 'Profile'), icon: Settings },
-        { id: 'more', label: t('nav.more', undefined, 'More'), icon: Grid },
-      ]
-    : [
-        { id: 'dashboard', label: t('nav.dashboard', undefined, 'Dashboard'), icon: LayoutDashboard },
-        { id: 'jobs', label: t('nav.jobs', undefined, 'Jobs'), icon: Briefcase },
-        { id: 'customers', label: t('nav.customers', undefined, 'Customers'), icon: Users },
-        { id: 'invoices', label: t('nav.invoices', undefined, 'Invoices'), icon: Receipt },
-        { id: 'more', label: t('nav.modules', undefined, 'Modules'), icon: Grid },
-      ];
+  // Tenant Bottom Bar Items - Exactly 5 items as specified
+  const tenantBottomItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'jobs', label: 'Jobs', icon: Briefcase },
+    { id: 'customers', label: 'Customers', icon: Users },
+    { id: 'invoices', label: 'Invoices', icon: Receipt },
+    { id: 'more', label: 'Modules', icon: Grid },
+  ];
 
   const bottomItems = isSuperAdmin ? superAdminBottomItems : tenantBottomItems;
 
@@ -153,45 +145,67 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
 
   return (
     <>
-      {/* Bottom Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-lg">
-        {bottomItems.map((item) => {
-          const Icon = item.icon;
-          let isActive = false;
-          if (isSuperAdmin) {
-            if (item.id === 'super_admin_dashboard') {
-              isActive = activeTab === 'super_admin_dashboard' || activeTab === 'super_admin';
-            } else if (item.id === 'super_admin_pending') {
-              isActive = activeTab === 'super_admin_pending' || activeTab === 'super_admin_approvals';
-            } else if (item.id === 'super_admin_tenants') {
-              isActive = activeTab === 'super_admin_tenants';
-            } else if (item.id === 'super_admin_support') {
-              isActive = activeTab === 'super_admin_support';
+      {/* Bottom Bar - Strictly 5 Equal Columns, 100% Viewport Fit, Zero Horizontal Scroll */}
+      <nav 
+        aria-label="Bottom Navigation"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-t border-slate-200/90 dark:border-slate-800/90 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.4)] w-full max-w-full pb-[env(safe-area-inset-bottom,0px)] select-none"
+      >
+        <div className="grid grid-cols-5 w-full h-14 items-stretch px-0">
+          {bottomItems.map((item) => {
+            const Icon = item.icon;
+            let isActive = false;
+            if (isSuperAdmin) {
+              if (item.id === 'super_admin_dashboard') {
+                isActive = activeTab === 'super_admin_dashboard' || activeTab === 'super_admin';
+              } else if (item.id === 'super_admin_pending') {
+                isActive = activeTab === 'super_admin_pending' || activeTab === 'super_admin_approvals';
+              } else if (item.id === 'super_admin_tenants') {
+                isActive = activeTab === 'super_admin_tenants';
+              } else if (item.id === 'super_admin_support') {
+                isActive = activeTab === 'super_admin_support';
+              } else {
+                isActive = activeTab === item.id;
+              }
             } else {
               isActive = activeTab === item.id;
             }
-          } else {
-            isActive = activeTab === item.id;
-          }
-          isActive = isActive && !isMoreMenuOpen;
+            isActive = isActive && !isMoreMenuOpen;
 
-          return (
-            <button
-              key={item.id}
-              onClick={() => handleTabClick(item.id)}
-              className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-xl text-[10px] font-semibold transition-all cursor-pointer ${
-                isActive
-                  ? isSuperAdmin
-                    ? 'text-purple-600 dark:text-purple-400 font-black'
-                    : 'text-indigo-600 dark:text-indigo-400 font-bold'
-                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
-              }`}
-            >
-              <Icon className={`w-5 h-5 ${isActive ? 'scale-110' : ''}`} />
-              <span className="truncate max-w-[68px]">{item.label}</span>
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleTabClick(item.id)}
+                className={`relative flex flex-col items-center justify-center w-full h-full py-1 text-center cursor-pointer transition-colors duration-150 select-none ${
+                  isActive
+                    ? isSuperAdmin
+                      ? 'text-purple-600 dark:text-purple-400 font-bold'
+                      : 'text-indigo-600 dark:text-indigo-400 font-bold'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-medium'
+                }`}
+              >
+                {/* Active Indicator Top Bar - No layout shift */}
+                {isActive && (
+                  <span
+                    className={`absolute top-0 inset-x-2.5 sm:inset-x-4 h-0.5 rounded-full ${
+                      isSuperAdmin ? 'bg-purple-600 dark:bg-purple-400' : 'bg-indigo-600 dark:bg-indigo-400'
+                    }`}
+                  />
+                )}
+
+                {/* Centered Icon - Exact 20px, consistent baseline */}
+                <div className="flex items-center justify-center h-5 w-5 mb-1 shrink-0">
+                  <Icon className="w-5 h-5 stroke-[2]" />
+                </div>
+
+                {/* Centered Single-line Label - No wrapping, no ellipsis, fits in 72px */}
+                <span className="text-[10px] sm:text-[11px] font-semibold leading-none text-center whitespace-nowrap overflow-visible">
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </nav>
 
       {/* More Modules Full-Screen Modal Drawer */}

@@ -55,13 +55,14 @@ export const QuickActionFab: React.FC<QuickActionFabProps> = ({
     showToast,
   } = useApp();
 
-  // If user is logged out or on attendance, jobs, customers, staff, or super admin tab, don't show FAB
+  // If user is logged out or on attendance, jobs, customers, staff, dashboard, or super admin tab, don't show FAB
   if (
     !currentUser ||
     activeTab === 'attendance' ||
     activeTab === 'jobs' ||
     activeTab === 'customers' ||
     activeTab === 'staff' ||
+    activeTab === 'dashboard' ||
     activeTab === 'super_admin' ||
     (currentUser.role as string) === 'super_admin'
   )
@@ -144,7 +145,7 @@ export const QuickActionFab: React.FC<QuickActionFabProps> = ({
 
   return (
     <>
-      <div className="fixed bottom-22 sm:bottom-8 right-4 sm:right-6 z-40 flex flex-col items-end">
+      <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+4.25rem)] sm:bottom-8 right-4 sm:right-6 z-30 flex flex-col items-end">
         {/* Backdrop when FAB is open */}
         {isOpen && (
           <div

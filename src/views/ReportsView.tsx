@@ -19,7 +19,7 @@ export const ReportsView: React.FC = () => {
   // Filter datasets by date range
   const filteredInvoices = invoices.filter((i) => isDateInRange(i.date));
   const filteredExpenses = expenses.filter((e) => isDateInRange(e.date));
-  const filteredPayments = payments.filter((p) => isDateInRange(p.date));
+  const filteredPayments = payments.filter((p) => isDateInRange(p.date || p.paymentDate));
   const filteredJobs = jobs.filter((j) => isDateInRange(j.scheduledDate));
 
   const totalRevenue = filteredInvoices.reduce((s, i) => s + i.grandTotal, 0);

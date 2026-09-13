@@ -373,33 +373,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-4 lg:space-y-4.5 pb-8 animate-in fade-in w-full max-w-full overflow-x-hidden">
-      {/* Top Banner Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-4 sm:p-4.5 lg:py-3.5 lg:px-5 rounded-2xl shadow-lg w-full max-w-full overflow-hidden">
+      {/* Top Banner Header - Compact, Professional, Non-Repetitive */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-3.5 sm:p-4 lg:py-3.5 lg:px-5 rounded-2xl shadow-md w-full max-w-full overflow-hidden">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="text-xs bg-indigo-500/20 text-indigo-300 font-bold px-2.5 py-0.5 rounded-full border border-indigo-500/30 truncate max-w-full">
-              {currentBusiness.type || "Service Business"}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1">
+            <span className="text-[11px] bg-indigo-500/25 text-indigo-200 font-bold px-2.5 py-0.5 rounded-full border border-indigo-500/30 truncate max-w-full">
+              {currentBusiness.type || "Field Services"}
             </span>
-            <span className="text-xs text-slate-400 font-medium">{t('dashboard.overviewSubtitle', undefined, "Today's Operations")}</span>
+            <span className="text-[11px] text-slate-400 font-medium">
+              {t('dashboard.overviewSubtitle', undefined, "Today's Operations")}
+            </span>
           </div>
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-black tracking-tight break-words">{currentBusiness.name}</h1>
-          <p className="text-xs text-slate-300 mt-0.5 max-w-3xl">
-            {t('dashboard.subtitle', undefined, 'Overview of jobs, enquiries, technician activity & business performance for today.')}
+          <h1 className="text-base sm:text-lg lg:text-xl font-black tracking-tight text-white">
+            Operations & Service Hub
+          </h1>
+          <p className="text-xs text-slate-300 mt-0.5 leading-snug">
+            {t('dashboard.subtitle', undefined, "Real-time summary of today's jobs, enquiries, collections, and team activity.")}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto shrink-0 pt-1 sm:pt-0">
           <button
             onClick={() => setIsActivityLogOpen(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs border border-white/20 transition-all active:scale-95 cursor-pointer"
+            className="h-8.5 sm:h-9 flex items-center justify-center gap-1.5 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs border border-white/20 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
           >
-            <History className="w-4 h-4 text-indigo-300" /> {t('common.activityLog', undefined, 'Activity Log')}
+            <History className="w-3.5 h-3.5 text-indigo-300 shrink-0" />
+            <span>{t('common.activityLog', undefined, 'Activity Log')}</span>
           </button>
           <button
             onClick={() => navigate('jobs', { datePreset: 'today' })}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer"
+            className="h-8.5 sm:h-9 flex items-center justify-center gap-1.5 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all shadow-md active:scale-95 cursor-pointer whitespace-nowrap"
           >
-            <Calendar className="w-4 h-4" /> {t('dashboard.todayJobs', undefined, "Today's Schedule")}
+            <Calendar className="w-3.5 h-3.5 shrink-0" />
+            <span>{t('dashboard.todayJobs', undefined, "Today's Schedule")}</span>
           </button>
         </div>
       </div>
@@ -601,215 +607,233 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
-      {/* Quick Actions Bar */}
-      <div className="bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+      {/* Quick Actions Bar - Balanced 2x2 Mobile Grid */}
+      <div className="bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs w-full max-w-full">
         <div className="flex items-center justify-between mb-2.5">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 shrink-0">
               <Zap className="w-4 h-4" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
                 {t('dashboard.quickActions', undefined, 'Quick Actions')}
               </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                 {t('dashboard.quickActionsSubtitle', undefined, 'Direct access to core field service & administrative tasks')}
               </p>
             </div>
           </div>
           {pendingSyncQueue.length > 0 && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-              {pendingSyncQueue.length} Pending Sync{pendingSyncQueue.length > 1 ? 's' : ''}
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+              {pendingSyncQueue.length}
             </span>
           )}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-          {/* Action 1: New Enquiry (Primary Entry Point) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 w-full">
+          {/* Action 1: New Enquiry */}
           <button
+            type="button"
             onClick={() => setIsNewEnquiryOpen(true)}
-            className="flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-xl bg-slate-50/80 hover:bg-blue-50 dark:bg-slate-800/60 dark:hover:bg-blue-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-blue-300 dark:hover:border-blue-600/50 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-300 transition-all group active:scale-95 cursor-pointer min-h-[78px] sm:min-h-[82px]"
+            className="flex flex-col items-center justify-center h-[86px] sm:h-[90px] w-full p-2 rounded-xl bg-slate-50/80 hover:bg-blue-50 dark:bg-slate-800/60 dark:hover:bg-blue-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-blue-300 dark:hover:border-blue-600/50 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-300 transition-all group active:scale-95 cursor-pointer text-center"
           >
-            <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 mb-1 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className="w-7.5 h-7.5 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 mb-1 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
               <HelpCircle className="w-4 h-4" />
             </div>
-            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{t('enquiries.newEnquiry', undefined, 'New Enquiry')}</span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">{t('dashboard.captureIntake', undefined, 'Capture intake')}</span>
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-tight text-center truncate w-full px-1">
+              {t('enquiries.newEnquiry', undefined, 'New Enquiry')}
+            </span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight text-center truncate w-full mt-0.5 px-1">
+              {t('dashboard.captureIntake', undefined, 'Capture intake')}
+            </span>
           </button>
 
           {/* Action 2: Add Customer */}
           <button
+            type="button"
             onClick={() => setIsAddCustomerOpen(true)}
-            className="flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-xl bg-slate-50/80 hover:bg-indigo-50 dark:bg-slate-800/60 dark:hover:bg-indigo-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-indigo-300 dark:hover:border-indigo-600/50 text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-300 transition-all group active:scale-95 cursor-pointer min-h-[78px] sm:min-h-[82px]"
+            className="flex flex-col items-center justify-center h-[86px] sm:h-[90px] w-full p-2 rounded-xl bg-slate-50/80 hover:bg-indigo-50 dark:bg-slate-800/60 dark:hover:bg-indigo-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-indigo-300 dark:hover:border-indigo-600/50 text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-300 transition-all group active:scale-95 cursor-pointer text-center"
           >
-            <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 mb-1 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className="w-7.5 h-7.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 mb-1 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
               <UserPlus className="w-4 h-4" />
             </div>
-            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{t('customers.addCustomer', undefined, 'Add Customer')}</span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">{t('dashboard.createCrmEntry', undefined, 'Create CRM entry')}</span>
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-tight text-center truncate w-full px-1">
+              {t('customers.addCustomer', undefined, 'Add Customer')}
+            </span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight text-center truncate w-full mt-0.5 px-1">
+              {t('dashboard.createCrmEntry', undefined, 'Create CRM entry')}
+            </span>
           </button>
 
-          {/* Action 3: Schedule Job */}
+          {/* Action 3: Create Job Ticket */}
           <button
+            type="button"
             onClick={onOpenNewJob}
-            className="flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-xl bg-slate-50/80 hover:bg-purple-50 dark:bg-slate-800/60 dark:hover:bg-purple-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-purple-300 dark:hover:border-purple-600/50 text-slate-700 dark:text-slate-200 hover:text-purple-600 dark:hover:text-purple-300 transition-all group active:scale-95 cursor-pointer min-h-[78px] sm:min-h-[82px]"
+            className="flex flex-col items-center justify-center h-[86px] sm:h-[90px] w-full p-2 rounded-xl bg-slate-50/80 hover:bg-purple-50 dark:bg-slate-800/60 dark:hover:bg-purple-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-purple-300 dark:hover:border-purple-600/50 text-slate-700 dark:text-slate-200 hover:text-purple-600 dark:hover:text-purple-300 transition-all group active:scale-95 cursor-pointer text-center"
           >
-            <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 mb-1 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className="w-7.5 h-7.5 rounded-lg bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 mb-1 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
               <Plus className="w-4 h-4" />
             </div>
-            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{t('jobs.createJob', undefined, 'Schedule Job')}</span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">{t('dashboard.dispatchTechnician', undefined, 'Dispatch technician')}</span>
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-tight text-center truncate w-full px-1">
+              {t('jobs.createJob', undefined, 'Create Job Ticket')}
+            </span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight text-center truncate w-full mt-0.5 px-1">
+              {t('dashboard.dispatchTechnician', undefined, 'Dispatch technician')}
+            </span>
           </button>
 
-          {/* Action 4: Quick Quote */}
+          {/* Action 4: New Quotation */}
           <button
+            type="button"
             onClick={() => setIsQuickQuoteOpen(true)}
-            className="flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-xl bg-slate-50/80 hover:bg-emerald-50 dark:bg-slate-800/60 dark:hover:bg-emerald-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-emerald-300 dark:hover:border-emerald-600/50 text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-300 transition-all group active:scale-95 cursor-pointer min-h-[78px] sm:min-h-[82px]"
+            className="flex flex-col items-center justify-center h-[86px] sm:h-[90px] w-full p-2 rounded-xl bg-slate-50/80 hover:bg-emerald-50 dark:bg-slate-800/60 dark:hover:bg-emerald-950/40 border border-slate-200/60 dark:border-slate-700/60 hover:border-emerald-300 dark:hover:border-emerald-600/50 text-slate-700 dark:text-slate-200 hover:text-emerald-600 dark:hover:text-emerald-300 transition-all group active:scale-95 cursor-pointer text-center"
           >
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 mb-1 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className="w-7.5 h-7.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 mb-1 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
               <FileText className="w-4 h-4" />
             </div>
-            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{t('quotations.createQuotation', undefined, 'Quick Quote')}</span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 text-center line-clamp-1">{t('dashboard.generateEstimate', undefined, 'Generate estimate')}</span>
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-tight text-center truncate w-full px-1">
+              {t('quotations.createQuotation', undefined, 'New Quotation')}
+            </span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight text-center truncate w-full mt-0.5 px-1">
+              {t('dashboard.generateEstimate', undefined, 'Generate estimate')}
+            </span>
           </button>
         </div>
       </div>
 
       {/* Interactive Featured Summary Cards: Urgent Jobs & Today's Revenue */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 items-stretch">
-        {/* Urgent Jobs Summary Card (Consistent 2-column height, padding, & alignment) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 items-stretch w-full max-w-full">
+        {/* Urgent Jobs Summary Card */}
         {activeUrgentJobs.length === 0 ? (
           <div
             onClick={() => navigate('jobs', { statusFilter: 'all' })}
-            className="p-4 sm:p-4.5 rounded-2xl bg-gradient-to-br from-emerald-50/70 via-teal-50/30 to-white dark:from-emerald-950/30 dark:via-teal-950/15 dark:to-slate-900 border-2 border-emerald-200/80 dark:border-emerald-800/80 hover:border-emerald-400 dark:hover:border-emerald-600 shadow-xs hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between h-full overflow-hidden"
+            className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-emerald-50/70 via-teal-50/30 to-white dark:from-emerald-950/30 dark:via-teal-950/15 dark:to-slate-900 border-2 border-emerald-200/80 dark:border-emerald-800/80 hover:border-emerald-400 dark:hover:border-emerald-600 shadow-xs hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between h-full overflow-hidden"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-600/30 shrink-0">
-                  <CheckCircle2 className="w-5 h-5" />
+            <div className="flex items-start justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-xs shrink-0">
+                  <CheckCircle2 className="w-4.5 h-4.5" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/60">
                       All Normal
                     </span>
                   </div>
-                  <h3 className="text-base font-black text-slate-900 dark:text-slate-100 mt-0.5 group-hover:text-emerald-600 transition-colors">
+                  <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100 group-hover:text-emerald-600 transition-colors leading-tight truncate">
                     Urgent Jobs Summary
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    All service requests are on schedule with 0 active urgent flags
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-tight mt-0.5">
+                    All service requests are on schedule with 0 urgent flags
                   </p>
                 </div>
               </div>
 
               <div className="text-right shrink-0">
-                <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 leading-none">
                   0
                 </div>
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">
                   Total Urgent
                 </div>
               </div>
             </div>
 
-            {/* Metric Quick Stats Pills */}
-            <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-emerald-200/60 dark:border-emerald-900/40">
-              <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Active Pending</div>
-                <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">0</div>
+            {/* Metric Quick Stats: 3 Equal Columns */}
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-3 pt-2.5 border-t border-emerald-200/60 dark:border-emerald-900/40 w-full">
+              <div className="p-2 sm:p-2.5 rounded-xl bg-white/85 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 text-center flex flex-col items-center justify-center min-w-0">
+                <span className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-semibold truncate w-full text-center leading-none">Active Pending</span>
+                <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400 truncate w-full text-center mt-1 leading-tight">0</span>
               </div>
 
-              <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Unassigned Techs</div>
-                <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100">0</div>
+              <div className="p-2 sm:p-2.5 rounded-xl bg-white/85 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 text-center flex flex-col items-center justify-center min-w-0">
+                <span className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-semibold truncate w-full text-center leading-none">Unassigned Techs</span>
+                <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100 truncate w-full text-center mt-1 leading-tight">0</span>
               </div>
 
-              <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Est. Job Value</div>
-                <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
-                  {curr}0
-                </div>
+              <div className="p-2 sm:p-2.5 rounded-xl bg-white/85 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 text-center flex flex-col items-center justify-center min-w-0">
+                <span className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-semibold truncate w-full text-center leading-none">Est. Job Value</span>
+                <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100 truncate w-full text-center mt-1 leading-tight">{curr}0</span>
               </div>
             </div>
 
             {/* Quick Action Footer */}
-            <div className="mt-2.5 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 pt-1 border-t border-emerald-200/40 dark:border-emerald-900/30">
-              <span className="flex items-center gap-1.5">
-                <Filter className="w-3.5 h-3.5" /> Quick Access Filtered List
+            <div className="mt-2.5 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 pt-1.5 border-t border-emerald-200/40 dark:border-emerald-900/30">
+              <span className="flex items-center gap-1.5 text-[11px]">
+                <Filter className="w-3.5 h-3.5" /> Filtered Schedule
               </span>
-              <span className="inline-flex items-center gap-1 bg-emerald-600 text-white text-[11px] font-bold px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-xl group-hover:bg-emerald-700 transition-colors shadow-xs">
-                View List <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              <span className="inline-flex items-center gap-1 bg-emerald-600 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-xl group-hover:bg-emerald-700 transition-colors shadow-xs">
+                View List <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
               </span>
             </div>
           </div>
         ) : (
           <div
             onClick={() => setIsUrgentModalOpen(true)}
-            className="relative p-4 sm:p-4.5 rounded-2xl bg-gradient-to-br from-rose-50 via-amber-50/40 to-white dark:from-rose-950/40 dark:via-amber-950/20 dark:to-slate-900 border-2 border-rose-200 dark:border-rose-800/80 hover:border-rose-400 dark:hover:border-rose-600 shadow-xs hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between h-full overflow-hidden"
+            className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-rose-50 via-amber-50/40 to-white dark:from-rose-950/40 dark:via-amber-950/20 dark:to-slate-900 border-2 border-rose-200 dark:border-rose-800/80 hover:border-rose-400 dark:hover:border-rose-600 shadow-xs hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between h-full overflow-hidden"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="relative p-2.5 rounded-xl bg-rose-600 text-white shadow-md shadow-rose-600/30 shrink-0">
-                  <AlertTriangle className="w-5 h-5 animate-pulse" />
-                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+            <div className="flex items-start justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="relative p-2 rounded-xl bg-rose-600 text-white shadow-xs shrink-0">
+                  <AlertTriangle className="w-4.5 h-4.5 animate-pulse" />
+                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-600 border-2 border-white dark:border-slate-900"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600 border-2 border-white dark:border-slate-900"></span>
                   </span>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-950/80 px-2 py-0.5 rounded-full">
                       High Priority Dispatch
                     </span>
                   </div>
-                  <h3 className="text-base font-black text-slate-900 dark:text-slate-100 mt-0.5 group-hover:text-rose-600 transition-colors">
+                  <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100 group-hover:text-rose-600 transition-colors leading-tight truncate">
                     Urgent Jobs Summary
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Critical tickets requiring immediate technician dispatch & resolution
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-tight mt-0.5">
+                    Critical tickets requiring immediate technician dispatch
                   </p>
                 </div>
               </div>
 
               <div className="text-right shrink-0">
-                <div className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400">
+                <div className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400 leading-none">
                   {activeUrgentJobs.length}
                 </div>
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">
                   Total Urgent
                 </div>
               </div>
             </div>
 
-            {/* Metric Quick Stats Pills */}
-            <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-rose-200/60 dark:border-rose-900/40">
-              <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Active Pending</div>
-                <div className="text-sm font-extrabold text-amber-600 dark:text-amber-400">{activePendingUrgentJobs.length}</div>
+            {/* Metric Quick Stats: 3 Equal Columns */}
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-3 pt-2.5 border-t border-rose-200/60 dark:border-rose-900/40 w-full">
+              <div className="p-2 sm:p-2.5 rounded-xl bg-white/85 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 text-center flex flex-col items-center justify-center min-w-0">
+                <span className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-semibold truncate w-full text-center leading-none">Active Pending</span>
+                <span className="text-xs sm:text-sm font-black text-amber-600 dark:text-amber-400 truncate w-full text-center mt-1 leading-tight">{activePendingUrgentJobs.length}</span>
               </div>
 
-              <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Unassigned Techs</div>
-                <div className="text-sm font-extrabold text-rose-600 dark:text-rose-400">{unassignedUrgentJobs.length}</div>
+              <div className="p-2 sm:p-2.5 rounded-xl bg-white/85 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 text-center flex flex-col items-center justify-center min-w-0">
+                <span className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-semibold truncate w-full text-center leading-none">Unassigned Techs</span>
+                <span className="text-xs sm:text-sm font-black text-rose-600 dark:text-rose-400 truncate w-full text-center mt-1 leading-tight">{unassignedUrgentJobs.length}</span>
               </div>
 
-              <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Est. Job Value</div>
-                <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+              <div className="p-2 sm:p-2.5 rounded-xl bg-white/85 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 text-center flex flex-col items-center justify-center min-w-0">
+                <span className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-semibold truncate w-full text-center leading-none">Est. Job Value</span>
+                <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100 truncate w-full text-center mt-1 leading-tight">
                   {curr}{activeUrgentValue.toLocaleString()}
-                </div>
+                </span>
               </div>
             </div>
 
             {/* Quick Action Footer */}
-            <div className="mt-2.5 flex items-center justify-between text-xs font-bold text-rose-600 dark:text-rose-400 pt-1 border-t border-rose-200/40 dark:border-rose-900/30">
-              <span className="flex items-center gap-1.5">
-                <Filter className="w-3.5 h-3.5" /> Quick Access Filtered List
+            <div className="mt-2.5 flex items-center justify-between text-xs font-bold text-rose-600 dark:text-rose-400 pt-1.5 border-t border-rose-200/40 dark:border-rose-900/30">
+              <span className="flex items-center gap-1.5 text-[11px]">
+                <Filter className="w-3.5 h-3.5" /> Urgent Filter
               </span>
-              <span className="inline-flex items-center gap-1 bg-rose-600 text-white text-[11px] font-bold px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-xl group-hover:bg-rose-700 transition-colors shadow-xs">
-                View List <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              <span className="inline-flex items-center gap-1 bg-rose-600 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-xl group-hover:bg-rose-700 transition-colors shadow-xs">
+                View List <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
               </span>
             </div>
           </div>
@@ -818,67 +842,67 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Today's Revenue Interactive Summary Card */}
         <div
           onClick={() => setIsRevenueModalOpen(true)}
-          className="relative p-4 sm:p-4.5 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-white dark:from-emerald-950/40 dark:via-teal-950/20 dark:to-slate-900 border-2 border-emerald-200 dark:border-emerald-800/80 hover:border-emerald-400 dark:hover:border-emerald-600 shadow-xs hover:shadow-lg transition-all cursor-pointer group flex flex-col justify-between h-full overflow-hidden"
+          className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50/40 to-white dark:from-emerald-950/40 dark:via-teal-950/20 dark:to-slate-900 border-2 border-emerald-200 dark:border-emerald-800/80 hover:border-emerald-400 dark:hover:border-emerald-600 shadow-xs hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between h-full overflow-hidden"
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-600/30 shrink-0">
-                <TrendingUp className="w-5 h-5" />
+          <div className="flex items-start justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-xs shrink-0">
+                <TrendingUp className="w-4.5 h-4.5" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full">
                     Live Billing Collections
                   </span>
                 </div>
-                <h3 className="text-base font-black text-slate-900 dark:text-slate-100 mt-0.5 group-hover:text-emerald-600 transition-colors">
+                <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-slate-100 group-hover:text-emerald-600 transition-colors leading-tight truncate">
                   Today's Revenue Summary
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Payment receipts, paid invoices, & real-time daily cash inflows
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-tight mt-0.5">
+                  Payment receipts, paid invoices, & daily cash inflows
                 </p>
               </div>
             </div>
 
             <div className="text-right shrink-0">
-              <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">
+              <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 leading-none">
                 {curr}{todayPayments.toLocaleString()}
               </div>
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">
                 Collected Revenue
               </div>
             </div>
           </div>
 
-          {/* Metric Quick Stats Pills */}
-          <div className="grid grid-cols-3 gap-2 mt-3 pt-2.5 border-t border-emerald-200/60 dark:border-emerald-900/40">
-            <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Paid Invoices</div>
-              <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">{todayPaidInvoices.length}</div>
+          {/* Metric Quick Stats: 3 Equal Columns */}
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-3 pt-2.5 border-t border-emerald-200/60 dark:border-emerald-900/40 w-full">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-white/85 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 text-center flex flex-col items-center justify-center min-w-0">
+              <span className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-semibold truncate w-full text-center leading-none">Paid Invoices</span>
+              <span className="text-xs sm:text-sm font-black text-emerald-600 dark:text-emerald-400 truncate w-full text-center mt-1 leading-tight">{todayPaidInvoices.length}</span>
             </div>
 
-            <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Total Invoiced</div>
-              <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-white/85 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 text-center flex flex-col items-center justify-center min-w-0">
+              <span className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-semibold truncate w-full text-center leading-none">Total Invoiced</span>
+              <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-slate-100 truncate w-full text-center mt-1 leading-tight">
                 {curr}{totalSales.toLocaleString()}
-              </div>
+              </span>
             </div>
 
-            <div className="p-2 rounded-xl bg-white/80 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold truncate">Pending Due</div>
-              <div className="text-sm font-extrabold text-rose-600 dark:text-rose-400">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-white/85 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 text-center flex flex-col items-center justify-center min-w-0">
+              <span className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-semibold truncate w-full text-center leading-none">Pending Due</span>
+              <span className="text-xs sm:text-sm font-black text-rose-600 dark:text-rose-400 truncate w-full text-center mt-1 leading-tight">
                 {curr}{pendingPayments.toLocaleString()}
-              </div>
+              </span>
             </div>
           </div>
 
           {/* Quick Action Footer */}
-          <div className="mt-2.5 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 pt-1 border-t border-emerald-200/40 dark:border-emerald-900/30">
-            <span className="flex items-center gap-1.5">
-              <Receipt className="w-3.5 h-3.5" /> Quick Access Receipts & Transactions
+          <div className="mt-2.5 flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400 pt-1.5 border-t border-emerald-200/40 dark:border-emerald-900/30">
+            <span className="flex items-center gap-1.5 text-[11px]">
+              <Receipt className="w-3.5 h-3.5" /> Receipts & History
             </span>
-            <span className="inline-flex items-center gap-1 bg-emerald-600 text-white text-[11px] font-bold px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-xl group-hover:bg-emerald-700 transition-colors shadow-xs">
-              View Receipts <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            <span className="inline-flex items-center gap-1 bg-emerald-600 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-xl group-hover:bg-emerald-700 transition-colors shadow-xs">
+              View Receipts <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
             </span>
           </div>
         </div>
