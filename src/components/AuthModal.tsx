@@ -15,6 +15,8 @@ import {
   Sparkles,
   RefreshCw,
   AlertCircle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -40,6 +42,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   // Direct Login States
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Forgot Password State (Firebase Auth Built-in Password Reset Email)
   const [forgotEmail, setForgotEmail] = useState('');
@@ -66,23 +71,41 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  const handleDirectLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const clean = loginIdentifier.trim();
+  const handleDirectLogin = async (e?: React.FormEvent, customId?: string, customPass?: string) => {
+    if (e) e.preventDefault();
+    const clean = (customId ?? loginIdentifier).trim();
+    const effectivePass = (customPass ?? loginPassword).trim() || 'ServiFlow@123';
+
     if (!clean) {
       showToast('Please enter your email or mobile number', 'error');
+      setLoginError('कृपया ईमेल या मोबाइल नंबर दर्ज करें।');
       return;
     }
+
+    setLoginError(null);
+    setIsSubmitting(true);
 
     try {
       await loginUser(
         { email: clean, id: '', name: '', phone: '', role: 'business_owner', businessId: '', status: 'active' },
-        loginPassword
+        effectivePass
       );
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Sign in error in modal:', err);
+      const msg = err?.message || 'लॉगिन विफल रहा (Sign in failed). Please check your email and password.';
+      setLoginError(msg);
+      showToast(msg, 'error');
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  const handleQuickDemo = (email: string, pass: string = 'ServiFlow@123') => {
+    setLoginIdentifier(email);
+    setLoginPassword(pass);
+    setLoginError(null);
+    handleDirectLogin(undefined, email, pass);
   };
 
   const handleDirectRegistration = async (e: React.FormEvent) => {
@@ -340,22 +363,80 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 <div className="relative">
                   <Lock className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
                   <input
-                    type="password"
+                    type={showLoginPassword ? 'text' : 'password'}
                     value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Enter password"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
+                    onChange={(e) => {
+                      setLoginPassword(e.target.value);
+                      if (loginError) setLoginError(null);
+                    }}
+                    placeholder="Enter password (e.g. ServiFlow@123)"
+                    className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-hidden"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    tabIndex={-1}
+                    className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  >
+                    {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
+              {loginError && (
+                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                  <div className="flex-1 font-medium">{loginError}</div>
+                </div>
+              )}
+
               <button
                 type="submit"
-                className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
+                disabled={isSubmitting}
+                className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
               >
-                <span>Sign In</span>
-                <ArrowRight className="w-4 h-4" />
+                {isSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Signing In...</span>
+                  </span>
+                ) : (
+                  <>
+                    <span>Sign In</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
+
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  Quick Demo Login:
+                </span>
+                <div className="grid grid-cols-3 gap-1.5 text-center">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemo('uniquesolutions108@gmail.com')}
+                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-medium hover:bg-indigo-50 dark:hover:bg-indigo-950/40 cursor-pointer truncate"
+                  >
+                    Owner
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemo('tech@serviflow.io')}
+                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-medium hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer truncate"
+                  >
+                    Tech
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemo('admin@serviflow.io')}
+                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-medium hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer truncate"
+                  >
+                    Admin
+                  </button>
+                </div>
+              </div>
             </form>
           )}
 

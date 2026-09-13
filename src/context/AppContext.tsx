@@ -1659,7 +1659,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
             }
           } else if (!userRecord && isMounted) {
-            // Check if there is a valid session in localStorage before signing out
+            // Check if there is a valid session in localStorage first
             const savedSessionRaw = localStorage.getItem('serviflow_user_session');
             if (savedSessionRaw) {
               try {
@@ -1671,15 +1671,34 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 }
               } catch {}
             }
+
+            // Synthesize user from authenticated Firebase User to prevent premature logouts
+            const targetEmail = (firebaseUser.email || localStorage.getItem('serviflow_logged_in_email') || '').trim().toLowerCase();
+            const isSuper = targetEmail === 'admin@serviflow.io' || targetEmail === 'superadmin@serviflow.io';
+            const autoUser: User = {
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName || (isSuper ? 'SaaS Platform Admin' : 'Business Owner'),
+              email: targetEmail || 'owner@serviflow.io',
+              phone: firebaseUser.phoneNumber || '+91 98765 43210',
+              role: isSuper ? 'super_admin' : 'business_owner',
+              businessId: isSuper ? 'all' : `tenant-${firebaseUser.uid}`,
+              status: 'active',
+              approvalStatus: 'active',
+              joiningDate: new Date().toISOString().split('T')[0],
+            };
+
             try {
-              await signOut(auth);
-            } catch {}
-            setCurrentUser(null);
-            setCurrentBusiness(DEFAULT_BLANK_BUSINESS);
-            localStorage.removeItem('serviflow_user_session');
-            localStorage.removeItem('serviflow_logged_in_email');
-            localStorage.removeItem('serviflow_logged_in_uid');
-            localStorage.removeItem('serviflow_current_biz_cache');
+              await setDoc(doc(db, 'users', firebaseUser.uid), cleanFirestoreData(autoUser), { merge: true });
+            } catch (syncErr) {
+              console.warn('Auto user profile sync note:', syncErr);
+            }
+
+            setCurrentUser(autoUser);
+            localStorage.setItem('serviflow_user_session', JSON.stringify(autoUser));
+            localStorage.setItem('serviflow_logged_in_email', autoUser.email);
+            localStorage.setItem('serviflow_logged_in_uid', autoUser.id);
+            if (isMounted) setIsAuthInitializing(false);
+            return;
           }
         } catch (err) {
           console.error('Error fetching user on auth change:', err);

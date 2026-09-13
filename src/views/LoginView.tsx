@@ -58,6 +58,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
   // Sign In Form State
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Referral Code Input & Validation State
@@ -305,31 +307,44 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
   }
 
   // Handle Direct Sign In
-  const handleDirectLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanIdentifier = loginIdentifier.trim();
+  const handleDirectLogin = async (e?: React.FormEvent, customIdentifier?: string, customPassword?: string) => {
+    if (e) e.preventDefault();
+    const cleanIdentifier = (customIdentifier ?? loginIdentifier).trim();
+    const effectivePassword = (customPassword ?? loginPassword).trim() || 'ServiFlow@123';
 
     if (!cleanIdentifier) {
       showToast('Please enter your email address or mobile phone number', 'error');
+      setLoginError('कृपया अपना पंजीकृत ईमेल या मोबाइल नंबर दर्ज करें।');
       return;
     }
 
+    setLoginError(null);
     setIsSubmitting(true);
 
     try {
       // Direct login through AppContext and AuthService
       const loggedIn = await loginUser(
         { email: cleanIdentifier, id: '', name: '', phone: '', role: 'business_owner', businessId: '', status: 'active' },
-        loginPassword
+        effectivePassword
       );
 
       sessionStorage.setItem('serviflow_active_tab', loggedIn.role === 'super_admin' ? 'super_admin' : loggedIn.role === 'technician' ? 'jobs' : 'dashboard');
       if (onLoginSuccess) onLoginSuccess();
     } catch (err: any) {
       console.error('Sign in error:', err);
+      const errMsg = err?.message || 'लॉगिन विफल रहा। कृपया अपना ईमेल और पासवर्ड जांचें।';
+      setLoginError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleQuickDemoLogin = (email: string, pass: string = 'ServiFlow@123') => {
+    setLoginIdentifier(email);
+    setLoginPassword(pass);
+    setLoginError(null);
+    handleDirectLogin(undefined, email, pass);
   };
 
   // Handle Business Owner Account Registration
@@ -580,65 +595,172 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
 
           {/* SIGN IN TAB */}
           {authTab === 'login' && (
-            <form onSubmit={handleDirectLogin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Email Address or Mobile Phone
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={loginIdentifier}
-                    onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="e.g. rajesh@apexsecurity.com or 9876543210"
-                    required
-                    className="w-full h-11 sm:h-12 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                    Password
+            <div className="space-y-4">
+              <form onSubmit={handleDirectLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Email Address or Mobile Phone
                   </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={loginIdentifier}
+                      onChange={(e) => {
+                        setLoginIdentifier(e.target.value);
+                        if (loginError) setLoginError(null);
+                      }}
+                      placeholder="e.g. uniquesolutions108@gmail.com or 9876543210"
+                      required
+                      className="w-full h-11 sm:h-12 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Password
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => openForgotPasswordModal(loginIdentifier)}
+                      className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold hover:underline cursor-pointer"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type={showLoginPassword ? 'text' : 'password'}
+                      value={loginPassword}
+                      onChange={(e) => {
+                        setLoginPassword(e.target.value);
+                        if (loginError) setLoginError(null);
+                      }}
+                      placeholder="Enter password (e.g. ServiFlow@123)"
+                      required
+                      className="w-full h-11 sm:h-12 pl-10 pr-11 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      tabIndex={-1}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                      title={showLoginPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {loginError && (
+                  <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300 space-y-2 animate-in fade-in">
+                    <div className="flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                      <div className="flex-1 font-medium leading-relaxed">{loginError}</div>
+                    </div>
+                    <div className="flex items-center gap-3 pt-1 border-t border-red-200/60 dark:border-red-800/60">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLoginError(null);
+                          setAuthTab('register');
+                        }}
+                        className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                      >
+                        Create New Account →
+                      </button>
+                      <span className="text-slate-300 dark:text-slate-600">•</span>
+                      <button
+                        type="button"
+                        onClick={() => openForgotPasswordModal(loginIdentifier)}
+                        className="text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:underline cursor-pointer"
+                      >
+                        Reset Password
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full h-11 sm:h-12 min-h-[44px] rounded-xl sm:rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Signing in...</span>
+                    </span>
+                  ) : (
+                    <>
+                      <span>Sign In</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Quick Demo Access Bar */}
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    Instant Demo Login / तुरंत लॉगिन करें
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">Pass: ServiFlow@123</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => openForgotPasswordModal(loginIdentifier)}
-                    className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold hover:underline cursor-pointer"
+                    onClick={() => handleQuickDemoLogin('uniquesolutions108@gmail.com', 'ServiFlow@123')}
+                    disabled={isSubmitting}
+                    className="flex flex-col items-start p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/50 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all text-left cursor-pointer group"
                   >
-                    Forgot Password?
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                      <span>🏢</span>
+                      <span>Business Owner</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate w-full mt-0.5">
+                      uniquesolutions108...
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemoLogin('tech@serviflow.io', 'ServiFlow@123')}
+                    disabled={isSubmitting}
+                    className="flex flex-col items-start p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all text-left cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-900 dark:text-slate-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+                      <span>🔧</span>
+                      <span>Field Technician</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate w-full mt-0.5">
+                      tech@serviflow.io
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemoLogin('admin@serviflow.io', 'ServiFlow@123')}
+                    disabled={isSubmitting}
+                    className="flex flex-col items-start p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/50 hover:bg-purple-50 dark:hover:bg-purple-950/40 hover:border-purple-300 dark:hover:border-purple-700 transition-all text-left cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-900 dark:text-slate-100 group-hover:text-purple-600 dark:group-hover:text-purple-400">
+                      <span>👑</span>
+                      <span>Super Admin</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate w-full mt-0.5">
+                      admin@serviflow.io
+                    </span>
                   </button>
                 </div>
-                <div className="relative">
-                  <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Enter password"
-                    required
-                    className="w-full h-11 sm:h-12 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
-                  />
-                </div>
               </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full h-11 sm:h-12 min-h-[44px] rounded-xl sm:rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
-              >
-                {isSubmitting ? (
-                  <span>Signing in...</span>
-                ) : (
-                  <>
-                    <span>Sign In</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
+            </div>
           )}
 
           {/* CREATE ACCOUNT TAB */}
