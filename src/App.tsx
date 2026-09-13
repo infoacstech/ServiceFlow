@@ -349,6 +349,7 @@ const MainContent: React.FC = () => {
       {/* SaaS Trial & Subscription Status Banner */}
       <TrialStatusBanner
         onUpgradeClick={() => handleTabChange('settings_subscription')}
+        onViewReceiptClick={() => handleTabChange('settings_subscription')}
       />
 
       {/* Main Workspace Layout */}
@@ -425,7 +426,15 @@ const MainContent: React.FC = () => {
                     />
                   )}
 
-                  {activeTab === 'settings' && <SettingsView />}
+                  {(activeTab === 'settings' || activeTab.startsWith('settings_')) && (
+                    <SettingsView
+                      initialTab={
+                        activeTab.startsWith('settings_')
+                          ? (activeTab.replace('settings_', '') as any)
+                          : undefined
+                      }
+                    />
+                  )}
 
                   {activeTab === 'notifications' && <NotificationsView />}
 

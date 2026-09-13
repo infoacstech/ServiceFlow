@@ -60,6 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
     language,
     setLanguage,
     supportedLanguages,
+    subscriptionPayments,
   } = useApp();
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
   const permissions = getRolePermissions(currentUser?.role);
@@ -89,6 +90,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
     (p) => p.status === 'pending'
   ).length;
 
+  const pendingSubscriptionPaymentsCount = (subscriptionPayments || []).filter(
+    (p) => p.status === 'pending'
+  ).length;
+
   // ==========================================
   // 1. SUPER ADMIN PLATFORM NAVIGATION
   // ==========================================
@@ -114,6 +119,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
           icon: Building2,
           badge: businesses.length > 0 ? String(businesses.length) : null,
           badgeColor: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+        },
+        {
+          id: 'super_admin_subscriptions',
+          label: 'SaaS Payments & UTR',
+          icon: Receipt,
+          badge: pendingSubscriptionPaymentsCount > 0 ? `${pendingSubscriptionPaymentsCount} New` : null,
+          badgeColor: 'bg-amber-500 text-slate-950 font-black animate-pulse',
         },
         {
           id: 'super_admin_pending',

@@ -83,7 +83,20 @@ import {
   playNotificationChime,
 } from '../utils/audioNotification';
 
-export const SettingsView: React.FC = () => {
+export interface SettingsViewProps {
+  initialTab?:
+    | 'my_profile'
+    | 'profile'
+    | 'subscription'
+    | 'referrals'
+    | 'sync'
+    | 'security'
+    | 'appearance'
+    | 'language'
+    | 'reset';
+}
+
+export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
   const {
     currentBusiness,
     updateBusinessProfile,
@@ -126,7 +139,13 @@ export const SettingsView: React.FC = () => {
 
   const [activeSettingsTab, setActiveSettingsTab] = useState<
     'my_profile' | 'profile' | 'subscription' | 'referrals' | 'sync' | 'security' | 'appearance' | 'language' | 'reset'
-  >(isOwner ? 'profile' : 'my_profile');
+  >(initialTab || (isOwner ? 'profile' : 'my_profile'));
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveSettingsTab(initialTab);
+    }
+  }, [initialTab]);
 
   // User Profile Form State
   const [userProfileData, setUserProfileData] = useState({
