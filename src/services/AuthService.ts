@@ -254,9 +254,11 @@ export class AuthService {
       }
     }
 
-    // 2. Check all active user accounts in Firestore
+    // 2. Check active user accounts in Firestore within this tenant
     try {
-      const usersSnap = await getDocs(collection(db, 'users'));
+      const usersSnap = await getDocs(
+        query(collection(db, 'users'), where('businessId', '==', businessId))
+      );
       for (const uDoc of usersSnap.docs) {
         const u = uDoc.data() as User;
         // Ignore inactive or deleted records so deleted emails/numbers can be reused
@@ -274,41 +276,32 @@ export class AuthService {
           uPhoneDigits.slice(-10) === cleanPhoneDigits.slice(-10);
 
         if (isEmailMatch) {
-          if (u.role === 'business_owner' && u.businessId === businessId) {
+          if (u.role === 'business_owner') {
             throw new Error(
               `Cannot use Business Owner's email address (${email}) for a staff member. Please use the staff member's unique email.`
             );
           }
-          if (u.role === 'business_owner') {
-            throw new Error(
-              `This email address (${email}) is already registered as a Business Owner on the platform. Please use another email.`
-            );
-          }
-          if (u.role === 'super_admin') {
-            throw new Error(
-              `This email address (${email}) is reserved for SaaS Administration.`
-            );
-          }
+          throw new Error(
+            `A staff member with email address (${email}) already exists in your team.`
+          );
         }
 
         if (isPhoneMatch) {
-          if (u.role === 'business_owner' && u.businessId === businessId) {
+          if (u.role === 'business_owner') {
             throw new Error(
               `Cannot use Business Owner's mobile number (${phone}) for a staff member. Please use the staff member's unique mobile number.`
             );
           }
-          if (u.role === 'business_owner') {
-            throw new Error(
-              `This phone number (${phone}) is already registered to a Business Owner on the platform.`
-            );
-          }
+          throw new Error(
+            `A staff member with phone number (${phone}) already exists in your team.`
+          );
         }
       }
     } catch (err: any) {
       if (err.message && (err.message.includes('Cannot use') || err.message.includes('already registered') || err.message.includes('already exists') || err.message.includes('reserved') || err.message.includes('already in use'))) {
         throw err;
       }
-      console.warn('User uniqueness pre-check notice:', err);
+      console.warn('Tenant staff validation check notice:', err);
     }
   }
 

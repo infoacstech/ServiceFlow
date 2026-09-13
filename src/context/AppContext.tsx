@@ -818,81 +818,169 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // -------------------------------------------------------------
-  // REAL-TIME FIRESTORE SUBSCRIPTIONS (WITH PERSISTENT LOCAL CACHE)
+  // REAL-TIME FIRESTORE SUBSCRIPTIONS (MULTI-TENANT OPTIMIZED & CACHE-BACKED)
   // -------------------------------------------------------------
   useEffect(() => {
-    // 1. Businesses
-    const unsubBiz = onSnapshot(
-      collection(db, 'businesses'),
-      (snapshot) => {
-        const cloudItems = snapshot.docs
-          .map((d) => ({ ...(d.data() as Business), id: d.id || (d.data() as Business).id }))
-          .filter(
-            (b) =>
-              b.id &&
-              b.id !== 'all' &&
-              b.id !== 'biz-default' &&
-              b.name !== 'ServiFlow Global Network' &&
-              b.name !== 'ServiFlow Workspace'
-          );
-        setBusinesses(cloudItems);
-        saveCache('serviflow_businesses_cache', cloudItems);
-        if (cloudItems.length > 0) {
-          setCurrentBusiness((prev) => {
-            const found = cloudItems.find((b) => b.id === prev.id);
-            const active = found || cloudItems[0];
-            saveCache('serviflow_current_biz_cache', active);
-            return active;
-          });
+    // Determine active tenant scope
+    const isSuperAdmin = currentUser?.role === 'super_admin';
+    const isViewingAll = isSuperAdmin && currentBusiness?.id === 'all';
+
+    // Effective tenant business ID:
+    const activeBizId = isViewingAll
+      ? 'all'
+      : currentBusiness?.id && currentBusiness.id !== 'all' && currentBusiness.id !== 'biz-default'
+      ? currentBusiness.id
+      : currentUser?.businessId && currentUser.businessId !== 'all'
+      ? currentUser.businessId
+      : null;
+
+    const unsubs: Array<() => void> = [];
+
+    // 19. System Settings (Always global - allow read: if true)
+    const unsubSystemSettings = onSnapshot(
+      doc(db, 'systemSettings', 'global'),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const loaded = docSnap.data() as SystemSettings;
+          setSystemSettings(loaded);
+          saveCache('serviflow_system_settings_cache', loaded);
         } else {
-          setCurrentBusiness(DEFAULT_BLANK_BUSINESS);
-          saveCache('serviflow_current_biz_cache', DEFAULT_BLANK_BUSINESS);
+          saveToFirestore('systemSettings', 'global', DEFAULT_SYSTEM_SETTINGS);
         }
       },
-      (error) => handleFirestoreError(error, OperationType.GET, 'businesses')
+      (error) => handleFirestoreError(error, OperationType.GET, 'systemSettings/global')
     );
+    unsubs.push(unsubSystemSettings);
 
-    // 2. Users
+    // 17. Roles (System-wide definitions)
+    const unsubRoles = onSnapshot(
+      collection(db, 'roles'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const loadedRoles = snapshot.docs.map((d) => d.data() as Role);
+          setRoles(loadedRoles);
+          saveCache('serviflow_roles_cache', loadedRoles);
+        } else {
+          DEMO_ROLES.forEach((r) => saveToFirestore('roles', r.id, r));
+          setRoles(DEMO_ROLES);
+          saveCache('serviflow_roles_cache', DEMO_ROLES);
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'roles')
+    );
+    unsubs.push(unsubRoles);
+
+    // IF NO USER IS LOGGED IN OR NO ACTIVE TENANT RESOLVED:
+    // Do NOT open listeners for private tenant collections!
+    // This stops unauthenticated permission-denied errors and cuts idle reads to zero.
+    if (!currentUser || !activeBizId) {
+      return () => {
+        unsubs.forEach((u) => u());
+      };
+    }
+
+    // Helper to query either all (Super Admin) or scoped to the active tenant
+    const getTenantQuery = (colName: string) => {
+      if (activeBizId === 'all') {
+        return collection(db, colName);
+      }
+      return query(collection(db, colName), where('businessId', '==', activeBizId));
+    };
+
+    // 1. Businesses
+    if (activeBizId === 'all') {
+      const unsubBiz = onSnapshot(
+        collection(db, 'businesses'),
+        (snapshot) => {
+          const cloudItems = snapshot.docs
+            .map((d) => ({ ...(d.data() as Business), id: d.id || (d.data() as Business).id }))
+            .filter(
+              (b) =>
+                b.id &&
+                b.id !== 'all' &&
+                b.id !== 'biz-default' &&
+                b.name !== 'ServiFlow Global Network' &&
+                b.name !== 'ServiFlow Workspace'
+            );
+          setBusinesses(cloudItems);
+          saveCache('serviflow_businesses_cache', cloudItems);
+          if (cloudItems.length > 0) {
+            setCurrentBusiness((prev) => {
+              const found = cloudItems.find((b) => b.id === prev.id);
+              const active = found || cloudItems[0];
+              saveCache('serviflow_current_biz_cache', active);
+              return active;
+            });
+          }
+        },
+        (error) => handleFirestoreError(error, OperationType.GET, 'businesses')
+      );
+      unsubs.push(unsubBiz);
+    } else {
+      const unsubBiz = onSnapshot(
+        doc(db, 'businesses', activeBizId),
+        (docSnap) => {
+          if (docSnap.exists()) {
+            const b = { ...(docSnap.data() as Business), id: docSnap.id };
+            setBusinesses([b]);
+            setCurrentBusiness((prev) => (prev.id === b.id ? { ...prev, ...b } : b));
+            saveCache('serviflow_businesses_cache', [b]);
+            saveCache('serviflow_current_biz_cache', b);
+          }
+        },
+        (error) => handleFirestoreError(error, OperationType.GET, `businesses/${activeBizId}`)
+      );
+      unsubs.push(unsubBiz);
+    }
+
+    // 2. Users (Scoped to tenant for tenant members, platform-wide for Super Admin)
+    const usersQuery =
+      activeBizId === 'all'
+        ? collection(db, 'users')
+        : query(collection(db, 'users'), where('businessId', '==', activeBizId));
+
     const unsubUsers = onSnapshot(
-      collection(db, 'users'),
+      usersQuery,
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as User);
 
-        // Security & Account Isolation Migration Routine:
-        // Audit all user profiles and revert unauthorized super_admin roles to business_owner
-        cloudItems.forEach((u) => {
-          const uEmail = (u.email || '').trim().toLowerCase();
-          const isAuthorizedSuperAdmin =
-            uEmail === 'admin@serviflow.io' ||
-            uEmail === 'superadmin@serviflow.io' ||
-            u.id === SUPER_ADMIN_USER.id;
+        // Security & Account Isolation Migration Routine (Super Admin only audit)
+        if (isSuperAdmin) {
+          cloudItems.forEach((u) => {
+            const uEmail = (u.email || '').trim().toLowerCase();
+            const isAuthorizedSuperAdmin =
+              uEmail === 'admin@serviflow.io' ||
+              uEmail === 'superadmin@serviflow.io' ||
+              u.id === SUPER_ADMIN_USER.id;
 
-          if (u.role === 'super_admin' && !isAuthorizedSuperAdmin) {
-            console.warn(
-              `[Security Audit Auto-Correction] Account ${u.email || u.id} was inappropriately marked as super_admin. Correcting to business_owner.`
-            );
-            const correctedBizId = u.businessId && u.businessId !== 'all' ? u.businessId : `tenant-${u.id}`;
-            saveToFirestore('users', u.id, {
-              role: 'business_owner',
-              businessId: correctedBizId,
-            });
-            u.role = 'business_owner';
-            u.businessId = correctedBizId;
-          } else if (u.role !== 'super_admin' && u.businessId === 'all') {
-            const correctedBizId = `tenant-${u.id}`;
-            saveToFirestore('users', u.id, { businessId: correctedBizId });
-            u.businessId = correctedBizId;
-          }
-        });
+            if (u.role === 'super_admin' && !isAuthorizedSuperAdmin) {
+              console.warn(
+                `[Security Audit Auto-Correction] Account ${u.email || u.id} was inappropriately marked as super_admin. Correcting to business_owner.`
+              );
+              const correctedBizId = u.businessId && u.businessId !== 'all' ? u.businessId : `tenant-${u.id}`;
+              saveToFirestore('users', u.id, {
+                role: 'business_owner',
+                businessId: correctedBizId,
+              });
+              u.role = 'business_owner';
+              u.businessId = correctedBizId;
+            } else if (u.role !== 'super_admin' && u.businessId === 'all') {
+              const correctedBizId = `tenant-${u.id}`;
+              saveToFirestore('users', u.id, { businessId: correctedBizId });
+              u.businessId = correctedBizId;
+            }
+          });
+        }
 
         // Deduplicate and canonicalize Super Admin
-        const superAdminRecord = cloudItems.find(
-          (u) =>
-            (u.email || '').trim().toLowerCase() === 'admin@serviflow.io' ||
-            (u.email || '').trim().toLowerCase() === 'superadmin@serviflow.io' ||
-            u.role === 'super_admin' ||
-            u.id === SUPER_ADMIN_USER.id
-        ) || SUPER_ADMIN_USER;
+        const superAdminRecord =
+          cloudItems.find(
+            (u) =>
+              (u.email || '').trim().toLowerCase() === 'admin@serviflow.io' ||
+              (u.email || '').trim().toLowerCase() === 'superadmin@serviflow.io' ||
+              u.role === 'super_admin' ||
+              u.id === SUPER_ADMIN_USER.id
+          ) || SUPER_ADMIN_USER;
 
         const canonicalSuperAdmin: User = {
           ...SUPER_ADMIN_USER,
@@ -908,7 +996,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const map = new Map<string, User>();
         map.set(SUPER_ADMIN_USER.id, canonicalSuperAdmin);
 
-        // Group non-superadmin users by business tenant identity to eliminate duplicate owner/staff records
+        // Group non-superadmin users by business tenant identity
         const tenantUserGroups = new Map<string, User[]>();
 
         cloudItems.forEach((u) => {
@@ -920,14 +1008,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             u.id === SUPER_ADMIN_USER.id;
 
           if (isSuper) {
-            // Already handled in canonicalSuperAdmin
             return;
           }
 
           const bizId = u.businessId || 'default';
           const cleanPhone = (u.phone || '').replace(/[^0-9]/g, '').slice(-10);
 
-          // Identity grouping key per tenant
           let groupKey = '';
           if (uEmail) {
             groupKey = `${bizId}__email__${uEmail}`;
@@ -945,7 +1031,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           tenantUserGroups.get(groupKey)!.push(u);
         });
 
-        // Current active UID to prevent deleting current logged-in user doc
         const activeSessionUid = localStorage.getItem('serviflow_logged_in_uid') || auth.currentUser?.uid;
 
         tenantUserGroups.forEach((groupUsers) => {
@@ -955,11 +1040,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return;
           }
 
-          // More than 1 record found for the same identity in the same tenant!
-          // Rank records to pick the single canonical user record:
-          // 1. Matches active logged-in UID
-          // 2. Is not a temporary prefix (e.g. valid Firebase UID vs 'usr-owner-')
-          // 3. Has more populated fields / latest joiningDate
           const sorted = [...groupUsers].sort((a, b) => {
             const aIsActive = activeSessionUid && a.id === activeSessionUid ? 1 : 0;
             const bIsActive = activeSessionUid && b.id === activeSessionUid ? 1 : 0;
@@ -982,20 +1062,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUsers(allUsers);
         saveCache('serviflow_users_cache', allUsers);
 
-        // Ensure Super Admin user exists in database
-        const hasSuperAdmin = cloudItems.some(
-          (u) =>
-            (u.role === 'super_admin' && (u.email || '').trim().toLowerCase() === 'admin@serviflow.io') ||
-            u.id === SUPER_ADMIN_USER.id
-        );
-        if (!hasSuperAdmin) {
-          saveToFirestore('users', SUPER_ADMIN_USER.id, canonicalSuperAdmin);
-        }
-
         setCurrentUser((prev) => {
           if (!prev) return null;
-          const isSuperAdmin = prev.role === 'super_admin' || prev.email === 'admin@serviflow.io';
-          if (isSuperAdmin) return prev;
+          const isSuper = prev.role === 'super_admin' || prev.email === 'admin@serviflow.io';
+          if (isSuper) return prev;
 
           const prevEmail = (prev.email || '').trim().toLowerCase();
           const prevPhone = (prev.phone || '').replace(/[^0-9]/g, '');
@@ -1010,39 +1080,18 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             );
           });
 
-          if (!found) {
-            // Only invalidate if we are certain cloud data loaded and user genuinely no longer exists
-            if (cloudItems.length > 0) {
-              const stillInCloud = cloudItems.some((u) => {
-                const uEmail = (u.email || '').trim().toLowerCase();
-                const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
-                return (
-                  u.id === prev.id ||
-                  (Boolean(uEmail) && Boolean(prevEmail) && uEmail === prevEmail) ||
-                  (uPhone.length >= 10 && prevPhone.length >= 10 && uPhone.slice(-10) === prevPhone.slice(-10))
-                );
-              });
-
-              if (!stillInCloud) {
-                localStorage.removeItem('serviflow_user_session');
-                localStorage.removeItem('serviflow_logged_in_email');
-                localStorage.removeItem('serviflow_logged_in_uid');
-                return null;
-              }
-            }
-            return prev;
-          }
-
+          if (!found) return prev;
           localStorage.setItem('serviflow_user_session', JSON.stringify(found));
           return found;
         });
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'users')
     );
+    unsubs.push(unsubUsers);
 
     // 2.5 Enquiries
     const unsubEnquiries = onSnapshot(
-      collection(db, 'enquiries'),
+      getTenantQuery('enquiries'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Enquiry);
         setEnquiries(cloudItems);
@@ -1050,10 +1099,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'enquiries')
     );
+    unsubs.push(unsubEnquiries);
 
     // 3. Customers
     const unsubCustomers = onSnapshot(
-      collection(db, 'customers'),
+      getTenantQuery('customers'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Customer);
         setCustomers(cloudItems);
@@ -1061,10 +1111,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'customers')
     );
+    unsubs.push(unsubCustomers);
 
     // 4. Categories
     const unsubCategories = onSnapshot(
-      collection(db, 'categories'),
+      getTenantQuery('categories'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as ServiceCategory);
         setCategories(cloudItems);
@@ -1072,10 +1123,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'categories')
     );
+    unsubs.push(unsubCategories);
 
     // 5. Services
     const unsubServices = onSnapshot(
-      collection(db, 'services'),
+      getTenantQuery('services'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Service);
         setServices(cloudItems);
@@ -1083,26 +1135,26 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'services')
     );
+    unsubs.push(unsubServices);
 
     // 6. Jobs
     const unsubJobs = onSnapshot(
-      collection(db, 'jobs'),
+      getTenantQuery('jobs'),
       (snapshot) => {
         const loadedJobs = snapshot.docs.map((d) => d.data() as Job);
-
         if (isInitialJobsLoadRef.current) {
           isInitialJobsLoadRef.current = false;
         }
-
         setJobs(loadedJobs);
         saveCache('serviflow_jobs_cache', loadedJobs);
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'jobs')
     );
+    unsubs.push(unsubJobs);
 
     // 7. Inventory
     const unsubInventory = onSnapshot(
-      collection(db, 'inventory'),
+      getTenantQuery('inventory'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as InventoryItem);
         setInventory(cloudItems);
@@ -1110,10 +1162,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'inventory')
     );
+    unsubs.push(unsubInventory);
 
     // 8. Inventory Transactions
     const unsubInvTx = onSnapshot(
-      collection(db, 'inventoryTransactions'),
+      getTenantQuery('inventoryTransactions'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as InventoryTransaction);
         setInventoryTransactions(cloudItems);
@@ -1121,10 +1174,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'inventoryTransactions')
     );
+    unsubs.push(unsubInvTx);
 
     // 9. Quotations
     const unsubQuotations = onSnapshot(
-      collection(db, 'quotations'),
+      getTenantQuery('quotations'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Quotation);
         setQuotations(cloudItems);
@@ -1132,10 +1186,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'quotations')
     );
+    unsubs.push(unsubQuotations);
 
     // 10. Invoices
     const unsubInvoices = onSnapshot(
-      collection(db, 'invoices'),
+      getTenantQuery('invoices'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Invoice);
         setInvoices(cloudItems);
@@ -1143,10 +1198,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'invoices')
     );
+    unsubs.push(unsubInvoices);
 
     // 11. Payments
     const unsubPayments = onSnapshot(
-      collection(db, 'payments'),
+      getTenantQuery('payments'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Payment);
         setPayments(cloudItems);
@@ -1154,10 +1210,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'payments')
     );
+    unsubs.push(unsubPayments);
 
     // 12. Contracts
     const unsubContracts = onSnapshot(
-      collection(db, 'contracts'),
+      getTenantQuery('contracts'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as RecurringContract);
         setContracts(cloudItems);
@@ -1165,10 +1222,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'contracts')
     );
+    unsubs.push(unsubContracts);
 
     // 13. Expenses
     const unsubExpenses = onSnapshot(
-      collection(db, 'expenses'),
+      getTenantQuery('expenses'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Expense);
         setExpenses(cloudItems);
@@ -1176,10 +1234,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'expenses')
     );
+    unsubs.push(unsubExpenses);
 
-    // 14. Notifications
+    // 14. Notifications (Scoped to tenant)
     const unsubNotifications = onSnapshot(
-      collection(db, 'notifications'),
+      getTenantQuery('notifications'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as Notification);
 
@@ -1194,8 +1253,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               if (!currentUser) return;
               if (notif.businessId !== currentBusiness?.id && currentUser.role !== 'super_admin') return;
 
-              // SELF-NOTIFICATION SUPPRESSION:
-              // The user who performed this action should NEVER receive a banner popup or voice alert for their own action
               const curId = (currentUser.id || '').trim().toLowerCase();
               const curEmail = (currentUser.email || '').trim().toLowerCase();
               const senderId = (notif.senderUserId || '').trim().toLowerCase();
@@ -1204,7 +1261,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 return;
               }
 
-              // Check if notification is targeted to the current active user
               let isTargetedToMe = false;
 
               const isCustomerServiceRequest =
@@ -1232,7 +1288,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   notif.title?.toLowerCase().includes('job completed'));
 
               if (isCustomerServiceRequest) {
-                // Business Owner & Managers (and Super Admin) receive direct audio alert and popup for incoming customer portal bookings
                 if (
                   currentUser.role === 'business_owner' ||
                   currentUser.role === 'manager' ||
@@ -1241,7 +1296,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   isTargetedToMe = true;
                 }
               } else if (isJobAssignment) {
-                // Only the assigned technician receives the voice alert and popup
                 if (currentUser.role === 'technician') {
                   if (notif.targetUserId) {
                     const curPhone = (currentUser.phone || '').replace(/\D/g, '');
@@ -1271,13 +1325,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   }
                 }
               } else if (isJobStatusUpdate) {
-                // Owner & Manager (and Super Admin) receive updates when field technician accepts, starts, or finishes jobs
-                // Technicians / Staff NEVER receive this notification popup or sound
-                if (currentUser.role === 'business_owner' || currentUser.role === 'manager' || currentUser.role === 'super_admin') {
+                if (
+                  currentUser.role === 'business_owner' ||
+                  currentUser.role === 'manager' ||
+                  currentUser.role === 'super_admin'
+                ) {
                   isTargetedToMe = true;
                 }
               } else {
-                // General notifications
                 if (notif.targetUserId) {
                   isTargetedToMe = notif.targetUserId === currentUser.id || notif.targetUserId === currentUser.email;
                 } else if (notif.targetRoleId) {
@@ -1288,16 +1343,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
 
               if (isTargetedToMe) {
-                // Show in-app banner popup card with full details
                 setActiveJobPopup(notif);
-
-                // Trigger Background OS System Notification (works when window is minimized/tab in background/PWA)
                 sendBackgroundSystemNotification(notif.title, {
                   body: notif.message,
                   data: { jobId: notif.jobId, url: '/' },
                 });
 
-                // Trigger Voice Audio Alert
                 if (isCustomerServiceRequest) {
                   playCustomerServiceRequestVoiceNotification(
                     notif.jobId || 'NEW',
@@ -1338,10 +1389,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'notifications')
     );
+    unsubs.push(unsubNotifications);
 
     // 15. Activity Logs
     const unsubActivities = onSnapshot(
-      collection(db, 'activities'),
+      getTenantQuery('activities'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as ActivityLog);
         setActivityLogs(cloudItems);
@@ -1349,10 +1401,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'activities')
     );
+    unsubs.push(unsubActivities);
 
     // 16. Manual Sync Logs
     const unsubSyncLogs = onSnapshot(
-      collection(db, 'manualSyncLogs'),
+      getTenantQuery('manualSyncLogs'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as ManualSyncLog);
         setManualSyncLogs(cloudItems);
@@ -1360,27 +1413,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'manualSyncLogs')
     );
-
-    // 17. Roles
-    const unsubRoles = onSnapshot(
-      collection(db, 'roles'),
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const loadedRoles = snapshot.docs.map((d) => d.data() as Role);
-          setRoles(loadedRoles);
-          saveCache('serviflow_roles_cache', loadedRoles);
-        } else {
-          DEMO_ROLES.forEach((r) => saveToFirestore('roles', r.id, r));
-          setRoles(DEMO_ROLES);
-          saveCache('serviflow_roles_cache', DEMO_ROLES);
-        }
-      },
-      (error) => handleFirestoreError(error, OperationType.GET, 'roles')
-    );
+    unsubs.push(unsubSyncLogs);
 
     // 18. Support Sessions
+    const supportSessionsQuery = isViewingAll
+      ? collection(db, 'supportSessions')
+      : query(collection(db, 'supportSessions'), where('targetBusinessId', '==', activeBizId));
     const unsubSupportSessions = onSnapshot(
-      collection(db, 'supportSessions'),
+      supportSessionsQuery,
       (snapshot) => {
         const sessions = snapshot.docs.map((d) => d.data() as SupportSession);
         setSupportSessions(sessions);
@@ -1390,25 +1430,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'supportSessions')
     );
-
-    // 19. System Settings
-    const unsubSystemSettings = onSnapshot(
-      doc(db, 'systemSettings', 'global'),
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const loaded = docSnap.data() as SystemSettings;
-          setSystemSettings(loaded);
-          saveCache('serviflow_system_settings_cache', loaded);
-        } else {
-          saveToFirestore('systemSettings', 'global', DEFAULT_SYSTEM_SETTINGS);
-        }
-      },
-      (error) => handleFirestoreError(error, OperationType.GET, 'systemSettings/global')
-    );
+    unsubs.push(unsubSupportSessions);
 
     // 20. Security Audit Logs
     const unsubSecurityLogs = onSnapshot(
-      collection(db, 'securityAuditLogs'),
+      getTenantQuery('securityAuditLogs'),
       (snapshot) => {
         const logs = snapshot.docs.map((d) => d.data() as SecurityAuditLog);
         setSecurityAuditLogs(logs);
@@ -1416,10 +1442,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'securityAuditLogs')
     );
+    unsubs.push(unsubSecurityLogs);
 
     // 21. Referral Records
+    const refQuery = isViewingAll
+      ? collection(db, 'referrals')
+      : query(collection(db, 'referrals'), where('ownerId', '==', currentUser.id));
     const unsubReferrals = onSnapshot(
-      collection(db, 'referrals'),
+      refQuery,
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as ReferralRecord);
         setReferralRecords(cloudItems);
@@ -1427,10 +1457,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'referrals')
     );
+    unsubs.push(unsubReferrals);
 
     // 22. Referral Payout Requests
+    const refPayoutQuery = isViewingAll
+      ? collection(db, 'referralPayouts')
+      : query(collection(db, 'referralPayouts'), where('ownerId', '==', currentUser.id));
     const unsubReferralPayouts = onSnapshot(
-      collection(db, 'referralPayouts'),
+      refPayoutQuery,
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as ReferralPayoutRequest);
         setReferralPayoutRequests(cloudItems);
@@ -1438,10 +1472,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'referralPayouts')
     );
+    unsubs.push(unsubReferralPayouts);
 
     // 23. Attendance Records
     const unsubAttendance = onSnapshot(
-      collection(db, 'attendance'),
+      getTenantQuery('attendance'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as AttendanceRecord);
         setAttendanceRecords(cloudItems);
@@ -1449,10 +1484,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'attendance')
     );
+    unsubs.push(unsubAttendance);
 
     // 24. Attendance Locations
     const unsubAttendanceLocations = onSnapshot(
-      collection(db, 'attendanceLocations'),
+      getTenantQuery('attendanceLocations'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as AttendanceLocation);
         setAttendanceLocations(cloudItems);
@@ -1460,10 +1496,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'attendanceLocations')
     );
+    unsubs.push(unsubAttendanceLocations);
 
     // 25. Attendance Audit Logs
     const unsubAttendanceAuditLogs = onSnapshot(
-      collection(db, 'attendanceAuditLogs'),
+      getTenantQuery('attendanceAuditLogs'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as AttendanceAuditItem);
         setAttendanceAuditLogs(cloudItems);
@@ -1471,10 +1508,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'attendanceAuditLogs')
     );
+    unsubs.push(unsubAttendanceAuditLogs);
 
     // 26. Attendance Issues
     const unsubAttendanceIssues = onSnapshot(
-      collection(db, 'attendanceIssues'),
+      getTenantQuery('attendanceIssues'),
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as AttendanceIssue);
         setAttendanceIssues(cloudItems);
@@ -1482,37 +1520,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'attendanceIssues')
     );
+    unsubs.push(unsubAttendanceIssues);
 
     return () => {
-      unsubBiz();
-      unsubUsers();
-      unsubEnquiries();
-      unsubCustomers();
-      unsubCategories();
-      unsubServices();
-      unsubJobs();
-      unsubInventory();
-      unsubInvTx();
-      unsubQuotations();
-      unsubInvoices();
-      unsubPayments();
-      unsubContracts();
-      unsubExpenses();
-      unsubNotifications();
-      unsubActivities();
-      unsubSyncLogs();
-      unsubRoles();
-      unsubSupportSessions();
-      unsubSystemSettings();
-      unsubSecurityLogs();
-      unsubReferrals();
-      unsubReferralPayouts();
-      unsubAttendance();
-      unsubAttendanceLocations();
-      unsubAttendanceAuditLogs();
-      unsubAttendanceIssues();
+      unsubs.forEach((u) => u());
     };
-  }, []);
+  }, [currentUser?.id, currentUser?.role, currentBusiness?.id]);
 
   // Online / Offline Window Listener
   useEffect(() => {
@@ -1745,6 +1758,24 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setCurrentUser(null);
     setCurrentBusiness(DEFAULT_BLANK_BUSINESS);
+    setJobs([]);
+    setCustomers([]);
+    setInvoices([]);
+    setQuotations([]);
+    setEnquiries([]);
+    setInventory([]);
+    setInventoryTransactions([]);
+    setPayments([]);
+    setContracts([]);
+    setExpenses([]);
+    setNotifications([]);
+    setActivityLogs([]);
+    setManualSyncLogs([]);
+    setAttendanceRecords([]);
+    setAttendanceLocations([]);
+    setAttendanceAuditLogs([]);
+    setAttendanceIssues([]);
+    setBusinesses([]);
     localStorage.removeItem('serviflow_user_session');
     localStorage.removeItem('serviflow_logged_in_email');
     localStorage.removeItem('serviflow_logged_in_uid');
