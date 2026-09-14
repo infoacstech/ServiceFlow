@@ -11,7 +11,19 @@ service cloud.firestore {
     function isSuperAdmin() {
       return isAuthenticated() && (
         request.auth.token.super_admin == true ||
-        request.auth.token.role == 'super_admin'
+        request.auth.token.role == 'super_admin' ||
+        request.auth.token.email == 'admin@serviflow.io' ||
+        request.auth.token.email == 'superadmin@serviflow.io' ||
+        request.auth.token.email == 'uniquesolutions108@gmail.com' ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          (
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin' ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email == 'admin@serviflow.io' ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email == 'superadmin@serviflow.io' ||
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.email == 'uniquesolutions108@gmail.com'
+          )
+        )
       );
     }
 

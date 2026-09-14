@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp, checkIsSuperAdmin } from '../context/AppContext';
 import { Customer, Job } from '../types';
 import { CsvImportModal, CsvColumnMapping } from '../components/CsvImportModal';
 import { CustomerServiceSummary } from '../components/CustomerServiceSummary';
@@ -73,7 +73,8 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
   const currencySymbol = currentBusiness?.currency || '₹';
 
   // Permissions logic
-  const isOwnerOrAdmin = currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin';
+  const isSuper = checkIsSuperAdmin(currentUser);
+  const isOwnerOrAdmin = currentUser?.role === 'business_owner' || isSuper;
   const isManager = currentUser?.role === 'manager';
   const canEditCustomers = isOwnerOrAdmin || isManager;
   const isReadOnlyStaff = !canEditCustomers;

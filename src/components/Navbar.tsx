@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp, checkIsSuperAdmin } from '../context/AppContext';
 import {
   Building2,
   Search,
@@ -169,10 +169,15 @@ export const Navbar: React.FC<NavbarProps> = ({
     },
   };
 
-  const currentRoleObj = currentUser?.role ? roleMap[currentUser.role] : {
-    label: 'Guest',
-    badgeColor: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700',
-  };
+  const isSuperAdmin = checkIsSuperAdmin(currentUser);
+  const currentRoleObj = isSuperAdmin
+    ? roleMap['super_admin']
+    : currentUser?.role
+    ? roleMap[currentUser.role]
+    : {
+        label: 'Guest',
+        badgeColor: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700',
+      };
 
   return (
     <header className="sticky top-0 z-40 w-full max-w-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 px-3 sm:px-5 lg:px-6 py-2 sm:py-2.5 transition-all">
@@ -187,16 +192,23 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="flex items-center justify-between gap-2 sm:gap-4 w-full relative z-50">
         {/* Left: Brand / Company Name Display (Full Visibility without restrictive truncation) */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink min-w-0 flex-1 sm:flex-initial">
-          {currentUser?.role === 'super_admin' ? (
+          {isSuperAdmin ? (
             /* Tenant Switcher Dropdown (Super Admin Only) */
             <div className="relative min-w-0">
               <button
+                type="button"
                 onClick={() => toggleMenu('tenant')}
                 className="flex items-center gap-2 p-1 sm:p-1.5 sm:pr-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors border border-slate-200/60 dark:border-slate-700/60 text-left min-w-0 cursor-pointer"
-                title={`Current Active Business: ${currentBusiness?.name || 'ServiFlow'}`}
+                title={`Active Context: ${currentBusiness?.id === 'all' ? 'Super Admin Console (All Tenants)' : currentBusiness?.name || 'ServiFlow'}`}
               >
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-xs sm:text-sm shadow-xs overflow-hidden shrink-0">
-                  {currentBusiness?.logo ? (
+                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm shadow-xs overflow-hidden shrink-0 ${
+                  currentBusiness?.id === 'all'
+                    ? 'bg-gradient-to-br from-purple-600 to-indigo-700 text-white'
+                    : 'bg-indigo-600 text-white'
+                }`}>
+                  {currentBusiness?.id === 'all' ? (
+                    <Shield className="w-4 h-4 text-white" />
+                  ) : currentBusiness?.logo ? (
                     <img src={currentBusiness.logo} alt={currentBusiness.name} className="w-full h-full object-cover" />
                   ) : (
                     (currentBusiness?.name || 'SF').substring(0, 2).toUpperCase()
@@ -204,33 +216,69 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
                 <div className="text-left min-w-0">
                   <div className="text-xs sm:text-sm md:text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-1 leading-tight">
-                    <span className="truncate max-w-[180px] xs:max-w-[240px] sm:max-w-xs md:max-w-sm lg:max-w-md" title={currentBusiness?.name}>
-                      {currentBusiness?.name || 'ServiFlow'}
+                    <span className="truncate max-w-[170px] xs:max-w-[220px] sm:max-w-xs md:max-w-sm" title={currentBusiness?.id === 'all' ? 'ServiFlow Master' : currentBusiness?.name}>
+                      {currentBusiness?.id === 'all' ? 'ServiFlow Master' : (currentBusiness?.name || 'ServiFlow')}
                     </span>
                     <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   </div>
-                  <div className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate leading-none mt-0.5 hidden xs:block">
-                    {currentBusiness?.type || 'Field Services'}
+                  <div className="text-[10px] sm:text-[11px] font-semibold truncate leading-none mt-0.5 hidden xs:block">
+                    {currentBusiness?.id === 'all' ? (
+                      <span className="text-purple-600 dark:text-purple-400 font-bold">Super Admin Console (All Tenants)</span>
+                    ) : (
+                      <span className="text-amber-600 dark:text-amber-400 font-bold">Tenant Context (Click to switch)</span>
+                    )}
                   </div>
                 </div>
               </button>
 
               {/* Tenant Dropdown */}
               {activeMenu === 'tenant' && (
-                <div className="absolute left-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 animate-in fade-in zoom-in-95">
+                <div className="absolute left-0 mt-2 w-80 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 animate-in fade-in zoom-in-95">
                   <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Switch Active Business
+                    Select SaaS Context
                   </div>
-                  <div className="space-y-1 my-1 max-h-60 overflow-y-auto">
+
+                  {/* Option 1: Global Platform Console (All Tenants) */}
+                  <div className="mb-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        switchBusiness('all');
+                        closeAllMenus();
+                      }}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-colors ${
+                        currentBusiness?.id === 'all'
+                          ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 font-bold border border-purple-200 dark:border-purple-800/60'
+                          : 'hover:bg-slate-100 dark:hover:bg-slate-800/70 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 overflow-hidden">
+                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-600 to-indigo-700 text-white flex items-center justify-center text-xs font-black shrink-0">
+                          <Globe className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="truncate">
+                          <div className="text-xs font-bold truncate">All Tenants (Global Console)</div>
+                          <div className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">Platform-Wide Overview & Access</div>
+                        </div>
+                      </div>
+                      {currentBusiness?.id === 'all' && <Check className="w-4 h-4 text-purple-600 shrink-0" />}
+                    </button>
+                  </div>
+
+                  <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Inspect Tenant Business ({businesses.length})
+                  </div>
+                  <div className="space-y-1 my-1 max-h-56 overflow-y-auto">
                     {businesses.map((b, idx) => (
                       <button
+                        type="button"
                         key={b.id || `nav-biz-${idx}`}
                         onClick={() => {
                           switchBusiness(b.id);
                           closeAllMenus();
                         }}
                         className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors ${
-                          b.id === currentBusiness.id
+                          b.id === currentBusiness?.id
                             ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-medium'
                             : 'hover:bg-slate-100 dark:hover:bg-slate-800/70 text-slate-700 dark:text-slate-300'
                         }`}
@@ -241,15 +289,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                           </div>
                           <div className="truncate">
                             <div className="text-xs font-medium truncate">{b.name}</div>
-                            <div className="text-[10px] text-slate-500">{b.type}</div>
+                            <div className="text-[10px] text-slate-500">{b.type || 'Field Service'}</div>
                           </div>
                         </div>
-                        {b.id === currentBusiness.id && <Check className="w-4 h-4 text-indigo-600 shrink-0" />}
+                        {b.id === currentBusiness?.id && <Check className="w-4 h-4 text-indigo-600 shrink-0" />}
                       </button>
                     ))}
                   </div>
                   <div className="pt-2 mt-1 border-t border-slate-100 dark:border-slate-800">
                     <button
+                      type="button"
                       onClick={() => {
                         onOpenOnboarding();
                         closeAllMenus();

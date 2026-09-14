@@ -635,6 +635,39 @@ const DEFAULT_BLANK_BUSINESS: Business = {
   status: 'active',
 };
 
+export const GLOBAL_SUPER_ADMIN_BUSINESS: Business = {
+  id: 'all',
+  name: 'ServiFlow Global Network',
+  type: 'Platform Management',
+  logo: '',
+  mobile: '+91 90000 00000',
+  whatsapp: '+91 90000 00000',
+  email: 'admin@serviflow.io',
+  address: 'Global Operations Centre',
+  city: 'New Delhi',
+  state: 'Delhi',
+  pin: '110001',
+  currency: '₹',
+  createdAt: '2026-01-01',
+  planId: 'plan-enterprise',
+  status: 'active',
+};
+
+export const isSuperAdminEmail = (email?: string | null): boolean => {
+  if (!email) return false;
+  const clean = email.trim().toLowerCase();
+  return (
+    clean === 'admin@serviflow.io' ||
+    clean === 'superadmin@serviflow.io' ||
+    clean === 'uniquesolutions108@gmail.com'
+  );
+};
+
+export const checkIsSuperAdmin = (user?: User | null): boolean => {
+  if (!user) return false;
+  return user.role === 'super_admin' || isSuperAdminEmail(user.email);
+};
+
 const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { theme, toggleTheme } = useTheme();
 
@@ -642,9 +675,19 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [businesses, setBusinesses] = useState<Business[]>(() =>
     loadCache('serviflow_businesses_cache', [])
   );
-  const [currentBusiness, setCurrentBusiness] = useState<Business>(() =>
-    loadCache('serviflow_current_biz_cache', DEFAULT_BLANK_BUSINESS)
-  );
+  const [currentBusiness, setCurrentBusiness] = useState<Business>(() => {
+    try {
+      const savedSession = localStorage.getItem('serviflow_user_session');
+      if (savedSession) {
+        const u = JSON.parse(savedSession) as User;
+        if (checkIsSuperAdmin(u)) {
+          const cached = loadCache<Business | null>('serviflow_current_biz_cache', null);
+          return cached && cached.id && cached.id !== 'biz-default' ? cached : GLOBAL_SUPER_ADMIN_BUSINESS;
+        }
+      }
+    } catch {}
+    return loadCache('serviflow_current_biz_cache', DEFAULT_BLANK_BUSINESS);
+  });
 
   const [users, setUsers] = useState<User[]>(() =>
     loadCache('serviflow_users_cache', [SUPER_ADMIN_USER])
@@ -841,8 +884,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // -------------------------------------------------------------
   useEffect(() => {
     // Determine active tenant scope
-    const isSuperAdmin = currentUser?.role === 'super_admin';
-    const isViewingAll = isSuperAdmin && currentBusiness?.id === 'all';
+    const isSuperAdmin = checkIsSuperAdmin(currentUser);
+    const isViewingAll = isSuperAdmin && (currentBusiness?.id === 'all' || !currentBusiness?.id || currentBusiness?.id === 'biz-default');
 
     // Effective tenant business ID:
     const activeBizId = isViewingAll
@@ -907,7 +950,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     // 1. Businesses
-    if (activeBizId === 'all') {
+    if (activeBizId === 'all' || isSuperAdmin) {
       const unsubBiz = onSnapshot(
         collection(db, 'businesses'),
         (snapshot) => {
@@ -925,8 +968,19 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           saveCache('serviflow_businesses_cache', cloudItems);
           if (cloudItems.length > 0) {
             setCurrentBusiness((prev) => {
+              // If Super Admin is viewing all tenants, NEVER overwrite to cloudItems[0]!
+              if (checkIsSuperAdmin(currentUser) && (prev.id === 'all' || !prev.id || prev.id === 'biz-default')) {
+                return GLOBAL_SUPER_ADMIN_BUSINESS;
+              }
               const found = cloudItems.find((b) => b.id === prev.id);
-              const active = found || cloudItems[0];
+              if (found) {
+                saveCache('serviflow_current_biz_cache', found);
+                return found;
+              }
+              if (checkIsSuperAdmin(currentUser)) {
+                return GLOBAL_SUPER_ADMIN_BUSINESS;
+              }
+              const active = cloudItems[0];
               saveCache('serviflow_current_biz_cache', active);
               return active;
             });
@@ -935,15 +989,19 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         (error) => handleFirestoreError(error, OperationType.GET, 'businesses')
       );
       unsubs.push(unsubBiz);
-    } else {
+    } else if (activeBizId) {
       const unsubBiz = onSnapshot(
         doc(db, 'businesses', activeBizId),
         (docSnap) => {
           if (docSnap.exists()) {
             const b = { ...(docSnap.data() as Business), id: docSnap.id };
-            setBusinesses([b]);
+            setBusinesses((prev) => {
+              if (prev.some((existing) => existing.id === b.id)) {
+                return prev.map((existing) => (existing.id === b.id ? b : existing));
+              }
+              return [...prev, b];
+            });
             setCurrentBusiness((prev) => (prev.id === b.id ? { ...prev, ...b } : b));
-            saveCache('serviflow_businesses_cache', [b]);
             saveCache('serviflow_current_biz_cache', b);
           }
         },
@@ -954,7 +1012,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 2. Users (Scoped to tenant for tenant members, platform-wide for Super Admin)
     const usersQuery =
-      activeBizId === 'all'
+      activeBizId === 'all' || isSuperAdmin
         ? collection(db, 'users')
         : query(collection(db, 'users'), where('businessId', '==', activeBizId));
 
@@ -968,8 +1026,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           cloudItems.forEach((u) => {
             const uEmail = (u.email || '').trim().toLowerCase();
             const isAuthorizedSuperAdmin =
-              uEmail === 'admin@serviflow.io' ||
-              uEmail === 'superadmin@serviflow.io' ||
+              isSuperAdminEmail(uEmail) ||
               u.id === SUPER_ADMIN_USER.id;
 
             if (u.role === 'super_admin' && !isAuthorizedSuperAdmin) {
@@ -995,8 +1052,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const superAdminRecord =
           cloudItems.find(
             (u) =>
-              (u.email || '').trim().toLowerCase() === 'admin@serviflow.io' ||
-              (u.email || '').trim().toLowerCase() === 'superadmin@serviflow.io' ||
+              isSuperAdminEmail(u.email) ||
               u.role === 'super_admin' ||
               u.id === SUPER_ADMIN_USER.id
           ) || SUPER_ADMIN_USER;
@@ -1006,7 +1062,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ...superAdminRecord,
           id: SUPER_ADMIN_USER.id,
           role: 'super_admin',
-          email: 'admin@serviflow.io',
+          email: superAdminRecord.email || 'admin@serviflow.io',
           businessId: 'all',
           status: 'active',
           approvalStatus: 'active',
@@ -1022,8 +1078,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const uEmail = (u.email || '').trim().toLowerCase();
           const isSuper =
             u.role === 'super_admin' ||
-            uEmail === 'admin@serviflow.io' ||
-            uEmail === 'superadmin@serviflow.io' ||
+            isSuperAdminEmail(uEmail) ||
             u.id === SUPER_ADMIN_USER.id;
 
           if (isSuper) {
@@ -1083,7 +1138,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         setCurrentUser((prev) => {
           if (!prev) return null;
-          const isSuper = prev.role === 'super_admin' || prev.email === 'admin@serviflow.io';
+          const isSuper = checkIsSuperAdmin(prev);
           if (isSuper) return prev;
 
           const prevEmail = (prev.email || '').trim().toLowerCase();
@@ -1625,25 +1680,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             localStorage.setItem('serviflow_logged_in_uid', userRecord.id);
 
             // Fetch and set tenant
-            if (userRecord.businessId === 'all' || userRecord.role === 'super_admin') {
-              const globalBiz: Business = {
-                id: 'all',
-                name: 'ServiFlow Global Network',
-                type: 'Platform Management',
-                logo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&auto=format&fit=crop&q=80',
-                mobile: '+91 90000 00000',
-                whatsapp: '+91 90000 00000',
-                email: 'admin@serviflow.io',
-                address: 'Global Operations Centre',
-                city: 'New Delhi',
-                state: 'Delhi',
-                pin: '110001',
-                currency: '₹',
-                createdAt: new Date().toISOString().split('T')[0],
-                planId: 'plan-enterprise',
-                status: 'active',
-              };
-              setCurrentBusiness(globalBiz);
+            if (userRecord.businessId === 'all' || userRecord.role === 'super_admin' || isSuperAdminEmail(userRecord.email)) {
+              setCurrentBusiness(GLOBAL_SUPER_ADMIN_BUSINESS);
             } else {
               const bizSnap = await getDoc(doc(db, 'businesses', userRecord.businessId));
               if (bizSnap.exists()) {
@@ -1674,7 +1712,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             // Synthesize user from authenticated Firebase User to prevent premature logouts
             const targetEmail = (firebaseUser.email || localStorage.getItem('serviflow_logged_in_email') || '').trim().toLowerCase();
-            const isSuper = targetEmail === 'admin@serviflow.io' || targetEmail === 'superadmin@serviflow.io';
+            const isSuper = isSuperAdminEmail(targetEmail);
             const autoUser: User = {
               id: firebaseUser.uid,
               name: firebaseUser.displayName || (isSuper ? 'SaaS Platform Admin' : 'Business Owner'),
@@ -1715,25 +1753,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setCurrentUser(savedUser);
 
                 // Restore business tenant
-                if (savedUser.businessId === 'all' || savedUser.role === 'super_admin') {
-                  const globalBiz: Business = {
-                    id: 'all',
-                    name: 'ServiFlow Global Network',
-                    type: 'Platform Management',
-                    logo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&auto=format&fit=crop&q=80',
-                    mobile: '+91 90000 00000',
-                    whatsapp: '+91 90000 00000',
-                    email: 'admin@serviflow.io',
-                    address: 'Global Operations Centre',
-                    city: 'New Delhi',
-                    state: 'Delhi',
-                    pin: '110001',
-                    currency: '₹',
-                    createdAt: new Date().toISOString().split('T')[0],
-                    planId: 'plan-enterprise',
-                    status: 'active',
-                  };
-                  setCurrentBusiness(globalBiz);
+                if (savedUser.businessId === 'all' || savedUser.role === 'super_admin' || isSuperAdminEmail(savedUser.email)) {
+                  setCurrentBusiness(GLOBAL_SUPER_ADMIN_BUSINESS);
                 } else if (savedUser.businessId) {
                   try {
                     const bizSnap = await getDoc(doc(db, 'businesses', savedUser.businessId));
@@ -2495,14 +2516,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Switch role helper for role testing within authorized boundaries
   const switchRole = async (role: UserRole) => {
     if (role === 'super_admin') {
-      const isCurrentlySuperAdmin =
-        currentUser?.role === 'super_admin' &&
-        ((currentUser?.email || '').trim().toLowerCase() === 'admin@serviflow.io' ||
-          (currentUser?.email || '').trim().toLowerCase() === 'superadmin@serviflow.io');
+      const isCurrentlySuperAdmin = checkIsSuperAdmin(currentUser);
 
       if (!isCurrentlySuperAdmin) {
         showToast(
-          'Access Denied: Super Admin console requires dedicated credentials (admin@serviflow.io). Please log in via the Super Admin portal.',
+          'Access Denied: Super Admin console requires dedicated super admin credentials.',
           'error'
         );
         return;
@@ -2532,16 +2550,28 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Switch business tenant
   const switchBusiness = (bId: string) => {
+    const isSuper = checkIsSuperAdmin(currentUser);
     // SECURITY GUARD: Only Super Admin or active Support Session can switch business tenants
-    if (currentUser?.role !== 'super_admin' && (!activeSupportSession || activeSupportSession.targetBusinessId !== bId)) {
+    if (!isSuper && (!activeSupportSession || activeSupportSession.targetBusinessId !== bId)) {
       showToast('Unauthorized: Only Super Administrators with an active support session can switch business tenants.', 'error');
+      return;
+    }
+
+    if (bId === 'all' || bId === 'global') {
+      setCurrentBusiness(GLOBAL_SUPER_ADMIN_BUSINESS);
+      saveCache('serviflow_current_biz_cache', GLOBAL_SUPER_ADMIN_BUSINESS);
+      if (isSuper) {
+        logSecurityEvent('TENANT_SWITCHED', 'TENANT_ACCESS', 'Super Admin switched to Platform Global Console (All Tenants)', 'all', 'All Tenants');
+      }
+      showToast('Switched to Global Platform Console (All Tenants)', 'success');
       return;
     }
 
     const target = businesses.find((b) => b.id === bId);
     if (target) {
       setCurrentBusiness(target);
-      if (currentUser?.role === 'super_admin') {
+      saveCache('serviflow_current_biz_cache', target);
+      if (isSuper) {
         logSecurityEvent('TENANT_SWITCHED', 'TENANT_ACCESS', `Super Admin switched context to business "${target.name}" (ID: ${bId})`, bId, target.name);
       } else {
         const bUser = users.find((u) => u.businessId === bId && u.role === 'business_owner') || {
@@ -2694,19 +2724,29 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Business-filtered helpers
-  const isSuperAdminUser = currentUser?.role === 'super_admin';
+  const isSuperAdminUser = checkIsSuperAdmin(currentUser);
   const currBizId = currentBusiness?.id;
-  const filteredEnquiries = isSuperAdminUser ? enquiries : enquiries.filter((e) => e.businessId === currBizId);
-  const filteredCustomers = isSuperAdminUser ? customers : customers.filter((c) => c.businessId === currBizId);
-  const filteredCategories = isSuperAdminUser ? categories : categories.filter((c) => c.businessId === currBizId);
-  const filteredServices = isSuperAdminUser ? services : services.filter((s) => s.businessId === currBizId);
-  const filteredJobs = isSuperAdminUser ? jobs : jobs.filter((j) => j.businessId === currBizId);
-  const filteredInventory = isSuperAdminUser ? inventory : inventory.filter((i) => i.businessId === currBizId);
-  const filteredQuotations = isSuperAdminUser ? quotations : quotations.filter((q) => q.businessId === currBizId);
-  const filteredInvoices = isSuperAdminUser ? invoices : invoices.filter((inv) => inv.businessId === currBizId);
-  const filteredPayments = isSuperAdminUser ? payments : payments.filter((p) => p.businessId === currBizId);
-  const filteredContracts = isSuperAdminUser ? contracts : contracts.filter((c) => c.businessId === currBizId);
-  const filteredExpenses = isSuperAdminUser ? expenses : expenses.filter((e) => e.businessId === currBizId);
+  const isGlobalScope = isSuperAdminUser && (currBizId === 'all' || !currBizId || currBizId === 'biz-default');
+
+  const matchesTenant = (itemBizId?: string) => {
+    if (isGlobalScope) return true;
+    if (!currBizId) return true;
+    if (itemBizId === currBizId) return true;
+    if (!itemBizId && businesses.length <= 1) return true;
+    return false;
+  };
+
+  const filteredEnquiries = enquiries.filter((e) => matchesTenant(e.businessId));
+  const filteredCustomers = customers.filter((c) => matchesTenant(c.businessId));
+  const filteredCategories = categories.filter((c) => matchesTenant(c.businessId));
+  const filteredServices = services.filter((s) => matchesTenant(s.businessId));
+  const filteredJobs = jobs.filter((j) => matchesTenant(j.businessId));
+  const filteredInventory = inventory.filter((i) => matchesTenant(i.businessId));
+  const filteredQuotations = quotations.filter((q) => matchesTenant(q.businessId));
+  const filteredInvoices = invoices.filter((inv) => matchesTenant(inv.businessId));
+  const filteredPayments = payments.filter((p) => matchesTenant(p.businessId));
+  const filteredContracts = contracts.filter((c) => matchesTenant(c.businessId));
+  const filteredExpenses = expenses.filter((e) => matchesTenant(e.businessId));
   const filteredNotifications = (isSuperAdminUser
     ? notifications
     : notifications.filter((n) => {
@@ -3285,13 +3325,22 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast(perm.reason || 'Permission Denied: Cannot create customer records.', 'error');
       return;
     }
+    const effectiveBizId =
+      currentBusiness?.id && currentBusiness.id !== 'all' && currentBusiness.id !== 'biz-default'
+        ? currentBusiness.id
+        : currentUser?.businessId && currentUser.businessId !== 'all'
+        ? currentUser.businessId
+        : businesses[0]?.id || 'biz-default';
+
     const id = `cust-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const newCust: Customer = {
       ...data,
       id,
-      businessId: currentBusiness.id,
+      businessId: effectiveBizId,
       createdAt: new Date().toISOString().split('T')[0],
     };
+    setCustomers((prev) => [newCust, ...prev.filter((c) => c.id !== newCust.id)]);
+    saveCache('serviflow_customers_cache', [newCust, ...customers.filter((c) => c.id !== newCust.id)]);
     firestoreService.saveDocument<Customer>('customers', newCust.id, newCust);
     logActivity('Customer Created', 'customer', newCust.id, `Created customer record for ${newCust.name}`);
     showToast(`Added customer: ${newCust.name}`, 'success');
@@ -3378,6 +3427,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
+      setCustomers((prev) => {
+        const remaining = prev.filter((c) => c.id !== id);
+        saveCache('serviflow_customers_cache', remaining);
+        return remaining;
+      });
       await firestoreService.deleteCustomer(id);
       logActivity(
         'Customer Deleted',

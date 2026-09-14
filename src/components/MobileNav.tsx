@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp, checkIsSuperAdmin } from '../context/AppContext';
 import {
   LayoutDashboard,
   Briefcase,
@@ -43,6 +43,7 @@ interface MobileNavProps {
 export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab }) => {
   const {
     currentUser,
+    currentBusiness,
     getRolePermissions,
     businesses,
     referralPayoutRequests,
@@ -61,9 +62,10 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
   ).length;
 
   const isTech = currentUser?.role === 'technician';
-  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const isSuperAdmin = checkIsSuperAdmin(currentUser);
+  const isGlobalConsole = isSuperAdmin && (currentBusiness?.id === 'all' || !currentBusiness?.id);
 
-  // Super Admin Bottom Bar Items
+  // Super Admin Bottom Bar Items (when viewing all tenants)
   const superAdminBottomItems = [
     { id: 'super_admin_dashboard', label: t('nav.platformDashboard', undefined, 'Platform'), icon: LayoutDashboard },
     { id: 'super_admin_tenants', label: t('nav.tenantBusinesses', undefined, 'Tenants'), icon: Building2 },
@@ -78,10 +80,10 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
     { id: 'jobs', label: 'Jobs', icon: Briefcase },
     { id: 'customers', label: 'Customers', icon: Users },
     { id: 'invoices', label: 'Invoices', icon: Receipt },
-    { id: 'more', label: 'Modules', icon: Grid },
+    { id: 'more', label: isSuperAdmin ? 'Console' : 'Modules', icon: Grid },
   ];
 
-  const bottomItems = isSuperAdmin ? superAdminBottomItems : tenantBottomItems;
+  const bottomItems = isGlobalConsole ? superAdminBottomItems : tenantBottomItems;
 
   // Super Admin Drawer Modules
   const superAdminModules = [
@@ -154,7 +156,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
           {bottomItems.map((item) => {
             const Icon = item.icon;
             let isActive = false;
-            if (isSuperAdmin) {
+            if (isGlobalConsole) {
               if (item.id === 'super_admin_dashboard') {
                 isActive = activeTab === 'super_admin_dashboard' || activeTab === 'super_admin';
               } else if (item.id === 'super_admin_pending') {
