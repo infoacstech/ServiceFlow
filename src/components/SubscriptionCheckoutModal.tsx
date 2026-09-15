@@ -23,6 +23,11 @@ import {
   calculateAnnualPricing,
   ANNUAL_DISCOUNT_PERCENT,
 } from '../utils/planUtils';
+import {
+  generateUniqueInvoiceNumber,
+  generateUniqueReceiptNumber,
+  isDelhiIntraState,
+} from '../utils/subscriptionBillingUtils';
 import { useApp } from '../context/AppContext';
 
 interface SubscriptionCheckoutModalProps {
@@ -44,7 +49,7 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
   onPaymentSuccess,
   onViewReceipt,
 }) => {
-  const { currentBusiness, currentUser, showToast, logActivity, submitSubscriptionPayment } = useApp();
+  const { currentBusiness, currentUser, showToast, logActivity, submitSubscriptionPayment, subscriptionPayments } = useApp();
 
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(defaultBillingCycle);
   const [activePaymentTab, setActivePaymentTab] = useState<'upi_qr' | 'bank_transfer'>('upi_qr');
@@ -111,10 +116,27 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
       return;
     }
 
+    // Check for duplicate UTR submission to prevent duplicate financial records
+    const isDuplicateUtr = (subscriptionPayments || []).some(
+      (p) => p.utrNumber && p.utrNumber.trim().toUpperCase() === cleanUtr.toUpperCase()
+    );
+    if (isDuplicateUtr) {
+      showToast('This UTR / Reference number has already been submitted. Please check your payment history.', 'error');
+      return;
+    }
+
     setIsSubmitting(true);
 
     const now = new Date();
-    const receiptNum = `SF-REC-${now.getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+    const invoiceNum = generateUniqueInvoiceNumber(now);
+    const receiptNum = generateUniqueReceiptNumber(now);
+
+    const taxableAmount = Math.round(netPayable / 1.18);
+    const gstAmount = netPayable - taxableAmount;
+    const isDelhi = isDelhiIntraState(currentBusiness?.gstNumber, currentBusiness?.state);
+    const cgstAmount = isDelhi ? Math.round(gstAmount / 2) : 0;
+    const sgstAmount = isDelhi ? (gstAmount - cgstAmount) : 0;
+    const igstAmount = isDelhi ? 0 : gstAmount;
 
     const paymentRecord: SubscriptionPayment = {
       id: `sub-tx-${Date.now()}`,
@@ -135,9 +157,21 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
       status: 'pending',
       createdAt: now.toISOString(),
       notes: notes.trim() || undefined,
+      invoiceNumber: invoiceNum,
       receiptNumber: receiptNum,
       isAddon: !isPlan,
       addonType: !isPlan ? addon!.type : undefined,
+      taxableAmount,
+      gstAmount,
+      cgstAmount,
+      sgstAmount,
+      igstAmount,
+      gstRate: 18,
+      customerGstin: currentBusiness?.gstNumber?.trim() || undefined,
+      customerAddress: currentBusiness?.address?.trim() || undefined,
+      customerCity: currentBusiness?.city?.trim() || undefined,
+      customerState: currentBusiness?.state?.trim() || undefined,
+      customerPin: currentBusiness?.pin?.trim() || undefined,
     };
 
     setTimeout(async () => {
@@ -202,9 +236,9 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
             {/* Receipt Summary Box */}
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 text-left text-xs space-y-2 max-w-md mx-auto">
               <div className="flex justify-between pb-2 border-b border-slate-200 dark:border-slate-700">
-                <span className="text-slate-500">Receipt / Proforma #:</span>
+                <span className="text-slate-500">Invoice / Document #:</span>
                 <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
-                  {submittedPayment.receiptNumber}
+                  {submittedPayment.invoiceNumber || submittedPayment.receiptNumber}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -220,8 +254,8 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
                 </span>
               </div>
               <div className="flex justify-between pt-2 border-t border-slate-200 dark:border-slate-700 text-sm">
-                <span className="font-bold text-slate-700 dark:text-slate-300">Net Amount Paid:</span>
-                <span className="font-black text-emerald-600 dark:text-emerald-400">
+                <span className="font-bold text-slate-700 dark:text-slate-300">Amount Submitted:</span>
+                <span className="font-black text-amber-600 dark:text-amber-400">
                   ₹{submittedPayment.netPayable.toLocaleString('en-IN')}
                 </span>
               </div>
@@ -235,7 +269,7 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
                   className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 font-bold text-xs flex items-center justify-center gap-2 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-all cursor-pointer"
                 >
                   <Receipt className="w-4 h-4" />
-                  <span>View & Print Tax Receipt</span>
+                  <span>View Submission & Invoice</span>
                 </button>
               )}
               <button

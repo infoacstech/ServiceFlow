@@ -2075,10 +2075,10 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
 
                         <div className="border-l border-slate-200 dark:border-slate-700 pl-4 text-right">
                           <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            Paid Amount
+                            {p.status === 'verified' ? 'Total Paid' : 'Amount Submitted'}
                           </div>
                           <div className="text-lg font-black text-slate-900 dark:text-white">
-                            ₹{p.amount.toLocaleString('en-IN')}
+                            ₹{(p.netPayable !== undefined ? p.netPayable : p.amount).toLocaleString('en-IN')}
                           </div>
                           {p.discountAmount ? (
                             <div className="text-[10px] text-emerald-600 font-bold">
@@ -2136,7 +2136,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                           className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
                         >
                           <Receipt className="w-3.5 h-3.5 text-indigo-500" />
-                          <span>Receipt</span>
+                          <span>{p.status === 'verified' ? 'Receipt' : 'Invoice'}</span>
                         </button>
                       </div>
                     </div>

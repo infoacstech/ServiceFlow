@@ -135,6 +135,10 @@ import {
   canManageBusinessSettings,
   validateTenantIsolation,
 } from '../utils/rbac';
+import {
+  generateUniqueInvoiceNumber,
+  generateUniqueReceiptNumber,
+} from '../utils/subscriptionBillingUtils';
 
 export interface ToastMessage {
   id: string;
@@ -5538,24 +5542,33 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Subscription Billing & UTR Submission Handlers
   const submitSubscriptionPayment = async (payment: SubscriptionPayment): Promise<void> => {
-    await saveToFirestore('subscriptionPayments', payment.id, payment);
-    setSubscriptionPayments((prev) => [payment, ...prev.filter((p) => p.id !== payment.id)]);
-    saveCache('serviflow_sub_payments_cache', [payment, ...subscriptionPayments]);
+    // Ensure document numbers & creation timestamps are immutable
+    const now = new Date();
+    const finalPayment: SubscriptionPayment = {
+      ...payment,
+      invoiceNumber: payment.invoiceNumber || generateUniqueInvoiceNumber(now),
+      receiptNumber: payment.receiptNumber || generateUniqueReceiptNumber(now),
+      createdAt: payment.createdAt || now.toISOString(),
+    };
+
+    await saveToFirestore('subscriptionPayments', finalPayment.id, finalPayment);
+    setSubscriptionPayments((prev) => [finalPayment, ...prev.filter((p) => p.id !== finalPayment.id)]);
+    saveCache('serviflow_sub_payments_cache', [finalPayment, ...subscriptionPayments.filter((p) => p.id !== finalPayment.id)]);
 
     // Update business subscriptionStatus to pending_verification (so UI reflects submitted UTR)
-    if (currentBusiness?.id === payment.businessId) {
+    if (currentBusiness?.id === finalPayment.businessId) {
       const updates: Partial<Business> = {
         subscriptionStatus: 'pending_verification',
       };
-      await saveToFirestore('businesses', payment.businessId, updates);
+      await saveToFirestore('businesses', finalPayment.businessId, updates);
       setCurrentBusiness((prev) => (prev ? { ...prev, ...updates } : null));
     }
 
     logActivity(
       'Subscription Payment Submitted',
       'financials',
-      payment.id,
-      `Tenant ${payment.businessName} submitted ₹${payment.netPayable} for ${payment.planName} (UTR: ${payment.utrNumber})`
+      finalPayment.id,
+      `Tenant ${finalPayment.businessName} submitted ₹${finalPayment.netPayable} for ${finalPayment.planName} (UTR: ${finalPayment.utrNumber})`
     );
   };
 
@@ -5573,6 +5586,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       verifiedAt: now.toISOString(),
       verifiedBy: currentUser?.name || 'Platform Super Admin',
       notes: notes || payment.notes,
+      receiptNumber: payment.receiptNumber || generateUniqueReceiptNumber(now),
     };
 
     await saveToFirestore('subscriptionPayments', paymentId, updates);
@@ -5618,6 +5632,21 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       showToast(`Payment ${paymentId} verified and plan benefits activated!`, 'success');
     } else {
+      // Rejection: restore tenant's subscription status if it was pending_verification
+      const targetBiz = businesses.find((b) => b.id === payment.businessId) || currentBusiness;
+      if (targetBiz && targetBiz.subscriptionStatus === 'pending_verification') {
+        const fallbackStatus = targetBiz.planId && targetBiz.planId !== 'starter' ? 'active' : 'trial';
+        const bizUpdates: Partial<Business> = {
+          subscriptionStatus: fallbackStatus,
+        };
+        await saveToFirestore('businesses', targetBiz.id, bizUpdates);
+        setBusinesses((prev) =>
+          prev.map((b) => (b.id === targetBiz.id ? { ...b, ...bizUpdates } : b))
+        );
+        if (currentBusiness?.id === targetBiz.id) {
+          setCurrentBusiness((prev) => (prev ? { ...prev, ...bizUpdates } : null));
+        }
+      }
       showToast(`Payment ${paymentId} marked as rejected.`, 'info');
     }
   };

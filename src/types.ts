@@ -109,14 +109,26 @@ export interface SubscriptionPayment {
   netPayable: number;
   utrNumber: string;
   paymentMethod: 'upi' | 'bank_transfer' | 'qr_code';
-  status: 'pending' | 'verified' | 'rejected';
+  status: 'pending' | 'verified' | 'rejected' | 'failed' | 'refunded' | 'cancelled';
   createdAt: string;
   verifiedAt?: string;
   verifiedBy?: string;
   notes?: string;
   receiptNumber?: string;
+  invoiceNumber?: string;
   isAddon?: boolean;
   addonType?: 'staff_pack' | 'whatsapp_pack';
+  taxableAmount?: number;
+  gstAmount?: number;
+  cgstAmount?: number;
+  sgstAmount?: number;
+  igstAmount?: number;
+  gstRate?: number;
+  customerGstin?: string;
+  customerAddress?: string;
+  customerCity?: string;
+  customerState?: string;
+  customerPin?: string;
 }
 
 export interface Subscription {

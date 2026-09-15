@@ -1454,10 +1454,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 border-b border-slate-200 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider">
                     <tr>
-                      <th className="py-3 px-4">Receipt / Date</th>
+                      <th className="py-3 px-4">Document / Date</th>
                       <th className="py-3 px-4">Plan / Addon</th>
                       <th className="py-3 px-4">UTR Number</th>
-                      <th className="py-3 px-4 text-right">Amount</th>
+                      <th className="py-3 px-4 text-right">Net Amount</th>
                       <th className="py-3 px-4 text-center">Status</th>
                       <th className="py-3 px-4 text-right">Action</th>
                     </tr>
@@ -1469,7 +1469,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
                         <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
                           <td className="py-3 px-4">
                             <div className="font-bold text-slate-900 dark:text-white font-mono text-[11px]">
-                              {p.receiptNumber}
+                              {p.status === 'verified' ? (p.receiptNumber || p.invoiceNumber) : (p.invoiceNumber || p.receiptNumber)}
                             </div>
                             <div className="text-[10px] text-slate-400">
                               {new Date(p.createdAt).toLocaleDateString('en-IN', {
@@ -1492,21 +1492,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
                               {p.utrNumber}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-right font-black text-slate-900 dark:text-white">
-                            ₹{p.amount.toLocaleString('en-IN')}
+                          <td className="py-3 px-4 text-right">
+                            <div className="font-black text-slate-900 dark:text-white">
+                              ₹{(p.netPayable !== undefined ? p.netPayable : p.amount).toLocaleString('en-IN')}
+                            </div>
+                            {p.discountAmount ? (
+                              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                                -₹{p.discountAmount} off
+                              </div>
+                            ) : null}
                           </td>
                           <td className="py-3 px-4 text-center">
                             {p.status === 'verified' ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-[10px] font-extrabold uppercase">
                                 <CheckCircle2 className="w-3 h-3" /> Verified
                               </span>
-                            ) : p.status === 'rejected' ? (
+                            ) : p.status === 'rejected' || p.status === 'failed' ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-400 text-[10px] font-extrabold uppercase">
                                 <X className="w-3 h-3" /> Rejected
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 text-[10px] font-extrabold uppercase">
-                                <Clock className="w-3 h-3 animate-spin" /> Verifying
+                                <Clock className="w-3 h-3 animate-spin" /> Pending
                               </span>
                             )}
                           </td>
@@ -1520,7 +1527,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
                               className="px-2.5 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer"
                             >
                               <Receipt className="w-3 h-3" />
-                              <span>Receipt</span>
+                              <span>{p.status === 'verified' ? 'Receipt' : 'Invoice'}</span>
                             </button>
                           </td>
                         </tr>
