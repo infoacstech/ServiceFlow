@@ -764,9 +764,13 @@ export class AuthService {
         await setDoc(doc(db, 'tenants', user.businessId), cleanFirestoreData({ ...tenant, ownerId: user.id }), { merge: true });
       }
 
-      if (tenant.status === 'suspended' || tenant.status === 'rejected') {
+      if (tenant.status === 'suspended' || tenant.status === 'rejected' || tenant.status === 'pending') {
         await signOut(auth);
-        throw new Error('This business account has been suspended by the platform administrator.');
+        throw new Error(
+          tenant.status === 'pending'
+            ? 'This business registration is pending approval from the platform administrator.'
+            : 'This business account has been suspended by the platform administrator.'
+        );
       }
     }
 

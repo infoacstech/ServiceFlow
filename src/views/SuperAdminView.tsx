@@ -385,6 +385,15 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
   const [deleteAllConfirmText, setDeleteAllConfirmText] = useState('');
   const [isDeletingAllTenants, setIsDeletingAllTenants] = useState(false);
 
+  // Staff User Deletion State
+  const [userToDelete, setUserToDelete] = useState<{ id: string; name: string; role?: string } | null>(null);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+
+  // Subscription Payment Rejection Modal State
+  const [paymentToReject, setPaymentToReject] = useState<SubscriptionPayment | null>(null);
+  const [paymentRejectReason, setPaymentRejectReason] = useState('');
+  const [isRejectingPayment, setIsRejectingPayment] = useState(false);
+
   // Execute Payout Decision (Mark as Paid, Approve, or Reject & Refund)
   const handleExecutePayoutAction = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -525,7 +534,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
     e.preventDefault();
     if (!supportModalBiz) return;
     if (!supportReason.trim()) {
-      alert('Please provide a mandatory justification/reason for accessing customer tenant data.');
+      showToast('Please provide a mandatory justification/reason for accessing customer tenant data.', 'error');
       return;
     }
     startSupportSession(
@@ -1300,7 +1309,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                                 Reject
                               </button>
                               <button
-                                onClick={() => deleteUserAccount(usr.id)}
+                                onClick={() => setUserToDelete({ id: usr.id, name: usr.name || usr.email, role: usr.role })}
                                 className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/60 dark:hover:text-rose-400 font-bold transition-all cursor-pointer"
                                 title="Delete user"
                               >
@@ -2106,17 +2115,9 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                             <button
                               type="button"
                               disabled={isProcessing}
-                              onClick={async () => {
-                                if (!window.confirm(`Reject payment record with UTR ${p.utrNumber}?`)) return;
-                                setIsVerifyingPaymentId(p.id);
-                                try {
-                                  await verifySubscriptionPayment(p.id, 'rejected');
-                                  showToast('Payment rejected.', 'info');
-                                } catch {
-                                  showToast('Failed to reject payment', 'error');
-                                } finally {
-                                  setIsVerifyingPaymentId(null);
-                                }
+                              onClick={() => {
+                                setPaymentToReject(p);
+                                setPaymentRejectReason('');
                               }}
                               className="px-3 py-2 rounded-xl border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
                             >
@@ -3939,6 +3940,169 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                 </div>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM STAFF USER DELETION MODAL */}
+      {userToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-rose-600/40 max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="p-2.5 bg-rose-600 text-white rounded-2xl shadow-md">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-slate-100 text-base">
+                  Delete User Account
+                </h3>
+                <p className="text-xs text-rose-600 dark:text-rose-400 font-bold">
+                  {userToDelete.name} {userToDelete.role ? `(${userToDelete.role.replace('_', ' ')})` : ''}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 rounded-2xl border border-rose-200 dark:border-rose-900/60 text-slate-700 dark:text-slate-300 space-y-2 text-xs">
+              <div className="font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 text-rose-600" />
+                <span>Permanent Account Removal</span>
+              </div>
+              <p className="text-[11px] leading-relaxed">
+                Are you sure you want to permanently delete user account <strong>{userToDelete.name}</strong>? This user will no longer be able to log in, and their membership profile will be removed.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                disabled={isDeletingUser}
+                onClick={() => setUserToDelete(null)}
+                className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={isDeletingUser}
+                onClick={async () => {
+                  setIsDeletingUser(true);
+                  try {
+                    deleteUserAccount(userToDelete.id);
+                    setUserToDelete(null);
+                  } catch (err) {
+                    console.error('Error deleting user:', err);
+                  } finally {
+                    setIsDeletingUser(false);
+                  }
+                }}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-all disabled:opacity-50"
+              >
+                {isDeletingUser ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting User...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Confirm Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM PAYMENT REJECTION MODAL */}
+      {paymentToReject && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-rose-500/40 max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="p-2.5 bg-rose-600 text-white rounded-2xl shadow-md">
+                <XCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-slate-100 text-base">
+                  Reject Subscription Payment
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Business: {paymentToReject.businessName || paymentToReject.businessId}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Amount:</span>
+                <span className="font-black text-slate-900 dark:text-slate-100">₹{paymentToReject.amount.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">UTR / Ref:</span>
+                <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{paymentToReject.utrNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Plan:</span>
+                <span className="font-bold capitalize text-indigo-600 dark:text-indigo-400">{paymentToReject.planName || paymentToReject.planId}</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-slate-700 dark:text-slate-300 font-bold text-xs mb-1">
+                Reason for Rejection (Optional)
+              </label>
+              <textarea
+                rows={2}
+                value={paymentRejectReason}
+                onChange={(e) => setPaymentRejectReason(e.target.value)}
+                placeholder="e.g. Invalid UTR number or payment not credited to bank account"
+                className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                disabled={isRejectingPayment}
+                onClick={() => setPaymentToReject(null)}
+                className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={isRejectingPayment}
+                onClick={async () => {
+                  setIsRejectingPayment(true);
+                  setIsVerifyingPaymentId(paymentToReject.id);
+                  try {
+                    await verifySubscriptionPayment(paymentToReject.id, 'rejected', paymentRejectReason.trim() || undefined);
+                    showToast('Payment rejected.', 'info');
+                    setPaymentToReject(null);
+                  } catch {
+                    showToast('Failed to reject payment', 'error');
+                  } finally {
+                    setIsRejectingPayment(false);
+                    setIsVerifyingPaymentId(null);
+                  }
+                }}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-all disabled:opacity-50"
+              >
+                {isRejectingPayment ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Rejecting...</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>Confirm Rejection</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

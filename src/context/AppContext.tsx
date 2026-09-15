@@ -2506,8 +2506,13 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast('Operation Restricted: You are in a Read-Only Support Session. Request Full Support access to perform modifications.', 'error');
       return true;
     }
-    if (currentUser?.role !== 'super_admin' && (currentBusiness?.status === 'suspended' || currentBusiness?.status === 'rejected')) {
-      showToast('Account Suspended: Your business tenant access is suspended. Please contact platform support.', 'error');
+    if (currentUser?.role !== 'super_admin' && (currentBusiness?.status === 'suspended' || currentBusiness?.status === 'rejected' || currentBusiness?.status === 'pending')) {
+      showToast(
+        currentBusiness?.status === 'pending'
+          ? 'Account Pending: Your business registration is pending approval by platform administration.'
+          : 'Account Suspended: Your business tenant access is suspended. Please contact platform support.',
+        'error'
+      );
       return true;
     }
     return false;
