@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { SystemSettings, Business } from '../types';
 import { FirestoreService } from '../services/FirestoreService';
@@ -220,6 +220,17 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         break;
     }
   }, [activeSubSection]);
+
+  const tabListRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (tabListRef.current) {
+      const activeEl = tabListRef.current.querySelector<HTMLElement>('[data-active="true"]');
+      if (activeEl) {
+        activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
+  }, [activeTabSection]);
 
   const handleSwitchTabSection = (
     section:
@@ -598,45 +609,45 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
   return (
     <div className="space-y-5 sm:space-y-6 pb-12 animate-in fade-in max-w-full overflow-hidden">
       {/* 3. HERO SECTION */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-5 sm:p-7 rounded-2xl sm:rounded-3xl shadow-xl relative overflow-hidden">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-4 sm:p-6 lg:p-7 rounded-2xl sm:rounded-3xl shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 space-y-1">
-          <div className="inline-flex items-center gap-2 bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full border border-purple-500/30 text-xs font-semibold mb-0.5">
-            <ShieldCheck className="w-4 h-4 text-purple-300" />
-            <span>SaaS Super Administrator Master Console</span>
+        <div className="relative z-10 space-y-1 sm:space-y-1.5 min-w-0">
+          <div className="inline-flex items-center gap-1.5 bg-purple-500/20 text-purple-200 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full border border-purple-500/30 text-[10px] sm:text-xs font-semibold max-w-full">
+            <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-300 shrink-0" />
+            <span className="truncate">SaaS Super Administrator Master Console</span>
           </div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight">
+          <h1 className="text-lg sm:text-2xl lg:text-3xl font-black tracking-tight leading-tight">
             Platform Administration
           </h1>
-          <p className="text-xs sm:text-sm text-purple-200/80 max-w-2xl">
+          <p className="text-[11px] sm:text-xs md:text-sm text-purple-200/80 max-w-2xl leading-relaxed">
             Manage tenants, platform operations, security, subscriptions and global settings.
           </p>
         </div>
 
-        <div className="relative z-10 flex flex-wrap items-center gap-3">
+        <div className="relative z-10 flex flex-wrap sm:flex-nowrap items-center gap-2.5 sm:gap-3 shrink-0">
           <a
             href="/serviflow_operations_manual.html"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-2xl border border-white/20 text-xs backdrop-blur-md transition-all flex items-center gap-2 shadow-sm cursor-pointer"
+            className="w-full sm:w-auto px-3.5 py-2 sm:px-4 sm:py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl sm:rounded-2xl border border-white/20 text-xs backdrop-blur-md transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
           >
-            <FileText className="w-4 h-4 text-purple-300" />
+            <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-300 shrink-0" />
             <span>Master Operations PDF</span>
-            <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+            <ExternalLink className="w-3 h-3 sm:w-3.5 sm:h-3.5 opacity-70 shrink-0" />
           </a>
 
           {activeSupportSession && (
-            <div className="bg-amber-500/20 border border-amber-400/40 p-3 sm:p-3.5 rounded-2xl flex flex-col gap-1 text-xs">
+            <div className="w-full sm:w-auto bg-amber-500/20 border border-amber-400/40 p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl flex flex-col gap-1 text-xs">
               <span className="font-extrabold text-amber-300 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
-                <ShieldAlert className="w-4 h-4 text-amber-400" />
+                <ShieldAlert className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
                 Active Support Mode
               </span>
-              <span className="font-bold text-white">
+              <span className="font-bold text-white truncate max-w-[200px]">
                 {activeSupportSession.targetBusinessName}
               </span>
               <button
                 onClick={() => endSupportSession('Super Admin ended session from master console')}
-                className="mt-1 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-[11px] transition-all cursor-pointer shadow-xs"
+                className="mt-0.5 px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-[10px] sm:text-[11px] transition-all cursor-pointer shadow-xs"
               >
                 End Support Access
               </button>
@@ -646,28 +657,36 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
       </div>
 
       {/* 2. DASHBOARD TABS - High-Value Platform Views */}
-      <div className="flex items-center gap-1.5 overflow-x-auto p-1.5 bg-slate-200/60 dark:bg-slate-900/80 rounded-2xl border border-slate-300/60 dark:border-slate-800 text-xs font-bold scrollbar-none w-full max-w-full touch-pan-x">
+      <div
+        ref={tabListRef}
+        className="flex items-center gap-1.5 overflow-x-auto p-1.5 bg-slate-200/60 dark:bg-slate-900/80 rounded-2xl border border-slate-300/60 dark:border-slate-800 text-xs font-bold scrollbar-none w-full max-w-full touch-pan-x overscroll-x-contain"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
         <button
+          type="button"
+          data-active={activeTabSection === 'overview'}
           onClick={() => handleSwitchTabSection('overview')}
-          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
+          className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
             activeTabSection === 'overview'
               ? 'bg-purple-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
           }`}
         >
-          <Activity className="w-4 h-4" />
+          <Activity className="w-4 h-4 shrink-0" />
           <span>Platform Overview</span>
         </button>
 
         <button
+          type="button"
+          data-active={activeTabSection === 'approvals'}
           onClick={() => handleSwitchTabSection('approvals')}
-          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
+          className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
             activeTabSection === 'approvals'
               ? 'bg-amber-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
           }`}
         >
-          <Clock className="w-4 h-4" />
+          <Clock className="w-4 h-4 shrink-0" />
           <span>Pending Approvals</span>
           {pendingCount > 0 && (
             <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-amber-200 dark:bg-amber-950 text-amber-950 dark:text-amber-200 animate-pulse">
@@ -677,14 +696,16 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         </button>
 
         <button
+          type="button"
+          data-active={activeTabSection === 'subscriptions'}
           onClick={() => handleSwitchTabSection('subscriptions')}
-          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
+          className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
             activeTabSection === 'subscriptions'
               ? 'bg-indigo-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
           }`}
         >
-          <Receipt className="w-4 h-4" />
+          <Receipt className="w-4 h-4 shrink-0" />
           <span>SaaS Payments & UTR</span>
           {subscriptionPayments.filter((p) => p.status === 'pending').length > 0 && (
             <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-amber-500 text-white animate-pulse">
@@ -694,17 +715,19 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         </button>
 
         <button
+          type="button"
+          data-active={activeTabSection === 'tenants'}
           onClick={() => {
             handleSwitchTabSection('tenants');
             setTenantStatusFilter('all');
           }}
-          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
+          className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
             activeTabSection === 'tenants'
               ? 'bg-indigo-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
           }`}
         >
-          <Building2 className="w-4 h-4" />
+          <Building2 className="w-4 h-4 shrink-0" />
           <span>Tenant Directory</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-slate-300/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
             {businesses.length}
@@ -712,26 +735,30 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         </button>
 
         <button
+          type="button"
+          data-active={activeTabSection === 'analytics'}
           onClick={() => handleSwitchTabSection('analytics')}
-          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
+          className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
             activeTabSection === 'analytics'
               ? 'bg-blue-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
           }`}
         >
-          <BarChart3 className="w-4 h-4" />
+          <BarChart3 className="w-4 h-4 shrink-0" />
           <span>Platform Analytics</span>
         </button>
 
         <button
+          type="button"
+          data-active={activeTabSection === 'referrals'}
           onClick={() => handleSwitchTabSection('referrals')}
-          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
+          className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
             activeTabSection === 'referrals'
               ? 'bg-amber-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
           }`}
         >
-          <Gift className="w-4 h-4" />
+          <Gift className="w-4 h-4 shrink-0" />
           <span>Referral Analytics</span>
           {referralPayoutRequests.filter((p) => p.status === 'pending').length > 0 && (
             <span className="text-[10px] px-1.5 py-0.2 rounded-full font-black bg-rose-500 text-white animate-pulse">
@@ -741,14 +768,16 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         </button>
 
         <button
+          type="button"
+          data-active={activeTabSection === 'audit'}
           onClick={() => handleSwitchTabSection('audit')}
-          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
+          className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
             activeTabSection === 'audit'
               ? 'bg-emerald-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
           }`}
         >
-          <FileText className="w-4 h-4" />
+          <FileText className="w-4 h-4 shrink-0" />
           <span>Security / Audit</span>
         </button>
 
@@ -778,59 +807,59 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
       {activeTabSection === 'overview' && (
         <div className="space-y-5 sm:space-y-6 animate-in fade-in">
           {/* 4. COMPACT KPI CARDS */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5">
-            <div className="p-3.5 sm:p-4 bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+            <div className="p-3 sm:p-4 bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between min-w-0">
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Tenants</span>
-                  <div className="p-1.5 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
-                    <Building2 className="w-4 h-4" />
+                <div className="flex items-center justify-between gap-1.5 mb-1 sm:mb-1.5">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">Total Tenants</span>
+                  <div className="p-1 sm:p-1.5 rounded-lg sm:rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 shrink-0">
+                    <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
                 </div>
-                <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">{businesses.length}</div>
+                <div className="text-lg sm:text-2xl font-black text-slate-900 dark:text-slate-100">{businesses.length}</div>
               </div>
-              <div className="text-[11px] text-slate-400 dark:text-slate-500 font-medium mt-1.5">Isolated Data Workspaces</div>
+              <div className="text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 font-medium mt-1 sm:mt-1.5 truncate">Isolated Workspaces</div>
             </div>
 
-            <div className="p-3.5 sm:p-4 bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+            <div className="p-3 sm:p-4 bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between min-w-0">
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pending Approvals</span>
-                  <div className="p-1.5 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
-                    <Clock className="w-4 h-4" />
+                <div className="flex items-center justify-between gap-1.5 mb-1 sm:mb-1.5">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">Pending Approvals</span>
+                  <div className="p-1 sm:p-1.5 rounded-lg sm:rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 shrink-0">
+                    <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
                 </div>
-                <div className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400">{pendingCount}</div>
+                <div className="text-lg sm:text-2xl font-black text-amber-600 dark:text-amber-400">{pendingCount}</div>
               </div>
-              <div className="text-[11px] text-amber-700 dark:text-amber-300 font-medium mt-1.5">
-                {pendingCount > 0 ? 'Requires Super Admin Action' : 'All Clear — No Pending Approvals'}
+              <div className="text-[10px] sm:text-[11px] text-amber-700 dark:text-amber-300 font-medium mt-1 sm:mt-1.5 truncate">
+                {pendingCount > 0 ? 'Requires Action' : 'All Clear — None'}
               </div>
             </div>
 
-            <div className="p-3.5 sm:p-4 bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+            <div className="p-3 sm:p-4 bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between min-w-0">
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Businesses</span>
-                  <div className="p-1.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                    <CheckCircle2 className="w-4 h-4" />
+                <div className="flex items-center justify-between gap-1.5 mb-1 sm:mb-1.5">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">Active Businesses</span>
+                  <div className="p-1 sm:p-1.5 rounded-lg sm:rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 shrink-0">
+                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
                 </div>
-                <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">{activeCount}</div>
+                <div className="text-lg sm:text-2xl font-black text-emerald-600 dark:text-emerald-400">{activeCount}</div>
               </div>
-              <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1.5">Active ERP Workspaces</div>
+              <div className="text-[10px] sm:text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1 sm:mt-1.5 truncate">Active ERP Workspaces</div>
             </div>
 
-            <div className="p-3.5 sm:p-4 bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+            <div className="p-3 sm:p-4 bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between min-w-0">
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Suspended Businesses</span>
-                  <div className="p-1.5 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
-                    <Ban className="w-4 h-4" />
+                <div className="flex items-center justify-between gap-1.5 mb-1 sm:mb-1.5">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">Suspended</span>
+                  <div className="p-1 sm:p-1.5 rounded-lg sm:rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 shrink-0">
+                    <Ban className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
                 </div>
-                <div className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400">{suspendedCount}</div>
+                <div className="text-lg sm:text-2xl font-black text-rose-600 dark:text-rose-400">{suspendedCount}</div>
               </div>
-              <div className="text-[11px] text-rose-600 dark:text-rose-400 font-medium mt-1.5">Access Restricted / Blocked</div>
+              <div className="text-[10px] sm:text-[11px] text-rose-600 dark:text-rose-400 font-medium mt-1 sm:mt-1.5 truncate">Access Blocked</div>
             </div>
           </div>
 

@@ -67,11 +67,11 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
 
   // Super Admin Bottom Bar Items (when viewing all tenants)
   const superAdminBottomItems = [
-    { id: 'super_admin_dashboard', label: t('nav.platformDashboard', undefined, 'Platform'), icon: LayoutDashboard },
-    { id: 'super_admin_tenants', label: t('nav.tenantBusinesses', undefined, 'Tenants'), icon: Building2 },
-    { id: 'super_admin_pending', label: t('nav.pendingApprovals', undefined, 'Approvals'), icon: CheckCircle2 },
-    { id: 'super_admin_support', label: 'Support', icon: Headphones },
-    { id: 'more', label: t('nav.more', undefined, 'Console'), icon: Grid },
+    { id: 'super_admin_dashboard', label: t('nav.platform', undefined, 'Platform'), icon: LayoutDashboard },
+    { id: 'super_admin_tenants', label: t('nav.tenants', undefined, 'Tenants'), icon: Building2 },
+    { id: 'super_admin_pending', label: t('nav.approvals', undefined, 'Approvals'), icon: CheckCircle2 },
+    { id: 'super_admin_support', label: t('nav.support', undefined, 'Support'), icon: Headphones },
+    { id: 'more', label: t('nav.console', undefined, 'Console'), icon: Grid },
   ];
 
   // Tenant Bottom Bar Items - Exactly 5 items as specified
@@ -178,7 +178,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
                 key={item.id}
                 type="button"
                 onClick={() => handleTabClick(item.id)}
-                className={`relative flex flex-col items-center justify-center w-full h-full py-1 text-center cursor-pointer transition-colors duration-150 select-none ${
+                className={`relative flex flex-col items-center justify-center w-full h-full py-1 px-0.5 text-center cursor-pointer transition-colors duration-150 select-none min-w-0 overflow-hidden ${
                   isActive
                     ? isSuperAdmin
                       ? 'text-purple-600 dark:text-purple-400 font-bold'
@@ -189,19 +189,19 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
                 {/* Active Indicator Top Bar - No layout shift */}
                 {isActive && (
                   <span
-                    className={`absolute top-0 inset-x-2.5 sm:inset-x-4 h-0.5 rounded-full ${
+                    className={`absolute top-0 inset-x-2 sm:inset-x-3 h-0.5 rounded-full ${
                       isSuperAdmin ? 'bg-purple-600 dark:bg-purple-400' : 'bg-indigo-600 dark:bg-indigo-400'
                     }`}
                   />
                 )}
 
                 {/* Centered Icon - Exact 20px, consistent baseline */}
-                <div className="flex items-center justify-center h-5 w-5 mb-1 shrink-0">
+                <div className="flex items-center justify-center h-5 w-5 mb-0.5 shrink-0">
                   <Icon className="w-5 h-5 stroke-[2]" />
                 </div>
 
-                {/* Centered Single-line Label - No wrapping, no ellipsis, fits in 72px */}
-                <span className="text-[10px] sm:text-[11px] font-semibold leading-none text-center whitespace-nowrap overflow-visible">
+                {/* Centered Single-line Label - 100% column bounded, perfectly centered, no overlap */}
+                <span className="text-[10px] sm:text-[11px] font-semibold leading-tight text-center truncate block w-full max-w-full px-0.5 tracking-tight">
                   {item.label}
                 </span>
               </button>

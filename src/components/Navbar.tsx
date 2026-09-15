@@ -198,16 +198,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={() => toggleMenu('tenant')}
-                className="flex items-center gap-2 p-1 sm:p-1.5 sm:pr-3 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors border border-slate-200/60 dark:border-slate-700/60 text-left min-w-0 cursor-pointer"
+                className="flex items-center gap-1.5 sm:gap-2 p-1 sm:p-1.5 sm:pr-3 rounded-xl sm:rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors border border-slate-200/60 dark:border-slate-700/60 text-left min-w-0 cursor-pointer"
                 title={`Active Context: ${currentBusiness?.id === 'all' ? 'Super Admin Console (All Tenants)' : currentBusiness?.name || 'ServiFlow'}`}
               >
-                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-black text-xs sm:text-sm shadow-xs overflow-hidden shrink-0 ${
+                <div className={`w-7.5 h-7.5 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl flex items-center justify-center font-black text-xs sm:text-sm shadow-xs overflow-hidden shrink-0 ${
                   currentBusiness?.id === 'all'
                     ? 'bg-gradient-to-br from-purple-600 to-indigo-700 text-white'
                     : 'bg-indigo-600 text-white'
                 }`}>
                   {currentBusiness?.id === 'all' ? (
-                    <Shield className="w-4 h-4 text-white" />
+                    <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
                   ) : currentBusiness?.logo ? (
                     <img src={currentBusiness.logo} alt={currentBusiness.name} className="w-full h-full object-cover" />
                   ) : (
@@ -216,10 +216,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
                 <div className="text-left min-w-0">
                   <div className="text-xs sm:text-sm md:text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-1 leading-tight">
-                    <span className="truncate max-w-[170px] xs:max-w-[220px] sm:max-w-xs md:max-w-sm" title={currentBusiness?.id === 'all' ? 'ServiFlow Master' : currentBusiness?.name}>
+                    <span className="truncate max-w-[110px] xs:max-w-[160px] sm:max-w-xs md:max-w-sm" title={currentBusiness?.id === 'all' ? 'ServiFlow Master' : currentBusiness?.name}>
                       {currentBusiness?.id === 'all' ? 'ServiFlow Master' : (currentBusiness?.name || 'ServiFlow')}
                     </span>
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 shrink-0" />
                   </div>
                   <div className="text-[10px] sm:text-[11px] font-semibold truncate leading-none mt-0.5 hidden xs:block">
                     {currentBusiness?.id === 'all' ? (
@@ -349,7 +349,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         {/* Right Action Controls & User Profile - Vertically Balanced on Mobile */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           {/* User Role Badge */}
           <div className={`hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border shadow-xs ${currentRoleObj.badgeColor}`}>
             <UserCheck className="w-3.5 h-3.5 shrink-0" />
@@ -373,15 +373,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="relative flex items-center">
             <button
               onClick={() => toggleMenu('language')}
-              className="h-8.5 sm:h-9 px-2 sm:px-2.5 flex items-center justify-center gap-1 rounded-xl border border-slate-200 dark:border-slate-750 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-xs font-bold text-slate-700 dark:text-slate-200 transition-all cursor-pointer"
+              className="h-8 sm:h-9 px-1.5 sm:px-2.5 flex items-center justify-center gap-0.5 sm:gap-1 rounded-xl border border-slate-200 dark:border-slate-750 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-xs font-bold text-slate-700 dark:text-slate-200 transition-all cursor-pointer shrink-0"
               title={t('settings.language', undefined, 'Language')}
               aria-label="Language Selector"
             >
               <Globe className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-              <span className="text-[11px] font-black uppercase">
+              <span className="text-[10px] sm:text-[11px] font-black uppercase">
                 {language === 'hi' ? 'HI' : language === 'mr' ? 'MR' : 'EN'}
               </span>
-              <ChevronDown className="w-3 h-3 text-slate-400 hidden xs:block" />
+              <ChevronDown className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400 hidden xs:block" />
             </button>
 
             {activeMenu === 'language' && (
@@ -438,7 +438,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }
             }}
             disabled={isRefreshingPage}
-            className={`h-8.5 sm:h-9 px-2 sm:px-2.5 flex items-center justify-center gap-1 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer ${
+            className={`h-8 sm:h-9 px-1.5 sm:px-2.5 flex items-center justify-center gap-1 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer shrink-0 ${
               pendingSyncQueue.length > 0
                 ? 'bg-amber-500 hover:bg-amber-600 text-stone-900 border-amber-600 shadow-xs animate-pulse'
                 : 'bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-blue-950/40 text-slate-700 dark:text-slate-200 border-slate-200/80 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600'
@@ -459,7 +459,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="relative flex items-center">
             <button
               onClick={() => toggleMenu('notif')}
-              className="relative h-8.5 w-8.5 sm:h-9 sm:w-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700/80 transition-colors cursor-pointer"
+              className="relative h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700/80 transition-colors cursor-pointer shrink-0"
               title="Notifications"
             >
               <Bell className="w-4 h-4" />
@@ -540,7 +540,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Direct User Profile & Settings Drawer Trigger Button */}
           <button
             onClick={() => setIsProfileDrawerOpen(true)}
-            className="h-8.5 sm:h-9 flex items-center gap-1.5 p-0.5 sm:px-2 rounded-xl bg-slate-100/90 hover:bg-slate-200/90 dark:bg-slate-800/90 dark:hover:bg-slate-700/90 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 transition-all shrink-0 cursor-pointer active:scale-95 shadow-xs"
+            className="h-8 sm:h-9 flex items-center gap-1.5 p-0.5 sm:px-2 rounded-xl bg-slate-100/90 hover:bg-slate-200/90 dark:bg-slate-800/90 dark:hover:bg-slate-700/90 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 transition-all shrink-0 cursor-pointer active:scale-95 shadow-xs"
             title="Click to Open Profile & Settings"
             aria-label="User Profile and Settings"
           >
