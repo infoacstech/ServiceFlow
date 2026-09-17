@@ -36,6 +36,7 @@ import {
   MoreVertical,
   Receipt,
   FileText,
+  ArrowRight,
 } from 'lucide-react';
 import { playJobVoiceNotification, speakText } from '../utils/audioNotification';
 import {
@@ -852,24 +853,32 @@ export const JobsView: React.FC<JobsViewProps> = ({
 
                 {/* Ultra-compact Empty State or Populated Job Cards */}
                 {isEmpty ? (
-                  <div className="py-1.5 px-2 text-center text-[11px] text-slate-400 dark:text-slate-500 font-medium bg-slate-50/70 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-200/70 dark:border-slate-800/70 flex items-center justify-center">
-                    No jobs in this stage
+                  <div className="py-6 px-3 text-center text-[11px] text-slate-400 dark:text-slate-500 font-medium bg-slate-50/70 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-200/70 dark:border-slate-800/70 flex flex-col items-center justify-center gap-1.5">
+                    <Briefcase className="w-5 h-5 text-slate-300 dark:text-slate-600 stroke-[1.5]" />
+                    <span>No jobs in this stage</span>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     {colJobs.map((job) => {
                       const customer = (customers || []).find((c) => c.id === job.customerId);
                       const tech = (staff || []).find((s) => s.id === job.assignedStaffId);
+
+                      const priorityBorder =
+                        job.priority === 'urgent'
+                          ? 'border-l-rose-500'
+                          : job.priority === 'high'
+                          ? 'border-l-amber-500'
+                          : 'border-l-indigo-500';
 
                       return (
                         <div
                           key={job.id}
                           onClick={() => setSelectedJob(job)}
-                          className="p-3 sm:p-3.5 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-xs transition-all cursor-pointer space-y-1.5 group"
+                          className={`p-3 sm:p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200/90 dark:border-slate-700/80 border-l-4 ${priorityBorder} shadow-2xs hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-md transition-all cursor-pointer space-y-2 group relative`}
                         >
                           <div className="flex items-center justify-between gap-1.5">
                             <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 group-hover:underline font-mono truncate">
+                              <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 group-hover:underline font-mono truncate">
                                 {job.jobId}
                               </span>
                               <button
@@ -902,18 +911,32 @@ export const JobsView: React.FC<JobsViewProps> = ({
                             </span>
                           </div>
 
-                          <div className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-slate-100 line-clamp-1 break-words">
-                            {customer?.name || 'Customer'}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-slate-100 line-clamp-1 break-words">
+                              {customer?.name || 'Customer'}
+                            </div>
+                            {customer?.mobile && (
+                              <a
+                                href={`tel:${customer.mobile}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors shrink-0"
+                                title={`Call ${customer.name}`}
+                              >
+                                <Phone className="w-3.5 h-3.5" />
+                              </a>
+                            )}
                           </div>
 
                           <div className="text-[11.5px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed break-words">
                             {job.description}
                           </div>
 
-                          <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                            <div className="flex items-center gap-1 min-w-0 max-w-[60%]">
-                              <UserCheck className="w-3 h-3 text-indigo-500 shrink-0" />
-                              <span className="font-semibold text-slate-700 dark:text-slate-300 truncate">
+                          <div className="pt-2 border-t border-slate-200/70 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                            <div className="flex items-center gap-1.5 min-w-0 max-w-[60%]">
+                              <div className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                {(tech?.name || 'U').charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-semibold text-slate-700 dark:text-slate-300 truncate text-[11px]">
                                 {tech?.name || 'Unassigned'}
                               </span>
                             </div>
@@ -921,6 +944,61 @@ export const JobsView: React.FC<JobsViewProps> = ({
                               {currentBusiness.currency || '₹'}
                               {job.estimatedAmount}
                             </span>
+                          </div>
+
+                          {/* Quick Stage Advancement Control */}
+                          <div className="pt-1.5 flex items-center justify-between">
+                            {col.stage === 'assigned' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateJobStatus(job.id, 'started');
+                                  showToast('Job marked as On Site / Started', 'info');
+                                }}
+                                className="w-full py-1 px-2 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[10px] font-bold flex items-center justify-center gap-1 border border-blue-200/80 dark:border-blue-900/60 transition-all cursor-pointer shadow-2xs"
+                              >
+                                <span>Start Job</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </button>
+                            )}
+
+                            {col.stage === 'started' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateJobStatus(job.id, 'in_progress');
+                                  showToast('Job set to In Progress', 'info');
+                                }}
+                                className="w-full py-1 px-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold flex items-center justify-center gap-1 border border-indigo-200/80 dark:border-indigo-900/60 transition-all cursor-pointer shadow-2xs"
+                              >
+                                <span>In Progress</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </button>
+                            )}
+
+                            {col.stage === 'in_progress' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateJobStatus(job.id, 'completed');
+                                  showToast('Job marked as Completed! Great job!', 'success');
+                                }}
+                                className="w-full py-1 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold flex items-center justify-center gap-1 border border-emerald-200/80 dark:border-emerald-900/60 transition-all cursor-pointer shadow-2xs"
+                              >
+                                <span>Complete Work</span>
+                                <CheckCircle2 className="w-3 h-3" />
+                              </button>
+                            )}
+
+                            {col.stage === 'completed' && (
+                              <div className="w-full py-1 px-2 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold flex items-center justify-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                                <span>Work Verified</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );

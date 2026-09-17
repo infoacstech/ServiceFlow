@@ -2025,7 +2025,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                             <strong className="text-slate-800 dark:text-slate-200">
                               {p.planName}
                             </strong>{' '}
-                            ({p.isAddon ? 'Expansion Add-on' : `${p.billingCycle} billing`})
+                            ({p.isAddon ? 'Expansion Add-on' : (p.billingCycle === 'yearly' ? 'Annual billing' : `${p.billingCycle} billing`)})
                           </span>
                           <span>•</span>
                           <span>

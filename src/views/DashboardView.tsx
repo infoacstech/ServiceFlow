@@ -913,118 +913,232 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* Today's Jobs */}
         <div
           onClick={() => navigate('jobs', { datePreset: 'today', statusFilter: 'all' })}
-          className="p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all cursor-pointer group"
+          className="relative overflow-hidden p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all cursor-pointer group flex flex-col justify-between"
           title="Click to view Today's Jobs"
         >
           <div className="flex items-center justify-between text-slate-500 mb-1.5">
-            <span className="text-xs font-semibold group-hover:text-indigo-600 transition-colors truncate">{t('dashboard.todayJobs', undefined, "Today's Jobs")}</span>
-            <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all shrink-0">
+            <span className="text-xs font-semibold group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
+              {t('dashboard.todayJobs', undefined, "Today's Jobs")}
+            </span>
+            <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition-all shrink-0">
               <Briefcase className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">{todaysJobs.length}</div>
-          <div className="text-[10px] text-indigo-600 font-medium mt-0.5 flex items-center justify-between">
+          <div className="flex items-baseline justify-between gap-1">
+            <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+              {todaysJobs.length}
+            </div>
+            {/* Live Indicator */}
+            <span className="inline-flex items-center gap-1 text-[9px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/80 px-1.5 py-0.5 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping" />
+              Live
+            </span>
+          </div>
+
+          {/* Micro Trend Sparkline */}
+          <div className="my-1.5 h-5 w-full flex items-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+            <div className="flex-1 bg-indigo-200 dark:bg-indigo-900/60 rounded-xs h-[30%]" />
+            <div className="flex-1 bg-indigo-200 dark:bg-indigo-900/60 rounded-xs h-[55%]" />
+            <div className="flex-1 bg-indigo-300 dark:bg-indigo-800/80 rounded-xs h-[40%]" />
+            <div className="flex-1 bg-indigo-300 dark:bg-indigo-800/80 rounded-xs h-[70%]" />
+            <div className="flex-1 bg-indigo-400 dark:bg-indigo-700 rounded-xs h-[50%]" />
+            <div className="flex-1 bg-indigo-600 dark:bg-indigo-500 rounded-xs h-[90%]" />
+          </div>
+
+          <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-1">
             <span className="truncate">{t('dashboard.scheduled', undefined, 'Scheduled')}</span>
-            <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+            <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all shrink-0" />
           </div>
         </div>
 
         {/* Pending Jobs */}
         <div
           onClick={() => navigate('jobs', { datePreset: 'all', statusFilter: 'pending_active' })}
-          className="p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-amber-300 dark:hover:border-amber-700 transition-all cursor-pointer group"
+          className="relative overflow-hidden p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-amber-300 dark:hover:border-amber-700 transition-all cursor-pointer group flex flex-col justify-between"
           title="Click to view Pending Jobs"
         >
           <div className="flex items-center justify-between text-slate-500 mb-1.5">
-            <span className="text-xs font-semibold group-hover:text-amber-600 transition-colors truncate">{t('dashboard.pendingJobs', undefined, 'Pending Jobs')}</span>
-            <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white transition-all shrink-0">
+            <span className="text-xs font-semibold group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors truncate">
+              {t('dashboard.pendingJobs', undefined, 'Pending Jobs')}
+            </span>
+            <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 group-hover:bg-amber-500 group-hover:text-white transition-all shrink-0">
               <Clock className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">{pendingJobs.length}</div>
-          <div className="text-[10px] text-amber-600 font-medium mt-0.5 flex items-center justify-between">
+          <div className="flex items-baseline justify-between gap-1">
+            <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+              {pendingJobs.length}
+            </div>
+            {pendingJobs.length > 0 && (
+              <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/80 px-1.5 py-0.5 rounded-full">
+                Action
+              </span>
+            )}
+          </div>
+
+          {/* Micro Trend Sparkline */}
+          <div className="my-1.5 h-5 w-full flex items-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+            <div className="flex-1 bg-amber-200 dark:bg-amber-900/60 rounded-xs h-[45%]" />
+            <div className="flex-1 bg-amber-200 dark:bg-amber-900/60 rounded-xs h-[60%]" />
+            <div className="flex-1 bg-amber-300 dark:bg-amber-800/80 rounded-xs h-[75%]" />
+            <div className="flex-1 bg-amber-300 dark:bg-amber-800/80 rounded-xs h-[50%]" />
+            <div className="flex-1 bg-amber-400 dark:bg-amber-700 rounded-xs h-[65%]" />
+            <div className="flex-1 bg-amber-500 dark:bg-amber-400 rounded-xs h-[85%]" />
+          </div>
+
+          <div className="text-[10px] text-amber-600 dark:text-amber-400 font-medium flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-1">
             <span className="truncate">{t('dashboard.inProgress', undefined, 'In progress')}</span>
-            <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+            <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all shrink-0" />
           </div>
         </div>
 
         {/* Completed */}
         <div
           onClick={() => navigate('jobs', { datePreset: 'all', statusFilter: 'completed' })}
-          className="p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-700 transition-all cursor-pointer group"
+          className="relative overflow-hidden p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-700 transition-all cursor-pointer group flex flex-col justify-between"
           title="Click to view Completed Jobs"
         >
           <div className="flex items-center justify-between text-slate-500 mb-1.5">
-            <span className="text-xs font-semibold group-hover:text-emerald-600 transition-colors truncate">{t('dashboard.completedJobs', undefined, 'Completed')}</span>
-            <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white transition-all shrink-0">
+            <span className="text-xs font-semibold group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
+              {t('dashboard.completedJobs', undefined, 'Completed')}
+            </span>
+            <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-all shrink-0">
               <CheckCircle2 className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">{completedJobs.length}</div>
-          <div className="text-[10px] text-emerald-600 font-medium mt-0.5 flex items-center justify-between">
+          <div className="flex items-baseline justify-between gap-1">
+            <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+              {completedJobs.length}
+            </div>
+            <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-1.5 py-0.5 rounded-full">
+              Success
+            </span>
+          </div>
+
+          {/* Micro Trend Sparkline */}
+          <div className="my-1.5 h-5 w-full flex items-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+            <div className="flex-1 bg-emerald-200 dark:bg-emerald-900/60 rounded-xs h-[30%]" />
+            <div className="flex-1 bg-emerald-300 dark:bg-emerald-800/80 rounded-xs h-[45%]" />
+            <div className="flex-1 bg-emerald-300 dark:bg-emerald-800/80 rounded-xs h-[60%]" />
+            <div className="flex-1 bg-emerald-400 dark:bg-emerald-700 rounded-xs h-[75%]" />
+            <div className="flex-1 bg-emerald-500 dark:bg-emerald-600 rounded-xs h-[65%]" />
+            <div className="flex-1 bg-emerald-600 dark:bg-emerald-500 rounded-xs h-[95%]" />
+          </div>
+
+          <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-1">
             <span className="truncate">{t('dashboard.resolved', undefined, 'Resolved')}</span>
-            <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+            <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all shrink-0" />
           </div>
         </div>
 
         {/* Total Revenue */}
         <div
           onClick={() => navigate('invoices', { statusFilter: 'all' })}
-          className="p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group"
+          className="relative overflow-hidden p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group flex flex-col justify-between"
           title="Click to view Invoices & Total Revenue"
         >
           <div className="flex items-center justify-between text-slate-500 mb-1.5">
-            <span className="text-xs font-semibold group-hover:text-blue-600 transition-colors truncate">{t('dashboard.totalSales', undefined, 'Total Revenue')}</span>
-            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0">
+            <span className="text-xs font-semibold group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
+              {t('dashboard.totalSales', undefined, 'Total Revenue')}
+            </span>
+            <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0">
               <TrendingUp className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">
-            {curr}{totalSales.toLocaleString()}
+          <div className="flex items-baseline justify-between gap-1">
+            <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight font-mono truncate">
+              {curr}{totalSales.toLocaleString()}
+            </div>
           </div>
-          <div className="text-[10px] text-blue-600 font-medium mt-0.5 flex items-center justify-between">
+
+          {/* Micro Trend Sparkline */}
+          <div className="my-1.5 h-5 w-full flex items-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+            <div className="flex-1 bg-blue-200 dark:bg-blue-900/60 rounded-xs h-[40%]" />
+            <div className="flex-1 bg-blue-200 dark:bg-blue-900/60 rounded-xs h-[50%]" />
+            <div className="flex-1 bg-blue-300 dark:bg-blue-800/80 rounded-xs h-[65%]" />
+            <div className="flex-1 bg-blue-300 dark:bg-blue-800/80 rounded-xs h-[55%]" />
+            <div className="flex-1 bg-blue-400 dark:bg-blue-700 rounded-xs h-[80%]" />
+            <div className="flex-1 bg-blue-600 dark:bg-blue-500 rounded-xs h-[90%]" />
+          </div>
+
+          <div className="text-[10px] text-blue-600 dark:text-blue-400 font-medium flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-1">
             <span className="truncate">{t('dashboard.invoiced', undefined, 'Invoiced')}</span>
-            <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+            <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all shrink-0" />
           </div>
         </div>
 
         {/* Pending Payments / Pending Due */}
         <div
           onClick={() => navigate('invoices', { statusFilter: 'pending' })}
-          className="p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-rose-300 dark:hover:border-rose-700 transition-all cursor-pointer group"
+          className="relative overflow-hidden p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-rose-300 dark:hover:border-rose-700 transition-all cursor-pointer group flex flex-col justify-between"
           title="Click to view Pending Payments & Unpaid Invoices"
         >
           <div className="flex items-center justify-between text-slate-500 mb-1.5">
-            <span className="text-xs font-semibold group-hover:text-rose-600 transition-colors truncate">{t('dashboard.pendingPayments', undefined, 'Pending Due')}</span>
-            <div className="p-1.5 rounded-lg bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-all shrink-0">
+            <span className="text-xs font-semibold group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors truncate">
+              {t('dashboard.pendingPayments', undefined, 'Pending Due')}
+            </span>
+            <div className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 group-hover:bg-rose-600 group-hover:text-white transition-all shrink-0">
               <DollarSign className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">
-            {curr}{pendingPayments.toLocaleString()}
+          <div className="flex items-baseline justify-between gap-1">
+            <div className="text-lg sm:text-xl font-black text-rose-600 dark:text-rose-400 tracking-tight font-mono truncate">
+              {curr}{pendingPayments.toLocaleString()}
+            </div>
           </div>
-          <div className="text-[10px] text-rose-600 font-medium mt-0.5 flex items-center justify-between">
+
+          {/* Micro Trend Sparkline */}
+          <div className="my-1.5 h-5 w-full flex items-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+            <div className="flex-1 bg-rose-200 dark:bg-rose-900/60 rounded-xs h-[70%]" />
+            <div className="flex-1 bg-rose-200 dark:bg-rose-900/60 rounded-xs h-[50%]" />
+            <div className="flex-1 bg-rose-300 dark:bg-rose-800/80 rounded-xs h-[85%]" />
+            <div className="flex-1 bg-rose-300 dark:bg-rose-800/80 rounded-xs h-[60%]" />
+            <div className="flex-1 bg-rose-400 dark:bg-rose-700 rounded-xs h-[45%]" />
+            <div className="flex-1 bg-rose-500 dark:bg-rose-400 rounded-xs h-[35%]" />
+          </div>
+
+          <div className="text-[10px] text-rose-600 dark:text-rose-400 font-medium flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-1">
             <span className="truncate">{t('dashboard.awaitingCollection', undefined, 'Awaiting collection')}</span>
-            <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+            <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all shrink-0" />
           </div>
         </div>
 
         {/* Active Customers */}
         <div
           onClick={() => navigate('customers')}
-          className="p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700 transition-all cursor-pointer group"
+          className="relative overflow-hidden p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700 transition-all cursor-pointer group flex flex-col justify-between"
           title="Click to view Active Customers CRM"
         >
           <div className="flex items-center justify-between text-slate-500 mb-1.5">
-            <span className="text-xs font-semibold group-hover:text-purple-600 transition-colors truncate">{t('dashboard.totalCustomers', undefined, 'Customers')}</span>
-            <div className="p-1.5 rounded-lg bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-all shrink-0">
+            <span className="text-xs font-semibold group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors truncate">
+              {t('dashboard.totalCustomers', undefined, 'Customers')}
+            </span>
+            <div className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 group-hover:bg-purple-600 group-hover:text-white transition-all shrink-0">
               <Users className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">{customers.length}</div>
-          <div className="text-[10px] text-purple-600 font-medium mt-0.5 flex items-center justify-between">
+          <div className="flex items-baseline justify-between gap-1">
+            <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+              {customers.length}
+            </div>
+            <span className="text-[9px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-950/80 px-1.5 py-0.5 rounded-full">
+              Total CRM
+            </span>
+          </div>
+
+          {/* Micro Trend Sparkline */}
+          <div className="my-1.5 h-5 w-full flex items-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+            <div className="flex-1 bg-purple-200 dark:bg-purple-900/60 rounded-xs h-[35%]" />
+            <div className="flex-1 bg-purple-200 dark:bg-purple-900/60 rounded-xs h-[45%]" />
+            <div className="flex-1 bg-purple-300 dark:bg-purple-800/80 rounded-xs h-[55%]" />
+            <div className="flex-1 bg-purple-300 dark:bg-purple-800/80 rounded-xs h-[70%]" />
+            <div className="flex-1 bg-purple-400 dark:bg-purple-700 rounded-xs h-[80%]" />
+            <div className="flex-1 bg-purple-600 dark:bg-purple-500 rounded-xs h-[100%]" />
+          </div>
+
+          <div className="text-[10px] text-purple-600 dark:text-purple-400 font-medium flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-1">
             <span className="truncate">{t('dashboard.crmDatabase', undefined, 'CRM Database')}</span>
-            <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+            <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all shrink-0" />
           </div>
         </div>
       </div>

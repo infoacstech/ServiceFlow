@@ -410,7 +410,7 @@ export const SubscriptionReceiptModal: React.FC<SubscriptionReceiptModalProps> =
                       </div>
                     </td>
                     <td className="p-3 text-center capitalize font-bold text-slate-700 dark:text-slate-300">
-                      {payment.isAddon ? 'Quota Pack' : `${payment.billingCycle}`}
+                      {payment.isAddon ? 'Quota Pack' : (payment.billingCycle === 'yearly' ? 'Annual (1 Yr)' : payment.billingCycle)}
                     </td>
                     <td className="p-3 text-right font-mono text-slate-800 dark:text-slate-200 print:text-black">
                       ₹{fin.grossPlanPrice.toLocaleString('en-IN')}
@@ -451,7 +451,7 @@ export const SubscriptionReceiptModal: React.FC<SubscriptionReceiptModalProps> =
                     </div>
                   </div>
                   <span className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] uppercase shrink-0">
-                    {payment.isAddon ? 'Add-on' : payment.billingCycle}
+                    {payment.isAddon ? 'Add-on' : (payment.billingCycle === 'yearly' ? 'Annual' : payment.billingCycle)}
                   </span>
                 </div>
 

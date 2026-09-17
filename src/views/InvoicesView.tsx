@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import { sendInvoiceWhatsAppReminder } from '../utils/whatsappHelper';
 import { getIndiaDatePlusDays } from '../utils/dateUtils';
+import { QRCodeSVG } from 'qrcode.react';
+import { printInvoiceDocument, InvoiceTheme } from '../utils/invoicePdfHelper';
 
 export interface InvoiceInitialFilter {
   statusFilter?: string;
@@ -48,6 +50,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>(initialFilter?.statusFilter || 'all');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [invoiceTheme, setInvoiceTheme] = useState<InvoiceTheme>('modern');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -515,87 +518,258 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
       )}
 
       {/* Printable Invoice Modal */}
-      {selectedInvoice && !isPaymentModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-6 border shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div>
-                <span className="text-xs font-bold text-indigo-600">{selectedInvoice.invoiceNumber}</span>
-                <h3 className="font-extrabold text-base text-slate-900 dark:text-slate-100">Tax Invoice</h3>
-              </div>
-              <button onClick={() => setSelectedInvoice(null)} className="text-slate-400">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {selectedInvoice && !isPaymentModalOpen && (() => {
+        const customer = (customers || []).find((c) => c.id === selectedInvoice.customerId);
+        const isPaid = selectedInvoice.status === 'paid' || (selectedInvoice.balanceAmount || 0) <= 0;
+        const upiId = currentBusiness?.email ? `${currentBusiness.email.split('@')[0]}@upi` : 'merchant@upi';
+        const balanceToPay = (selectedInvoice.balanceAmount || 0) > 0 ? selectedInvoice.balanceAmount : selectedInvoice.grandTotal;
+        const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(currentBusiness.name || 'ServiFlow Merchant')}&am=${balanceToPay}&cu=INR&tn=${encodeURIComponent('Invoice ' + selectedInvoice.invoiceNumber)}`;
 
-            <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border text-xs space-y-4">
-              <div className="flex justify-between items-start border-b pb-3">
-                <div>
-                  <div className="font-extrabold text-base text-slate-900 dark:text-slate-100">{currentBusiness.name}</div>
-                  <div className="text-slate-500">{currentBusiness.address}, {currentBusiness.city}</div>
-                  <div className="text-slate-500">GSTIN: {currentBusiness.gstNumber || '09AAAAA0000A1Z5'}</div>
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full p-4 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+              {/* Modal Top Header */}
+              <div className="flex items-center justify-between border-b border-slate-200/80 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+                    <Receipt className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 font-mono">
+                        {selectedInvoice.invoiceNumber}
+                      </span>
+                      {isPaid ? (
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                          ✓ Paid
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+                          Payment Due
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="font-black text-base text-slate-900 dark:text-slate-100">
+                      Tax Invoice & Payment Receipt
+                    </h3>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-black text-emerald-600 text-sm">TAX INVOICE</div>
-                  <div className="text-slate-500">Date: {selectedInvoice.date}</div>
+
+                <div className="flex items-center gap-2">
+                  {/* Theme Switcher */}
+                  <div className="hidden sm:flex items-center p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+                    {(['modern', 'classic', 'minimal'] as InvoiceTheme[]).map((thm) => (
+                      <button
+                        key={thm}
+                        type="button"
+                        onClick={() => setInvoiceTheme(thm)}
+                        className={`px-2.5 py-1 rounded-lg font-bold capitalize transition-all cursor-pointer ${
+                          invoiceTheme === thm
+                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-2xs'
+                            : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+                        }`}
+                      >
+                        {thm}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedInvoice(null)}
+                    className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
 
-              <div>
-                <div className="font-bold text-slate-400 uppercase text-[10px]">Billed To:</div>
-                <div className="font-bold text-slate-900 dark:text-slate-100">
-                  {(customers || []).find((c) => c.id === selectedInvoice.customerId)?.name}
-                </div>
-              </div>
-
-              <table className="w-full text-left border-collapse">
-                <thead className="border-b text-slate-400">
-                  <tr>
-                    <th className="py-2">Description</th>
-                    <th className="py-2 text-center">Qty</th>
-                    <th className="py-2 text-right">Rate</th>
-                    <th className="py-2 text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {selectedInvoice.items.map((it) => (
-                    <tr key={it.id}>
-                      <td className="py-2 font-medium">{it.description}</td>
-                      <td className="py-2 text-center">{it.quantity}</td>
-                      <td className="py-2 text-right">{currentBusiness.currency}{it.rate}</td>
-                      <td className="py-2 text-right font-bold">{currentBusiness.currency}{it.amount}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <div className="border-t pt-3 flex justify-end text-right">
-                <div className="space-y-1">
-                  <div>Total: {currentBusiness.currency}{selectedInvoice.grandTotal}</div>
-                  <div className="text-emerald-600 font-bold">Paid: {currentBusiness.currency}{selectedInvoice.paidAmount}</div>
-                  <div className="text-rose-600 font-black">Balance Due: {currentBusiness.currency}{selectedInvoice.balanceAmount}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between gap-2 pt-3 border-t">
-              <button
-                type="button"
-                onClick={() => {
-                  const cust = (customers || []).find((c) => c.id === selectedInvoice.customerId);
-                  sendInvoiceWhatsAppReminder(selectedInvoice, cust, currentBusiness);
-                }}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
+              {/* In-Modal Visual Invoice Preview */}
+              <div
+                className={`p-5 sm:p-6 rounded-2xl border text-xs space-y-4 ${
+                  invoiceTheme === 'classic'
+                    ? 'bg-slate-50 dark:bg-slate-950 border-slate-300 dark:border-slate-800'
+                    : invoiceTheme === 'minimal'
+                    ? 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-900/60'
+                    : 'bg-indigo-50/30 dark:bg-slate-900 border-indigo-100 dark:border-indigo-950'
+                }`}
               >
-                <MessageSquare className="w-4 h-4" /> Share on WhatsApp
-              </button>
-              <button onClick={() => setSelectedInvoice(null)} className="px-5 py-2 rounded-xl bg-slate-200 text-slate-800 font-semibold text-xs cursor-pointer">
-                Close
-              </button>
+                {/* Business Header */}
+                <div className="flex justify-between items-start border-b border-slate-200 dark:border-slate-800 pb-3 gap-3">
+                  <div>
+                    <div className="font-black text-lg text-slate-900 dark:text-slate-100">
+                      {currentBusiness.name}
+                    </div>
+                    <div className="text-slate-500 text-[11px] mt-0.5">
+                      {currentBusiness.address}, {currentBusiness.city} {currentBusiness.pin}
+                    </div>
+                    <div className="text-slate-500 text-[11px]">
+                      GSTIN: <span className="font-mono font-bold text-slate-700 dark:text-slate-300">{currentBusiness.gstNumber || '09AAAAA0000A1Z5'}</span>
+                    </div>
+                    <div className="text-slate-500 text-[11px]">
+                      Phone: {currentBusiness.mobile} • Email: {currentBusiness.email}
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <div className="font-black text-indigo-600 dark:text-indigo-400 text-sm tracking-wide">
+                      TAX INVOICE
+                    </div>
+                    <div className="text-slate-600 dark:text-slate-400 font-mono text-[11px] mt-0.5">
+                      Date: <strong className="text-slate-900 dark:text-slate-100">{selectedInvoice.date}</strong>
+                    </div>
+                    <div className="text-slate-600 dark:text-slate-400 font-mono text-[11px]">
+                      Due: <strong className="text-slate-900 dark:text-slate-100">{selectedInvoice.dueDate || 'On Receipt'}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Customer Billed To */}
+                <div className="p-3 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 flex justify-between items-start">
+                  <div>
+                    <div className="font-black text-slate-400 uppercase text-[9.5px] tracking-wider">
+                      Billed To (Customer):
+                    </div>
+                    <div className="font-black text-slate-900 dark:text-slate-100 text-sm mt-0.5">
+                      {customer?.name || 'Customer'}
+                    </div>
+                    <div className="text-slate-500 text-[11px]">
+                      {customer?.mobile && `Phone: ${customer.mobile}`}
+                      {customer?.address && ` • ${customer.address}`}
+                    </div>
+                  </div>
+                  {customer?.gstNumber && (
+                    <div className="text-right text-[11px] text-slate-500">
+                      GSTIN: <strong className="font-mono text-slate-800 dark:text-slate-200">{customer.gstNumber}</strong>
+                    </div>
+                  )}
+                </div>
+
+                {/* Line Items Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-700 text-slate-500 text-[11px]">
+                        <th className="py-2 px-2 font-bold">Item Description</th>
+                        <th className="py-2 px-2 text-center font-bold">Qty</th>
+                        <th className="py-2 px-2 text-right font-bold">Rate</th>
+                        <th className="py-2 px-2 text-center font-bold">GST</th>
+                        <th className="py-2 px-2 text-right font-bold">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-[11.5px]">
+                      {selectedInvoice.items.map((it) => (
+                        <tr key={it.id}>
+                          <td className="py-2.5 px-2 font-semibold text-slate-800 dark:text-slate-200">
+                            {it.description}
+                          </td>
+                          <td className="py-2.5 px-2 text-center text-slate-600 dark:text-slate-400 font-mono">
+                            {it.quantity}
+                          </td>
+                          <td className="py-2.5 px-2 text-right text-slate-600 dark:text-slate-400 font-mono">
+                            {currentBusiness.currency}{it.rate}
+                          </td>
+                          <td className="py-2.5 px-2 text-center text-slate-500 font-mono">
+                            {it.taxPercent || 18}%
+                          </td>
+                          <td className="py-2.5 px-2 text-right font-black text-slate-900 dark:text-slate-100 font-mono">
+                            {currentBusiness.currency}{it.amount}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mathematical Summary & UPI QR Payment Box */}
+                <div className="border-t border-slate-200 dark:border-slate-800 pt-3 grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                  {/* Left: Dynamic UPI QR Box */}
+                  <div className="p-3 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 flex items-center gap-3">
+                    <div className="p-2 bg-white rounded-lg border border-slate-200 shrink-0">
+                      <QRCodeSVG value={upiUrl} size={84} level="M" />
+                    </div>
+                    <div className="space-y-1 min-w-0">
+                      <div className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-wider">
+                        Scan & Pay via UPI
+                      </div>
+                      <div className="text-[11px] text-slate-600 dark:text-slate-300 font-mono truncate">
+                        {upiId}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        Supports GPay, PhonePe, Paytm & BHIM
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: Calculations */}
+                  <div className="space-y-1.5 text-right font-medium text-xs">
+                    <div className="flex justify-between text-slate-500">
+                      <span>Subtotal:</span>
+                      <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                        {currentBusiness.currency}{selectedInvoice.subtotal}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-slate-500">
+                      <span>GST:</span>
+                      <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                        {currentBusiness.currency}{selectedInvoice.taxTotal}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-slate-900 dark:text-slate-100 font-black text-sm pt-1 border-t border-slate-200 dark:border-slate-700">
+                      <span>Grand Total:</span>
+                      <span className="font-mono text-indigo-600 dark:text-indigo-400">
+                        {currentBusiness.currency}{selectedInvoice.grandTotal}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-emerald-600 font-bold">
+                      <span>Paid Amount:</span>
+                      <span className="font-mono">
+                        {currentBusiness.currency}{selectedInvoice.paidAmount}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-rose-600 font-black text-sm">
+                      <span>Balance Due:</span>
+                      <span className="font-mono">
+                        {currentBusiness.currency}{selectedInvoice.balanceAmount}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => printInvoiceDocument(selectedInvoice, customer, currentBusiness, invoiceTheme)}
+                    className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                  >
+                    <Printer className="w-4 h-4" /> Print / Save PDF
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sendInvoiceWhatsAppReminder(selectedInvoice, customer, currentBusiness);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
+                  >
+                    <MessageSquare className="w-4 h-4" /> Share on WhatsApp
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvoice(null)}
+                  className="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-xs cursor-pointer transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Create Invoice Modal */}
       {isCreateInvoiceOpen && (

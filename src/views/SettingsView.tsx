@@ -216,8 +216,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
   const [isSubmittingPayout, setIsSubmittingPayout] = useState(false);
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
 
-  // Subscription Pricing Billing Toggle
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
+  // Subscription Pricing Billing Cycle (Enforce Yearly)
+  const billingCycle = 'yearly';
   const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
   const [isUpgradingPlan, setIsUpgradingPlan] = useState(false);
 
@@ -519,8 +519,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
     {
       id: 'addon-extra-tech',
       name: 'Extra Technician Seat',
-      price: billingCycle === 'yearly' ? 1490 : 149,
-      unit: billingCycle === 'yearly' ? '/tech/year' : '/tech/month',
+      price: 1490,
+      unit: '/tech/year',
       desc: 'Add 1 additional field technician beyond your current plan quota',
     },
     {
@@ -1200,32 +1200,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
               </p>
             </div>
 
-            <div className="inline-flex p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <button
-                type="button"
-                onClick={() => setBillingCycle('monthly')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  billingCycle === 'monthly'
-                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
-              >
-                Monthly Billing
-              </button>
-              <button
-                type="button"
-                onClick={() => setBillingCycle('yearly')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  billingCycle === 'yearly'
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
-              >
-                <span>Annual Billing</span>
-                <span className="text-[9px] px-1.5 py-0.2 rounded bg-white text-emerald-950 font-black">
-                  SAVE 20%
-                </span>
-              </button>
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-extrabold shadow-xs">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Annual Plans (20% Savings Included)</span>
             </div>
           </div>
 
@@ -1273,40 +1250,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
                   </div>
 
                   <div className="mb-4 pb-4 border-b border-slate-200 dark:border-slate-800">
-                    {billingCycle === 'monthly' ? (
-                      <div>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-xs font-bold text-slate-400">₹</span>
-                          <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                            {plan.price.toLocaleString('en-IN')}
-                          </span>
-                          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                            / month
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-slate-400 mt-1">
-                          Billed monthly, cancel anytime
-                        </div>
+                    <div>
+                      <div className="flex items-baseline gap-1.5 flex-wrap">
+                        <span className="text-xs font-bold text-slate-400">₹</span>
+                        <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                          {annualInfo.discountedAnnual.toLocaleString('en-IN')}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          / year
+                        </span>
+                        <span className="text-xs line-through text-slate-400 font-medium ml-1">
+                          ₹{annualInfo.originalAnnual.toLocaleString('en-IN')}
+                        </span>
                       </div>
-                    ) : (
-                      <div>
-                        <div className="flex items-baseline gap-1.5 flex-wrap">
-                          <span className="text-xs font-bold text-slate-400">₹</span>
-                          <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                            {annualInfo.discountedAnnual.toLocaleString('en-IN')}
-                          </span>
-                          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                            / year
-                          </span>
-                          <span className="text-xs line-through text-slate-400 font-medium ml-1">
-                            ₹{annualInfo.originalAnnual.toLocaleString('en-IN')}
-                          </span>
-                        </div>
-                        <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
-                          <span>Billed annually (Save 20% • ₹{annualInfo.savings.toLocaleString('en-IN')})</span>
-                        </div>
+                      <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                        <span>Billed annually (Save 20% • ₹{annualInfo.savings.toLocaleString('en-IN')})</span>
                       </div>
-                    )}
+                    </div>
                   </div>
 
                   {/* Quota Highlights */}
@@ -2031,7 +1991,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
                 <div className="p-3.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-xs text-indigo-900 dark:text-indigo-200 flex items-start gap-2.5">
                   <Sparkles className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold">Instant Subscription Credit:</span> ₹{payoutAmount.toLocaleString('en-IN')} will be credited directly to reduce your upcoming monthly or yearly subscription renewals.
+                    <span className="font-bold">Instant Subscription Credit:</span> ₹{payoutAmount.toLocaleString('en-IN')} will be credited directly to reduce your upcoming yearly subscription renewals.
                   </div>
                 </div>
               )}

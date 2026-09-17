@@ -75,13 +75,24 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, setActiveTab })
   ];
 
   // Tenant Bottom Bar Items - Exactly 5 items as specified
-  const tenantBottomItems = [
+  const adminBottomItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'jobs', label: 'Jobs', icon: Briefcase },
     { id: 'customers', label: 'Customers', icon: Users },
     { id: 'invoices', label: 'Invoices', icon: Receipt },
     { id: 'more', label: isSuperAdmin ? 'Console' : 'Modules', icon: Grid },
   ];
+
+  // Field Technician Bottom Bar Items - Optimized for On-Field Work
+  const techBottomItems = [
+    { id: 'jobs', label: t('nav.myJobs', undefined, 'My Tasks'), icon: Briefcase },
+    { id: 'attendance', label: t('nav.attendance', undefined, 'Attendance'), icon: Clock },
+    { id: 'customers', label: t('nav.customers', undefined, 'Customers'), icon: Users },
+    { id: 'ai_assistant', label: t('nav.aiAssistant', undefined, 'AI Copilot'), icon: Sparkles },
+    { id: 'more', label: 'More', icon: Grid },
+  ];
+
+  const tenantBottomItems = isTech ? techBottomItems : adminBottomItems;
 
   const bottomItems = isGlobalConsole ? superAdminBottomItems : tenantBottomItems;
 

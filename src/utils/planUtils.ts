@@ -49,9 +49,9 @@ export const PLANS: Plan[] = [
   {
     id: 'plan-starter',
     name: 'Starter',
-    price: 299,
-    yearlyPrice: 2870, // 299 * 12 * 0.8 = 2870.4
-    billingCycle: 'monthly',
+    price: 2870,
+    yearlyPrice: 2870,
+    billingCycle: 'yearly',
     maxStaff: 2,
     maxJobs: 100,
     maxCustomers: 500,
@@ -72,9 +72,9 @@ export const PLANS: Plan[] = [
   {
     id: 'plan-pro',
     name: 'Professional',
-    price: 599,
-    yearlyPrice: 5750, // 599 * 12 * 0.8 = 5750.4
-    billingCycle: 'monthly',
+    price: 5750,
+    yearlyPrice: 5750,
+    billingCycle: 'yearly',
     maxStaff: 7,
     maxJobs: 500,
     maxCustomers: 2500,
@@ -95,9 +95,9 @@ export const PLANS: Plan[] = [
   {
     id: 'plan-biz',
     name: 'Business',
-    price: 999,
-    yearlyPrice: 9590, // 999 * 12 * 0.8 = 9590.4
-    billingCycle: 'monthly',
+    price: 9590,
+    yearlyPrice: 9590,
+    billingCycle: 'yearly',
     maxStaff: 15,
     maxJobs: 1500,
     maxCustomers: 10000,
@@ -136,9 +136,20 @@ export function getPlanById(planIdOrName?: string): Plan {
 /**
  * Calculate annual pricing breakdown with standard 20% discount
  */
-export function calculateAnnualPricing(monthlyPrice: number) {
-  const originalAnnual = monthlyPrice * 12;
-  const discountedAnnual = Math.round(originalAnnual * (1 - ANNUAL_DISCOUNT_PERCENT / 100));
+export function calculateAnnualPricing(priceOrMonthly: number) {
+  let discountedAnnual: number;
+  let originalAnnual: number;
+
+  if (priceOrMonthly <= 1200) {
+    // Legacy monthly input (e.g. 299, 599, 999)
+    originalAnnual = priceOrMonthly * 12;
+    discountedAnnual = Math.round(originalAnnual * (1 - ANNUAL_DISCOUNT_PERCENT / 100));
+  } else {
+    // Direct yearly price (e.g. 2870, 5750, 9590)
+    discountedAnnual = priceOrMonthly;
+    originalAnnual = Math.round(discountedAnnual / (1 - ANNUAL_DISCOUNT_PERCENT / 100));
+  }
+
   const savings = originalAnnual - discountedAnnual;
   return {
     originalAnnual,

@@ -29,7 +29,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
   onPlanSelected,
 }) => {
   const { currentBusiness, updateBusinessProfile, showToast } = useApp();
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const billingCycle = 'yearly';
   const [isUpgrading, setIsUpgrading] = useState(false);
 
   if (!isOpen) return null;
@@ -49,7 +49,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
       playNotificationChime();
       playCustomVoiceNotification(`Plan updated to ${plan.name} successfully.`);
       showToast(
-        `Subscription upgraded to ${plan.name} Plan (${billingCycle === 'yearly' ? 'Annual' : 'Monthly'})!`,
+        `Subscription upgraded to ${plan.name} Plan (Annual)!`,
         'success'
       );
       if (onPlanSelected) onPlanSelected(plan.id);
@@ -76,41 +76,18 @@ export const PricingModal: React.FC<PricingModalProps> = ({
               <span>ServiFlow Subscription Plans</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-              Simple, Transparent Plans for Service Teams
+              Annual Plans for Service Teams
             </h2>
             <p className="text-xs sm:text-sm text-indigo-200/80 mt-1">
-              From enquiry capture to field job dispatch, tracking, and completion.
+              From enquiry capture to field job dispatch, live GPS tracking, and completion.
             </p>
           </div>
 
-          {/* Billing Cycle Toggle */}
-          <div className="mt-5 flex items-center justify-center sm:justify-start">
-            <div className="inline-flex p-1 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10">
-              <button
-                type="button"
-                onClick={() => setBillingCycle('monthly')}
-                className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  billingCycle === 'monthly'
-                    ? 'bg-white text-slate-900 shadow-md'
-                    : 'text-indigo-200 hover:text-white'
-                }`}
-              >
-                Monthly Billing
-              </button>
-              <button
-                type="button"
-                onClick={() => setBillingCycle('yearly')}
-                className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                  billingCycle === 'yearly'
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md'
-                    : 'text-indigo-200 hover:text-white'
-                }`}
-              >
-                <span>Annual Billing</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white text-emerald-950 font-black tracking-wide">
-                  SAVE 20%
-                </span>
-              </button>
+          {/* Annual Billing Guarantee Banner */}
+          <div className="mt-4 flex items-center justify-center sm:justify-start">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>ANNUAL BILLING • 20% DISCOUNT APPLIED TO ALL PLANS</span>
             </div>
           </div>
         </div>
@@ -163,40 +140,23 @@ export const PricingModal: React.FC<PricingModalProps> = ({
 
                   {/* Pricing Display */}
                   <div className="mb-4 pb-4 border-b border-slate-200 dark:border-slate-800">
-                    {billingCycle === 'monthly' ? (
-                      <div>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-xs font-bold text-slate-400">₹</span>
-                          <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                            {plan.price.toLocaleString('en-IN')}
-                          </span>
-                          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                            / month
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-slate-400 mt-1">
-                          Billed monthly, cancel anytime
-                        </div>
+                    <div>
+                      <div className="flex items-baseline gap-1.5 flex-wrap">
+                        <span className="text-xs font-bold text-slate-400">₹</span>
+                        <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                          {annualInfo.discountedAnnual.toLocaleString('en-IN')}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          / year
+                        </span>
+                        <span className="text-xs line-through text-slate-400 font-medium ml-1">
+                          ₹{annualInfo.originalAnnual.toLocaleString('en-IN')}
+                        </span>
                       </div>
-                    ) : (
-                      <div>
-                        <div className="flex items-baseline gap-1.5 flex-wrap">
-                          <span className="text-xs font-bold text-slate-400">₹</span>
-                          <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                            {annualInfo.discountedAnnual.toLocaleString('en-IN')}
-                          </span>
-                          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                            / year
-                          </span>
-                          <span className="text-xs line-through text-slate-400 font-medium ml-1">
-                            ₹{annualInfo.originalAnnual.toLocaleString('en-IN')}
-                          </span>
-                        </div>
-                        <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
-                          <span>Billed annually (Save 20% • ₹{annualInfo.savings.toLocaleString('en-IN')})</span>
-                        </div>
+                      <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                        <span>Billed annually (Save 20% • ₹{annualInfo.savings.toLocaleString('en-IN')})</span>
                       </div>
-                    )}
+                    </div>
                   </div>
 
                   {/* Recommended Operational Limits */}

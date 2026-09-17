@@ -521,11 +521,40 @@ export const QuotationsView: React.FC = () => {
       {/* Quotations List & Table */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-sm">
         {filtered.length === 0 ? (
-          <div className="p-10 text-center text-slate-400 space-y-2">
-            <FileText className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
-            <p className="text-xs">
-              No quotations found. Click <strong className="text-indigo-600">Create Quotation</strong> to generate one.
-            </p>
+          <div className="p-10 sm:p-14 text-center space-y-3.5">
+            <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-500 mx-auto flex items-center justify-center shadow-2xs border border-indigo-100 dark:border-indigo-900/50">
+              <FileText className="w-7 h-7 stroke-[1.75]" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-slate-800 dark:text-slate-200">
+                {search ? 'No quotations match your search' : 'No quotations created yet'}
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mt-1 leading-relaxed">
+                {search
+                  ? `No quotation records matched "${search}". Try searching by customer name or clear search filter.`
+                  : 'Send professional estimates & cost proposals to customers with automated GST calculations and WhatsApp delivery.'}
+              </p>
+            </div>
+            <div className="pt-2 flex items-center justify-center gap-2">
+              {search ? (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Clear Search
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleOpenCreateModal}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Create First Quotation</span>
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <>

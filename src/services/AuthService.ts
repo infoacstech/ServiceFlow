@@ -157,7 +157,7 @@ export class AuthService {
       status: 'trial',
       subscriptionStatus: 'trial',
       trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      billingCycle: 'monthly',
+      billingCycle: 'yearly',
       addonStaff: 0,
       addonWhatsappQuota: 0,
       referralCode: newReferralCode,

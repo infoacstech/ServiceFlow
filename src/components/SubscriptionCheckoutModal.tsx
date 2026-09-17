@@ -51,7 +51,7 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
 }) => {
   const { currentBusiness, currentUser, showToast, logActivity, submitSubscriptionPayment, subscriptionPayments } = useApp();
 
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(defaultBillingCycle);
+  const billingCycle: 'yearly' = 'yearly';
   const [activePaymentTab, setActivePaymentTab] = useState<'upi_qr' | 'bank_transfer'>('upi_qr');
   const [utrNumber, setUtrNumber] = useState('');
   const [senderName, setSenderName] = useState(currentUser?.name || currentBusiness?.name || '');
@@ -67,17 +67,13 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
   const isPlan = Boolean(plan);
   const itemName = isPlan ? `${plan!.name} Plan` : addon!.name;
 
-  // Pricing Calculation
+  // Pricing Calculation (Annual Billing Only)
   let basePrice = 0;
   if (isPlan) {
-    if (billingCycle === 'yearly') {
-      const annualCalc = calculateAnnualPricing(plan!.price);
-      basePrice = annualCalc.discountedAnnual;
-    } else {
-      basePrice = plan!.price;
-    }
+    const annualCalc = calculateAnnualPricing(plan!.price);
+    basePrice = annualCalc.discountedAnnual;
   } else {
-    basePrice = billingCycle === 'yearly' && addon!.yearlyPrice ? addon!.yearlyPrice : addon!.price;
+    basePrice = addon!.yearlyPrice ? addon!.yearlyPrice : addon!.price;
   }
 
   // Check 10% referral discount eligibility
@@ -87,7 +83,7 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
   const netPayable = Math.max(0, basePrice - discountAmount);
 
   // Generate UPI URI
-  const upiTxNote = `ServiFlow ${itemName} (${billingCycle})`;
+  const upiTxNote = `ServiFlow ${itemName} (Annual)`;
   const upiUrl = buildUpiPaymentUrl({
     amount: netPayable,
     note: upiTxNote,
@@ -302,42 +298,17 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
                 </p>
               </div>
 
-              {/* Billing Cycle Selector for Plans */}
-              {isPlan && (
-                <div className="flex items-center gap-1.5 p-1 bg-white dark:bg-slate-900 rounded-xl border border-indigo-200 dark:border-indigo-800/80 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycle('monthly')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      billingCycle === 'monthly'
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-indigo-600'
-                    }`}
-                  >
-                    Monthly
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycle('yearly')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                      billingCycle === 'yearly'
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-indigo-600'
-                    }`}
-                  >
-                    <span>Yearly</span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 font-black">
-                      -20%
-                    </span>
-                  </button>
-                </div>
-              )}
+              {/* Annual Billing Indicator */}
+              <div className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-black shrink-0 flex items-center gap-1.5 shadow-xs">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Annual Plan (1 Year)</span>
+              </div>
             </div>
 
             {/* Price Breakdown Calculation Box */}
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs space-y-2">
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                <span>Standard Pricing ({billingCycle === 'yearly' ? 'Annual Plan' : '1 Month'}):</span>
+                <span>Standard Pricing (Annual Subscription):</span>
                 <span className="font-semibold text-slate-800 dark:text-slate-200">
                   ₹{basePrice.toLocaleString('en-IN')}
                 </span>
