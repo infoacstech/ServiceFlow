@@ -43,10 +43,8 @@ export function isBusinessOwnerOrAdmin(user: User | null | undefined): boolean {
   if (!user) return false;
   const email = (user.email || '').trim().toLowerCase();
   const isSuper =
-    user.role === 'super_admin' ||
-    email === 'admin@serviflow.io' ||
-    email === 'superadmin@serviflow.io' ||
-    email === 'uniquesolutions108@gmail.com';
+    user.role === 'super_admin' &&
+    (email === 'admin@serviflow.io' || email === 'superadmin@serviflow.io');
   return user.role === 'business_owner' || isSuper;
 }
 
@@ -190,10 +188,8 @@ export function validateTenantIsolation(
   // Super Admin can access all tenants
   const email = (currentUser.email || '').trim().toLowerCase();
   if (
-    currentUser.role === 'super_admin' ||
-    email === 'admin@serviflow.io' ||
-    email === 'superadmin@serviflow.io' ||
-    email === 'uniquesolutions108@gmail.com'
+    currentUser.role === 'super_admin' &&
+    (email === 'admin@serviflow.io' || email === 'superadmin@serviflow.io')
   ) {
     return { allowed: true };
   }

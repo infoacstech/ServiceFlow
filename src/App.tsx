@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppProvider, useApp } from './context/AppContext';
+import { AppProvider, useApp, checkIsSuperAdmin } from './context/AppContext';
 import { navigationManager, useBackHandler } from './utils/backNavigation';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -77,7 +77,23 @@ const MainContent: React.FC = () => {
     showToast,
   } = useApp();
   const [activeTab, setActiveTab] = useState<string>(() => {
-    return localStorage.getItem('serviflow_active_tab') || sessionStorage.getItem('serviflow_active_tab') || 'dashboard';
+    const raw = localStorage.getItem('serviflow_active_tab') || sessionStorage.getItem('serviflow_active_tab') || 'dashboard';
+    if (raw === 'super_admin' || raw.startsWith('super_admin_')) {
+      try {
+        const savedSession = localStorage.getItem('serviflow_user_session');
+        if (savedSession) {
+          const u = JSON.parse(savedSession);
+          if (checkIsSuperAdmin(u)) {
+            return raw;
+          }
+        }
+      } catch {}
+      // Unauthorized or Business Owner session — sanitize immediately to default screen
+      localStorage.setItem('serviflow_active_tab', 'dashboard');
+      sessionStorage.setItem('serviflow_active_tab', 'dashboard');
+      return 'dashboard';
+    }
+    return raw;
   });
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isCreateJobOpen, setIsCreateJobOpen] = useState(false);
@@ -110,6 +126,60 @@ const MainContent: React.FC = () => {
 
   const prevUserIdRef = React.useRef<string | null>(null);
 
+  const permissions = getRolePermissions(currentUser?.role);
+
+  const getTabAccess = (tab: string) => {
+    const isSuperUser = checkIsSuperAdmin(currentUser);
+    if (tab === 'super_admin' || tab.startsWith('super_admin_')) {
+      return { allowed: isSuperUser && permissions.canAccessSuperAdmin, label: 'SaaS Platform Super Admin' };
+    }
+    switch (tab) {
+      case 'dashboard':
+        return {
+          allowed: currentUser?.role !== 'technician' && (permissions.canManageJobs || permissions.canViewFinancials),
+          label: 'Admin or Manager'
+        };
+      case 'enquiries':
+        return {
+          allowed: currentUser?.role !== 'technician' && (permissions.canManageJobs || permissions.canManageStaff),
+          label: 'Admin or Manager'
+        };
+      case 'jobs':
+        return { allowed: permissions.canManageJobs, label: 'Technician, Manager, or Admin' };
+      case 'customers':
+        return { allowed: permissions.canManageJobs || permissions.canManageStaff, label: 'Technician, Manager, or Admin' };
+      case 'services':
+        return { allowed: permissions.canManageServices, label: 'Admin or Manager' };
+      case 'staff':
+        return { allowed: permissions.canManageStaff, label: 'Admin or Manager' };
+      case 'attendance':
+        return { allowed: true, label: '' };
+      case 'inventory':
+        return { allowed: permissions.canManageInventory, label: 'Admin or Manager' };
+      case 'quotations':
+      case 'invoices':
+      case 'payments':
+      case 'reports':
+        return { allowed: permissions.canViewFinancials, label: 'Admin or Manager' };
+      case 'expenses':
+        return { allowed: true, label: '' };
+      case 'contracts':
+        return { allowed: permissions.canManageContracts, label: 'Admin or Manager' };
+      case 'ai_assistant':
+        return { allowed: permissions.canManageJobs || permissions.canViewFinancials, label: 'Admin or Manager' };
+      case 'customer_portal':
+        return { allowed: permissions.canAccessCustomerPortal, label: 'Admin or Manager' };
+      case 'settings':
+        return { allowed: true, label: '' };
+      case 'notifications':
+      case 'login':
+      default:
+        return { allowed: true, label: '' };
+    }
+  };
+
+  const currentTabAccess = getTabAccess(activeTab);
+
   // Initialize global navigation manager once on mount
   useEffect(() => {
     navigationManager.init(
@@ -127,52 +197,109 @@ const MainContent: React.FC = () => {
     );
   }, []);
 
-  // Sync activeTab only when switching authenticated user/session
+  // Sync activeTab only when switching authenticated user/session & enforce strict role boundaries
   React.useEffect(() => {
-    if (currentUser) {
-      if (prevUserIdRef.current !== currentUser.id) {
-        prevUserIdRef.current = currentUser.id;
-        const isTechUser = currentUser.role === 'technician';
-        const isSuperUser = currentUser.role === 'super_admin';
-        const savedTab = localStorage.getItem('serviflow_active_tab') || sessionStorage.getItem('serviflow_active_tab');
+    if (!currentUser) {
+      if (!isAuthInitializing && activeTab !== 'login') {
+        console.log('[RoleRoutingDebug] Unauthenticated session. Redirecting to login screen.');
+        prevUserIdRef.current = null;
+        setActiveTab('login');
+        navigationManager.pushScreen('login');
+      }
+      return;
+    }
 
-        if (isTechUser) {
-          // Technicians & staff must default to 'jobs' (My Jobs) and are restricted from dashboard
-          if (!savedTab || savedTab === 'login' || savedTab === 'dashboard') {
-            setActiveTab('jobs');
-            navigationManager.pushScreen('jobs');
-            localStorage.setItem('serviflow_active_tab', 'jobs');
-            sessionStorage.setItem('serviflow_active_tab', 'jobs');
-          } else {
-            setActiveTab(savedTab);
-            navigationManager.pushScreen(savedTab);
-          }
-        } else if (!savedTab || savedTab === 'login') {
-          const defaultTab = isSuperUser ? 'super_admin_dashboard' : 'dashboard';
-          setActiveTab(defaultTab);
-          navigationManager.pushScreen(defaultTab);
-          localStorage.setItem('serviflow_active_tab', defaultTab);
-          sessionStorage.setItem('serviflow_active_tab', defaultTab);
+    const isTechUser = currentUser.role === 'technician';
+    const isSuperUser = checkIsSuperAdmin(currentUser);
+    const isSuperTab = activeTab === 'super_admin' || activeTab.startsWith('super_admin_');
+
+    console.log('[RoleRoutingDebug] Active tab check:', {
+      userId: currentUser.id,
+      email: currentUser.email,
+      role: currentUser.role,
+      activeTab,
+      isSuperUser,
+      isSuperTab,
+    });
+
+    // CRITICAL FIX: If current tab is a Super Admin tab, but user is NOT a verified super admin:
+    // Fallback immediately to default screen (Dashboard for Business Owner, Jobs for Tech)
+    // NEVER show the Access Restricted to Super Admin screen for normal navigation
+    if (isSuperTab && !isSuperUser) {
+      console.warn(`[RoleRoutingDebug] Non-super-admin user (${currentUser.email}, role: ${currentUser.role}) attempted to access super admin tab "${activeTab}". Auto-correcting to default screen.`);
+      const fallbackTab = isTechUser ? 'jobs' : 'dashboard';
+      setActiveTab(fallbackTab);
+      navigationManager.pushScreen(fallbackTab);
+      localStorage.setItem('serviflow_active_tab', fallbackTab);
+      sessionStorage.setItem('serviflow_active_tab', fallbackTab);
+      return;
+    }
+
+    if (isTechUser && (activeTab === 'dashboard' || activeTab === 'reports')) {
+      console.warn(`[RoleRoutingDebug] Technician restricted from tab "${activeTab}". Redirecting to jobs.`);
+      setActiveTab('jobs');
+      navigationManager.pushScreen('jobs');
+      localStorage.setItem('serviflow_active_tab', 'jobs');
+      sessionStorage.setItem('serviflow_active_tab', 'jobs');
+      return;
+    }
+
+    // Session synchronization when user identity changes
+    if (prevUserIdRef.current !== currentUser.id) {
+      prevUserIdRef.current = currentUser.id;
+      const rawSavedTab = localStorage.getItem('serviflow_active_tab') || sessionStorage.getItem('serviflow_active_tab');
+
+      let defaultTargetTab: string;
+      if (isTechUser) {
+        defaultTargetTab = 'jobs';
+      } else if (isSuperUser) {
+        defaultTargetTab = 'super_admin_dashboard';
+      } else {
+        defaultTargetTab = 'dashboard';
+      }
+
+      let finalTab = defaultTargetTab;
+      if (rawSavedTab && rawSavedTab !== 'login') {
+        const access = getTabAccess(rawSavedTab);
+        if (access.allowed) {
+          finalTab = rawSavedTab;
         } else {
-          setActiveTab(savedTab);
-          navigationManager.pushScreen(savedTab);
+          console.warn(`[RoleRoutingDebug] Saved tab "${rawSavedTab}" not permitted for role "${currentUser.role}". Falling back to "${defaultTargetTab}".`);
         }
       }
-    } else if (!isAuthInitializing) {
-      prevUserIdRef.current = null;
-      setActiveTab('login');
-      navigationManager.pushScreen('login');
+
+      console.log(`[RoleRoutingDebug] Setting active tab for ${currentUser.email} (${currentUser.role}): ${finalTab}`);
+      setActiveTab(finalTab);
+      navigationManager.pushScreen(finalTab);
+      localStorage.setItem('serviflow_active_tab', finalTab);
+      sessionStorage.setItem('serviflow_active_tab', finalTab);
     }
-  }, [currentUser?.id, currentUser?.role, isAuthInitializing]);
+  }, [currentUser?.id, currentUser?.role, activeTab, isAuthInitializing]);
 
   const handleTabChange = (tab: string) => {
     let targetTab = tab;
-    if (currentUser?.role === 'technician' && tab === 'dashboard') {
+    const isSuperUser = checkIsSuperAdmin(currentUser);
+
+    console.log('[RoleRoutingDebug] handleTabChange requested:', {
+      requestedTab: tab,
+      userRole: currentUser?.role,
+      userEmail: currentUser?.email,
+      isSuperUser,
+    });
+
+    if (!isSuperUser && (targetTab === 'super_admin' || targetTab.startsWith('super_admin_'))) {
+      console.warn(`[RoleRoutingDebug] Blocked non-super-admin from tab "${targetTab}". Redirecting to dashboard.`);
+      targetTab = currentUser?.role === 'technician' ? 'jobs' : 'dashboard';
+    }
+
+    if (currentUser?.role === 'technician' && (targetTab === 'dashboard' || targetTab === 'reports')) {
       targetTab = 'jobs';
     }
-    if (currentUser?.role === 'super_admin' && tab === 'super_admin') {
+
+    if (isSuperUser && targetTab === 'super_admin') {
       targetTab = 'super_admin_dashboard';
     }
+
     navigationManager.pushScreen(targetTab);
     setActiveTab(targetTab);
     if (currentUser) {
@@ -258,59 +385,6 @@ const MainContent: React.FC = () => {
       </div>
     );
   }
-
-  const permissions = getRolePermissions(currentUser?.role);
-
-  const getTabAccess = (tab: string) => {
-    if (tab === 'super_admin' || tab.startsWith('super_admin_')) {
-      return { allowed: permissions.canAccessSuperAdmin, label: 'SaaS Platform Super Admin' };
-    }
-    switch (tab) {
-      case 'dashboard':
-        return {
-          allowed: currentUser?.role !== 'technician' && (permissions.canManageJobs || permissions.canViewFinancials),
-          label: 'Admin or Manager'
-        };
-      case 'enquiries':
-        return {
-          allowed: currentUser?.role !== 'technician' && (permissions.canManageJobs || permissions.canManageStaff),
-          label: 'Admin or Manager'
-        };
-      case 'jobs':
-        return { allowed: permissions.canManageJobs, label: 'Technician, Manager, or Admin' };
-      case 'customers':
-        return { allowed: permissions.canManageJobs || permissions.canManageStaff, label: 'Technician, Manager, or Admin' };
-      case 'services':
-        return { allowed: permissions.canManageServices, label: 'Admin or Manager' };
-      case 'staff':
-        return { allowed: permissions.canManageStaff, label: 'Admin or Manager' };
-      case 'attendance':
-        return { allowed: true, label: '' };
-      case 'inventory':
-        return { allowed: permissions.canManageInventory, label: 'Admin or Manager' };
-      case 'quotations':
-      case 'invoices':
-      case 'payments':
-      case 'reports':
-        return { allowed: permissions.canViewFinancials, label: 'Admin or Manager' };
-      case 'expenses':
-        return { allowed: true, label: '' };
-      case 'contracts':
-        return { allowed: permissions.canManageContracts, label: 'Admin or Manager' };
-      case 'ai_assistant':
-        return { allowed: permissions.canManageJobs || permissions.canViewFinancials, label: 'Admin or Manager' };
-      case 'customer_portal':
-        return { allowed: permissions.canAccessCustomerPortal, label: 'Admin or Manager' };
-      case 'settings':
-        return { allowed: true, label: '' };
-      case 'notifications':
-      case 'login':
-      default:
-        return { allowed: true, label: '' };
-    }
-  };
-
-  const currentTabAccess = getTabAccess(activeTab);
 
   const handleNavigateWithFilter = (tab: string, filter?: any) => {
     if (tab === 'jobs') {

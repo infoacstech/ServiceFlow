@@ -664,14 +664,15 @@ export const isSuperAdminEmail = (email?: string | null): boolean => {
   const clean = email.trim().toLowerCase();
   return (
     clean === 'admin@serviflow.io' ||
-    clean === 'superadmin@serviflow.io' ||
-    clean === 'uniquesolutions108@gmail.com'
+    clean === 'superadmin@serviflow.io'
   );
 };
 
 export const checkIsSuperAdmin = (user?: User | null): boolean => {
-  if (!user) return false;
-  return user.role === 'super_admin' || isSuperAdminEmail(user.email);
+  if (!user || !user.role) return false;
+  // Non-super_admin or undefined/loading role MUST NOT be treated as super_admin
+  if (user.role !== 'super_admin') return false;
+  return isSuperAdminEmail(user.email) || user.id === SUPER_ADMIN_USER.id;
 };
 
 const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -688,11 +689,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const u = JSON.parse(savedSession) as User;
         if (checkIsSuperAdmin(u)) {
           const cached = loadCache<Business | null>('serviflow_current_biz_cache', null);
-          return cached && cached.id && cached.id !== 'biz-default' ? cached : GLOBAL_SUPER_ADMIN_BUSINESS;
+          return cached && cached.id && cached.id !== 'biz-default' && cached.id !== 'all' ? cached : GLOBAL_SUPER_ADMIN_BUSINESS;
         }
       }
     } catch {}
-    return loadCache('serviflow_current_biz_cache', DEFAULT_BLANK_BUSINESS);
+    const cached = loadCache<Business>('serviflow_current_biz_cache', DEFAULT_BLANK_BUSINESS);
+    if (cached && (cached.id === 'all' || cached.id === 'global')) {
+      return DEFAULT_BLANK_BUSINESS;
+    }
+    return cached;
   });
 
   const [users, setUsers] = useState<User[]>(() =>
@@ -702,7 +707,25 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const savedSession = localStorage.getItem('serviflow_user_session');
       if (savedSession) {
-        return JSON.parse(savedSession) as User;
+        const u = JSON.parse(savedSession) as User;
+        if (u) {
+          const isRealSuper = u.role === 'super_admin' && (isSuperAdminEmail(u.email) || u.id === SUPER_ADMIN_USER.id);
+          if (u.role === 'super_admin' && !isRealSuper) {
+            console.warn('[Security Sanitizer] Cached user had illegitimate super_admin role. Resetting to business_owner.');
+            u.role = 'business_owner';
+            if (!u.businessId || u.businessId === 'all') {
+              u.businessId = `tenant-${u.id}`;
+            }
+            localStorage.setItem('serviflow_user_session', JSON.stringify(u));
+          }
+          console.log('[AuthDebug] Initialized currentUser from cached session:', {
+            id: u.id,
+            email: u.email,
+            role: u.role,
+            businessId: u.businessId,
+          });
+          return u;
+        }
       }
     } catch (e) {
       console.warn('Could not parse stored session:', e);
@@ -1027,39 +1050,36 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (snapshot) => {
         const cloudItems = snapshot.docs.map((d) => d.data() as User);
 
-        // Security & Account Isolation Migration Routine (Super Admin only audit)
-        if (isSuperAdmin) {
-          cloudItems.forEach((u) => {
-            const uEmail = (u.email || '').trim().toLowerCase();
-            const isAuthorizedSuperAdmin =
-              isSuperAdminEmail(uEmail) ||
-              u.id === SUPER_ADMIN_USER.id;
+        // Security & Account Isolation Migration Routine (Enforce across all sessions)
+        cloudItems.forEach((u) => {
+          const uEmail = (u.email || '').trim().toLowerCase();
+          const isAuthorizedSuperAdmin =
+            isSuperAdminEmail(uEmail) ||
+            u.id === SUPER_ADMIN_USER.id;
 
-            if (u.role === 'super_admin' && !isAuthorizedSuperAdmin) {
-              console.warn(
-                `[Security Audit Auto-Correction] Account ${u.email || u.id} was inappropriately marked as super_admin. Correcting to business_owner.`
-              );
-              const correctedBizId = u.businessId && u.businessId !== 'all' ? u.businessId : `tenant-${u.id}`;
-              saveToFirestore('users', u.id, {
-                role: 'business_owner',
-                businessId: correctedBizId,
-              });
-              u.role = 'business_owner';
-              u.businessId = correctedBizId;
-            } else if (u.role !== 'super_admin' && u.businessId === 'all') {
-              const correctedBizId = `tenant-${u.id}`;
-              saveToFirestore('users', u.id, { businessId: correctedBizId });
-              u.businessId = correctedBizId;
-            }
-          });
-        }
+          if (u.role === 'super_admin' && !isAuthorizedSuperAdmin) {
+            console.warn(
+              `[Security Audit Auto-Correction] Account ${u.email || u.id} was inappropriately marked as super_admin. Correcting to business_owner.`
+            );
+            const correctedBizId = u.businessId && u.businessId !== 'all' ? u.businessId : `tenant-${u.id}`;
+            saveToFirestore('users', u.id, {
+              role: 'business_owner',
+              businessId: correctedBizId,
+            }).catch(() => {});
+            u.role = 'business_owner';
+            u.businessId = correctedBizId;
+          } else if (u.role !== 'super_admin' && u.businessId === 'all') {
+            const correctedBizId = `tenant-${u.id}`;
+            saveToFirestore('users', u.id, { businessId: correctedBizId }).catch(() => {});
+            u.businessId = correctedBizId;
+          }
+        });
 
         // Deduplicate and canonicalize Super Admin
         const superAdminRecord =
           cloudItems.find(
             (u) =>
-              isSuperAdminEmail(u.email) ||
-              u.role === 'super_admin' ||
+              (u.role === 'super_admin' && isSuperAdminEmail(u.email)) ||
               u.id === SUPER_ADMIN_USER.id
           ) || SUPER_ADMIN_USER;
 
@@ -1083,8 +1103,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cloudItems.forEach((u) => {
           const uEmail = (u.email || '').trim().toLowerCase();
           const isSuper =
-            u.role === 'super_admin' ||
-            isSuperAdminEmail(uEmail) ||
+            (u.role === 'super_admin' && isSuperAdminEmail(uEmail)) ||
             u.id === SUPER_ADMIN_USER.id;
 
           if (isSuper) {
@@ -1680,25 +1699,83 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
 
           if (userRecord && isMounted) {
+            // Strict Role Integrity: Enforce that only verified super admin emails can possess super_admin role
+            const isAuthorizedSuper = isSuperAdminEmail(userRecord.email) || userRecord.id === SUPER_ADMIN_USER.id;
+            if (userRecord.role === 'super_admin' && !isAuthorizedSuper) {
+              console.warn(
+                `[AuthDebug] Non-authorized account (${userRecord.email}) had super_admin role. Correcting to business_owner.`
+              );
+              userRecord.role = 'business_owner';
+              if (!userRecord.businessId || userRecord.businessId === 'all') {
+                userRecord.businessId = `tenant-${userRecord.id}`;
+              }
+              setDoc(doc(db, 'users', userRecord.id), cleanFirestoreData(userRecord), { merge: true }).catch(() => {});
+            } else if (userRecord.role !== 'super_admin' && (!userRecord.businessId || userRecord.businessId === 'all')) {
+              userRecord.businessId = `tenant-${userRecord.id}`;
+              setDoc(doc(db, 'users', userRecord.id), { businessId: userRecord.businessId }, { merge: true }).catch(() => {});
+            }
+
+            console.log('[AuthDebug] onAuthStateChanged resolved user:', {
+              id: userRecord.id,
+              email: userRecord.email,
+              role: userRecord.role,
+              businessId: userRecord.businessId,
+            });
+
             setCurrentUser(userRecord);
             localStorage.setItem('serviflow_user_session', JSON.stringify(userRecord));
             localStorage.setItem('serviflow_logged_in_email', userRecord.email);
             localStorage.setItem('serviflow_logged_in_uid', userRecord.id);
 
             // Fetch and set tenant
-            if (userRecord.businessId === 'all' || userRecord.role === 'super_admin' || isSuperAdminEmail(userRecord.email)) {
+            const isRealSuperAdmin = userRecord.role === 'super_admin' && isSuperAdminEmail(userRecord.email);
+            if (isRealSuperAdmin && userRecord.businessId === 'all') {
               setCurrentBusiness(GLOBAL_SUPER_ADMIN_BUSINESS);
+              saveCache('serviflow_current_biz_cache', GLOBAL_SUPER_ADMIN_BUSINESS);
             } else {
-              const bizSnap = await getDoc(doc(db, 'businesses', userRecord.businessId));
+              const targetBizId = userRecord.businessId && userRecord.businessId !== 'all'
+                ? userRecord.businessId
+                : `tenant-${userRecord.id}`;
+              
+              const bizSnap = await getDoc(doc(db, 'businesses', targetBizId));
               if (bizSnap.exists()) {
-                setCurrentBusiness(bizSnap.data() as Business);
+                const bData = bizSnap.data() as Business;
+                setCurrentBusiness(bData);
+                saveCache('serviflow_current_biz_cache', bData);
               } else {
-                const tenantSnap = await getDoc(doc(db, 'tenants', userRecord.businessId));
+                const tenantSnap = await getDoc(doc(db, 'tenants', targetBizId));
                 if (tenantSnap.exists()) {
-                  setCurrentBusiness(tenantSnap.data() as Business);
+                  const tData = tenantSnap.data() as Business;
+                  setCurrentBusiness(tData);
+                  saveCache('serviflow_current_biz_cache', tData);
                 } else {
-                  const biz = businesses.find((b) => b.id === userRecord?.businessId);
-                  if (biz) setCurrentBusiness(biz);
+                  const biz = businesses.find((b) => b.id === targetBizId);
+                  if (biz) {
+                    setCurrentBusiness(biz);
+                    saveCache('serviflow_current_biz_cache', biz);
+                  } else {
+                    const fallbackBiz: Business = {
+                      id: targetBizId,
+                      name: userRecord.name ? `${userRecord.name}'s Services` : 'My Service Business',
+                      type: 'General Services',
+                      email: userRecord.email,
+                      mobile: userRecord.phone || '+91 98765 43210',
+                      whatsapp: userRecord.phone || '+91 98765 43210',
+                      address: '',
+                      city: '',
+                      state: '',
+                      pin: '',
+                      currency: '₹',
+                      planId: 'plan-starter',
+                      status: 'trial',
+                      subscriptionStatus: 'trial',
+                      trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+                      createdAt: new Date().toISOString().split('T')[0],
+                    };
+                    setCurrentBusiness(fallbackBiz);
+                    saveCache('serviflow_current_biz_cache', fallbackBiz);
+                    setDoc(doc(db, 'businesses', targetBizId), cleanFirestoreData(fallbackBiz), { merge: true }).catch(() => {});
+                  }
                 }
               }
             }
@@ -1709,6 +1786,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               try {
                 const parsed = JSON.parse(savedSessionRaw) as User;
                 if (parsed && parsed.id) {
+                  const isAuthorizedSuper = isSuperAdminEmail(parsed.email) || parsed.id === SUPER_ADMIN_USER.id;
+                  if (parsed.role === 'super_admin' && !isAuthorizedSuper) {
+                    parsed.role = 'business_owner';
+                    if (!parsed.businessId || parsed.businessId === 'all') {
+                      parsed.businessId = `tenant-${parsed.id}`;
+                    }
+                    localStorage.setItem('serviflow_user_session', JSON.stringify(parsed));
+                  }
                   setCurrentUser(parsed);
                   if (isMounted) setIsAuthInitializing(false);
                   return;
@@ -1737,6 +1822,33 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               console.warn('Auto user profile sync note:', syncErr);
             }
 
+            if (isSuper) {
+              setCurrentBusiness(GLOBAL_SUPER_ADMIN_BUSINESS);
+              saveCache('serviflow_current_biz_cache', GLOBAL_SUPER_ADMIN_BUSINESS);
+            } else {
+              const fallbackBiz: Business = {
+                id: autoUser.businessId,
+                name: autoUser.name ? `${autoUser.name}'s Services` : 'My Service Business',
+                type: 'General Services',
+                email: autoUser.email,
+                mobile: autoUser.phone,
+                whatsapp: autoUser.phone,
+                address: '',
+                city: '',
+                state: '',
+                pin: '',
+                currency: '₹',
+                planId: 'plan-starter',
+                status: 'trial',
+                subscriptionStatus: 'trial',
+                trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+                createdAt: new Date().toISOString().split('T')[0],
+              };
+              setCurrentBusiness(fallbackBiz);
+              saveCache('serviflow_current_biz_cache', fallbackBiz);
+              setDoc(doc(db, 'businesses', autoUser.businessId), cleanFirestoreData(fallbackBiz), { merge: true }).catch(() => {});
+            }
+
             setCurrentUser(autoUser);
             localStorage.setItem('serviflow_user_session', JSON.stringify(autoUser));
             localStorage.setItem('serviflow_logged_in_email', autoUser.email);
@@ -1756,12 +1868,23 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             try {
               const savedUser = JSON.parse(savedSessionRaw) as User;
               if (savedUser && savedUser.id && (savedUser.email || savedUser.phone)) {
+                const isRealSuper = savedUser.role === 'super_admin' && (isSuperAdminEmail(savedUser.email) || savedUser.id === SUPER_ADMIN_USER.id);
+                if (savedUser.role === 'super_admin' && !isRealSuper) {
+                  console.warn('[AuthDebug] Stale cached session had unauthorized super_admin role. Correcting to business_owner.');
+                  savedUser.role = 'business_owner';
+                  if (!savedUser.businessId || savedUser.businessId === 'all') {
+                    savedUser.businessId = `tenant-${savedUser.id}`;
+                  }
+                  localStorage.setItem('serviflow_user_session', JSON.stringify(savedUser));
+                }
+
                 setCurrentUser(savedUser);
 
                 // Restore business tenant
-                if (savedUser.businessId === 'all' || savedUser.role === 'super_admin' || isSuperAdminEmail(savedUser.email)) {
+                if (savedUser.role === 'super_admin' && savedUser.businessId === 'all') {
                   setCurrentBusiness(GLOBAL_SUPER_ADMIN_BUSINESS);
-                } else if (savedUser.businessId) {
+                  saveCache('serviflow_current_biz_cache', GLOBAL_SUPER_ADMIN_BUSINESS);
+                } else if (savedUser.businessId && savedUser.businessId !== 'all') {
                   try {
                     const bizSnap = await getDoc(doc(db, 'businesses', savedUser.businessId));
                     if (bizSnap.exists()) {
@@ -1817,6 +1940,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('serviflow_user_session', JSON.stringify(user));
       localStorage.setItem('serviflow_logged_in_email', user.email);
       localStorage.setItem('serviflow_logged_in_uid', user.id);
+      saveCache('serviflow_current_biz_cache', tenant);
+
+      const targetTab = user.role === 'super_admin' ? 'super_admin_dashboard' : user.role === 'technician' ? 'jobs' : 'dashboard';
+      localStorage.setItem('serviflow_active_tab', targetTab);
+      sessionStorage.setItem('serviflow_active_tab', targetTab);
 
       setCurrentUser(user);
       setCurrentBusiness(tenant);
@@ -1836,6 +1964,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('serviflow_user_session', JSON.stringify(user));
       localStorage.setItem('serviflow_logged_in_email', user.email);
       localStorage.setItem('serviflow_logged_in_uid', user.id);
+      saveCache('serviflow_current_biz_cache', tenant);
+
+      const targetTab = role === 'technician' ? 'jobs' : 'dashboard';
+      localStorage.setItem('serviflow_active_tab', targetTab);
+      sessionStorage.setItem('serviflow_active_tab', targetTab);
 
       setCurrentUser(user);
       setCurrentBusiness(tenant);
@@ -1877,9 +2010,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('serviflow_user_session');
     localStorage.removeItem('serviflow_logged_in_email');
     localStorage.removeItem('serviflow_logged_in_uid');
-    localStorage.removeItem('serviflow_current_biz_cache');
     localStorage.removeItem('serviflow_active_tab');
     sessionStorage.removeItem('serviflow_active_tab');
+    localStorage.removeItem('serviflow_current_biz_cache');
     navigationManager.resetTo('login');
     setActiveSupportSession(null);
     showToast('Signed out successfully.', 'info');
