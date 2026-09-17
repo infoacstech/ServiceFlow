@@ -151,6 +151,21 @@ class BackNavigationManager {
     }
   }
 
+  public resetTo(tab: string) {
+    this.screenStack = [tab || 'login'];
+    this.overlayStack = [];
+    if (typeof window !== 'undefined') {
+      try {
+        window.history.replaceState({ type: 'screen', tab: tab || 'login', depth: 1 }, '');
+      } catch (e) {
+        // ignore
+      }
+    }
+    if (this.onScreenChange) {
+      this.onScreenChange(tab || 'login');
+    }
+  }
+
   public registerOverlay(id: string, close: () => boolean | void) {
     // Remove if already present
     this.overlayStack = this.overlayStack.filter((o) => o.id !== id);

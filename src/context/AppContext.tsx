@@ -86,6 +86,7 @@ import {
 import { checkStaffCapacity, checkMonthlyJobCapacity, getPlanById, getTrialStatus } from '../utils/planUtils';
 import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } from '../lib/firebase';
 import { AuthService } from '../services/AuthService';
+import { navigationManager } from '../utils/backNavigation';
 import {
   updatePassword as firebaseUpdatePassword,
   signInWithEmailAndPassword,
@@ -156,6 +157,7 @@ interface AppContextType {
   setCurrentUser: (u: User | null) => void;
   isAuthInitializing: boolean;
   loginUser: (u: User, password?: string) => Promise<User>;
+  loginSandboxDemo: (role?: 'business_owner' | 'technician') => Promise<User>;
   logoutUser: () => Promise<void>;
   switchRole: (role: UserRole) => Promise<void>;
   switchBusiness: (businessId: string) => void;
@@ -1805,9 +1807,12 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loginUser = async (userToLogin: User, password?: string): Promise<User> => {
     try {
       const email = userToLogin.email || '';
-      const pass = password || userToLogin.password || 'ServiFlow@123';
+      const pass = password || userToLogin.password;
+      if (!pass || !pass.trim()) {
+        throw new Error('Please enter your password.');
+      }
       
-      const { user, tenant } = await AuthService.loginWithCredentials(email, pass);
+      const { user, tenant } = await AuthService.loginWithCredentials(email, pass.trim());
 
       localStorage.setItem('serviflow_user_session', JSON.stringify(user));
       localStorage.setItem('serviflow_logged_in_email', user.email);
@@ -1821,6 +1826,24 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err: any) {
       console.error('Error logging in user:', err);
       showToast(err.message || 'Login failed', 'error');
+      throw err;
+    }
+  };
+
+  const loginSandboxDemo = async (role: 'business_owner' | 'technician' = 'business_owner'): Promise<User> => {
+    try {
+      const { user, tenant } = await AuthService.loginSandboxDemo(role);
+      localStorage.setItem('serviflow_user_session', JSON.stringify(user));
+      localStorage.setItem('serviflow_logged_in_email', user.email);
+      localStorage.setItem('serviflow_logged_in_uid', user.id);
+
+      setCurrentUser(user);
+      setCurrentBusiness(tenant);
+      showToast(`Welcome to ServiFlow Demo Sandbox!`, 'info');
+      return user;
+    } catch (err: any) {
+      console.error('Error starting demo session:', err);
+      showToast('Unable to start demo session. Please try again.', 'error');
       throw err;
     }
   };
@@ -1855,7 +1878,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('serviflow_logged_in_email');
     localStorage.removeItem('serviflow_logged_in_uid');
     localStorage.removeItem('serviflow_current_biz_cache');
+    localStorage.removeItem('serviflow_active_tab');
     sessionStorage.removeItem('serviflow_active_tab');
+    navigationManager.resetTo('login');
     setActiveSupportSession(null);
     showToast('Signed out successfully.', 'info');
   };
@@ -6559,6 +6584,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentUser,
         isAuthInitializing,
         loginUser,
+        loginSandboxDemo,
         logoutUser,
         switchRole,
         switchBusiness,

@@ -25,6 +25,9 @@ import {
   ChevronRight,
   User,
   AlertCircle,
+  Receipt,
+  Printer,
+  DollarSign,
 } from 'lucide-react';
 import {
   sendTechnicianOnTheWayAlert,
@@ -36,6 +39,9 @@ import {
   isJobInProgress,
   isJobCompleted,
 } from '../utils/jobWorkflow';
+import { JobCompletionModal } from '../components/JobCompletionModal';
+import { DailySettlementModal } from '../components/DailySettlementModal';
+import { generateJobReportPdf } from '../utils/jobReportPdfHelper';
 
 export function formatJobSchedule(scheduledDate?: string, scheduledTimeSlot?: string): string {
   let dateStr = '';
@@ -76,6 +82,7 @@ export const TechnicianView: React.FC = () => {
     customers,
     staff,
     inventory,
+    payments,
     currentUser,
     updateJobStatus,
     completeJob,
@@ -118,7 +125,8 @@ export const TechnicianView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [detailsJobId, setDetailsJobId] = useState<string | null>(null);
   const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
-  const [completionStep, setCompletionStep] = useState<1 | 2 | 3 | 4>(1);
+  const [completionJob, setCompletionJob] = useState<Job | null>(null);
+  const [isDailySettlementOpen, setIsDailySettlementOpen] = useState(false);
 
   // Single reliable status counts
   const totalAssigned = techJobs.length;
@@ -159,73 +167,13 @@ export const TechnicianView: React.FC = () => {
     return null;
   }, [detailsJobId, jobs]);
 
-  // Form State for Completing Job
-  const [problemFound, setProblemFound] = useState('');
-  const [solutionProvided, setSolutionProvided] = useState('');
-  const [rating, setRating] = useState(5);
-  const [signature, setSignature] = useState('');
-  const [selectedMaterials, setSelectedMaterials] = useState<{ inventoryId: string; quantity: number }[]>([]);
-  const [beforePhoto, setBeforePhoto] = useState<string>(
-    'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=500&auto=format&fit=crop&q=80'
-  );
-  const [afterPhoto, setAfterPhoto] = useState<string>(
-    'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=500&auto=format&fit=crop&q=80'
-  );
-
   const handleStatusChange = (jobId: string, newStatus: JobStatus) => {
     updateJobStatus(jobId, newStatus);
   };
 
   const handleOpenCompletionWorkflow = (job: Job) => {
-    setDetailsJobId(job.id);
-    setProblemFound(job.problemFound || job.notes || '');
-    setSolutionProvided(job.solutionProvided || '');
-    setBeforePhoto(
-      job.beforePhotos?.[0] ||
-        'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=500&auto=format&fit=crop&q=80'
-    );
-    setAfterPhoto(
-      job.afterPhotos?.[0] ||
-        'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=500&auto=format&fit=crop&q=80'
-    );
-    setCompletionStep(1);
+    setCompletionJob(job);
     setIsCompletionModalOpen(true);
-  };
-
-  const handleFinalSubmit = () => {
-    if (!activeSelectedJob) return;
-    completeJob(activeSelectedJob.id, {
-      problemFound: problemFound || 'Service diagnostic performed on site equipment.',
-      solutionProvided: solutionProvided || 'Repaired fault, calibrated components, and verified successful operation.',
-      customerRating: rating,
-      customerSignature: signature,
-      materialsUsed: selectedMaterials.map((m) => {
-        const invItem = (inventory || []).find((i) => i.id === m.inventoryId);
-        return {
-          inventoryItemId: m.inventoryId,
-          name: invItem?.name || 'Spare Part',
-          quantity: m.quantity,
-          unitPrice: invItem?.sellingPrice || 0,
-        };
-      }),
-      beforePhotos: beforePhoto ? [beforePhoto] : (activeSelectedJob.beforePhotos || []),
-      afterPhotos: afterPhoto ? [afterPhoto] : [],
-    });
-    setIsCompletionModalOpen(false);
-  };
-
-  const addMaterialItem = (inventoryId: string) => {
-    setSelectedMaterials((prev) => {
-      const exists = prev.find((m) => m.inventoryId === inventoryId);
-      if (exists) {
-        return prev.map((m) => (m.inventoryId === inventoryId ? { ...m, quantity: m.quantity + 1 } : m));
-      }
-      return [...prev, { inventoryId, quantity: 1 }];
-    });
-  };
-
-  const removeMaterialItem = (inventoryId: string) => {
-    setSelectedMaterials((prev) => prev.filter((m) => m.inventoryId !== inventoryId));
   };
 
   // Render single prominent status badge
@@ -297,11 +245,22 @@ export const TechnicianView: React.FC = () => {
               {currentBusiness?.name || 'ServiFlow'} • {totalAssigned} assigned {totalAssigned === 1 ? 'task' : 'tasks'}
             </p>
           </div>
-          {currentUser?.name && (
-            <span className="text-[10px] font-bold text-indigo-300 bg-indigo-950/80 border border-indigo-800/80 px-2 py-0.5 rounded-full truncate max-w-[130px]">
-              {currentUser.name}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {currentUser?.name && (
+              <span className="text-[10px] font-bold text-indigo-300 bg-indigo-950/80 border border-indigo-800/80 px-2 py-0.5 rounded-full truncate max-w-[130px]">
+                {currentUser.name}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsDailySettlementOpen(true)}
+              className="px-2.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+              title="Daily Cash Settlement & Handover Slip"
+            >
+              <Receipt className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Cash Settlement</span>
+            </button>
+          </div>
         </div>
 
         {/* 3 Compact Counters: Pending | In Progress | Completed */}
@@ -687,6 +646,16 @@ export const TechnicianView: React.FC = () => {
                             )}
                           </div>
 
+                          <button
+                            type="button"
+                            onClick={() => {
+                              generateJobReportPdf(activeSelectedJob, customer, currentUser, currentBusiness);
+                            }}
+                            className="w-full py-2 px-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center gap-1.5 border border-indigo-200 dark:border-indigo-800 transition-all cursor-pointer"
+                          >
+                            <Printer className="w-3.5 h-3.5 text-indigo-600" /> Print / Download Digital Job Card
+                          </button>
+
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
@@ -718,282 +687,59 @@ export const TechnicianView: React.FC = () => {
         </div>
       )}
 
-      {/* 5. Complete Job 4-Step Modal Workflow */}
-      {isCompletionModalOpen && activeSelectedJob && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 z-50 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md">
-                  Field Job Signoff
-                </span>
-                <h3 className="font-black text-slate-900 dark:text-slate-100 text-sm sm:text-base mt-0.5">
-                  Complete Job {activeSelectedJob.jobId}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsCompletionModalOpen(false)}
-                className="p-1.5 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Stepper Tabs */}
-            <div className="grid grid-cols-4 text-center border-b border-slate-100 dark:border-slate-800 text-[11px] font-bold text-slate-500 bg-slate-50/50 dark:bg-slate-900/50">
-              <button
-                type="button"
-                onClick={() => setCompletionStep(1)}
-                className={`py-2.5 border-b-2 transition-all cursor-pointer ${
-                  completionStep === 1 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/30' : 'border-transparent'
-                }`}
-              >
-                1. Diagnosis
-              </button>
-              <button
-                type="button"
-                onClick={() => setCompletionStep(2)}
-                className={`py-2.5 border-b-2 transition-all cursor-pointer ${
-                  completionStep === 2 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/30' : 'border-transparent'
-                }`}
-              >
-                2. Parts
-              </button>
-              <button
-                type="button"
-                onClick={() => setCompletionStep(3)}
-                className={`py-2.5 border-b-2 transition-all cursor-pointer ${
-                  completionStep === 3 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/30' : 'border-transparent'
-                }`}
-              >
-                3. Photos
-              </button>
-              <button
-                type="button"
-                onClick={() => setCompletionStep(4)}
-                className={`py-2.5 border-b-2 transition-all cursor-pointer ${
-                  completionStep === 4 ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/30' : 'border-transparent'
-                }`}
-              >
-                4. Signoff
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
-              {/* Step 1: Diagnosis & Solution */}
-              {completionStep === 1 && (
-                <div className="space-y-3.5 text-xs">
-                  <div>
-                    <label className="font-bold text-slate-900 dark:text-slate-100 block mb-1">
-                      Problem Diagnosed on Site *
-                    </label>
-                    <textarea
-                      value={problemFound}
-                      onChange={(e) => setProblemFound(e.target.value)}
-                      placeholder="e.g. Broken connector, power fluctuations, optical lens out of focus"
-                      rows={3}
-                      className="w-full p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-hidden"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-900 dark:text-slate-100 block mb-1">
-                      Solution & Work Carried Out *
-                    </label>
-                    <textarea
-                      value={solutionProvided}
-                      onChange={(e) => setSolutionProvided(e.target.value)}
-                      placeholder="e.g. Replaced faulty wiring, tuned signal strength, calibrated settings and verified with client."
-                      rows={3}
-                      className="w-full p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-hidden"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setCompletionStep(2)}
-                    className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer shadow-xs transition-all"
-                  >
-                    Next: Add Spare Parts Used →
-                  </button>
-                </div>
-              )}
-
-              {/* Step 2: Inventory & Parts Used */}
-              {completionStep === 2 && (
-                <div className="space-y-3.5 text-xs">
-                  <div className="font-bold text-slate-900 dark:text-slate-100">
-                    Select Spare Parts / Materials Used
-                  </div>
-
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                    {inventory.length === 0 ? (
-                      <div className="text-center py-4 text-slate-400">No inventory parts found in catalog.</div>
-                    ) : (
-                      inventory.map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={() => addMaterialItem(item.id)}
-                          className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30 flex items-center justify-between cursor-pointer transition-all"
-                        >
-                          <div>
-                            <div className="font-bold text-slate-900 dark:text-slate-100">{item.name}</div>
-                            <div className="text-[10px] text-slate-400">
-                              Stock: {item.currentStock} {item.unit} • ₹{item.sellingPrice}
-                            </div>
-                          </div>
-                          <span className="text-xs text-indigo-600 font-bold bg-indigo-50 dark:bg-indigo-950/60 px-2 py-1 rounded-lg">
-                            + Add
-                          </span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {/* Selected Materials List */}
-                  {selectedMaterials.length > 0 && (
-                    <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-2xl border border-indigo-100 dark:border-indigo-800/60 space-y-1.5">
-                      <div className="font-bold text-indigo-950 dark:text-indigo-200">
-                        Parts to deduct from inventory:
-                      </div>
-                      {selectedMaterials.map((m) => {
-                        const invItem = (inventory || []).find((i) => i.id === m.inventoryId);
-                        return (
-                          <div key={m.inventoryId} className="flex items-center justify-between text-indigo-700 dark:text-indigo-300">
-                            <span>{invItem?.name || 'Part'}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold">x{m.quantity} {invItem?.unit}</span>
-                              <button
-                                type="button"
-                                onClick={() => removeMaterialItem(m.inventoryId)}
-                                className="text-rose-500 hover:text-rose-700 text-xs font-bold cursor-pointer"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setCompletionStep(1)}
-                      className="w-1/2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs cursor-pointer"
-                    >
-                      ← Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCompletionStep(3)}
-                      className="w-1/2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer shadow-xs"
-                    >
-                      Next: Photos →
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 3: Photos */}
-              {completionStep === 3 && (
-                <div className="space-y-4 text-xs">
-                  <div className="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/60 text-indigo-900 dark:text-indigo-200">
-                    <p className="font-bold text-xs">Photo Evidence & Job Audit Trail</p>
-                    <p className="text-[11px] text-indigo-700 dark:text-indigo-300 mt-0.5">
-                      Capture high-resolution photos using your device camera or upload from gallery to document on-site equipment conditions.
-                    </p>
-                  </div>
-
-                  <PhotoEvidenceUploader
-                    id="before-photo-uploader"
-                    label="Before Work Photo"
-                    badge="Initial Condition"
-                    subLabel="Initial site/fault photo"
-                    value={beforePhoto}
-                    onChange={(val) => setBeforePhoto(val)}
-                  />
-
-                  <PhotoEvidenceUploader
-                    id="after-photo-uploader"
-                    label="After Work Photo"
-                    badge="Finished Service"
-                    subLabel="Completed installation/repair photo"
-                    value={afterPhoto}
-                    onChange={(val) => setAfterPhoto(val)}
-                  />
-
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setCompletionStep(2)}
-                      className="w-1/2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs cursor-pointer"
-                    >
-                      ← Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCompletionStep(4)}
-                      className="w-1/2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer shadow-xs"
-                    >
-                      Next: Customer Signoff →
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 4: Rating & Digital Signature */}
-              {completionStep === 4 && (
-                <div className="space-y-4 text-xs">
-                  <div>
-                    <label className="font-bold block mb-1.5 text-slate-900 dark:text-slate-100">
-                      Customer Service Satisfaction Rating
-                    </label>
-                    <div className="flex items-center gap-2">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => setRating(s)}
-                          className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
-                            rating >= s
-                              ? 'bg-amber-400 text-slate-950 border-amber-400 font-black scale-105'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
-                          }`}
-                        >
-                          <Star className="w-4 h-4 fill-current" />
-                        </button>
-                      ))}
-                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 ml-2">
-                        {rating} of 5 Stars
-                      </span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="font-bold block mb-1 text-slate-900 dark:text-slate-100">
-                      Customer Digital Signature Signoff *
-                    </label>
-                    <DigitalSignatureCanvas onSave={(sig) => setSignature(sig)} />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleFinalSubmit}
-                    className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98"
-                  >
-                    <FileCheck2 className="w-5 h-5" /> Submit Completed Job & Notify Owner
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+      {/* 5. Complete Job Modal Workflow (Digital Work Order Sign-off with Parts, Photos & Payments) */}
+      {completionJob && (
+        <JobCompletionModal
+          isOpen={isCompletionModalOpen}
+          onClose={() => {
+            setIsCompletionModalOpen(false);
+            setCompletionJob(null);
+          }}
+          job={completionJob}
+          customer={(customers || []).find((c) => c.id === completionJob.customerId)}
+          technician={currentUser}
+          inventory={inventory || []}
+          business={currentBusiness}
+          onComplete={(completionData) => {
+            completeJob(completionJob.id, {
+              problemFound: completionData.problemFound,
+              solutionProvided: completionData.solutionProvided,
+              customerRating: completionData.customerRating,
+              customerSignature: completionData.customerSignature,
+              beforePhotos: completionData.beforePhotos,
+              afterPhotos: completionData.afterPhotos,
+              materialsUsed: completionData.materialsUsed?.map((m) => ({
+                inventoryItemId: m.inventoryItemId,
+                name: m.name,
+                quantity: m.quantity,
+                unitPrice: m.unitPrice,
+              })),
+              paymentCollected: completionData.paymentCollected
+                ? {
+                    amount: completionData.paymentCollected.amount,
+                    method: (['cash', 'upi', 'card', 'cheque', 'bank_transfer'].includes(completionData.paymentCollected.method)
+                      ? completionData.paymentCollected.method
+                      : 'cash') as 'cash' | 'upi' | 'card' | 'cheque' | 'bank_transfer',
+                    transactionReference: completionData.paymentCollected.referenceNumber,
+                  }
+                : undefined,
+            });
+            setIsCompletionModalOpen(false);
+            setCompletionJob(null);
+            setDetailsJobId(null);
+          }}
+        />
       )}
+
+      {/* 6. Daily Cash Handover & Settlement Modal */}
+      <DailySettlementModal
+        isOpen={isDailySettlementOpen}
+        onClose={() => setIsDailySettlementOpen(false)}
+        technician={currentUser}
+        jobs={techJobs}
+        business={currentBusiness}
+        payments={payments || []}
+      />
     </div>
   );
 };

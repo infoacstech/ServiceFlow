@@ -32,6 +32,7 @@ import {
   Eye,
   EyeOff,
   ChevronDown,
+  Languages,
 } from 'lucide-react';
 
 interface LoginViewProps {
@@ -43,6 +44,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
   const {
     users,
     loginUser,
+    loginSandboxDemo,
     businesses,
     switchRole,
     currentUser,
@@ -50,6 +52,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
     registerUser,
     updateUserPassword,
     validateReferralCode,
+    language,
+    setLanguage,
+    supportedLanguages,
     t,
   } = useApp();
 
@@ -155,7 +160,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
   };
 
   // Super Admin Credentials State
-  const [superAdminEmail, setSuperAdminEmail] = useState('admin@serviflow.io');
+  const [superAdminEmail, setSuperAdminEmail] = useState('');
   const [superAdminPassword, setSuperAdminPassword] = useState('');
   const [showSuperAdminPassword, setShowSuperAdminPassword] = useState(false);
   const [isSuperAdminSubmitting, setIsSuperAdminSubmitting] = useState(false);
@@ -310,11 +315,19 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
   const handleDirectLogin = async (e?: React.FormEvent, customIdentifier?: string, customPassword?: string) => {
     if (e) e.preventDefault();
     const cleanIdentifier = (customIdentifier ?? loginIdentifier).trim();
-    const effectivePassword = (customPassword ?? loginPassword).trim() || 'ServiFlow@123';
+    const effectivePassword = (customPassword ?? loginPassword).trim();
 
     if (!cleanIdentifier) {
-      showToast('Please enter your email address or mobile phone number', 'error');
-      setLoginError('कृपया अपना पंजीकृत ईमेल या मोबाइल नंबर दर्ज करें।');
+      const err = t('auth.enterValidIdentifier', undefined, 'Please enter your email address or mobile phone number');
+      showToast(err, 'error');
+      setLoginError(err);
+      return;
+    }
+
+    if (!effectivePassword) {
+      const err = t('auth.enterPasswordError', undefined, 'Please enter your password');
+      showToast(err, 'error');
+      setLoginError(err);
       return;
     }
 
@@ -332,7 +345,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
       if (onLoginSuccess) onLoginSuccess();
     } catch (err: any) {
       console.error('Sign in error:', err);
-      const errMsg = err?.message || 'लॉगिन विफल रहा। कृपया अपना ईमेल और पासवर्ड जांचें।';
+      const errMsg = err?.message || t('auth.invalidCredentials', undefined, 'Invalid login credentials. Please check your email/mobile and password.');
       setLoginError(errMsg);
       showToast(errMsg, 'error');
     } finally {
@@ -340,11 +353,22 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
     }
   };
 
-  const handleQuickDemoLogin = (email: string, pass: string = 'ServiFlow@123') => {
-    setLoginIdentifier(email);
-    setLoginPassword(pass);
+  // Dedicated, isolated sandbox demonstration environment
+  const handleTryDemo = async () => {
+    setIsSubmitting(true);
     setLoginError(null);
-    handleDirectLogin(undefined, email, pass);
+    try {
+      await loginSandboxDemo('business_owner');
+      sessionStorage.setItem('serviflow_active_tab', 'dashboard');
+      if (onLoginSuccess) onLoginSuccess();
+    } catch (err: any) {
+      console.error('Error starting demo session:', err);
+      const errMsg = t('auth.demoError', undefined, 'Unable to start demo session. Please try again.');
+      setLoginError(errMsg);
+      showToast(errMsg, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Handle Business Owner Account Registration
@@ -464,11 +488,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
       return;
     }
 
-    if (cleanEmail !== 'admin@serviflow.io' && cleanEmail !== 'superadmin@serviflow.io') {
-      showToast('Invalid Super Admin credentials. Access is strictly restricted to authorized platform administrators.', 'error');
-      return;
-    }
-
     setIsSuperAdminSubmitting(true);
     try {
       const loggedIn = await loginUser(
@@ -485,6 +504,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
       if (onLoginSuccess) onLoginSuccess();
     } catch (err: any) {
       console.error('Super Admin sign in error:', err);
+      showToast(err?.message || 'Super Admin authentication failed', 'error');
     } finally {
       setIsSuperAdminSubmitting(false);
     }
@@ -552,8 +572,29 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
             ServiFlow
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium max-w-xs mx-auto">
-            Service Management & Operations Portal
+            {t('auth.portalSubtitle', undefined, 'Service Management & Operations Portal')}
           </p>
+
+          {/* Clean Language Switcher */}
+          <div className="pt-2 flex items-center justify-center gap-1.5">
+            <Languages className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <div className="inline-flex p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+              {supportedLanguages.map((lang) => (
+                <button
+                  key={lang.code}
+                  type="button"
+                  onClick={() => setLanguage(lang.code)}
+                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer select-none ${
+                    language === lang.code
+                      ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 font-bold shadow-xs'
+                      : 'hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {lang.nativeName}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Main Clean Card */}
@@ -573,7 +614,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
               }`}
             >
               <KeyRound className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span>Sign In</span>
+              <span>{t('auth.signIn', undefined, 'Sign In')}</span>
             </button>
 
             <button
@@ -589,7 +630,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
               }`}
             >
               <UserPlus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              <span>Create Account</span>
+              <span>{t('auth.createAccount', undefined, 'Create Account')}</span>
             </button>
           </div>
 
@@ -598,19 +639,21 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
             <div className="space-y-4">
               <form onSubmit={handleDirectLogin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Email Address or Mobile Phone
+                  <label htmlFor="login-identifier" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    {t('auth.emailOrMobile', undefined, 'Email Address or Mobile Phone')}
                   </label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     <input
+                      id="login-identifier"
                       type="text"
+                      autoComplete="username"
                       value={loginIdentifier}
                       onChange={(e) => {
                         setLoginIdentifier(e.target.value);
                         if (loginError) setLoginError(null);
                       }}
-                      placeholder="e.g. uniquesolutions108@gmail.com or 9876543210"
+                      placeholder={t('auth.emailOrMobilePlaceholder', undefined, 'e.g. name@example.com or 9876543210')}
                       required
                       className="w-full h-11 sm:h-12 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
                     />
@@ -619,36 +662,37 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                      Password
+                    <label htmlFor="login-password" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {t('auth.password', undefined, 'Password')}
                     </label>
                     <button
                       type="button"
                       onClick={() => openForgotPasswordModal(loginIdentifier)}
                       className="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold hover:underline cursor-pointer"
                     >
-                      Forgot Password?
+                      {t('auth.forgotPassword', undefined, 'Forgot Password?')}
                     </button>
                   </div>
                   <div className="relative">
-                    <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                     <input
+                      id="login-password"
                       type={showLoginPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
                       value={loginPassword}
                       onChange={(e) => {
                         setLoginPassword(e.target.value);
                         if (loginError) setLoginError(null);
                       }}
-                      placeholder="Enter password (e.g. ServiFlow@123)"
+                      placeholder={t('auth.enterPassword', undefined, 'Enter password')}
                       required
                       className="w-full h-11 sm:h-12 pl-10 pr-11 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 outline-hidden transition-all"
                     />
                     <button
                       type="button"
                       onClick={() => setShowLoginPassword(!showLoginPassword)}
-                      tabIndex={-1}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                      title={showLoginPassword ? 'Hide password' : 'Show password'}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer p-1"
+                      aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
                     >
                       {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -670,7 +714,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
                         }}
                         className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer"
                       >
-                        Create New Account →
+                        {t('auth.createAccount', undefined, 'Create Account')} →
                       </button>
                       <span className="text-slate-300 dark:text-slate-600">•</span>
                       <button
@@ -678,7 +722,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
                         onClick={() => openForgotPasswordModal(loginIdentifier)}
                         className="text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:underline cursor-pointer"
                       >
-                        Reset Password
+                        {t('auth.forgotPassword', undefined, 'Forgot Password?')}
                       </button>
                     </div>
                   </div>
@@ -692,73 +736,43 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
                   {isSubmitting ? (
                     <span className="flex items-center gap-2">
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Signing in...</span>
+                      <span>{t('auth.signingIn', undefined, 'Signing in...')}</span>
                     </span>
                   ) : (
                     <>
-                      <span>Sign In</span>
+                      <span>{t('auth.signIn', undefined, 'Sign In')}</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
                 </button>
               </form>
 
-              {/* Quick Demo Access Bar */}
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    Instant Demo Login / तुरंत लॉगिन करें
+              {/* Separator */}
+              <div className="relative my-2">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-200 dark:border-slate-800" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-white dark:bg-slate-900 px-3 text-slate-400 font-medium">
+                    {t('auth.or', undefined, 'or')}
                   </span>
-                  <span className="text-[10px] text-slate-400 font-mono">Pass: ServiFlow@123</span>
                 </div>
+              </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('uniquesolutions108@gmail.com', 'ServiFlow@123')}
-                    disabled={isSubmitting}
-                    className="flex flex-col items-start p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/50 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all text-left cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                      <span>🏢</span>
-                      <span>Business Owner</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate w-full mt-0.5">
-                      uniquesolutions108...
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('tech@serviflow.io', 'ServiFlow@123')}
-                    disabled={isSubmitting}
-                    className="flex flex-col items-start p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all text-left cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-900 dark:text-slate-100 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
-                      <span>🔧</span>
-                      <span>Field Technician</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate w-full mt-0.5">
-                      tech@serviflow.io
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('admin@serviflow.io', 'ServiFlow@123')}
-                    disabled={isSubmitting}
-                    className="flex flex-col items-start p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/50 hover:bg-purple-50 dark:hover:bg-purple-950/40 hover:border-purple-300 dark:hover:border-purple-700 transition-all text-left cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-900 dark:text-slate-100 group-hover:text-purple-600 dark:group-hover:text-purple-400">
-                      <span>👑</span>
-                      <span>Super Admin</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate w-full mt-0.5">
-                      admin@serviflow.io
-                    </span>
-                  </button>
-                </div>
+              {/* Production-Safe Isolated Demo Sandbox Action */}
+              <div className="space-y-1.5">
+                <button
+                  type="button"
+                  onClick={handleTryDemo}
+                  disabled={isSubmitting}
+                  className="w-full min-h-[44px] py-2.5 px-4 rounded-xl sm:rounded-2xl border border-purple-200 dark:border-purple-800/60 bg-purple-50/60 dark:bg-purple-950/30 hover:bg-purple-100/70 dark:hover:bg-purple-950/60 text-purple-900 dark:text-purple-200 text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                >
+                  <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                  <span>{t('auth.tryDemo', undefined, 'Try Demo (Sandbox)')}</span>
+                </button>
+                <p className="text-[11px] text-center text-slate-400 dark:text-slate-500 leading-tight">
+                  {t('auth.tryDemoSubtitle', undefined, 'Explore field operations with sample data in an isolated sandbox')}
+                </p>
               </div>
             </div>
           )}
@@ -1098,7 +1112,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
                       required
                       value={superAdminEmail}
                       onChange={(e) => setSuperAdminEmail(e.target.value)}
-                      placeholder="admin@serviflow.io"
+                      placeholder="Enter administrator email"
                       className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 text-xs font-medium focus:ring-2 focus:ring-purple-500 focus:bg-white dark:focus:bg-slate-900 outline-hidden transition-all text-slate-900 dark:text-slate-100"
                     />
                   </div>
@@ -1167,18 +1181,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
                 }}
                 className="hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors cursor-pointer"
               >
-                {t('settings.privacyPolicy', undefined, 'Privacy Policy')}
+                {t('auth.privacyPolicy', undefined, 'Privacy Policy')}
               </button>
               <span>•</span>
               <a
-                href="mailto:uniquesolutions108@gmail.com"
+                href="mailto:support@serviflow.io"
                 className="hover:text-indigo-600 dark:hover:text-indigo-400 font-medium transition-colors"
               >
-                Support & Terms
+                {t('auth.supportAndTerms', undefined, 'Support & Terms')}
               </a>
             </div>
             <p className="text-[10px] text-slate-400/80">
-              © {new Date().getFullYear()} Expert Technologies • ServiFlow Field Ops
+              © {new Date().getFullYear()} ServiFlow • {t('auth.portalSubtitle', undefined, 'Service Management & Operations Portal')}
             </p>
           </div>
         )}

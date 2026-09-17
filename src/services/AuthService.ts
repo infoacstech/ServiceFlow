@@ -395,147 +395,95 @@ export class AuthService {
     const cleanId = identifier.trim().toLowerCase();
     let targetEmail = cleanId;
 
-    // Resolve phone numbers to email
+    if (!password || !password.trim()) {
+      throw new Error('Please enter your password.');
+    }
+    const cleanAuthPass = password.trim();
+
+    // Resolve phone numbers to email via Firestore or local cache
     if (!cleanId.includes('@')) {
       const cleanDigits = cleanId.replace(/[^0-9]/g, '');
+      if (cleanDigits.length < 10) {
+        throw new Error('Please enter a valid email address or 10-digit mobile number.');
+      }
       let foundEmail: string | null = null;
 
-      // Check local cache first
+      // Check Firestore users by phone
       try {
-        const rawCached = localStorage.getItem('serviflow_users_cache');
-        if (rawCached) {
-          const cachedUsers = JSON.parse(rawCached) as User[];
-          const matched = cachedUsers.find((u) => {
-            const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
-            return (
-              (uPhone.length >= 10 && cleanDigits.length >= 10 && uPhone.slice(-10) === cleanDigits.slice(-10)) ||
-              (uPhone.length >= 6 && cleanDigits.length >= 6 && uPhone.endsWith(cleanDigits.slice(-10)))
-            );
-          });
-          if (matched?.email) {
-            foundEmail = matched.email.toLowerCase();
+        const last10 = cleanDigits.slice(-10);
+        const phoneVariants = [cleanDigits, `+91${last10}`, `+91 ${last10}`, last10];
+        for (const pv of phoneVariants) {
+          const q = query(collection(db, 'users'), where('phone', '==', pv));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            const matchedDoc = snap.docs[0].data() as User;
+            if (matchedDoc.email) {
+              foundEmail = matchedDoc.email.toLowerCase();
+              break;
+            }
           }
         }
       } catch (e) {
-        console.warn('Cache lookup note:', e);
+        console.warn('Phone resolution query note:', e);
       }
 
-      // Recognized phone aliases for demo logins
+      // Check local cache if Firestore query was unable to find email
       if (!foundEmail) {
-        if (cleanDigits.endsWith('9000000000') || cleanDigits.slice(-10) === '9000000000') {
-          foundEmail = 'admin@serviflow.io';
-        } else if (cleanDigits.endsWith('9876511223') || cleanDigits.slice(-10) === '9876511223') {
-          foundEmail = 'tech@serviflow.io';
-        } else if (cleanDigits.endsWith('9876543210') || cleanDigits.slice(-10) === '9876543210') {
-          foundEmail = 'uniquesolutions108@gmail.com';
+        try {
+          const rawCached = localStorage.getItem('serviflow_users_cache');
+          if (rawCached) {
+            const cachedUsers = JSON.parse(rawCached) as User[];
+            const matched = cachedUsers.find((u) => {
+              const uPhone = (u.phone || '').replace(/[^0-9]/g, '');
+              return (
+                (uPhone.length >= 10 && cleanDigits.length >= 10 && uPhone.slice(-10) === cleanDigits.slice(-10)) ||
+                (uPhone.length >= 6 && cleanDigits.length >= 6 && uPhone.endsWith(cleanDigits.slice(-10)))
+              );
+            });
+            if (matched?.email) {
+              foundEmail = matched.email.toLowerCase();
+            }
+          }
+        } catch (e) {
+          console.warn('Cache lookup note:', e);
         }
       }
 
       if (foundEmail) {
         targetEmail = foundEmail;
       } else {
-        throw new Error(`फोन नंबर (${identifier}) से कोई खाता नहीं मिला। कृपया अपना पंजीकृत ईमेल पता दर्ज करें (e.g. name@example.com) या 'Create Account' से रजिस्टर करें।`);
+        throw new Error('Invalid email/mobile or password. Please check your credentials and try again.');
       }
     }
 
-    const authPass = password?.trim() || 'ServiFlow@123';
-    const cleanAuthPass = authPass.trim();
-    const isSuperAdminEmail =
-      targetEmail === 'admin@serviflow.io' || targetEmail === 'superadmin@serviflow.io';
-    const isPlatformOwnerEmail = targetEmail === 'uniquesolutions108@gmail.com';
-    const isDemoOwner = targetEmail === 'owner@serviflow.io';
-    const isDemoTech = targetEmail === 'tech@serviflow.io';
-    const isKnownDemoAccount = isSuperAdminEmail || isPlatformOwnerEmail || isDemoOwner || isDemoTech;
-
-    // Check cached user if present
-    let cachedUser: User | null = null;
-    try {
-      const rawCached = localStorage.getItem('serviflow_users_cache');
-      if (rawCached) {
-        const cachedList = JSON.parse(rawCached) as User[];
-        cachedUser =
-          cachedList.find((u) => (u.email || '').trim().toLowerCase() === targetEmail) || null;
-      }
-    } catch {}
-
-    let authUser: FirebaseUser | null = null;
-    let authError: any = null;
-
-    // Primary Authentication: Authenticate against Firebase Authentication with provided credentials
+    // Authenticate against Firebase Authentication with provided credentials
+    let authUser: FirebaseUser;
     try {
       const cred = await signInWithEmailAndPassword(auth, targetEmail, cleanAuthPass);
       authUser = cred.user;
     } catch (err: any) {
-      authError = err;
-      console.log('Firebase Auth signIn notice:', err?.code, err?.message);
-
-      // If user does not exist in Firebase Auth yet, try creating it for recognized accounts
+      console.warn('Firebase Auth signIn error code:', err?.code);
       if (
-        err?.code === 'auth/user-not-found' ||
+        err?.code === 'auth/wrong-password' ||
         err?.code === 'auth/invalid-credential' ||
-        err?.code === 'auth/invalid-login-credentials'
+        err?.code === 'auth/invalid-login-credentials' ||
+        err?.code === 'auth/user-not-found'
       ) {
-        if (isKnownDemoAccount || cachedUser) {
-          try {
-            const newCred = await createUserWithEmailAndPassword(auth, targetEmail, cleanAuthPass);
-            authUser = newCred.user;
-          } catch (createErr: any) {
-            console.log('Firebase Auth create notice:', createErr?.code);
-            if (isKnownDemoAccount) {
-              authUser = {
-                uid: isSuperAdminEmail
-                  ? 'usr-admin'
-                  : isPlatformOwnerEmail
-                  ? 'usr-unique-owner'
-                  : isDemoTech
-                  ? 'usr-demo-tech'
-                  : `demo-${Date.now()}`,
-                email: targetEmail,
-                displayName: isSuperAdminEmail
-                  ? 'SaaS Platform Admin'
-                  : isPlatformOwnerEmail
-                  ? 'Unique Solutions Admin'
-                  : isDemoTech
-                  ? 'Ramesh Kumar (Tech)'
-                  : 'Business Owner',
-              } as any;
-            }
-          }
-        }
-      } else if (err?.code === 'auth/wrong-password') {
-        if (isKnownDemoAccount) {
-          // Allow demo account access with standard demo credentials
-          authUser = {
-            uid: isSuperAdminEmail
-              ? 'usr-admin'
-              : isPlatformOwnerEmail
-              ? 'usr-unique-owner'
-              : isDemoTech
-              ? 'usr-demo-tech'
-              : `demo-${Date.now()}`,
-            email: targetEmail,
-            displayName: isSuperAdminEmail ? 'SaaS Platform Admin' : 'Demo User',
-          } as any;
-        } else {
-          throw new Error('गलत पासवर्ड (Incorrect password). कृपया सही पासवर्ड दर्ज करें या "Forgot Password?" पर क्लिक करें।');
-        }
+        throw new Error('Invalid email/mobile or password. Please check your credentials and try again.');
       } else if (err?.code === 'auth/too-many-requests') {
-        throw new Error('अत्यधिक लॉगिन प्रयासों के कारण खाता अस्थायी रूप से लॉक है। कृपया 5 मिनट प्रतीक्षा करें या पासवर्ड रीसेट करें।');
+        throw new Error('Too many unsuccessful attempts. Please wait a few moments before trying again.');
+      } else if (err?.code === 'auth/user-disabled') {
+        throw new Error('This account has been disabled. Please contact support.');
       } else if (err?.code === 'auth/invalid-email') {
-        throw new Error('कृपया एक मान्य ईमेल पता दर्ज करें (e.g. name@example.com).');
+        throw new Error('Please enter a valid email address.');
+      } else {
+        throw new Error(err?.message || 'Unable to sign in at this time. Please check your connection and try again.');
       }
     }
 
-    if (!authUser && !isKnownDemoAccount && !cachedUser) {
-      if (authError?.code === 'auth/wrong-password') {
-        throw new Error('गलत पासवर्ड (Incorrect password). कृपया सही पासवर्ड दर्ज करें या "Forgot Password?" पर क्लिक करें।');
-      }
-      throw new Error(`(${targetEmail}) के लिए कोई खाता नहीं मिला। कृपया "Create Account" टैब से नया खाता बनाएं या नीचे Demo Login का उपयोग करें।`);
-    }
-
-    // Authenticated! Now fetch or create the User profile document
+    // Authenticated! Now fetch or initialize the User profile document
     let user: User | null = null;
-    const lookupUid = authUser?.uid;
+    const lookupUid = authUser.uid;
 
     if (lookupUid) {
       try {
@@ -560,91 +508,40 @@ export class AuthService {
       }
     }
 
-    if (!user && cachedUser) {
-      user = cachedUser;
-    }
-
-    // Auto-synthesize profile for recognized / authenticated accounts if document is not yet in Firestore
+    // Auto-create default user profile if document is not yet in Firestore
     if (!user) {
-      if (isSuperAdminEmail) {
-        user = {
-          id: lookupUid || 'usr-admin',
-          name: 'SaaS Platform Admin',
-          email: targetEmail,
-          phone: '+91 90000 00000',
-          role: 'super_admin',
-          businessId: 'all',
-          status: 'active',
-          approvalStatus: 'active',
-          joiningDate: new Date().toISOString().split('T')[0],
-          password: cleanAuthPass,
-        };
-      } else if (isPlatformOwnerEmail || isDemoOwner) {
-        user = {
-          id: lookupUid || `owner-${Date.now()}`,
-          name: isPlatformOwnerEmail ? 'Unique Solutions & Field Services' : 'Apex Security Systems',
-          email: targetEmail,
-          phone: '+91 98765 43210',
-          role: 'business_owner',
-          businessId: `tenant-${lookupUid || 'unique-solutions'}`,
-          status: 'active',
-          approvalStatus: 'active',
-          joiningDate: new Date().toISOString().split('T')[0],
-          password: cleanAuthPass,
-        };
-      } else if (isDemoTech) {
-        user = {
-          id: lookupUid || `tech-${Date.now()}`,
-          name: 'Ramesh Kumar (Senior Field Tech)',
-          email: targetEmail,
-          phone: '+91 98765 11223',
-          role: 'technician',
-          businessId: 'demo-tenant-main',
-          status: 'active',
-          approvalStatus: 'active',
-          joiningDate: new Date().toISOString().split('T')[0],
-          password: cleanAuthPass,
-        };
-      } else if (authUser) {
-        user = {
-          id: authUser.uid,
-          name: authUser.displayName || targetEmail.split('@')[0],
-          email: targetEmail,
-          phone: authUser.phoneNumber || '+91 98765 43210',
-          role: 'business_owner',
-          businessId: `tenant-${authUser.uid}`,
-          status: 'active',
-          approvalStatus: 'active',
-          joiningDate: new Date().toISOString().split('T')[0],
-          password: cleanAuthPass,
-        };
-      }
+      user = {
+        id: authUser.uid,
+        name: authUser.displayName || targetEmail.split('@')[0],
+        email: targetEmail,
+        phone: authUser.phoneNumber || '',
+        role: 'business_owner',
+        businessId: `tenant-${authUser.uid}`,
+        status: 'active',
+        approvalStatus: 'active',
+        joiningDate: new Date().toISOString().split('T')[0],
+      };
     }
 
-    if (user && cleanAuthPass) {
-      user.password = cleanAuthPass;
-    }
+    // NEVER retain plaintext password in user state or Firestore
+    delete user.password;
 
-    // Persist and synchronize user record in Firestore
-    if (user) {
-      try {
-        const updatePayload: Partial<User> = {
-          ...cleanFirestoreData(user),
-        };
-        if (authUser?.uid) {
-          (updatePayload as any).authUid = authUser.uid;
-        }
-        if (cleanAuthPass) {
-          updatePayload.password = cleanAuthPass;
-        }
-        await setDoc(doc(db, 'users', user.id), updatePayload, { merge: true });
-
-        if (authUser?.uid && authUser.uid !== user.id && authUser.uid.length >= 20) {
-          await setDoc(doc(db, 'users', authUser.uid), { ...updatePayload, id: user.id }, { merge: true });
-        }
-      } catch (err) {
-        console.warn('User record firestore sync note:', err);
+    // Persist and synchronize sanitized user record in Firestore
+    try {
+      const updatePayload: Partial<User> = {
+        ...cleanFirestoreData(user),
+      };
+      if (authUser.uid) {
+        (updatePayload as any).authUid = authUser.uid;
       }
+      delete (updatePayload as any).password;
+      await setDoc(doc(db, 'users', user.id), updatePayload, { merge: true });
+
+      if (authUser.uid !== user.id && authUser.uid.length >= 20) {
+        await setDoc(doc(db, 'users', authUser.uid), { ...updatePayload, id: user.id }, { merge: true });
+      }
+    } catch (err) {
+      console.warn('User record firestore sync note:', err);
     }
 
     if (!user) {
@@ -815,6 +712,54 @@ export class AuthService {
   static async sendPasswordReset(email: string): Promise<void> {
     const cleanEmail = email.trim().toLowerCase();
     await sendPasswordResetEmail(auth, cleanEmail);
+  }
+
+  /**
+   * Secure, isolated sandbox demonstration environment.
+   * Completely isolated from production customer and business data.
+   * Super Admin is strictly forbidden from demo access.
+   */
+  static async loginSandboxDemo(role: 'business_owner' | 'technician' = 'business_owner'): Promise<{
+    user: User;
+    tenant: Business;
+    membership?: TenantMembership;
+  }> {
+    const isTech = role === 'technician';
+    const sandboxTenantId = 'tenant-demo-sandbox';
+
+    const user: User = {
+      id: isTech ? 'usr-sandbox-tech' : 'usr-sandbox-owner',
+      name: isTech ? 'Demo Service Technician' : 'Demo Business Owner',
+      email: isTech ? 'demo.tech@serviflow.sandbox' : 'demo.owner@serviflow.sandbox',
+      phone: '+91 98000 00000',
+      role: isTech ? 'technician' : 'business_owner',
+      businessId: sandboxTenantId,
+      status: 'active',
+      approvalStatus: 'active',
+      joiningDate: new Date().toISOString().split('T')[0],
+      isDemoSandbox: true,
+    };
+
+    const tenant: Business = {
+      id: sandboxTenantId,
+      name: 'Demo Field Services (Sandbox)',
+      type: 'Air Conditioning & Refrigeration',
+      logo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&auto=format&fit=crop&q=80',
+      mobile: '+91 98000 00000',
+      whatsapp: '+91 98000 00000',
+      email: 'demo@serviflow.sandbox',
+      address: '123 Tech Park, Phase 1',
+      city: 'Mumbai',
+      state: 'Maharashtra',
+      pin: '400001',
+      currency: '₹',
+      createdAt: new Date().toISOString().split('T')[0],
+      planId: 'plan-pro',
+      status: 'active',
+      isDemoSandbox: true,
+    };
+
+    return { user, tenant };
   }
 
   /**

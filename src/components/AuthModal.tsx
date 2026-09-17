@@ -53,7 +53,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [resetError, setResetError] = useState<string | null>(null);
 
   // Super Admin States
-  const [superAdminEmail, setSuperAdminEmail] = useState('admin@serviflow.io');
+  const [superAdminEmail, setSuperAdminEmail] = useState('');
   const [superAdminPassword, setSuperAdminPassword] = useState('');
   const [isSuperAdminSubmitting, setIsSuperAdminSubmitting] = useState(false);
 
@@ -74,11 +74,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const handleDirectLogin = async (e?: React.FormEvent, customId?: string, customPass?: string) => {
     if (e) e.preventDefault();
     const clean = (customId ?? loginIdentifier).trim();
-    const effectivePass = (customPass ?? loginPassword).trim() || 'ServiFlow@123';
+    const effectivePass = (customPass ?? loginPassword).trim();
 
     if (!clean) {
       showToast('Please enter your email or mobile number', 'error');
-      setLoginError('कृपया ईमेल या मोबाइल नंबर दर्ज करें।');
+      setLoginError('Please enter your email or mobile number.');
+      return;
+    }
+
+    if (!effectivePass) {
+      showToast('Please enter your password', 'error');
+      setLoginError('Please enter your password.');
       return;
     }
 
@@ -93,19 +99,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       onClose();
     } catch (err: any) {
       console.error('Sign in error in modal:', err);
-      const msg = err?.message || 'लॉगिन विफल रहा (Sign in failed). Please check your email and password.';
+      const msg = err?.message || 'Sign in failed. Please check your credentials.';
       setLoginError(msg);
       showToast(msg, 'error');
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleQuickDemo = (email: string, pass: string = 'ServiFlow@123') => {
-    setLoginIdentifier(email);
-    setLoginPassword(pass);
-    setLoginError(null);
-    handleDirectLogin(undefined, email, pass);
   };
 
   const handleDirectRegistration = async (e: React.FormEvent) => {
@@ -407,36 +406,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   </>
                 )}
               </button>
-
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
-                <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-amber-500" />
-                  Quick Demo Login:
-                </span>
-                <div className="grid grid-cols-3 gap-1.5 text-center">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemo('uniquesolutions108@gmail.com')}
-                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-medium hover:bg-indigo-50 dark:hover:bg-indigo-950/40 cursor-pointer truncate"
-                  >
-                    Owner
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemo('tech@serviflow.io')}
-                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-medium hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer truncate"
-                  >
-                    Tech
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemo('admin@serviflow.io')}
-                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-medium hover:bg-purple-50 dark:hover:bg-purple-950/40 cursor-pointer truncate"
-                  >
-                    Admin
-                  </button>
-                </div>
-              </div>
             </form>
           )}
 

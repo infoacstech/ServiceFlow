@@ -41,6 +41,7 @@ export interface User {
   referralCode?: string;
   employeeCode?: string; // e.g. EMP-0001
   language?: AppLanguage;
+  isDemoSandbox?: boolean;
 }
 
 export interface Business {
@@ -63,6 +64,7 @@ export interface Business {
   planId: string;
   plan?: string;
   status: 'active' | 'suspended' | 'pending' | 'rejected' | 'trial';
+  isDemoSandbox?: boolean;
   subscriptionStatus?: 'trial' | 'active' | 'past_due' | 'expired' | 'pending_verification';
   trialEndsAt?: string;
   subscriptionExpiresAt?: string;
