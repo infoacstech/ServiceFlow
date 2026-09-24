@@ -85,6 +85,9 @@ export const JobsView: React.FC<JobsViewProps> = ({
     updateJob,
     updateJobStatus,
     currentBusiness,
+    currentUser,
+    trialStatus,
+    openTrialExpiredModal,
     showToast,
     t,
   } = useApp();
@@ -592,7 +595,13 @@ export const JobsView: React.FC<JobsViewProps> = ({
           {/* Primary CTA: Create Job Ticket */}
           <button
             type="button"
-            onClick={() => setIsCreateModalOpen(true)}
+            onClick={() => {
+              if (trialStatus.isExpired && currentUser?.role !== 'super_admin' && currentBusiness?.subscriptionStatus !== 'pending_verification') {
+                openTrialExpiredModal('Creating new job tickets and dispatching technicians');
+                return;
+              }
+              setIsCreateModalOpen(true);
+            }}
             className="flex-1 sm:flex-none h-9 justify-center flex items-center gap-1.5 px-3.5 sm:px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all shadow-xs active:scale-95 cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-3.5 h-3.5 shrink-0" />

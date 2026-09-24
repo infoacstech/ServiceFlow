@@ -246,6 +246,11 @@ interface AppContextType {
     isPaidActive: boolean;
     statusLabel: string;
   };
+  isTrialExpiredModalOpen: boolean;
+  trialExpiredAction: string;
+  openTrialExpiredModal: (actionAttempted?: string) => void;
+  closeTrialExpiredModal: () => void;
+  checkTrialExpiredGuard: (actionAttempted?: string) => boolean;
 
   // Data collections (filtered by current business when applicable)
   enquiries: Enquiry[];
@@ -855,6 +860,23 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [subscriptionPayments, setSubscriptionPayments] = useState<SubscriptionPayment[]>(() =>
     loadCache('serviflow_sub_payments_cache', [])
   );
+
+  // SaaS Trial Expiration Guard Modal State
+  const [isTrialExpiredModalOpen, setIsTrialExpiredModalOpen] = useState<boolean>(false);
+  const [trialExpiredAction, setTrialExpiredAction] = useState<string>(
+    'Creating new job tickets and dispatching technicians'
+  );
+
+  const openTrialExpiredModal = (actionAttempted?: string) => {
+    if (actionAttempted) {
+      setTrialExpiredAction(actionAttempted);
+    }
+    setIsTrialExpiredModalOpen(true);
+  };
+
+  const closeTrialExpiredModal = () => {
+    setIsTrialExpiredModalOpen(false);
+  };
 
   // Super Admin Support Access & Security States
   const [supportSessions, setSupportSessions] = useState<SupportSession[]>(() =>
@@ -2680,6 +2702,23 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return false;
   };
 
+  // Guard helper to check if tenant's 14-day free trial has expired and trigger the upgrade modal
+  const checkTrialExpiredGuard = (actionAttempted = 'Creating new records'): boolean => {
+    if (currentUser?.role === 'super_admin') return false;
+    if (
+      currentBusiness?.subscriptionStatus === 'active' ||
+      currentBusiness?.subscriptionStatus === 'pending_verification'
+    ) {
+      return false;
+    }
+    const trial = getTrialStatus(currentBusiness);
+    if (trial.isExpired) {
+      openTrialExpiredModal(actionAttempted);
+      return true;
+    }
+    return false;
+  };
+
   // Switch role helper for role testing within authorized boundaries
   const switchRole = async (role: UserRole) => {
     if (role === 'super_admin') {
@@ -3035,6 +3074,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Enquiry Actions
   const addEnquiry = (data: Omit<Enquiry, 'id' | 'businessId' | 'enquiryId' | 'createdAt'>) => {
     if (checkReadOnlySupportGuard()) return {} as Enquiry;
+    if (checkTrialExpiredGuard('Creating customer enquiries')) return {} as Enquiry;
     const perm = canCreateRecord(currentUser, 'enquiry');
     if (!perm.allowed) {
       showToast(perm.reason || 'Permission Denied: Cannot create enquiries.', 'error');
@@ -3309,6 +3349,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   ): Promise<Quotation> => {
     if (checkReadOnlySupportGuard()) throw new Error('Read-only mode active');
+    if (checkTrialExpiredGuard('Creating quotations from enquiries')) throw new Error('Trial expired');
     const enq = enquiries.find((e) => e.id === enquiryId);
     if (!enq) throw new Error('Enquiry not found');
 
@@ -3392,6 +3433,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const convertEnquiryToJob = async (enquiryId: string, jobOverrides?: Partial<Job>): Promise<Job> => {
     if (checkReadOnlySupportGuard()) throw new Error('Read-only mode active');
+    if (checkTrialExpiredGuard('Converting enquiries to jobs')) throw new Error('Trial expired');
     const enq = enquiries.find((e) => e.id === enquiryId);
     if (!enq) throw new Error('Enquiry not found');
 
@@ -3487,6 +3529,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Customer Actions
   const addCustomer = (data: Omit<Customer, 'id' | 'businessId' | 'createdAt'>) => {
     if (checkReadOnlySupportGuard()) return;
+    if (checkTrialExpiredGuard('Adding new customer profiles')) return;
     const perm = canCreateRecord(currentUser, 'customer');
     if (!perm.allowed) {
       showToast(perm.reason || 'Permission Denied: Cannot create customer records.', 'error');
@@ -3703,6 +3746,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addService = (data: Omit<Service, 'id' | 'businessId'>) => {
     if (checkReadOnlySupportGuard()) return;
+    if (checkTrialExpiredGuard('Adding new service catalog items')) return;
     const perm = canCreateRecord(currentUser, 'service');
     if (!perm.allowed) {
       showToast(perm.reason || 'Permission Denied: Cannot create service.', 'error');
@@ -3758,6 +3802,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (!isCustomerPortal) {
       if (checkReadOnlySupportGuard()) return null;
+      if (checkTrialExpiredGuard('Creating new job tickets and dispatching technicians')) return null;
       const perm = canCreateRecord(currentUser, 'job');
       if (!perm.allowed) {
         showToast(perm.reason || 'Permission Denied: Cannot create jobs.', 'error');
@@ -4410,6 +4455,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Inventory Actions
   const addInventoryItem = (data: Omit<InventoryItem, 'id' | 'businessId'>) => {
     if (checkReadOnlySupportGuard()) return;
+    if (checkTrialExpiredGuard('Adding inventory stock items')) return;
     const perm = canCreateRecord(currentUser, 'inventory');
     if (!perm.allowed) {
       showToast(perm.reason || 'Permission Denied: Cannot create inventory items.', 'error');
@@ -4461,6 +4507,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     options?: { silentToast?: boolean }
   ) => {
     if (checkReadOnlySupportGuard()) return;
+    if (checkTrialExpiredGuard('Creating estimates and quotations')) return;
     const perm = canCreateRecord(currentUser, 'quotation');
     if (!perm.allowed) {
       showToast(perm.reason || 'Permission Denied: Cannot create quotations.', 'error');
@@ -4541,6 +4588,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Invoice Actions
   const addInvoice = (data: Omit<Invoice, 'id' | 'businessId' | 'invoiceNumber'>) => {
     if (checkReadOnlySupportGuard()) return {} as Invoice;
+    if (checkTrialExpiredGuard('Generating customer invoices')) return {} as Invoice;
     const perm = canCreateRecord(currentUser, 'invoice');
     if (!perm.allowed) {
       showToast(perm.reason || 'Permission Denied: Cannot create invoices.', 'error');
@@ -4761,6 +4809,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Contract Actions
   const addContract = (data: Omit<RecurringContract, 'id' | 'businessId' | 'contractNumber'>) => {
     if (checkReadOnlySupportGuard()) return {} as RecurringContract;
+    if (checkTrialExpiredGuard('Setting up AMC service contracts')) return {} as RecurringContract;
     const perm = canCreateRecord(currentUser, 'contract');
     if (!perm.allowed) {
       showToast(perm.reason || 'Permission Denied: Cannot create service contracts.', 'error');
@@ -4970,6 +5019,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Staff & User Auth Actions
   const addStaff = async (data: Omit<User, 'id' | 'businessId'>): Promise<User | undefined> => {
     if (checkReadOnlySupportGuard()) return;
+    if (checkTrialExpiredGuard('Adding new technician or staff logins')) return;
     const perm = canManageStaffMembers(currentUser);
     if (!perm.allowed) {
       showToast(perm.reason || 'Permission Denied: Only Business Owners can add staff members.', 'error');
@@ -6870,6 +6920,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         submitSubscriptionPayment,
         verifySubscriptionPayment,
         trialStatus: getTrialStatus(currentBusiness),
+        isTrialExpiredModalOpen,
+        trialExpiredAction,
+        openTrialExpiredModal,
+        closeTrialExpiredModal,
+        checkTrialExpiredGuard,
 
         // Attendance & GPS Verification Module
         attendanceRecords: filteredAttendanceRecords,

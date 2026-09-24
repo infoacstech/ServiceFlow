@@ -20,6 +20,7 @@ import { UserProfileDrawer } from './components/UserProfileDrawer';
 import { InstallAppModal } from './components/InstallAppModal';
 import { PwaInstallPrompt } from './components/PwaInstallPrompt';
 import { TrialStatusBanner } from './components/TrialStatusBanner';
+import { TrialExpiredModal } from './components/TrialExpiredModal';
 
 import type { JobInitialFilter } from './views/JobsView';
 import type { InvoiceInitialFilter } from './views/InvoicesView';
@@ -75,6 +76,11 @@ const MainContent: React.FC = () => {
     setIsInstallModalOpen,
     getRolePermissions,
     showToast,
+    trialStatus,
+    isTrialExpiredModalOpen,
+    trialExpiredAction,
+    openTrialExpiredModal,
+    closeTrialExpiredModal,
   } = useApp();
   const [activeTab, setActiveTab] = useState<string>(() => {
     const raw = localStorage.getItem('serviflow_active_tab') || sessionStorage.getItem('serviflow_active_tab') || 'dashboard';
@@ -104,6 +110,7 @@ const MainContent: React.FC = () => {
   useBackHandler(isAuthModalOpen, () => setIsAuthModalOpen(false), 'app-auth-modal');
   useBackHandler(isProfileDrawerOpen, () => setIsProfileDrawerOpen(false), 'app-profile-drawer');
   useBackHandler(isInstallModalOpen, () => setIsInstallModalOpen(false), 'app-install-modal');
+  useBackHandler(isTrialExpiredModalOpen, closeTrialExpiredModal, 'app-trial-expired-modal');
 
   const [jobsFilter, setJobsFilter] = useState<JobInitialFilter | null>(null);
   const [invoicesFilter, setInvoicesFilter] = useState<InvoiceInitialFilter | null>(null);
@@ -396,6 +403,10 @@ const MainContent: React.FC = () => {
   };
 
   const handleOpenNewJob = () => {
+    if (trialStatus.isExpired && currentUser?.role !== 'super_admin' && currentBusiness?.subscriptionStatus !== 'pending_verification') {
+      openTrialExpiredModal('Creating new job tickets and dispatching technicians');
+      return;
+    }
     handleTabChange('jobs');
     setIsCreateJobOpen(true);
   };
@@ -434,7 +445,7 @@ const MainContent: React.FC = () => {
         {/* View Content Area with Natural Scroll & Pull-To-Refresh */}
         <main className="flex-1 min-w-0 flex flex-col w-full">
           <PullToRefresh
-            disabled={isCreateJobOpen || isOnboardingOpen || isAuthModalOpen || isProfileDrawerOpen || isInstallModalOpen}
+            disabled={isCreateJobOpen || isOnboardingOpen || isAuthModalOpen || isProfileDrawerOpen || isInstallModalOpen || isTrialExpiredModalOpen}
             className="p-3 sm:p-4 lg:p-5 pb-24 sm:pb-8 w-full max-w-full"
           >
             <div key={activeTab} className="animate-in fade-in duration-200">
@@ -526,6 +537,12 @@ const MainContent: React.FC = () => {
       <MobileNav activeTab={activeTab} setActiveTab={handleTabChange} />
 
       {/* Global Modals & Toasts */}
+      <TrialExpiredModal
+        isOpen={isTrialExpiredModalOpen}
+        onClose={closeTrialExpiredModal}
+        onUpgradeClick={() => handleTabChange('settings_subscription')}
+        actionAttempted={trialExpiredAction}
+      />
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
