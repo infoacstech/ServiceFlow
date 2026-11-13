@@ -216,16 +216,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
                 <div className="text-left min-w-0">
                   <div className="text-xs sm:text-sm md:text-base font-black text-slate-900 dark:text-slate-100 flex items-center gap-1 leading-tight">
-                    <span className="truncate max-w-[110px] xs:max-w-[160px] sm:max-w-xs md:max-w-sm" title={currentBusiness?.id === 'all' ? 'ServiFlow Master' : currentBusiness?.name}>
+                    <span className="truncate max-w-[120px] sm:max-w-xs md:max-w-sm" title={currentBusiness?.id === 'all' ? 'ServiFlow Master' : currentBusiness?.name}>
                       {currentBusiness?.id === 'all' ? 'ServiFlow Master' : (currentBusiness?.name || 'ServiFlow')}
                     </span>
                     <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 shrink-0" />
                   </div>
-                  <div className="text-[10px] sm:text-[11px] font-semibold truncate leading-none mt-0.5 hidden xs:block">
+                  <div className="text-[10px] sm:text-[11px] font-semibold truncate leading-none mt-0.5">
                     {currentBusiness?.id === 'all' ? (
                       <span className="text-purple-600 dark:text-purple-400 font-bold">Super Admin Console (All Tenants)</span>
                     ) : (
-                      <span className="text-amber-600 dark:text-amber-400 font-bold">Tenant Context (Click to switch)</span>
+                      <span className="text-amber-600 dark:text-amber-400 font-bold">Tenant Context</span>
                     )}
                   </div>
                 </div>
@@ -314,10 +314,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           ) : (
             /* Full Company Name Display for Business Owners / Staff / Technicians */
             <div
-              className="flex items-center gap-2 sm:gap-2.5 p-1 sm:p-1.5 sm:px-3 rounded-2xl bg-slate-100/70 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60 text-left min-w-0"
+              className="flex items-center gap-2 sm:gap-2.5 py-0.5 text-left min-w-0"
               title={currentBusiness?.name || 'ServiFlow'}
             >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-xs sm:text-sm shadow-xs overflow-hidden shrink-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-xs sm:text-sm shadow-xs overflow-hidden shrink-0 ring-1 ring-slate-200 dark:ring-slate-700">
                 {currentBusiness?.logo ? (
                   <img src={currentBusiness.logo} alt={currentBusiness.name} className="w-full h-full object-cover" />
                 ) : (
@@ -325,11 +325,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </div>
               <div className="text-left min-w-0">
-                <div className="text-xs sm:text-sm md:text-base font-black text-slate-900 dark:text-slate-100 tracking-tight leading-tight truncate max-w-[125px] xs:max-w-[180px] sm:max-w-xs md:max-w-md lg:max-w-lg">
+                <div className="text-[13px] sm:text-sm md:text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-tight truncate max-w-[140px] sm:max-w-xs md:max-w-md lg:max-w-lg">
                   {currentBusiness?.name || 'ServiFlow'}
                 </div>
-                <div className="text-[10px] sm:text-[11px] text-slate-500 font-semibold truncate leading-none mt-0.5 hidden xs:block">
-                  {ownerUser?.name ? `Owner: ${ownerUser.name}` : (currentBusiness?.type || 'Field Services')}
+                <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate leading-tight mt-0.5 max-w-[140px] sm:max-w-xs">
+                  {ownerUser?.name ? ownerUser.name : (currentBusiness?.type || 'Field Services')}
                 </div>
               </div>
             </div>
@@ -369,6 +369,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             <History className="w-4 h-4" />
           </button>
 
+          {/* Mobile Quick Search Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsSearchOpen(true);
+              closeAllMenus();
+            }}
+            className="md:hidden h-8 w-8 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700/80 transition-colors cursor-pointer shrink-0"
+            title="Search customers, jobs, invoices"
+            aria-label="Search"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+
           {/* Language Switcher Dropdown */}
           <div className="relative flex items-center">
             <button
@@ -381,7 +395,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="text-[10px] sm:text-[11px] font-black uppercase">
                 {language === 'hi' ? 'HI' : language === 'mr' ? 'MR' : 'EN'}
               </span>
-              <ChevronDown className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400 hidden xs:block" />
+              <ChevronDown className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400 shrink-0" />
             </button>
 
             {activeMenu === 'language' && (

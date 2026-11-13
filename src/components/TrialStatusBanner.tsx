@@ -57,24 +57,31 @@ export const TrialStatusBanner: React.FC<TrialStatusBannerProps> = ({
   // Case 2: Trial Expired
   if (trialStatus.isExpired) {
     return (
-      <div className="bg-gradient-to-r from-rose-700 via-rose-800 to-rose-700 text-white border-b border-rose-600 px-4 py-2.5 text-xs shadow-md">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-center sm:text-left">
-            <span className="p-1 rounded-lg bg-white text-rose-700 shrink-0">
+      <div className="bg-gradient-to-r from-rose-700 via-rose-800 to-rose-700 text-white border-b border-rose-600 px-3 sm:px-4 py-2 text-xs shadow-sm">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="p-1 rounded-lg bg-white/15 text-white shrink-0">
               <AlertTriangle className="w-3.5 h-3.5" />
             </span>
-            <span>
-              <strong className="font-black tracking-wide uppercase">14-Day Free Trial Expired:</strong> Select an official ServiFlow subscription plan to continue dispatching technicians and creating jobs without disruption.
-            </span>
+            <p className="leading-snug text-[11px] sm:text-xs min-w-0">
+              <strong className="font-extrabold tracking-wide uppercase">Trial Expired:</strong>{' '}
+              <span className="sm:hidden text-rose-100">
+                Choose a plan to resume creating jobs &amp; dispatching.
+              </span>
+              <span className="hidden sm:inline text-rose-50">
+                Select an official ServiFlow subscription plan to continue dispatching technicians and creating jobs without disruption.
+              </span>
+            </p>
           </div>
 
           <button
             type="button"
             onClick={onUpgradeClick}
-            className="px-4 py-1.5 rounded-xl bg-white text-rose-800 hover:bg-rose-50 active:scale-95 font-black text-xs flex items-center gap-1.5 shadow-sm transition-all shrink-0 cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-white text-rose-800 hover:bg-rose-50 active:scale-95 font-extrabold text-[11px] sm:text-xs flex items-center gap-1 shadow-xs transition-all shrink-0 cursor-pointer whitespace-nowrap"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            <span>Upgrade Now</span>
+            <Sparkles className="w-3 h-3 text-amber-600 hidden sm:inline" />
+            <span>Upgrade</span>
+            <span className="hidden sm:inline">Now</span>
             <ArrowRight className="w-3 h-3" />
           </button>
         </div>
@@ -85,22 +92,28 @@ export const TrialStatusBanner: React.FC<TrialStatusBannerProps> = ({
   // Case 3: Trial Ending Soon (3 days or fewer)
   if (trialStatus.isTrial && trialStatus.daysRemaining <= 3) {
     return (
-      <div className="bg-gradient-to-r from-amber-600 via-amber-700 to-amber-600 text-white border-b border-amber-500 px-4 py-2 text-xs">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-center sm:text-left">
-            <span className="p-1 rounded-lg bg-amber-900/40 text-amber-200 shrink-0">
+      <div className="bg-gradient-to-r from-amber-600 via-amber-700 to-amber-600 text-white border-b border-amber-500 px-3 sm:px-4 py-2 text-xs">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="p-1 rounded-lg bg-amber-900/40 text-amber-100 shrink-0">
               <Clock className="w-3.5 h-3.5" />
             </span>
-            <span>
-              <strong className="font-bold">Free Trial Ending Soon:</strong> Only{' '}
-              <strong className="underline decoration-amber-200 font-black">{trialStatus.daysRemaining} days remaining</strong> on your 14-day trial. Choose your plan to keep your workflows active.
-            </span>
+            <p className="leading-snug text-[11px] sm:text-xs min-w-0">
+              <strong className="font-bold">Trial Ending:</strong>{' '}
+              <strong className="underline decoration-amber-200 font-black tabular-nums">
+                {trialStatus.daysRemaining}d left
+              </strong>
+              <span className="sm:hidden text-amber-100"> — Choose a plan to stay active.</span>
+              <span className="hidden sm:inline text-amber-50">
+                {' '}on your 14-day trial. Choose your plan to keep your workflows active.
+              </span>
+            </p>
           </div>
 
           <button
             type="button"
             onClick={onUpgradeClick}
-            className="px-3.5 py-1 rounded-xl bg-white text-amber-900 hover:bg-amber-50 active:scale-95 font-extrabold text-[11px] flex items-center gap-1.5 shadow-xs transition-all shrink-0 cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-white text-amber-900 hover:bg-amber-50 active:scale-95 font-extrabold text-[11px] flex items-center gap-1 shadow-xs transition-all shrink-0 cursor-pointer whitespace-nowrap"
           >
             <span>Choose Plan</span>
             <ArrowRight className="w-3 h-3" />
