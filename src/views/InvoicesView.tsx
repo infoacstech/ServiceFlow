@@ -44,6 +44,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
     recordPayment,
     addInvoice,
     currentBusiness,
+    checkTrialExpiredGuard,
     t,
   } = useApp();
 
@@ -159,7 +160,11 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({ initialFilter }) => 
         </div>
 
         <button
-          onClick={() => setIsCreateInvoiceOpen(true)}
+          onClick={() => {
+            if (!checkTrialExpiredGuard('Generating customer invoices')) {
+              setIsCreateInvoiceOpen(true);
+            }
+          }}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-all shadow-md active:scale-95"
         >
           <Plus className="w-4 h-4" /> {t('invoices.createInvoice', undefined, 'Create New Invoice')}

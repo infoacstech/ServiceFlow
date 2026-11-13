@@ -79,6 +79,7 @@ export const QuotationsView: React.FC = () => {
     convertQuotationToInvoice,
     currentBusiness,
     showToast,
+    checkTrialExpiredGuard,
   } = useApp();
 
   const [search, setSearch] = useState('');
@@ -138,6 +139,7 @@ export const QuotationsView: React.FC = () => {
 
   // Reset & Open Create Quotation Modal
   const handleOpenCreateModal = () => {
+    if (checkTrialExpiredGuard('Creating estimates and quotations')) return;
     const defaultCustId = customers[0]?.id || '';
     setCustomerId(defaultCustId);
     setIsChangingCustomer(defaultCustId ? false : true);

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { auth } from '../lib/firebase';
 import { Sparkles, Send, Bot, User, ArrowRight, MessageSquare, Zap } from 'lucide-react';
 
 export const AIAssistantView: React.FC = () => {
-  const { currentBusiness, jobs, customers, invoices, inventory } = useApp();
+  const { currentBusiness, currentUser, jobs, customers, invoices, inventory } = useApp();
 
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,15 +31,23 @@ export const AIAssistantView: React.FC = () => {
     setLoading(true);
 
     try {
+      const idToken = auth.currentUser ? await auth.currentUser.getIdToken() : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (idToken) {
+        headers['Authorization'] = `Bearer ${idToken}`;
+      }
+
       const res = await fetch('/api/ai/assistant', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           prompt: q,
-          context: {
+          isDemoSandbox: Boolean(currentBusiness?.isDemoSandbox || currentUser?.isDemoSandbox),
+          businessContext: {
             businessName: currentBusiness.name,
             businessType: currentBusiness.type,
             currency: currentBusiness.currency,
+            totalCustomersCount: customers.length,
             totalJobsCount: jobs.length,
             pendingJobsCount: jobs.filter((j) => j.status !== 'completed' && j.status !== 'closed').length,
             totalInvoicesCount: invoices.length,
@@ -49,7 +58,13 @@ export const AIAssistantView: React.FC = () => {
       });
 
       const data = await res.json();
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.reply || 'Analysis complete.' }]);
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to generate AI response');
+      }
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: data.response || data.reply || 'Analysis complete.' },
+      ]);
     } catch (err) {
       setMessages((prev) => [
         ...prev,

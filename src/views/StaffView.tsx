@@ -31,7 +31,7 @@ import {
 import { openWhatsApp } from '../utils/whatsappHelper';
 
 export const StaffView: React.FC = () => {
-  const { users, staff, jobs, currentBusiness, currentUser, roles, addStaff, deleteStaff, updateUserStatus, showToast } = useApp();
+  const { users, staff, jobs, currentBusiness, currentUser, roles, addStaff, deleteStaff, updateUserStatus, showToast, checkTrialExpiredGuard } = useApp();
   const [activeTab, setActiveTab] = useState<'calendar' | 'directory'>('calendar');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [deletingStaffUser, setDeletingStaffUser] = useState<User | null>(null);
@@ -105,7 +105,7 @@ export const StaffView: React.FC = () => {
     (u) => (u.status === 'active' || !u.status) && u.role !== 'super_admin' && u.role !== 'business_owner'
   ).length;
 
-  const capacity = checkStaffCapacity(activeStaffCount, currentBusiness.planId || currentBusiness.plan);
+  const capacity = checkStaffCapacity(activeStaffCount, currentBusiness.planId || currentBusiness.plan, currentBusiness.addonStaff || 0);
 
   const pendingApprovals = businessUsers.filter((u) => u.approvalStatus === 'pending');
   const isOwnerOrAdmin = currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin';
@@ -269,7 +269,11 @@ export const StaffView: React.FC = () => {
 
           {isOwnerOrAdmin && (
             <button
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={() => {
+                if (!checkTrialExpiredGuard('Adding new technician or staff logins')) {
+                  setIsAddModalOpen(true);
+                }
+              }}
               className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm transition-all active:scale-95 shrink-0 cursor-pointer"
             >
               <UserPlus className="w-4 h-4 shrink-0" />

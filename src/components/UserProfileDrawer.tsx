@@ -1,4 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
+import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  verifyBeforeUpdateEmail,
+} from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import { useApp } from '../context/AppContext';
 import {
   X,
@@ -262,7 +268,6 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
     setIsUpdatingPassword(true);
     try {
       await updateUserPassword(currentUser.id, newPassword);
-      showToast('Password updated successfully!', 'success');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
@@ -317,10 +322,8 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
       return;
     }
 
-    // Verify current password
-    const expectedPassword = currentUser.password || 'ServiFlow@123';
-    if (currentUser.password && emailVerifyPassword !== expectedPassword) {
-      setEmailUpdateError('Incorrect current password. Identity verification failed.');
+    if (!currentUser.isDemoSandbox && !emailVerifyPassword.trim()) {
+      setEmailUpdateError('Please enter your current password to verify your identity.');
       return;
     }
 
@@ -328,11 +331,35 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
     setEmailUpdateError('');
 
     try {
-      await updateUserProfile(currentUser.id, { email: cleanNewEmail });
-      showToast(`Sign-in email updated to ${cleanNewEmail}! Active session preserved.`, 'success');
+      if (!currentUser.isDemoSandbox && auth.currentUser?.email) {
+        const credential = EmailAuthProvider.credential(
+          auth.currentUser.email,
+          emailVerifyPassword.trim()
+        );
+        await reauthenticateWithCredential(auth.currentUser, credential);
+        await verifyBeforeUpdateEmail(auth.currentUser, cleanNewEmail);
+        showToast(
+          `Verification link sent to ${cleanNewEmail}. Please verify it in your inbox to complete the sign-in email change.`,
+          'success'
+        );
+      } else {
+        await updateUserProfile(currentUser.id, { email: cleanNewEmail });
+        showToast(`Sign-in email updated to ${cleanNewEmail}!`, 'success');
+      }
       handleCloseEmailModal();
     } catch (err: any) {
-      setEmailUpdateError(err.message || 'Failed to update email. Please try again.');
+      const code = err?.code || '';
+      if (
+        code === 'auth/wrong-password' ||
+        code === 'auth/invalid-credential' ||
+        code === 'auth/invalid-login-credentials'
+      ) {
+        setEmailUpdateError('Incorrect current password. Identity verification failed.');
+      } else if (code === 'auth/email-already-in-use') {
+        setEmailUpdateError('This email is already associated with another account.');
+      } else {
+        setEmailUpdateError(err.message || 'Failed to update email. Please try again.');
+      }
     } finally {
       setIsUpdatingEmail(false);
     }

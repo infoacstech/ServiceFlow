@@ -13,6 +13,7 @@ export const ServicesView: React.FC = () => {
     addServiceCategory,
     currentBusiness,
     currentUser,
+    checkTrialExpiredGuard,
   } = useApp();
 
   const isOwnerOrAdmin = currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin';
@@ -81,13 +82,21 @@ export const ServicesView: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setIsCategoryModalOpen(true)}
+            onClick={() => {
+              if (!checkTrialExpiredGuard('Adding new service categories')) {
+                setIsCategoryModalOpen(true);
+              }
+            }}
             className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold text-xs hover:bg-slate-200 transition-all"
           >
             <FolderPlus className="w-4 h-4" /> Add Category
           </button>
           <button
-            onClick={() => setIsServiceModalOpen(true)}
+            onClick={() => {
+              if (!checkTrialExpiredGuard('Adding new service catalog items')) {
+                setIsServiceModalOpen(true);
+              }
+            }}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-all shadow-md active:scale-95"
           >
             <Plus className="w-4 h-4" /> Create Service

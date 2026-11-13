@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import { useApp } from '../context/AppContext';
 import {
   Settings,
@@ -231,41 +233,66 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
   const [newPassInput, setNewPassInput] = useState('');
   const [confirmPassInput, setConfirmPassInput] = useState('');
   const [passChangeSuccess, setPassChangeSuccess] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPassInput.trim()) {
+    const cleanNew = newPassInput.trim();
+    const cleanCurrent = currentPassInput.trim();
+
+    if (!cleanNew) {
       showToast('Please enter a new password', 'error');
       return;
     }
 
-    if (newPassInput.length < 4) {
-      showToast('Password must be at least 4 characters long', 'error');
+    if (cleanNew.length < 6) {
+      showToast('Password must be at least 6 characters long', 'error');
       return;
     }
 
-    if (newPassInput !== confirmPassInput) {
+    if (cleanNew !== confirmPassInput.trim()) {
       showToast('New passwords do not match', 'error');
       return;
     }
 
-    const cleanCurrent = currentPassInput.trim();
-    const cleanStored = (currentUser?.password || '').trim();
+    if (!currentUser?.id) return;
 
-    if (cleanStored && cleanCurrent !== cleanStored && cleanCurrent !== 'ServiFlow@123') {
-      showToast('Current password is incorrect', 'error');
-      return;
-    }
+    setIsUpdatingPassword(true);
+    try {
+      if (!currentUser.isDemoSandbox && auth.currentUser?.email) {
+        if (!cleanCurrent) {
+          showToast('Please enter your current password to verify your identity', 'error');
+          setIsUpdatingPassword(false);
+          return;
+        }
+        const credential = EmailAuthProvider.credential(auth.currentUser.email, cleanCurrent);
+        await reauthenticateWithCredential(auth.currentUser, credential);
+      }
 
-    if (currentUser?.id) {
-      await updateUserPassword(currentUser.id, newPassInput.trim());
+      await updateUserPassword(currentUser.id, cleanNew);
+      setPassChangeSuccess(true);
+      setCurrentPassInput('');
+      setNewPassInput('');
+      setConfirmPassInput('');
+      setTimeout(() => setPassChangeSuccess(false), 3000);
+    } catch (err: any) {
+      const code = err?.code || '';
+      if (
+        code === 'auth/wrong-password' ||
+        code === 'auth/invalid-credential' ||
+        code === 'auth/invalid-login-credentials'
+      ) {
+        showToast('Current password is incorrect', 'error');
+      } else if (code === 'auth/weak-password') {
+        showToast('New password is too weak. Use at least 6 characters.', 'error');
+      } else if (code === 'auth/requires-recent-login') {
+        showToast('Please log out and sign in again before changing your password.', 'error');
+      } else {
+        showToast(err?.message || 'Failed to update password', 'error');
+      }
+    } finally {
+      setIsUpdatingPassword(false);
     }
-    setPassChangeSuccess(true);
-    setCurrentPassInput('');
-    setNewPassInput('');
-    setConfirmPassInput('');
-    showToast('Your password has been updated successfully!', 'success');
-    setTimeout(() => setPassChangeSuccess(false), 3000);
   };
 
   const myReferralCode = currentBusiness?.referralCode || `SF-${(currentBusiness?.name || 'SERVICE').substring(0, 4).toUpperCase()}10`;
@@ -2289,7 +2316,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
           )}
 
           <form onSubmit={handlePasswordChange} className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-            {currentUser?.password && (
+            {!currentUser?.isDemoSandbox && (
               <div>
                 <label className="font-semibold block mb-1">Current Password *</label>
                 <input
@@ -2304,13 +2331,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
             )}
 
             <div>
-              <label className="font-semibold block mb-1">New Password *</label>
+              <label className="font-semibold block mb-1">New Password (Min 6 chars) *</label>
               <input
                 type="password"
                 required
+                minLength={6}
                 value={newPassInput}
                 onChange={(e) => setNewPassInput(e.target.value)}
-                placeholder="Min 4 chars"
+                placeholder="Min 6 chars"
                 className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 dark:border-slate-700 font-medium"
               />
             </div>
@@ -2320,6 +2348,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
               <input
                 type="password"
                 required
+                minLength={6}
                 value={confirmPassInput}
                 onChange={(e) => setConfirmPassInput(e.target.value)}
                 placeholder="Repeat new password"
@@ -2330,9 +2359,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
             <div className="sm:col-span-3 flex justify-end pt-2">
               <button
                 type="submit"
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md flex items-center gap-2 cursor-pointer"
+                disabled={isUpdatingPassword}
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-60"
               >
-                <KeyRound className="w-4 h-4" /> Update Password
+                <KeyRound className="w-4 h-4" /> {isUpdatingPassword ? 'Updating...' : 'Update Password'}
               </button>
             </div>
           </form>

@@ -44,6 +44,8 @@ try {
   }
 }
 
+export const firebaseApp = app;
+export { firebaseConfig };
 export const db = dbInstance;
 export const auth = getAuth(app);
 

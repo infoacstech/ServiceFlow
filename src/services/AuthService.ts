@@ -1,4 +1,8 @@
+import { initializeApp, getApps } from 'firebase/app';
 import {
+  getAuth,
+  setPersistence,
+  inMemoryPersistence,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
@@ -18,7 +22,7 @@ import {
   getDocs,
   serverTimestamp,
 } from 'firebase/firestore';
-import { auth, db, cleanFirestoreData } from '../lib/firebase';
+import { auth, db, cleanFirestoreData, firebaseConfig } from '../lib/firebase';
 import { User, Business, UserRole, ServiceCategory, Service } from '../types';
 
 export interface TenantMembership {
@@ -311,6 +315,40 @@ export class AuthService {
   }
 
   /**
+   * Provision a Firebase Auth account using an isolated secondary app instance
+   * so the currently logged-in administrator/owner session is never signed out.
+   */
+  static async provisionFirebaseAccount(email: string, password: string): Promise<string | null> {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = password.trim();
+    if (!cleanEmail || cleanPass.length < 6) return null;
+
+    const secondaryApp =
+      getApps().find((a) => a.name === 'StaffProvisioner') ||
+      initializeApp(firebaseConfig, 'StaffProvisioner');
+    const secondaryAuth = getAuth(secondaryApp);
+    await setPersistence(secondaryAuth, inMemoryPersistence).catch(() => {});
+
+    try {
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, cleanEmail, cleanPass);
+      return cred.user.uid;
+    } catch (err: any) {
+      if (err?.code === 'auth/email-already-in-use') {
+        try {
+          const signInCred = await signInWithEmailAndPassword(secondaryAuth, cleanEmail, cleanPass);
+          return signInCred.user.uid;
+        } catch {
+          return null;
+        }
+      }
+      console.warn('Secondary auth provisioning notice:', err);
+      return null;
+    } finally {
+      await signOut(secondaryAuth).catch(() => {});
+    }
+  }
+
+  /**
    * Create or Invite a new Staff Member by Business Owner / Admin
    * Scopes the staff member strictly to the owner's Business Tenant.
    */
@@ -322,6 +360,10 @@ export class AuthService {
     const phone = params.phone.trim();
     const name = params.name.trim();
     const tempPassword = params.password?.trim() || 'ServiFlow@123';
+    if (tempPassword.length < 6) {
+      throw new Error('Staff password must be at least 6 characters long.');
+    }
+
     const nowIso = new Date().toISOString();
     const today = nowIso.split('T')[0];
 
@@ -334,7 +376,46 @@ export class AuthService {
     // Strict validation: Reject if staff email or phone matches owner or any active existing account
     await AuthService.validateStaffUniqueness(params.businessId, email, phone);
 
-    const uid = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    // Provision a real Firebase Auth user via an isolated secondary app instance
+    // so the currently logged-in Business Owner session is never interrupted.
+    const secondaryApp =
+      getApps().find((a) => a.name === 'StaffProvisioner') ||
+      initializeApp(firebaseConfig, 'StaffProvisioner');
+    const secondaryAuth = getAuth(secondaryApp);
+    await setPersistence(secondaryAuth, inMemoryPersistence).catch(() => {});
+
+    let uid = '';
+    try {
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, email, tempPassword);
+      uid = cred.user.uid;
+    } catch (authErr: any) {
+      if (authErr?.code === 'auth/email-already-in-use') {
+        const existingSnap = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
+        const hasActiveUser = existingSnap.docs.some((d) => {
+          const existing = d.data() as User;
+          return existing.status !== 'inactive' && existing.approvalStatus !== 'rejected';
+        });
+        if (hasActiveUser) {
+          throw new Error(`Email address (${email}) is already registered with an active account.`);
+        }
+        try {
+          const signInCred = await signInWithEmailAndPassword(secondaryAuth, email, tempPassword);
+          uid = signInCred.user.uid;
+        } catch {
+          throw new Error(
+            `Email address (${email}) already has an existing login. Use another email address or reset its password from the login screen.`
+          );
+        }
+      } else if (authErr?.code === 'auth/weak-password') {
+        throw new Error('Staff password must be at least 6 characters long.');
+      } else if (authErr?.code === 'auth/invalid-email') {
+        throw new Error('Please enter a valid email address for the staff member.');
+      } else {
+        throw authErr;
+      }
+    } finally {
+      await signOut(secondaryAuth).catch(() => {});
+    }
 
     const user: User = {
       id: uid,
@@ -348,7 +429,6 @@ export class AuthService {
       skills: params.skills && params.skills.length > 0 ? params.skills : ['General Field Service'],
       joiningDate: today,
       requestedDate: today,
-      password: tempPassword,
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
     };
 

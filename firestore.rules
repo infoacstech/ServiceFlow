@@ -284,13 +284,30 @@ service cloud.firestore {
       allow update, delete: if isSuperAdmin();
     }
 
+    match /roles/{roleId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
     match /manualSyncLogs/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.businessId != null && isTenantMember(resource.data.businessId))
+      );
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.businessId != null && isTenantMember(request.resource.data.businessId))
+      );
+      allow update, delete: if isSuperAdmin();
     }
 
     // System Settings & Support Sessions
     match /supportSessions/{sessionId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.targetBusinessId != null && isTenantOwner(resource.data.targetBusinessId))
+      );
+      allow create, update, delete: if isSuperAdmin();
     }
 
     match /systemSettings/{settingId} {
@@ -299,8 +316,14 @@ service cloud.firestore {
     }
 
     match /securityAuditLogs/{logId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.targetBusinessId != null && isTenantOwner(resource.data.targetBusinessId))
+      );
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.targetBusinessId != null && isTenantMember(request.resource.data.targetBusinessId))
+      );
       allow update, delete: if false; // Immutable audit trail
     }
 
@@ -360,16 +383,41 @@ service cloud.firestore {
 
     // Referral System Collections
     match /referrals/{referralId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.referrerBusinessId != null && isTenantMember(resource.data.referrerBusinessId)) ||
+        (resource.data.referredBusinessId != null && isTenantMember(resource.data.referredBusinessId))
+      );
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.referredBusinessId != null && isTenantMember(request.resource.data.referredBusinessId))
+      );
+      allow update, delete: if isSuperAdmin();
     }
 
     match /referralPayouts/{payoutId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.businessId != null && isTenantMember(resource.data.businessId))
+      );
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.businessId != null && isTenantOwner(request.resource.data.businessId))
+      );
+      allow update, delete: if isSuperAdmin();
     }
 
     // Subscription Billing & UTR Payments
     match /subscriptionPayments/{paymentId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.businessId != null && isTenantMember(resource.data.businessId))
+      );
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (request.resource.data.businessId != null && isTenantOwner(request.resource.data.businessId))
+      );
+      allow update, delete: if isSuperAdmin();
     }
   }
 }

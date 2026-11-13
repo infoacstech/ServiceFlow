@@ -54,6 +54,7 @@ export const ContractsView: React.FC = () => {
     deleteContract,
     scheduleAmcVisit,
     batchScheduleDueAmcVisits,
+    checkTrialExpiredGuard,
   } = useApp();
 
   const [search, setSearch] = useState('');
@@ -213,6 +214,7 @@ export const ContractsView: React.FC = () => {
 
   // Open Batch Scheduler Modal
   const openBatchScheduler = () => {
+    if (checkTrialExpiredGuard('Scheduling AMC maintenance visits')) return;
     const ids = dueContracts.map((c) => c.id);
     setSelectedBatchContractIds(ids);
 
@@ -283,6 +285,7 @@ export const ContractsView: React.FC = () => {
 
   // Reset & Open New Contract Modal
   const openNewContractModal = () => {
+    if (checkTrialExpiredGuard('Setting up AMC service contracts')) return;
     setEditingContract(null);
     setFormName('');
     setFormCustomerId(customers[0]?.id || '');

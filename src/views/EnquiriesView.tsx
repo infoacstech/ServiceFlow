@@ -45,7 +45,7 @@ interface EnquiriesViewProps {
 }
 
 export const EnquiriesView: React.FC<EnquiriesViewProps> = ({ onNavigate }) => {
-  const { enquiries, customers, services } = useApp();
+  const { enquiries, customers, services, checkTrialExpiredGuard } = useApp();
 
   // Search & Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -117,6 +117,7 @@ export const EnquiriesView: React.FC<EnquiriesViewProps> = ({ onNavigate }) => {
   const lostCount = enquiries.filter((e) => e.status === 'lost').length;
 
   const handleOpenAdd = () => {
+    if (checkTrialExpiredGuard('Adding new customer enquiries')) return;
     setEnquiryToEdit(null);
     setIsFormModalOpen(true);
   };

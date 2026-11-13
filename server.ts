@@ -4,8 +4,38 @@ import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import fs from "fs";
 
 dotenv.config();
+
+let firebaseApiKey = "";
+try {
+  const cfgPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(cfgPath)) {
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+    firebaseApiKey = cfg.apiKey || "";
+  }
+} catch {}
+
+async function verifyFirebaseBearerToken(authHeader?: string): Promise<boolean> {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) return false;
+  const idToken = authHeader.slice(7).trim();
+  if (!idToken) return false;
+  if (!firebaseApiKey) return true;
+  try {
+    const verifyRes = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(firebaseApiKey)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      }
+    );
+    return verifyRes.ok;
+  } catch {
+    return false;
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,9 +73,21 @@ async function startServer() {
   // Gemini AI Assistant Endpoint
   app.post("/api/ai/assistant", async (req, res) => {
     try {
-      const { prompt, businessContext } = req.body;
+      const { prompt, businessContext, isDemoSandbox } = req.body;
       if (!prompt) {
         return res.status(400).json({ error: "Prompt is required" });
+      }
+
+      const isAuthorized = await verifyFirebaseBearerToken(req.headers.authorization);
+      if (!isAuthorized) {
+        if (isDemoSandbox) {
+          const ctx = businessContext || {};
+          return res.json({
+            response: `Demo Sandbox Snapshot for ${ctx.businessName || "Your Business"}:\n- Active Jobs: ${ctx.totalJobsCount ?? 0} (${ctx.pendingJobsCount ?? 0} pending)\n- Unpaid Invoices: ${ctx.unpaidInvoicesCount ?? 0} of ${ctx.totalInvoicesCount ?? 0}\n- Low Stock Parts: ${ctx.lowStockItemsCount ?? 0}\nSign in with a verified business account for live AI analysis.`,
+            isDemo: true,
+          });
+        }
+        return res.status(401).json({ error: "Unauthorized: Valid user session required." });
       }
 
       const client = getGeminiClient();
@@ -65,7 +107,7 @@ Business Data Context:
 ${JSON.stringify(businessContext || {}, null, 2)}`;
 
       const response = await client.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-4-hydrogen",
         contents: prompt,
         config: {
           systemInstruction,
@@ -87,9 +129,18 @@ ${JSON.stringify(businessContext || {}, null, 2)}`;
   // AI Route Optimization Endpoint
   app.post("/api/ai/optimize-route", async (req, res) => {
     try {
-      const { technician, startLocation, jobs, date } = req.body;
+      const { technician, startLocation, jobs, date, isDemoSandbox } = req.body;
       if (!jobs || !Array.isArray(jobs) || jobs.length === 0) {
         return res.status(400).json({ error: "Jobs list is required for route optimization" });
+      }
+
+      const isAuthorized = await verifyFirebaseBearerToken(req.headers.authorization);
+      if (!isAuthorized) {
+        if (isDemoSandbox) {
+          const fallback = buildHeuristicRoute(startLocation || "Central Service Operations Hub", jobs);
+          return res.json({ ...fallback, isDemo: true });
+        }
+        return res.status(401).json({ error: "Unauthorized: Valid user session required." });
       }
 
       const client = getGeminiClient();
@@ -138,7 +189,7 @@ Return ONLY a strictly valid JSON object (no markdown code blocks, no backticks,
 }`;
 
       const response = await client.models.generateContent({
-        model: "gemini-3.6-flash",
+        model: "gemini-4-hydrogen",
         contents: prompt,
         config: {
           responseMimeType: "application/json",

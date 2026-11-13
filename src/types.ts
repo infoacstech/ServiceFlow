@@ -557,6 +557,7 @@ export interface ManualSyncItemDetail {
 
 export interface ManualSyncLog {
   id: string;
+  businessId?: string;
   timestamp: string;
   technicianName: string;
   status: 'SUCCESS' | 'FAILED' | 'NO_CHANGES' | 'OFFLINE_QUEUED';

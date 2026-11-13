@@ -67,6 +67,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
     currentUser,
     showToast,
     logActivity,
+    checkTrialExpiredGuard,
     t,
   } = useApp();
 
@@ -397,7 +398,11 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
         <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
           <button
             type="button"
-            onClick={() => setIsCsvModalOpen(true)}
+            onClick={() => {
+              if (!checkTrialExpiredGuard('Importing customers via CSV')) {
+                setIsCsvModalOpen(true);
+              }
+            }}
             className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs transition-all active:scale-95 cursor-pointer shadow-2xs"
           >
             <Upload className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
@@ -405,7 +410,11 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
           </button>
           <button
             type="button"
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={() => {
+              if (!checkTrialExpiredGuard('Adding new customer profiles')) {
+                setIsAddModalOpen(true);
+              }
+            }}
             className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all shadow-xs active:scale-95 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -520,7 +529,11 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onNavigate, onOpen
             ) : (
               <button
                 type="button"
-                onClick={() => setIsAddModalOpen(true)}
+                onClick={() => {
+                  if (!checkTrialExpiredGuard('Adding new customer profiles')) {
+                    setIsAddModalOpen(true);
+                  }
+                }}
                 className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-bold text-xs shadow-xs hover:bg-indigo-700 cursor-pointer"
               >
                 + Add Customer

@@ -208,7 +208,6 @@ const MainContent: React.FC = () => {
   React.useEffect(() => {
     if (!currentUser) {
       if (!isAuthInitializing && activeTab !== 'login') {
-        console.log('[RoleRoutingDebug] Unauthenticated session. Redirecting to login screen.');
         prevUserIdRef.current = null;
         setActiveTab('login');
         navigationManager.pushScreen('login');
@@ -219,15 +218,6 @@ const MainContent: React.FC = () => {
     const isTechUser = currentUser.role === 'technician';
     const isSuperUser = checkIsSuperAdmin(currentUser);
     const isSuperTab = activeTab === 'super_admin' || activeTab.startsWith('super_admin_');
-
-    console.log('[RoleRoutingDebug] Active tab check:', {
-      userId: currentUser.id,
-      email: currentUser.email,
-      role: currentUser.role,
-      activeTab,
-      isSuperUser,
-      isSuperTab,
-    });
 
     // CRITICAL FIX: If current tab is a Super Admin tab, but user is NOT a verified super admin:
     // Fallback immediately to default screen (Dashboard for Business Owner, Jobs for Tech)
@@ -275,7 +265,6 @@ const MainContent: React.FC = () => {
         }
       }
 
-      console.log(`[RoleRoutingDebug] Setting active tab for ${currentUser.email} (${currentUser.role}): ${finalTab}`);
       setActiveTab(finalTab);
       navigationManager.pushScreen(finalTab);
       localStorage.setItem('serviflow_active_tab', finalTab);
@@ -286,13 +275,6 @@ const MainContent: React.FC = () => {
   const handleTabChange = (tab: string) => {
     let targetTab = tab;
     const isSuperUser = checkIsSuperAdmin(currentUser);
-
-    console.log('[RoleRoutingDebug] handleTabChange requested:', {
-      requestedTab: tab,
-      userRole: currentUser?.role,
-      userEmail: currentUser?.email,
-      isSuperUser,
-    });
 
     if (!isSuperUser && (targetTab === 'super_admin' || targetTab.startsWith('super_admin_'))) {
       console.warn(`[RoleRoutingDebug] Blocked non-super-admin from tab "${targetTab}". Redirecting to dashboard.`);

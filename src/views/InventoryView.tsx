@@ -12,6 +12,7 @@ export const InventoryView: React.FC = () => {
     currentBusiness,
     showToast,
     logActivity,
+    checkTrialExpiredGuard,
   } = useApp();
 
   const [search, setSearch] = useState('');
@@ -124,13 +125,21 @@ export const InventoryView: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setIsCsvModalOpen(true)}
+            onClick={() => {
+              if (!checkTrialExpiredGuard('Importing inventory items via CSV')) {
+                setIsCsvModalOpen(true);
+              }
+            }}
             className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-xs transition-all active:scale-95"
           >
             <Upload className="w-4 h-4 text-indigo-600 dark:text-indigo-400" /> Import CSV
           </button>
           <button
-            onClick={() => setIsAddItemOpen(true)}
+            onClick={() => {
+              if (!checkTrialExpiredGuard('Adding inventory stock items')) {
+                setIsAddItemOpen(true);
+              }
+            }}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-all shadow-md active:scale-95"
           >
             <Plus className="w-4 h-4" /> Add Inventory Item

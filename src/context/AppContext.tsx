@@ -957,31 +957,13 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const loaded = docSnap.data() as SystemSettings;
           setSystemSettings(loaded);
           saveCache('serviflow_system_settings_cache', loaded);
-        } else {
+        } else if (isSuperAdmin) {
           saveToFirestore('systemSettings', 'global', DEFAULT_SYSTEM_SETTINGS);
         }
       },
       (error) => handleFirestoreError(error, OperationType.GET, 'systemSettings/global')
     );
     unsubs.push(unsubSystemSettings);
-
-    // 17. Roles (System-wide definitions)
-    const unsubRoles = onSnapshot(
-      collection(db, 'roles'),
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const loadedRoles = snapshot.docs.map((d) => d.data() as Role);
-          setRoles(loadedRoles);
-          saveCache('serviflow_roles_cache', loadedRoles);
-        } else {
-          DEMO_ROLES.forEach((r) => saveToFirestore('roles', r.id, r));
-          setRoles(DEMO_ROLES);
-          saveCache('serviflow_roles_cache', DEMO_ROLES);
-        }
-      },
-      (error) => handleFirestoreError(error, OperationType.GET, 'roles')
-    );
-    unsubs.push(unsubRoles);
 
     // IF NO USER IS LOGGED IN OR NO ACTIVE TENANT RESOLVED:
     // Do NOT open listeners for private tenant collections!
@@ -991,6 +973,26 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unsubs.forEach((u) => u());
       };
     }
+
+    // 17. Roles (Authenticated users only; seed only by Super Admin)
+    const unsubRoles = onSnapshot(
+      collection(db, 'roles'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const loadedRoles = snapshot.docs.map((d) => d.data() as Role);
+          setRoles(loadedRoles);
+          saveCache('serviflow_roles_cache', loadedRoles);
+        } else {
+          if (isSuperAdmin) {
+            DEMO_ROLES.forEach((r) => saveToFirestore('roles', r.id, r));
+          }
+          setRoles(DEMO_ROLES);
+          saveCache('serviflow_roles_cache', DEMO_ROLES);
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'roles')
+    );
+    unsubs.push(unsubRoles);
 
     // Helper to query either all (Super Admin) or scoped to the active tenant
     const getTenantQuery = (colName: string) => {
@@ -1554,8 +1556,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     unsubs.push(unsubSupportSessions);
 
     // 20. Security Audit Logs
+    const securityLogsQuery = isViewingAll
+      ? collection(db, 'securityAuditLogs')
+      : query(collection(db, 'securityAuditLogs'), where('targetBusinessId', '==', activeBizId));
     const unsubSecurityLogs = onSnapshot(
-      getTenantQuery('securityAuditLogs'),
+      securityLogsQuery,
       (snapshot) => {
         const logs = snapshot.docs.map((d) => d.data() as SecurityAuditLog);
         setSecurityAuditLogs(logs);
@@ -1568,7 +1573,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 21. Referral Records
     const refQuery = isViewingAll
       ? collection(db, 'referrals')
-      : query(collection(db, 'referrals'), where('ownerId', '==', currentUser.id));
+      : query(collection(db, 'referrals'), where('referrerBusinessId', '==', activeBizId));
     const unsubReferrals = onSnapshot(
       refQuery,
       (snapshot) => {
@@ -1583,7 +1588,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 22. Referral Payout Requests
     const refPayoutQuery = isViewingAll
       ? collection(db, 'referralPayouts')
-      : query(collection(db, 'referralPayouts'), where('ownerId', '==', currentUser.id));
+      : query(collection(db, 'referralPayouts'), where('businessId', '==', activeBizId));
     const unsubReferralPayouts = onSnapshot(
       refPayoutQuery,
       (snapshot) => {
@@ -1736,13 +1741,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               userRecord.businessId = `tenant-${userRecord.id}`;
               setDoc(doc(db, 'users', userRecord.id), { businessId: userRecord.businessId }, { merge: true }).catch(() => {});
             }
-
-            console.log('[AuthDebug] onAuthStateChanged resolved user:', {
-              id: userRecord.id,
-              email: userRecord.email,
-              role: userRecord.role,
-              businessId: userRecord.businessId,
-            });
 
             setCurrentUser(userRecord);
             localStorage.setItem('serviflow_user_session', JSON.stringify(userRecord));
@@ -2085,6 +2083,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (isOff) {
       const logEntry: ManualSyncLog = {
         id: `sync-log-${Date.now()}`,
+        businessId: currentBusiness?.id,
         timestamp: nowISO,
         technicianName: currentUser?.name || 'Field Technician',
         status: 'OFFLINE_QUEUED',
@@ -2124,6 +2123,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const logEntry: ManualSyncLog = {
         id: `sync-log-${Date.now()}`,
+        businessId: currentBusiness?.id,
         timestamp: nowISO,
         technicianName: currentUser?.name || 'Field Technician',
         status: 'SUCCESS',
@@ -2143,6 +2143,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
       const logEntry: ManualSyncLog = {
         id: `sync-log-${Date.now()}`,
+        businessId: currentBusiness?.id,
         timestamp: nowISO,
         technicianName: currentUser?.name || 'Field Technician',
         status: 'NO_CHANGES',
@@ -2838,7 +2839,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const ownerEmail = cleanEmail;
     const rawPhone = ownerData?.phone || cleanMobile;
     const ownerPhone = rawPhone.startsWith('+') ? rawPhone : `+91 ${rawPhone}`;
-    const ownerPassword = ownerData?.password || '1234';
+    const ownerPassword = ownerData?.password || 'ServiFlow@123';
 
     const ownerUser: User = {
       id: existingUser ? existingUser.id : `usr-owner-${newBizId}`,
@@ -2847,12 +2848,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       phone: ownerPhone,
       role: 'business_owner',
       businessId: newBizId,
-      password: ownerPassword,
       status: isPending ? 'inactive' : 'active',
       approvalStatus: isPending ? 'pending' : 'active',
       requestedDate: new Date().toISOString().split('T')[0],
       joiningDate: new Date().toISOString().split('T')[0],
     };
+
+    if (ownerEmail && ownerPassword.length >= 6) {
+      AuthService.provisionFirebaseAccount(ownerEmail, ownerPassword).catch(() => {});
+    }
 
     const defaultCategory: ServiceCategory = {
       id: `cat-${newBizId}-1`,
@@ -5057,7 +5061,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           u.role !== 'super_admin' &&
           u.role !== 'business_owner'
       );
-      const capacity = checkStaffCapacity(activeTenantStaff.length, currentBusiness.planId || currentBusiness.plan);
+      const capacity = checkStaffCapacity(
+        activeTenantStaff.length,
+        currentBusiness.planId || currentBusiness.plan,
+        currentBusiness.addonStaff || 0
+      );
       if (!capacity.allowed) {
         showToast(
           capacity.message ||
@@ -5083,9 +5091,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         data.employeeCode ||
         generateNextEmployeeCode((users || []).filter((u) => u.businessId === currentBusiness.id));
 
+      const { password: _omittedPassword, ...sanitizedData } = data as any;
       const newStaff: User = {
         ...result.user,
-        ...data,
+        ...sanitizedData,
         employeeCode: assignedEmployeeCode,
         id: result.user.id,
         businessId: currentBusiness.id,
@@ -5257,30 +5266,38 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateUserPassword = async (userId: string, newPassword: string) => {
     const cleanPass = newPassword.trim();
-    await saveToFirestore('users', userId, { password: cleanPass });
-
-    setUsers((prev) => {
-      const updated = prev.map((u) => (u.id === userId ? { ...u, password: cleanPass } : u));
-      saveCache('serviflow_users_cache', updated);
-      return updated;
-    });
+    if (cleanPass.length < 6) {
+      throw new Error('Password must be at least 6 characters long.');
+    }
 
     if (currentUser?.id === userId) {
-      const updatedUser = { ...currentUser, password: cleanPass };
-      setCurrentUser(updatedUser);
-      localStorage.setItem('serviflow_user_session', JSON.stringify(updatedUser));
-    }
-
-    if (auth.currentUser && currentUser?.id === userId) {
+      if (currentUser.isDemoSandbox) {
+        showToast('Password updated in Demo Sandbox session.', 'info');
+        return;
+      }
+      if (!auth.currentUser) {
+        throw new Error('Active authentication session required. Please log in again.');
+      }
       try {
         await firebaseUpdatePassword(auth.currentUser, cleanPass);
-      } catch (err) {
-        console.warn('Firebase Auth update password notice:', err);
+      } catch (err: any) {
+        if (err?.code === 'auth/requires-recent-login') {
+          throw new Error('For your security, please log out and sign in again before updating your password.');
+        }
+        throw err;
       }
+      showToast('Password updated successfully!', 'success');
+      logActivity('Password Changed', 'staff', userId, 'User updated account password');
+      return;
     }
 
-    showToast('Password updated successfully!', 'success');
-    logActivity('Password Changed', 'staff', userId, 'User updated account password');
+    const targetUser = users.find((u) => u.id === userId);
+    if (!targetUser?.email) {
+      throw new Error('Unable to send password reset: user email address not found.');
+    }
+    await AuthService.sendPasswordReset(targetUser.email);
+    showToast(`Password reset email sent to ${targetUser.email}.`, 'success');
+    logActivity('Password Reset Sent', 'staff', userId, `Sent password reset email to ${targetUser.email}`);
   };
 
   const updateUserProfile = async (userId: string, updates: Partial<User>) => {
