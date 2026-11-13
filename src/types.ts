@@ -82,9 +82,10 @@ export interface Business {
 
 export interface Plan {
   id: string;
-  name: 'Starter' | 'Professional' | 'Business';
-  price: number; // Monthly price in INR
+  name: string;
+  price: number; // Annual selling price in INR (or monthly if billingCycle === 'monthly')
   yearlyPrice?: number; // Annual discounted price in INR
+  originalPrice?: number; // Optional MRP / pre-discount annual price in INR
   billingCycle: 'monthly' | 'yearly';
   maxJobs: number;
   maxStaff: number;
@@ -93,6 +94,36 @@ export interface Plan {
   popular?: boolean;
   targetAudience?: string;
   badge?: string;
+  isActive?: boolean;
+  sortOrder?: number;
+  updatedAt?: string;
+}
+
+export interface SubscriptionCoupon {
+  id: string;
+  code: string;
+  description?: string;
+  discountType: 'percentage' | 'flat';
+  discountValue: number;
+  maxDiscountAmount?: number;
+  minOrderAmount?: number;
+  applicableTo: 'all' | 'plans' | 'addons';
+  applicablePlanIds?: string[];
+  validFrom?: string;
+  validUntil?: string;
+  maxUses?: number;
+  usedCount: number;
+  isActive: boolean;
+  allowWithReferral?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CouponValidationResult {
+  valid: boolean;
+  coupon?: SubscriptionCoupon;
+  discountAmount: number;
+  error?: string;
 }
 
 export interface SubscriptionPayment {
@@ -108,6 +139,10 @@ export interface SubscriptionPayment {
   amount: number;
   discountAmount?: number;
   referralDiscountPercent?: number;
+  referralDiscountAmount?: number;
+  couponCode?: string;
+  couponId?: string;
+  couponDiscountAmount?: number;
   netPayable: number;
   utrNumber: string;
   paymentMethod: 'upi' | 'bank_transfer' | 'qr_code';

@@ -3,7 +3,7 @@ import { Plan, Business } from '../types';
 export const ANNUAL_DISCOUNT_PERCENT = 20;
 
 export interface AddonPack {
-  id: 'addon-staff-5' | 'addon-whatsapp-1000';
+  id: string;
   name: string;
   type: 'staff_pack' | 'whatsapp_pack';
   price: number;
@@ -11,6 +11,9 @@ export interface AddonPack {
   description: string;
   capacityIncrease: number;
   badge?: string;
+  isActive?: boolean;
+  sortOrder?: number;
+  updatedAt?: string;
 }
 
 export const ADDON_PACKS: AddonPack[] = [
@@ -23,6 +26,8 @@ export const ADDON_PACKS: AddonPack[] = [
     description: 'Add 5 extra technician & staff logins without upgrading to a higher plan tier',
     capacityIncrease: 5,
     badge: 'FLEXIBLE CAPACITY',
+    isActive: true,
+    sortOrder: 1,
   },
   {
     id: 'addon-whatsapp-1000',
@@ -33,6 +38,8 @@ export const ADDON_PACKS: AddonPack[] = [
     description: '1,000 automated WhatsApp message credits for job bookings, status alerts & invoice PDFs',
     capacityIncrease: 1000,
     badge: 'CUSTOMER ENGAGEMENT',
+    isActive: true,
+    sortOrder: 2,
   },
 ];
 
@@ -51,10 +58,13 @@ export const PLANS: Plan[] = [
     name: 'Starter',
     price: 2870,
     yearlyPrice: 2870,
+    originalPrice: 3588,
     billingCycle: 'yearly',
     maxStaff: 2,
     maxJobs: 100,
     maxCustomers: 500,
+    isActive: true,
+    sortOrder: 1,
     targetAudience: 'For small service businesses',
     features: [
       'Enquiries & Intake',
@@ -74,12 +84,15 @@ export const PLANS: Plan[] = [
     name: 'Professional',
     price: 5750,
     yearlyPrice: 5750,
+    originalPrice: 7188,
     billingCycle: 'yearly',
     maxStaff: 7,
     maxJobs: 500,
     maxCustomers: 2500,
     popular: true,
     badge: 'MOST POPULAR',
+    isActive: true,
+    sortOrder: 2,
     targetAudience: 'For growing service teams',
     features: [
       'Everything in Starter, plus:',
@@ -97,10 +110,13 @@ export const PLANS: Plan[] = [
     name: 'Business',
     price: 9590,
     yearlyPrice: 9590,
+    originalPrice: 11988,
     billingCycle: 'yearly',
     maxStaff: 15,
     maxJobs: 1500,
     maxCustomers: 10000,
+    isActive: true,
+    sortOrder: 3,
     targetAudience: 'For larger service operations',
     features: [
       'Everything in Professional, plus:',
@@ -117,11 +133,12 @@ export const PLANS: Plan[] = [
 /**
  * Get plan configuration by plan ID or name, with safe fallback to Starter
  */
-export function getPlanById(planIdOrName?: string): Plan {
-  if (!planIdOrName) return PLANS[0];
-  
+export function getPlanById(planIdOrName?: string, customPlans?: Plan[]): Plan {
+  const sourcePlans = customPlans && customPlans.length > 0 ? customPlans : PLANS;
+  if (!planIdOrName) return sourcePlans[0] || PLANS[0];
+
   const normalized = planIdOrName.toLowerCase();
-  const match = PLANS.find(
+  const match = sourcePlans.find(
     (p) =>
       p.id.toLowerCase() === normalized ||
       p.name.toLowerCase() === normalized ||
@@ -130,32 +147,45 @@ export function getPlanById(planIdOrName?: string): Plan {
       ((normalized.includes('biz') || normalized.includes('business') || normalized.includes('enterprise')) && p.id === 'plan-biz')
   );
 
-  return match || PLANS[0];
+  return match || sourcePlans[0] || PLANS[0];
 }
 
 /**
- * Calculate annual pricing breakdown with standard 20% discount
+ * Calculate annual pricing breakdown with customizable originalPrice or standard 20% discount
  */
-export function calculateAnnualPricing(priceOrMonthly: number) {
+export function calculateAnnualPricing(
+  priceOrMonthly: number,
+  explicitOriginalAnnual?: number,
+  billingCycle?: 'monthly' | 'yearly'
+) {
   let discountedAnnual: number;
   let originalAnnual: number;
 
-  if (priceOrMonthly <= 1200) {
-    // Legacy monthly input (e.g. 299, 599, 999)
-    originalAnnual = priceOrMonthly * 12;
-    discountedAnnual = Math.round(originalAnnual * (1 - ANNUAL_DISCOUNT_PERCENT / 100));
+  if (billingCycle === 'yearly' || explicitOriginalAnnual !== undefined || priceOrMonthly > 1200) {
+    discountedAnnual = Math.max(0, Math.round(priceOrMonthly));
+    if (explicitOriginalAnnual !== undefined && explicitOriginalAnnual > discountedAnnual) {
+      originalAnnual = Math.round(explicitOriginalAnnual);
+    } else if (explicitOriginalAnnual !== undefined && explicitOriginalAnnual <= discountedAnnual) {
+      originalAnnual = discountedAnnual;
+    } else {
+      originalAnnual = Math.round(discountedAnnual / (1 - ANNUAL_DISCOUNT_PERCENT / 100));
+    }
   } else {
-    // Direct yearly price (e.g. 2870, 5750, 9590)
-    discountedAnnual = priceOrMonthly;
-    originalAnnual = Math.round(discountedAnnual / (1 - ANNUAL_DISCOUNT_PERCENT / 100));
+    // Legacy monthly input (e.g. 299, 599, 999)
+    originalAnnual = Math.round(priceOrMonthly * 12);
+    discountedAnnual = Math.round(originalAnnual * (1 - ANNUAL_DISCOUNT_PERCENT / 100));
   }
 
-  const savings = originalAnnual - discountedAnnual;
+  const savings = Math.max(0, originalAnnual - discountedAnnual);
+  const discountPercent =
+    originalAnnual > 0 && savings > 0 ? Math.round((savings / originalAnnual) * 100) : 0;
+
   return {
     originalAnnual,
     discountedAnnual,
     savings,
-    discountPercent: ANNUAL_DISCOUNT_PERCENT,
+    discountPercent,
+    monthlyEquivalent: Math.round(discountedAnnual / 12),
   };
 }
 
@@ -172,12 +202,23 @@ export type FeatureKey =
 /**
  * Check if a specific feature is unlocked on the tenant's current plan
  */
-export function isFeatureAllowed(feature: FeatureKey, planIdOrName?: string): boolean {
-  const plan = getPlanById(planIdOrName);
-  if (plan.id === 'plan-biz') return true;
-  if (plan.id === 'plan-pro') {
+export function isFeatureAllowed(
+  feature: FeatureKey,
+  planIdOrName?: string,
+  customPlans?: Plan[]
+): boolean {
+  const plan = getPlanById(planIdOrName, customPlans);
+  const lowerId = plan.id.toLowerCase();
+  const lowerName = plan.name.toLowerCase();
+  if (lowerId === 'plan-biz' || lowerName.includes('business') || lowerName.includes('enterprise')) {
+    return true;
+  }
+  if (lowerId === 'plan-pro' || lowerName.includes('pro')) {
     return feature !== 'audit_export';
   }
+  // Custom tier with high quotas unlocks pro features cleanly
+  if (plan.maxStaff >= 15 || plan.maxJobs >= 1500) return true;
+  if (plan.maxStaff >= 7 || plan.maxJobs >= 500) return feature !== 'audit_export';
   // Starter tier features allowed:
   return feature === 'customer_portal';
 }
@@ -284,9 +325,10 @@ export function getTrialStatus(business?: Business | null): {
 export function checkStaffCapacity(
   currentStaffCount: number,
   planIdOrName?: string,
-  addonStaff = 0
+  addonStaff = 0,
+  customPlans?: Plan[]
 ) {
-  const plan = getPlanById(planIdOrName);
+  const plan = getPlanById(planIdOrName, customPlans);
   const totalMaxStaff = plan.maxStaff + (addonStaff || 0);
   const isAllowed = currentStaffCount < totalMaxStaff;
   return {
@@ -305,8 +347,12 @@ export function checkStaffCapacity(
 /**
  * Check if creating a new job exceeds the monthly plan quota
  */
-export function checkMonthlyJobCapacity(currentMonthlyJobs: number, planIdOrName?: string) {
-  const plan = getPlanById(planIdOrName);
+export function checkMonthlyJobCapacity(
+  currentMonthlyJobs: number,
+  planIdOrName?: string,
+  customPlans?: Plan[]
+) {
+  const plan = getPlanById(planIdOrName, customPlans);
   const isAllowed = currentMonthlyJobs < plan.maxJobs;
   return {
     allowed: isAllowed,

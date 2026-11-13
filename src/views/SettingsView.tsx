@@ -69,7 +69,7 @@ import {
 import { InstallAppModal } from '../components/InstallAppModal';
 import { SubscriptionCheckoutModal } from '../components/SubscriptionCheckoutModal';
 import { SubscriptionReceiptModal } from '../components/SubscriptionReceiptModal';
-import { calculateAnnualPricing, ADDON_PACKS, AddonPack } from '../utils/planUtils';
+import { calculateAnnualPricing, AddonPack } from '../utils/planUtils';
 import { Plan, SubscriptionPayment } from '../types';
 import { clearAppCache } from '../utils/cacheUtils';
 import {
@@ -103,6 +103,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
     currentBusiness,
     updateBusinessProfile,
     plans,
+    addonPacks,
     theme,
     toggleTheme,
     isOffline,
@@ -220,8 +221,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
 
   // Subscription Pricing Billing Cycle (Enforce Yearly)
   const billingCycle = 'yearly';
-  const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
-  const [isUpgradingPlan, setIsUpgradingPlan] = useState(false);
+  const [isUpgradingPlan, _setIsUpgradingPlan] = useState(false);
 
   // Reset Workspace Modal / Action State
   const [isResetTenantModalOpen, setIsResetTenantModalOpen] = useState(false);
@@ -541,36 +541,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
 
   const filteredLogs = syncLogLimit === 'all' ? allFilteredLogs : allFilteredLogs.slice(0, syncLogLimit);
   const lastSyncLog = manualSyncLogs[0];
-
-  const ADDONS = [
-    {
-      id: 'addon-extra-tech',
-      name: 'Extra Technician Seat',
-      price: 1490,
-      unit: '/tech/year',
-      desc: 'Add 1 additional field technician beyond your current plan quota',
-    },
-    {
-      id: 'addon-whatsapp-pack',
-      name: '1,000 WhatsApp / SMS Pack',
-      price: 499,
-      unit: 'one-time',
-      desc: 'Automated invoice, job assignment & dispatch notifications sent to customer WhatsApp',
-    },
-    {
-      id: 'addon-white-label',
-      name: 'Custom White-Label App Setup',
-      price: 9999,
-      unit: 'one-time',
-      desc: 'Custom business branding, dedicated domain & branded app icon installer packages',
-    },
-  ];
-
-  const toggleAddon = (addonId: string) => {
-    setSelectedAddons((prev) =>
-      prev.includes(addonId) ? prev.filter((id) => id !== addonId) : [...prev, addonId]
-    );
-  };
 
   const tabs = isSuperAdmin
     ? [
@@ -1209,9 +1179,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
-              <div className="text-right">
+              <div className="text-right tabular-nums">
                 <div className="text-xs text-indigo-200">Current Plan Rate</div>
-                <div className="text-xl font-black text-white">₹{currentPlan.price}/mo</div>
+                <div className="text-xl font-black text-white">
+                  ₹{calculateAnnualPricing(currentPlan.price, currentPlan.originalPrice, currentPlan.billingCycle).discountedAnnual.toLocaleString('en-IN')}/yr
+                </div>
               </div>
             </div>
           </div>
@@ -1229,146 +1201,160 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
 
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-extrabold shadow-xs">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Annual Plans (20% Savings Included)</span>
+              <span>Annual Plans • Promo Coupons Supported at Checkout</span>
             </div>
           </div>
 
-          {/* 3-Tier SaaS Pricing Cards */}
+          {/* Dynamic SaaS Pricing Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
-            {plans.map((plan) => {
-              const isCurrent =
-                currentBusiness.planId === plan.id ||
-                currentBusiness.plan?.toLowerCase() === plan.name.toLowerCase();
-              const isPro = plan.id === 'plan-pro';
-              const annualInfo = calculateAnnualPricing(plan.price);
+            {plans
+              .filter((p) => p.isActive !== false)
+              .map((plan) => {
+                const isCurrent =
+                  currentBusiness.subscriptionStatus === 'active' &&
+                  (currentBusiness.planId === plan.id ||
+                    currentBusiness.plan?.toLowerCase() === plan.name.toLowerCase());
+                const isPro = Boolean(plan.popular || plan.id === 'plan-pro');
+                const annualInfo = calculateAnnualPricing(plan.price, plan.originalPrice, plan.billingCycle);
 
-              return (
-                <div
-                  key={plan.id}
-                  className={`rounded-3xl border-2 transition-all relative flex flex-col p-5 sm:p-6 ${
-                    isPro
-                      ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-xl shadow-indigo-600/10'
-                      : isCurrent
-                      ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/10'
-                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
-                  }`}
-                >
-                  {isPro && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1 bg-indigo-600 text-white shadow-indigo-600/40">
-                      <Flame className="w-3 h-3 text-amber-300" />
-                      <span>MOST POPULAR</span>
-                    </div>
-                  )}
-
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-black text-slate-900 dark:text-white">
-                        {plan.name}
-                      </h3>
-                      {isCurrent && (
-                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-extrabold uppercase">
-                          CURRENT PLAN
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">
-                      {plan.targetAudience}
-                    </p>
-                  </div>
-
-                  <div className="mb-4 pb-4 border-b border-slate-200 dark:border-slate-800">
-                    <div>
-                      <div className="flex items-baseline gap-1.5 flex-wrap">
-                        <span className="text-xs font-bold text-slate-400">₹</span>
-                        <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                          {annualInfo.discountedAnnual.toLocaleString('en-IN')}
-                        </span>
-                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                          / year
-                        </span>
-                        <span className="text-xs line-through text-slate-400 font-medium ml-1">
-                          ₹{annualInfo.originalAnnual.toLocaleString('en-IN')}
-                        </span>
+                return (
+                  <div
+                    key={plan.id}
+                    className={`rounded-3xl border-2 transition-all relative flex flex-col p-5 sm:p-6 ${
+                      isPro
+                        ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20 shadow-xl shadow-indigo-600/10'
+                        : isCurrent
+                        ? 'border-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/10'
+                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
+                    }`}
+                  >
+                    {isPro && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1 bg-indigo-600 text-white shadow-indigo-600/40">
+                        <Flame className="w-3 h-3 text-amber-300" />
+                        <span>{plan.badge || 'MOST POPULAR'}</span>
                       </div>
-                      <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
-                        <span>Billed annually (Save 20% • ₹{annualInfo.savings.toLocaleString('en-IN')})</span>
-                      </div>
-                    </div>
-                  </div>
+                    )}
 
-                  {/* Quota Highlights */}
-                  <div className="grid grid-cols-2 gap-2 mb-4">
-                    <div className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800/70 text-center">
-                      <div className="text-[10px] text-slate-500 font-semibold">Staff Limit</div>
-                      <div className="text-xs font-extrabold text-slate-900 dark:text-slate-100">
-                        Up to {plan.maxStaff} Techs
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                          {plan.name}
+                        </h3>
+                        {isCurrent && (
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-extrabold uppercase">
+                            CURRENT PLAN
+                          </span>
+                        )}
                       </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">
+                        {plan.targetAudience}
+                      </p>
                     </div>
-                    <div className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800/70 text-center">
-                      <div className="text-[10px] text-slate-500 font-semibold">Jobs / Month</div>
-                      <div className="text-xs font-extrabold text-slate-900 dark:text-slate-100">
-                        Up to {plan.maxJobs.toLocaleString('en-IN')} Jobs
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Feature Checklist */}
-                  <div className="space-y-2 flex-1 mb-6 text-xs text-slate-700 dark:text-slate-300">
-                    <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
-                      Core Features:
-                    </div>
-                    {plan.features.map((feat, idx) => {
-                      const isHeader = feat.startsWith('Everything in');
-                      return (
-                        <div
-                          key={idx}
-                          className={`flex items-start gap-2 ${
-                            isHeader
-                              ? 'font-bold text-indigo-700 dark:text-indigo-300 pb-0.5'
-                              : ''
-                          }`}
-                        >
-                          {!isHeader && (
-                            <div className="p-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0">
-                              <Check className="w-3 h-3" />
-                            </div>
+                    <div className="mb-4 pb-4 border-b border-slate-200 dark:border-slate-800 tabular-nums">
+                      <div>
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-slate-400">₹</span>
+                          <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                            {annualInfo.discountedAnnual.toLocaleString('en-IN')}
+                          </span>
+                          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                            / year
+                          </span>
+                          {annualInfo.savings > 0 && (
+                            <span className="text-xs line-through text-slate-400 font-medium ml-1">
+                              ₹{annualInfo.originalAnnual.toLocaleString('en-IN')}
+                            </span>
                           )}
-                          <span className="leading-snug text-[11px]">{feat}</span>
                         </div>
-                      );
-                    })}
-                  </div>
+                        {annualInfo.savings > 0 ? (
+                          <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                            <span>
+                              Billed annually (Save {annualInfo.discountPercent}% • ₹
+                              {annualInfo.savings.toLocaleString('en-IN')})
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1">
+                            ~₹{annualInfo.monthlyEquivalent.toLocaleString('en-IN')}/month billed annually
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-                  {isCurrent ? (
-                    <button
-                      type="button"
-                      disabled
-                      className="w-full py-2.5 px-4 rounded-2xl font-extrabold text-xs bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center gap-2 cursor-default"
-                    >
-                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                      <span>Current Plan</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handlePlanUpgrade(plan)}
-                      disabled={isUpgradingPlan}
-                      className={`w-full py-2.5 px-4 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm ${
-                        isPro
-                          ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/30'
-                          : 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900'
-                      }`}
-                    >
-                      <span>Choose {plan.name}</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+                    {/* Quota Highlights */}
+                    <div className="grid grid-cols-2 gap-2 mb-4 tabular-nums">
+                      <div className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800/70 text-center">
+                        <div className="text-[10px] text-slate-500 font-semibold">Staff Limit</div>
+                        <div className="text-xs font-extrabold text-slate-900 dark:text-slate-100">
+                          Up to {plan.maxStaff} Techs
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800/70 text-center">
+                        <div className="text-[10px] text-slate-500 font-semibold">Jobs / Month</div>
+                        <div className="text-xs font-extrabold text-slate-900 dark:text-slate-100">
+                          Up to {plan.maxJobs.toLocaleString('en-IN')} Jobs
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Feature Checklist */}
+                    <div className="space-y-2 flex-1 mb-6 text-xs text-slate-700 dark:text-slate-300">
+                      <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                        Core Features:
+                      </div>
+                      {plan.features.map((feat, idx) => {
+                        const isHeader = feat.startsWith('Everything in');
+                        return (
+                          <div
+                            key={idx}
+                            className={`flex items-start gap-2 ${
+                              isHeader
+                                ? 'font-bold text-indigo-700 dark:text-indigo-300 pb-0.5'
+                                : ''
+                            }`}
+                          >
+                            {!isHeader && (
+                              <div className="p-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0">
+                                <Check className="w-3 h-3" />
+                              </div>
+                            )}
+                            <span className="leading-snug text-[11px]">{feat}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {isCurrent ? (
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full py-2.5 px-4 rounded-2xl font-extrabold text-xs bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center gap-2 cursor-default"
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                        <span>Current Plan</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handlePlanUpgrade(plan)}
+                        disabled={isUpgradingPlan}
+                        className={`w-full py-2.5 px-4 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm ${
+                          isPro
+                            ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/30'
+                            : 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900'
+                        }`}
+                      >
+                        <span>Choose {plan.name}</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
           </div>
 
-          {/* Add-ons Section */}
+          {/* Add-ons Section (Live Super Admin Editable Packs) */}
           <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
             <div>
               <h4 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
@@ -1380,39 +1366,46 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {ADDONS.map((addon) => {
-                const isSelected = selectedAddons.includes(addon.id);
-                return (
-                  <div
-                    key={addon.id}
-                    onClick={() => toggleAddon(addon.id)}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
-                      isSelected
-                        ? 'border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/30'
-                        : 'border-slate-200 dark:border-slate-750 bg-slate-50/50 dark:bg-slate-800/40'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between font-bold text-xs text-slate-900 dark:text-slate-100 mb-1">
-                        <span>{addon.name}</span>
-                        <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">
-                          ₹{addon.price.toLocaleString('en-IN')} <span className="text-[10px] text-slate-400 font-normal">{addon.unit}</span>
-                        </span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {addonPacks
+                .filter((a) => a.isActive !== false)
+                .map((addon) => {
+                  const addonPrice = addon.yearlyPrice ?? addon.price;
+                  return (
+                    <div
+                      key={addon.id}
+                      className="p-4 rounded-2xl border border-slate-200 dark:border-slate-750 bg-slate-50/50 dark:bg-slate-800/40 flex flex-col justify-between gap-3"
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2 font-bold text-xs text-slate-900 dark:text-slate-100 mb-1">
+                          <span>{addon.name}</span>
+                          <span className="text-indigo-600 dark:text-indigo-400 font-extrabold tabular-nums shrink-0">
+                            ₹{addonPrice.toLocaleString('en-IN')}{' '}
+                            <span className="text-[10px] text-slate-400 font-normal">/year</span>
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                          {addon.description}
+                        </p>
                       </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-                        {addon.desc}
-                      </p>
-                    </div>
 
-                    <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between text-[11px] font-semibold">
-                      <span className={isSelected ? 'text-indigo-600 dark:text-indigo-300 font-bold' : 'text-slate-400'}>
-                        {isSelected ? '✓ Pack Selected' : '+ Add Pack'}
-                      </span>
+                      <div className="pt-2.5 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                          +{addon.capacityIncrease.toLocaleString('en-IN')}{' '}
+                          {addon.type === 'staff_pack' ? 'Staff Logins' : 'WhatsApp Credits'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleBuyAddon(addon)}
+                          className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                        >
+                          <span>Buy Pack</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </div>
 
@@ -1479,13 +1472,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
                               {p.utrNumber}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-right">
+                          <td className="py-3 px-4 text-right tabular-nums">
                             <div className="font-black text-slate-900 dark:text-white">
                               ₹{(p.netPayable !== undefined ? p.netPayable : p.amount).toLocaleString('en-IN')}
                             </div>
                             {p.discountAmount ? (
                               <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                                -₹{p.discountAmount} off
+                                -₹{p.discountAmount.toLocaleString('en-IN')} off
+                                {p.couponCode ? ` (${p.couponCode})` : ''}
                               </div>
                             ) : null}
                           </td>

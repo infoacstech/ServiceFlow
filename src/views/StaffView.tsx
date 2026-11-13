@@ -31,7 +31,7 @@ import {
 import { openWhatsApp } from '../utils/whatsappHelper';
 
 export const StaffView: React.FC = () => {
-  const { users, staff, jobs, currentBusiness, currentUser, roles, addStaff, deleteStaff, updateUserStatus, showToast, checkTrialExpiredGuard } = useApp();
+  const { users, staff, jobs, plans, currentBusiness, currentUser, roles, addStaff, deleteStaff, updateUserStatus, showToast, checkTrialExpiredGuard } = useApp();
   const [activeTab, setActiveTab] = useState<'calendar' | 'directory'>('calendar');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [deletingStaffUser, setDeletingStaffUser] = useState<User | null>(null);
@@ -105,7 +105,7 @@ export const StaffView: React.FC = () => {
     (u) => (u.status === 'active' || !u.status) && u.role !== 'super_admin' && u.role !== 'business_owner'
   ).length;
 
-  const capacity = checkStaffCapacity(activeStaffCount, currentBusiness.planId || currentBusiness.plan, currentBusiness.addonStaff || 0);
+  const capacity = checkStaffCapacity(activeStaffCount, currentBusiness.planId || currentBusiness.plan, currentBusiness.addonStaff || 0, plans);
 
   const pendingApprovals = businessUsers.filter((u) => u.approvalStatus === 'pending');
   const isOwnerOrAdmin = currentUser?.role === 'business_owner' || currentUser?.role === 'super_admin';

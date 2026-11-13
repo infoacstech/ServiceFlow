@@ -13,9 +13,10 @@ import {
   Users,
   Briefcase,
 } from 'lucide-react';
-import { Plan } from '../types';
-import { calculateAnnualPricing, PLANS } from '../utils/planUtils';
-import { playCustomVoiceNotification, playNotificationChime } from '../utils/audioNotification';
+import { Plan, SubscriptionPayment } from '../types';
+import { calculateAnnualPricing } from '../utils/planUtils';
+import { SubscriptionCheckoutModal } from './SubscriptionCheckoutModal';
+import { SubscriptionReceiptModal } from './SubscriptionReceiptModal';
 
 interface PricingModalProps {
   isOpen: boolean;
@@ -28,33 +29,18 @@ export const PricingModal: React.FC<PricingModalProps> = ({
   onClose,
   onPlanSelected,
 }) => {
-  const { currentBusiness, updateBusinessProfile, showToast } = useApp();
-  const billingCycle = 'yearly';
-  const [isUpgrading, setIsUpgrading] = useState(false);
+  const { currentBusiness, plans } = useApp();
+  const [checkoutPlan, setCheckoutPlan] = useState<Plan | null>(null);
+  const [receiptPayment, setReceiptPayment] = useState<SubscriptionPayment | null>(null);
 
   if (!isOpen) return null;
 
   const currentPlanId = currentBusiness?.planId || 'plan-starter';
+  const activePlans = (plans || []).filter((p) => p.isActive !== false);
 
   const handleSelectPlan = (plan: Plan) => {
-    if (plan.id === currentPlanId) return;
-
-    setIsUpgrading(true);
-    setTimeout(() => {
-      updateBusinessProfile({
-        planId: plan.id,
-        plan: plan.name,
-      });
-      setIsUpgrading(false);
-      playNotificationChime();
-      playCustomVoiceNotification(`Plan updated to ${plan.name} successfully.`);
-      showToast(
-        `Subscription upgraded to ${plan.name} Plan (Annual)!`,
-        'success'
-      );
-      if (onPlanSelected) onPlanSelected(plan.id);
-      onClose();
-    }, 500);
+    if (plan.id === currentPlanId && currentBusiness?.subscriptionStatus === 'active') return;
+    setCheckoutPlan(plan);
   };
 
   return (
@@ -83,11 +69,10 @@ export const PricingModal: React.FC<PricingModalProps> = ({
             </p>
           </div>
 
-          {/* Annual Billing Guarantee Banner */}
           <div className="mt-4 flex items-center justify-center sm:justify-start">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold shadow-xs">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>ANNUAL BILLING • 20% DISCOUNT APPLIED TO ALL PLANS</span>
+              <span>ANNUAL BILLING • PROMO COUPONS SUPPORTED AT CHECKOUT</span>
             </div>
           </div>
         </div>
@@ -95,12 +80,13 @@ export const PricingModal: React.FC<PricingModalProps> = ({
         {/* Plan Cards Container */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 items-stretch">
-            {PLANS.map((plan) => {
+            {activePlans.map((plan) => {
               const isCurrent =
-                currentPlanId === plan.id ||
-                currentBusiness?.plan?.toLowerCase() === plan.name.toLowerCase();
-              const isPro = plan.id === 'plan-pro';
-              const annualInfo = calculateAnnualPricing(plan.price);
+                currentBusiness?.subscriptionStatus === 'active' &&
+                (currentPlanId === plan.id ||
+                  currentBusiness?.plan?.toLowerCase() === plan.name.toLowerCase());
+              const isPro = Boolean(plan.popular || plan.id === 'plan-pro');
+              const annualInfo = calculateAnnualPricing(plan.price, plan.originalPrice, plan.billingCycle);
 
               return (
                 <div
@@ -113,17 +99,16 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                       : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60'
                   }`}
                 >
-                  {/* Badge */}
                   {isPro && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1 bg-indigo-600 text-white shadow-indigo-600/40">
                       <Flame className="w-3 h-3 text-amber-300" />
-                      <span>MOST POPULAR</span>
+                      <span>{plan.badge || 'MOST POPULAR'}</span>
                     </div>
                   )}
 
                   {/* Plan Name & Target Audience */}
                   <div className="mb-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <h3 className="text-lg font-black text-slate-900 dark:text-white">
                         {plan.name}
                       </h3>
@@ -139,7 +124,7 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                   </div>
 
                   {/* Pricing Display */}
-                  <div className="mb-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+                  <div className="mb-4 pb-4 border-b border-slate-200 dark:border-slate-800 tabular-nums">
                     <div>
                       <div className="flex items-baseline gap-1.5 flex-wrap">
                         <span className="text-xs font-bold text-slate-400">₹</span>
@@ -149,18 +134,29 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                         <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                           / year
                         </span>
-                        <span className="text-xs line-through text-slate-400 font-medium ml-1">
-                          ₹{annualInfo.originalAnnual.toLocaleString('en-IN')}
-                        </span>
+                        {annualInfo.savings > 0 && (
+                          <span className="text-xs line-through text-slate-400 font-medium ml-1">
+                            ₹{annualInfo.originalAnnual.toLocaleString('en-IN')}
+                          </span>
+                        )}
                       </div>
-                      <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
-                        <span>Billed annually (Save 20% • ₹{annualInfo.savings.toLocaleString('en-IN')})</span>
-                      </div>
+                      {annualInfo.savings > 0 ? (
+                        <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                          <span>
+                            Billed annually (Save {annualInfo.discountPercent}% • ₹
+                            {annualInfo.savings.toLocaleString('en-IN')})
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-1">
+                          ~₹{annualInfo.monthlyEquivalent.toLocaleString('en-IN')}/month billed annually
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Recommended Operational Limits */}
-                  <div className="grid grid-cols-2 gap-2 mb-4">
+                  <div className="grid grid-cols-2 gap-2 mb-4 tabular-nums">
                     <div className="p-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800/80 text-center flex flex-col justify-center">
                       <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold flex items-center justify-center gap-1 mb-0.5">
                         <Users className="w-3 h-3 text-slate-400" />
@@ -222,7 +218,6 @@ export const PricingModal: React.FC<PricingModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleSelectPlan(plan)}
-                      disabled={isUpgrading}
                       className={`w-full py-2.5 px-4 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm ${
                         isPro
                           ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/30'
@@ -255,6 +250,28 @@ export const PricingModal: React.FC<PricingModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Checkout & Receipt Modals */}
+      <SubscriptionCheckoutModal
+        isOpen={Boolean(checkoutPlan)}
+        onClose={() => setCheckoutPlan(null)}
+        plan={checkoutPlan}
+        onPaymentSuccess={(payment) => {
+          if (onPlanSelected && payment.planId) {
+            onPlanSelected(payment.planId);
+          }
+        }}
+        onViewReceipt={(payment) => {
+          setCheckoutPlan(null);
+          setReceiptPayment(payment);
+        }}
+      />
+
+      <SubscriptionReceiptModal
+        isOpen={Boolean(receiptPayment)}
+        onClose={() => setReceiptPayment(null)}
+        payment={receiptPayment}
+      />
     </div>
   );
 };

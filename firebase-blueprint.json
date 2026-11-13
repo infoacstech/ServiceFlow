@@ -315,6 +315,55 @@
         "userName": { "type": "string" },
         "details": { "type": "string" }
       }
+    },
+    "plans": {
+      "title": "Subscription Plan",
+      "description": "Customizable SaaS subscription plans managed by Super Admin",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "yearlyPrice": { "type": "number" },
+        "originalPrice": { "type": "number" },
+        "billingCycle": { "type": "string" },
+        "maxJobs": { "type": "number" },
+        "maxStaff": { "type": "number" },
+        "maxCustomers": { "type": "number" },
+        "popular": { "type": "boolean" },
+        "isActive": { "type": "boolean" },
+        "sortOrder": { "type": "number" }
+      }
+    },
+    "addonPacks": {
+      "title": "Subscription Add-on Pack",
+      "description": "Customizable quota add-on packs managed by Super Admin",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "price": { "type": "number" },
+        "yearlyPrice": { "type": "number" },
+        "capacityIncrease": { "type": "number" },
+        "isActive": { "type": "boolean" }
+      }
+    },
+    "coupons": {
+      "title": "Subscription Coupon",
+      "description": "Promo and discount coupon codes managed by Super Admin",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "discountType": { "type": "string" },
+        "discountValue": { "type": "number" },
+        "applicableTo": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "usedCount": { "type": "number" },
+        "maxUses": { "type": "number" },
+        "validUntil": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -393,6 +442,18 @@
     "attendanceIssues/{issueId}": {
       "schema": "attendanceIssues",
       "description": "Staff submitted attendance correction requests and issues"
+    },
+    "plans/{planId}": {
+      "schema": "plans",
+      "description": "Customizable SaaS subscription tier plans"
+    },
+    "addonPacks/{addonId}": {
+      "schema": "addonPacks",
+      "description": "Customizable SaaS expansion add-on packs"
+    },
+    "coupons/{couponId}": {
+      "schema": "coupons",
+      "description": "Super Admin discount and promo coupons"
     }
   }
 }

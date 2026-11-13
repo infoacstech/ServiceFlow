@@ -45,6 +45,8 @@ import type {
   AttendanceIssueType,
   AppLanguage,
   SubscriptionPayment,
+  SubscriptionCoupon,
+  CouponValidationResult,
 } from '../types';
 import {
   SUPPORTED_APP_LANGUAGES,
@@ -77,13 +79,20 @@ import {
   DEMO_EXPENSES,
   DEMO_NOTIFICATIONS,
   DEMO_ACTIVITIES,
-  DEMO_PLANS,
   DEMO_ROLES,
   SUPER_ADMIN_USER,
   DEMO_REFERRALS,
   DEMO_REFERRAL_PAYOUTS,
 } from '../data/demoData';
-import { checkStaffCapacity, checkMonthlyJobCapacity, getPlanById, getTrialStatus } from '../utils/planUtils';
+import {
+  AddonPack,
+  ADDON_PACKS,
+  PLANS,
+  checkStaffCapacity,
+  checkMonthlyJobCapacity,
+  getPlanById,
+  getTrialStatus,
+} from '../utils/planUtils';
 import { auth, db, handleFirestoreError, OperationType, cleanFirestoreData } from '../lib/firebase';
 import { AuthService } from '../services/AuthService';
 import { navigationManager } from '../utils/backNavigation';
@@ -234,7 +243,27 @@ interface AppContextType {
     notes?: string;
   }) => Promise<ReferralPayoutRequest>;
 
-  // Subscription Billing & UTR Payment Engine
+  // Subscription Billing, Customizable Plans & Coupon Engine
+  plans: Plan[];
+  addonPacks: AddonPack[];
+  coupons: SubscriptionCoupon[];
+  saveSubscriptionPlan: (plan: Plan) => Promise<Plan>;
+  deleteSubscriptionPlan: (planId: string) => Promise<void>;
+  resetPlansToDefault: () => Promise<void>;
+  saveAddonPack: (addon: AddonPack) => Promise<AddonPack>;
+  saveCoupon: (
+    coupon: Partial<SubscriptionCoupon> & {
+      code: string;
+      discountType: 'percentage' | 'flat';
+      discountValue: number;
+    }
+  ) => Promise<SubscriptionCoupon>;
+  toggleCouponStatus: (couponId: string, isActive: boolean) => Promise<void>;
+  deleteCoupon: (couponId: string) => Promise<void>;
+  validateCoupon: (
+    code: string,
+    params: { itemPrice: number; itemType: 'plan' | 'addon'; planId?: string }
+  ) => CouponValidationResult;
   subscriptionPayments: SubscriptionPayment[];
   submitSubscriptionPayment: (payment: SubscriptionPayment) => Promise<void>;
   verifySubscriptionPayment: (paymentId: string, status: 'verified' | 'rejected', notes?: string) => Promise<void>;
@@ -268,7 +297,6 @@ interface AppContextType {
   notifications: Notification[];
   activityLogs: ActivityLog[];
   staff: User[];
-  plans: Plan[];
   roles: Role[];
   getRolePermissions: (role: UserRole) => RolePermission;
 
@@ -857,6 +885,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 
   // Subscription Payments & UTR Audit State
+  const [plans, setPlans] = useState<Plan[]>(() =>
+    loadCache('serviflow_plans_cache', PLANS)
+  );
+  const [addonPacks, setAddonPacks] = useState<AddonPack[]>(() =>
+    loadCache('serviflow_addon_packs_cache', ADDON_PACKS)
+  );
+  const [coupons, setCoupons] = useState<SubscriptionCoupon[]>(() =>
+    loadCache('serviflow_coupons_cache', [])
+  );
   const [subscriptionPayments, setSubscriptionPayments] = useState<SubscriptionPayment[]>(() =>
     loadCache('serviflow_sub_payments_cache', [])
   );
@@ -965,6 +1002,54 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
     unsubs.push(unsubSystemSettings);
 
+    // 19b. Customizable Subscription Plans (Public read; Super Admin writable)
+    const getPlanOrder = (p: Plan) =>
+      p.sortOrder ??
+      (p.id === 'plan-starter' ? 1 : p.id === 'plan-pro' ? 2 : p.id === 'plan-biz' ? 3 : 99);
+
+    const unsubPlans = onSnapshot(
+      collection(db, 'plans'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const loadedPlans = snapshot.docs
+            .map((d) => ({ ...(d.data() as Plan), id: d.id || (d.data() as Plan).id }))
+            .sort((a, b) => getPlanOrder(a) - getPlanOrder(b));
+          setPlans(loadedPlans);
+          saveCache('serviflow_plans_cache', loadedPlans);
+        } else {
+          if (isSuperAdmin) {
+            PLANS.forEach((p) => saveToFirestore('plans', p.id, p));
+          }
+          setPlans(PLANS);
+          saveCache('serviflow_plans_cache', PLANS);
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'plans')
+    );
+    unsubs.push(unsubPlans);
+
+    // 19c. Customizable Add-on Packs (Public read; Super Admin writable)
+    const unsubAddonPacks = onSnapshot(
+      collection(db, 'addonPacks'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const loadedAddons = snapshot.docs
+            .map((d) => ({ ...(d.data() as AddonPack), id: d.id || (d.data() as AddonPack).id }))
+            .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99));
+          setAddonPacks(loadedAddons);
+          saveCache('serviflow_addon_packs_cache', loadedAddons);
+        } else {
+          if (isSuperAdmin) {
+            ADDON_PACKS.forEach((a) => saveToFirestore('addonPacks', a.id, a));
+          }
+          setAddonPacks(ADDON_PACKS);
+          saveCache('serviflow_addon_packs_cache', ADDON_PACKS);
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'addonPacks')
+    );
+    unsubs.push(unsubAddonPacks);
+
     // IF NO USER IS LOGGED IN OR NO ACTIVE TENANT RESOLVED:
     // Do NOT open listeners for private tenant collections!
     // This stops unauthenticated permission-denied errors and cuts idle reads to zero.
@@ -993,6 +1078,20 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (error) => handleFirestoreError(error, OperationType.GET, 'roles')
     );
     unsubs.push(unsubRoles);
+
+    // 17b. Subscription Discount Coupons (Authenticated read for checkout validation; Super Admin write)
+    const unsubCoupons = onSnapshot(
+      collection(db, 'coupons'),
+      (snapshot) => {
+        const loadedCoupons = snapshot.docs
+          .map((d) => ({ ...(d.data() as SubscriptionCoupon), id: d.id || (d.data() as SubscriptionCoupon).id }))
+          .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+        setCoupons(loadedCoupons);
+        saveCache('serviflow_coupons_cache', loadedCoupons);
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'coupons')
+    );
+    unsubs.push(unsubCoupons);
 
     // Helper to query either all (Super Admin) or scoped to the active tenant
     const getTenantQuery = (colName: string) => {
@@ -3826,7 +3925,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           j.businessId === resolvedBusinessId &&
           (j.createdAt?.startsWith(currentMonthPrefix) || j.scheduledDate?.startsWith(currentMonthPrefix))
       ).length;
-      const capacity = checkMonthlyJobCapacity(monthlyJobCount, currentBusiness.planId || currentBusiness.plan);
+      const capacity = checkMonthlyJobCapacity(monthlyJobCount, currentBusiness.planId || currentBusiness.plan, plans);
       if (!capacity.allowed) {
         showToast(
           capacity.message ||
@@ -5064,7 +5163,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const capacity = checkStaffCapacity(
         activeTenantStaff.length,
         currentBusiness.planId || currentBusiness.plan,
-        currentBusiness.addonStaff || 0
+        currentBusiness.addonStaff || 0,
+        plans
       );
       if (!capacity.allowed) {
         showToast(
@@ -5824,10 +5924,11 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (targetBiz) {
         let bizUpdates: Partial<Business> = {};
         if (payment.isAddon) {
+          const matchedAddon = addonPacks.find((a) => a.id === payment.planId);
           if (payment.addonType === 'staff_pack') {
-            bizUpdates.addonStaff = (targetBiz.addonStaff || 0) + 5;
+            bizUpdates.addonStaff = (targetBiz.addonStaff || 0) + (matchedAddon?.capacityIncrease || 5);
           } else if (payment.addonType === 'whatsapp_pack') {
-            bizUpdates.addonWhatsappQuota = (targetBiz.addonWhatsappQuota || 0) + 1000;
+            bizUpdates.addonWhatsappQuota = (targetBiz.addonWhatsappQuota || 0) + (matchedAddon?.capacityIncrease || 1000);
           }
         } else {
           // Plan Upgrade
@@ -5855,6 +5956,30 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setCurrentBusiness((prev) => (prev ? { ...prev, ...bizUpdates } : null));
         }
       }
+
+      // Increment coupon usage count if a coupon code was used
+      if (payment.couponId || payment.couponCode) {
+        const usedCoupon = coupons.find(
+          (c) =>
+            (payment.couponId && c.id === payment.couponId) ||
+            (payment.couponCode && c.code.toUpperCase() === payment.couponCode.toUpperCase())
+        );
+        if (usedCoupon) {
+          const nextCount = (usedCoupon.usedCount || 0) + 1;
+          await saveToFirestore('coupons', usedCoupon.id, {
+            usedCount: nextCount,
+            updatedAt: now.toISOString(),
+          });
+          setCoupons((prev) => {
+            const next = prev.map((c) =>
+              c.id === usedCoupon.id ? { ...c, usedCount: nextCount, updatedAt: now.toISOString() } : c
+            );
+            saveCache('serviflow_coupons_cache', next);
+            return next;
+          });
+        }
+      }
+
       showToast(`Payment ${paymentId} verified and plan benefits activated!`, 'success');
     } else {
       // Rejection: restore tenant's subscription status if it was pending_verification
@@ -5874,6 +5999,310 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       showToast(`Payment ${paymentId} marked as rejected.`, 'info');
     }
+  };
+
+  // Super Admin Customizable Plans, Add-on Packs & Coupon Management
+  const saveSubscriptionPlan = async (planData: Plan): Promise<Plan> => {
+    if (!checkIsSuperAdmin(currentUser)) {
+      throw new Error('Unauthorized: Only Super Admin can modify subscription plans.');
+    }
+    const cleanPrice = Math.max(0, Math.round(Number(planData.price) || 0));
+    const cleanOriginalPrice =
+      planData.originalPrice !== undefined && Number(planData.originalPrice) > 0
+        ? Math.round(Number(planData.originalPrice))
+        : undefined;
+    const updatedPlan: Plan = {
+      ...planData,
+      id: planData.id || `plan-custom-${Date.now()}`,
+      name: planData.name.trim() || 'Custom Plan',
+      price: cleanPrice,
+      yearlyPrice: cleanPrice,
+      originalPrice: cleanOriginalPrice,
+      billingCycle: 'yearly',
+      maxStaff: Math.max(1, Math.round(Number(planData.maxStaff) || 1)),
+      maxJobs: Math.max(1, Math.round(Number(planData.maxJobs) || 10)),
+      maxCustomers: Math.max(1, Math.round(Number(planData.maxCustomers) || 50)),
+      features: (planData.features || []).map((f) => f.trim()).filter(Boolean),
+      isActive: planData.isActive !== false,
+      sortOrder: planData.sortOrder ?? plans.length + 1,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const payloadToSave = cleanFirestoreData(updatedPlan);
+    await setDoc(doc(db, 'plans', updatedPlan.id), payloadToSave);
+
+    setPlans((prev) => {
+      const exists = prev.some((p) => p.id === updatedPlan.id);
+      const next = (exists ? prev.map((p) => (p.id === updatedPlan.id ? updatedPlan : p)) : [...prev, updatedPlan])
+        .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99));
+      saveCache('serviflow_plans_cache', next);
+      return next;
+    });
+
+    logActivity('Subscription Plan Updated', 'financials', updatedPlan.id, `Updated ${updatedPlan.name} plan price to ₹${updatedPlan.price}/yr`);
+    showToast(`${updatedPlan.name} plan saved and live for all tenants!`, 'success');
+    return updatedPlan;
+  };
+
+  const deleteSubscriptionPlan = async (planId: string): Promise<void> => {
+    if (!checkIsSuperAdmin(currentUser)) {
+      throw new Error('Unauthorized: Only Super Admin can delete plans.');
+    }
+    if (['plan-starter', 'plan-pro', 'plan-biz'].includes(planId)) {
+      showToast('Core plans cannot be permanently deleted; you can hide/deactivate them instead.', 'info');
+      return;
+    }
+    await deleteDoc(doc(db, 'plans', planId));
+    setPlans((prev) => {
+      const next = prev.filter((p) => p.id !== planId);
+      saveCache('serviflow_plans_cache', next);
+      return next;
+    });
+    showToast('Custom plan removed.', 'info');
+  };
+
+  const resetPlansToDefault = async (): Promise<void> => {
+    if (!checkIsSuperAdmin(currentUser)) {
+      throw new Error('Unauthorized: Only Super Admin can reset plans.');
+    }
+    await Promise.all([
+      ...PLANS.map((p) => setDoc(doc(db, 'plans', p.id), cleanFirestoreData({ ...p, updatedAt: new Date().toISOString() }), { merge: true })),
+      ...ADDON_PACKS.map((a) => setDoc(doc(db, 'addonPacks', a.id), cleanFirestoreData({ ...a, updatedAt: new Date().toISOString() }), { merge: true })),
+    ]);
+    setPlans(PLANS);
+    setAddonPacks(ADDON_PACKS);
+    saveCache('serviflow_plans_cache', PLANS);
+    saveCache('serviflow_addon_packs_cache', ADDON_PACKS);
+    showToast('Default subscription plans & add-ons restored!', 'success');
+  };
+
+  const saveAddonPack = async (addonData: AddonPack): Promise<AddonPack> => {
+    if (!checkIsSuperAdmin(currentUser)) {
+      throw new Error('Unauthorized: Only Super Admin can edit add-on packs.');
+    }
+    const cleanYearly = Math.max(0, Math.round(Number(addonData.yearlyPrice ?? addonData.price) || 0));
+    const updatedAddon: AddonPack = {
+      ...addonData,
+      name: addonData.name.trim(),
+      price: cleanYearly,
+      yearlyPrice: cleanYearly,
+      capacityIncrease: Math.max(1, Math.round(Number(addonData.capacityIncrease) || 1)),
+      isActive: addonData.isActive !== false,
+      updatedAt: new Date().toISOString(),
+    };
+    await setDoc(doc(db, 'addonPacks', updatedAddon.id), cleanFirestoreData(updatedAddon), { merge: true });
+    setAddonPacks((prev) => {
+      const exists = prev.some((a) => a.id === updatedAddon.id);
+      const next = exists ? prev.map((a) => (a.id === updatedAddon.id ? updatedAddon : a)) : [...prev, updatedAddon];
+      saveCache('serviflow_addon_packs_cache', next);
+      return next;
+    });
+    showToast(`${updatedAddon.name} pricing updated!`, 'success');
+    return updatedAddon;
+  };
+
+  const saveCoupon = async (
+    couponInput: Partial<SubscriptionCoupon> & {
+      code: string;
+      discountType: 'percentage' | 'flat';
+      discountValue: number;
+    }
+  ): Promise<SubscriptionCoupon> => {
+    if (!checkIsSuperAdmin(currentUser)) {
+      throw new Error('Unauthorized: Only Super Admin can manage coupon codes.');
+    }
+    const cleanCode = couponInput.code.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+    if (!cleanCode || cleanCode.length < 3) {
+      throw new Error('Coupon code must be at least 3 alphanumeric characters.');
+    }
+    const duplicate = coupons.find(
+      (c) => c.code.toUpperCase() === cleanCode && c.id !== couponInput.id
+    );
+    if (duplicate) {
+      throw new Error(`Coupon code "${cleanCode}" already exists.`);
+    }
+
+    const nowIso = new Date().toISOString();
+    const rawVal = Number(couponInput.discountValue) || 0;
+    const sanitizedVal =
+      couponInput.discountType === 'percentage'
+        ? Math.min(100, Math.max(1, Math.round(rawVal)))
+        : Math.max(1, Math.round(rawVal));
+
+    const couponObj: SubscriptionCoupon = {
+      id: couponInput.id || `cpn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      code: cleanCode,
+      description: couponInput.description?.trim() || undefined,
+      discountType: couponInput.discountType,
+      discountValue: sanitizedVal,
+      maxDiscountAmount:
+        couponInput.maxDiscountAmount && Number(couponInput.maxDiscountAmount) > 0
+          ? Math.round(Number(couponInput.maxDiscountAmount))
+          : undefined,
+      minOrderAmount:
+        couponInput.minOrderAmount && Number(couponInput.minOrderAmount) > 0
+          ? Math.round(Number(couponInput.minOrderAmount))
+          : undefined,
+      applicableTo: couponInput.applicableTo || 'all',
+      applicablePlanIds:
+        couponInput.applicablePlanIds && couponInput.applicablePlanIds.length > 0
+          ? couponInput.applicablePlanIds
+          : undefined,
+      validFrom: couponInput.validFrom?.trim() || undefined,
+      validUntil: couponInput.validUntil?.trim() || undefined,
+      maxUses:
+        couponInput.maxUses && Number(couponInput.maxUses) > 0
+          ? Math.round(Number(couponInput.maxUses))
+          : undefined,
+      usedCount: couponInput.usedCount ?? 0,
+      isActive: couponInput.isActive !== false,
+      allowWithReferral: Boolean(couponInput.allowWithReferral),
+      createdAt: couponInput.createdAt || nowIso,
+      updatedAt: nowIso,
+    };
+
+    await setDoc(doc(db, 'coupons', couponObj.id), cleanFirestoreData(couponObj));
+    setCoupons((prev) => {
+      const exists = prev.some((c) => c.id === couponObj.id);
+      const next = exists
+        ? prev.map((c) => (c.id === couponObj.id ? couponObj : c))
+        : [couponObj, ...prev];
+      saveCache('serviflow_coupons_cache', next);
+      return next;
+    });
+
+    logActivity(
+      couponInput.id ? 'Coupon Updated' : 'Coupon Created',
+      'financials',
+      couponObj.id,
+      `Coupon ${couponObj.code} (${couponObj.discountType === 'percentage' ? `${couponObj.discountValue}%` : `₹${couponObj.discountValue}`} OFF)`
+    );
+    showToast(`Coupon "${couponObj.code}" ${couponInput.id ? 'updated' : 'created'} successfully!`, 'success');
+    return couponObj;
+  };
+
+  const toggleCouponStatus = async (couponId: string, isActive: boolean): Promise<void> => {
+    if (!checkIsSuperAdmin(currentUser)) {
+      throw new Error('Unauthorized: Only Super Admin can update coupon status.');
+    }
+    const updatedAt = new Date().toISOString();
+    await setDoc(doc(db, 'coupons', couponId), { isActive, updatedAt }, { merge: true });
+    setCoupons((prev) => {
+      const next = prev.map((c) => (c.id === couponId ? { ...c, isActive, updatedAt } : c));
+      saveCache('serviflow_coupons_cache', next);
+      return next;
+    });
+    showToast(isActive ? 'Coupon activated and ready for use!' : 'Coupon paused.', 'info');
+  };
+
+  const deleteCoupon = async (couponId: string): Promise<void> => {
+    if (!checkIsSuperAdmin(currentUser)) {
+      throw new Error('Unauthorized: Only Super Admin can delete coupons.');
+    }
+    await deleteDoc(doc(db, 'coupons', couponId));
+    setCoupons((prev) => {
+      const next = prev.filter((c) => c.id !== couponId);
+      saveCache('serviflow_coupons_cache', next);
+      return next;
+    });
+    showToast('Coupon deleted permanently.', 'info');
+  };
+
+  const validateCoupon = (
+    rawCode: string,
+    params: { itemPrice: number; itemType: 'plan' | 'addon'; planId?: string }
+  ): CouponValidationResult => {
+    const cleanCode = (rawCode || '').trim().toUpperCase();
+    if (!cleanCode) {
+      return { valid: false, discountAmount: 0, error: 'Please enter a coupon code.' };
+    }
+
+    const coupon = coupons.find((c) => c.code.toUpperCase() === cleanCode);
+    if (!coupon) {
+      return { valid: false, discountAmount: 0, error: `Invalid coupon code "${cleanCode}".` };
+    }
+
+    if (!coupon.isActive) {
+      return { valid: false, discountAmount: 0, error: `Coupon "${cleanCode}" is currently paused.` };
+    }
+
+    const todayStr = getIndiaTodayDateString();
+    if (coupon.validFrom && todayStr < coupon.validFrom.slice(0, 10)) {
+      return {
+        valid: false,
+        discountAmount: 0,
+        error: `Coupon "${cleanCode}" is valid starting ${coupon.validFrom.slice(0, 10)}.`,
+      };
+    }
+    if (coupon.validUntil && todayStr > coupon.validUntil.slice(0, 10)) {
+      return {
+        valid: false,
+        discountAmount: 0,
+        error: `Coupon "${cleanCode}" expired on ${coupon.validUntil.slice(0, 10)}.`,
+      };
+    }
+
+    if (coupon.maxUses && coupon.maxUses > 0 && (coupon.usedCount || 0) >= coupon.maxUses) {
+      return {
+        valid: false,
+        discountAmount: 0,
+        error: `Coupon "${cleanCode}" redemption limit has been reached.`,
+      };
+    }
+
+    if ((coupon.applicableTo === 'plans' || (coupon.applicablePlanIds && coupon.applicablePlanIds.length > 0)) && params.itemType !== 'plan') {
+      return {
+        valid: false,
+        discountAmount: 0,
+        error: `Coupon "${cleanCode}" is only valid on subscription plans.`,
+      };
+    }
+    if (coupon.applicableTo === 'addons' && params.itemType !== 'addon') {
+      return {
+        valid: false,
+        discountAmount: 0,
+        error: `Coupon "${cleanCode}" is only valid on add-on packs.`,
+      };
+    }
+
+    if (
+      params.itemType === 'plan' &&
+      coupon.applicablePlanIds &&
+      coupon.applicablePlanIds.length > 0 &&
+      params.planId &&
+      !coupon.applicablePlanIds.includes(params.planId)
+    ) {
+      return {
+        valid: false,
+        discountAmount: 0,
+        error: `Coupon "${cleanCode}" is not valid for the selected plan.`,
+      };
+    }
+
+    if (coupon.minOrderAmount && params.itemPrice < coupon.minOrderAmount) {
+      return {
+        valid: false,
+        discountAmount: 0,
+        error: `Minimum order value of ₹${coupon.minOrderAmount.toLocaleString('en-IN')} required for "${cleanCode}".`,
+      };
+    }
+
+    let discountAmount = 0;
+    if (coupon.discountType === 'percentage') {
+      discountAmount = Math.round((params.itemPrice * coupon.discountValue) / 100);
+      if (coupon.maxDiscountAmount && coupon.maxDiscountAmount > 0) {
+        discountAmount = Math.min(discountAmount, coupon.maxDiscountAmount);
+      }
+    } else {
+      discountAmount = Math.round(coupon.discountValue);
+    }
+
+    discountAmount = Math.min(params.itemPrice, Math.max(0, discountAmount));
+    return {
+      valid: true,
+      coupon,
+      discountAmount,
+    };
   };
 
   const updateBusinessSettings = async (updates: Partial<Business>): Promise<void> => {
@@ -6810,7 +7239,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         notifications: filteredNotifications,
         activityLogs: filteredActivityLogs,
         staff: filteredStaff,
-        plans: DEMO_PLANS,
+        plans,
+        addonPacks,
+        coupons,
         roles,
         getRolePermissions,
 
@@ -6932,7 +7363,15 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteReferralRecord,
         settleReferralBonusDirectly,
 
-        // Subscription Billing & UTR Engine
+        // Subscription Billing, Customizable Plans, Coupons & UTR Engine
+        saveSubscriptionPlan,
+        deleteSubscriptionPlan,
+        resetPlansToDefault,
+        saveAddonPack,
+        saveCoupon,
+        toggleCouponStatus,
+        deleteCoupon,
+        validateCoupon,
         subscriptionPayments,
         submitSubscriptionPayment,
         verifySubscriptionPayment,

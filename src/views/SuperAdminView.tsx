@@ -57,8 +57,20 @@ import {
   Filter,
   Calendar,
   Receipt,
+  Pencil,
+  Percent,
+  Power,
+  Shuffle,
+  Flame,
 } from 'lucide-react';
-import { ReferralRecord, ReferralPayoutRequest, SubscriptionPayment } from '../types';
+import {
+  ReferralRecord,
+  ReferralPayoutRequest,
+  SubscriptionPayment,
+  Plan,
+  SubscriptionCoupon,
+} from '../types';
+import { AddonPack, calculateAnnualPricing } from '../utils/planUtils';
 import { ReferralAnalytics } from '../components/ReferralAnalytics';
 import { SubscriptionReceiptModal } from '../components/SubscriptionReceiptModal';
 import { DateRangePicker, DateRange, getLocalDateString, getPresetDates } from '../components/DateRangePicker';
@@ -89,6 +101,15 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
     activityLogs,
     roles,
     plans,
+    addonPacks,
+    coupons,
+    saveSubscriptionPlan,
+    deleteSubscriptionPlan,
+    resetPlansToDefault,
+    saveAddonPack,
+    saveCoupon,
+    toggleCouponStatus,
+    deleteCoupon,
     switchBusiness,
     createBusiness,
     updateBusinessAndOwnerStatus,
@@ -124,6 +145,19 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
   const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('all');
   const [subscriptionSearchQuery, setSubscriptionSearchQuery] = useState('');
   const [isVerifyingPaymentId, setIsVerifyingPaymentId] = useState<string | null>(null);
+
+  // Customizable Plans, Add-on Packs & Coupons Console States
+  const [plansSubView, setPlansSubView] = useState<'plans' | 'coupons'>('plans');
+  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [planFeaturesText, setPlanFeaturesText] = useState('');
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
+  const [editingAddon, setEditingAddon] = useState<AddonPack | null>(null);
+  const [isSavingAddon, setIsSavingAddon] = useState(false);
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState<Partial<SubscriptionCoupon>>({});
+  const [isSavingCoupon, setIsSavingCoupon] = useState(false);
+  const [couponSearchQuery, setCouponSearchQuery] = useState('');
+  const [couponStatusFilter, setCouponStatusFilter] = useState<'all' | 'active' | 'paused' | 'expired'>('all');
 
   // Exact registered tenant users who belong to active, existing businesses
   const registeredTenantUsers = useMemo(() => {
@@ -778,6 +812,25 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
 
         <button
           type="button"
+          data-active={activeTabSection === 'plans'}
+          onClick={() => handleSwitchTabSection('plans')}
+          className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
+            activeTabSection === 'plans'
+              ? 'bg-teal-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-300/50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Layers className="w-4 h-4 shrink-0" />
+          <span>Plans & Coupons</span>
+          {coupons.filter((c) => c.isActive).length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+              {coupons.filter((c) => c.isActive).length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
           data-active={activeTabSection === 'audit'}
           onClick={() => handleSwitchTabSection('audit')}
           className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
@@ -791,12 +844,11 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         </button>
 
         {/* Secondary section active indicator when navigated via sidebar */}
-        {!['overview', 'approvals', 'subscriptions', 'tenants', 'analytics', 'referrals', 'audit'].includes(activeTabSection) && (
+        {!['overview', 'approvals', 'subscriptions', 'tenants', 'analytics', 'referrals', 'plans', 'audit'].includes(activeTabSection) && (
           <div className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-600/15 border border-purple-500/30 text-purple-700 dark:text-purple-300 font-bold text-xs shrink-0">
             <span className="capitalize">
               {activeTabSection === 'support' && 'Audited Support View'}
               {activeTabSection === 'notifications' && 'System Notifications View'}
-              {activeTabSection === 'plans' && 'Plans & Pricing View'}
               {activeTabSection === 'settings' && 'Global Settings View'}
               {activeTabSection === 'sessions' && 'Security & Access View'}
               {activeTabSection === 'cleanup' && 'Data & Maintenance View'}
@@ -1770,97 +1822,599 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         </div>
       )}
 
-      {/* SECTION: Plans & Subscriptions Management */}
+      {/* SECTION: Plans, Pricing Customization & Coupon Codes */}
       {activeTabSection === 'plans' && (
         <div className="space-y-6 animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-sm space-y-6">
-            <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
-              <div className="p-2.5 bg-teal-600 text-white rounded-2xl">
-                <CreditCard className="w-6 h-6" />
+          {/* Header & Controls */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-sm space-y-5">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-teal-600 text-white rounded-2xl shrink-0">
+                  <CreditCard className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">
+                    Subscription Plans, Pricing & Coupon Console
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Customize every plan price, quota & feature live across the platform, and manage promo discount codes
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-lg font-black text-slate-900 dark:text-slate-100">
-                  Subscription Plans & Tier Entitlements
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Manage plan feature limits, pricing tiers, technician capacity quotas, and premium add-ons
-                </p>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextOrder = plans.length + 1;
+                    const blankPlan: Plan = {
+                      id: `plan-custom-${Date.now()}`,
+                      name: '',
+                      price: 3999,
+                      yearlyPrice: 3999,
+                      originalPrice: 4999,
+                      billingCycle: 'yearly',
+                      maxStaff: 5,
+                      maxJobs: 300,
+                      maxCustomers: 1000,
+                      targetAudience: 'For growing service teams',
+                      features: [
+                        'Enquiries & Intake',
+                        'Customer Management',
+                        'Job Scheduling & Tracking',
+                      ],
+                      popular: false,
+                      isActive: true,
+                      sortOrder: nextOrder,
+                    };
+                    setEditingPlan(blankPlan);
+                    setPlanFeaturesText(blankPlan.features.join('\n'));
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm cursor-pointer min-h-[40px]"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Custom Plan</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingCoupon({
+                      code: '',
+                      description: '',
+                      discountType: 'percentage',
+                      discountValue: 20,
+                      applicableTo: 'all',
+                      applicablePlanIds: [],
+                      isActive: true,
+                      allowWithReferral: false,
+                    });
+                    setIsCouponModalOpen(true);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm cursor-pointer min-h-[40px]"
+                >
+                  <Tag className="w-4 h-4" />
+                  <span>Create Coupon Code</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={resetPlansToDefault}
+                  className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer min-h-[40px]"
+                  title="Restore default Starter, Professional, Business pricing"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Defaults</span>
+                </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Starter Plan */}
-              <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black uppercase tracking-wider text-teal-600">Starter Plan</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 font-bold">
-                    Active
-                  </span>
-                </div>
-                <div>
-                  <div className="text-2xl font-black text-slate-900 dark:text-slate-100">₹299 <span className="text-xs font-normal text-slate-500">/ mo</span></div>
-                  <div className="text-xs text-slate-500 mt-1">For small service businesses</div>
-                </div>
-                <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> Up to 2 Staff / Technicians</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> Up to 100 Jobs / month</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> Enquiries, Follow-ups & Jobs</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-teal-600" /> Basic Quotations & Reports</div>
-                </div>
-                <div className="pt-2 text-xs font-bold text-slate-500">
-                  {businesses.filter(b => b.plan === 'Starter' || b.planId === 'plan-starter').length} Tenants Subscribed
+            {/* KPI Summary Row */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 tabular-nums">
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Plans</div>
+                <div className="text-xl font-black text-slate-900 dark:text-white mt-0.5">
+                  {plans.filter((p) => p.isActive !== false).length} / {plans.length}
                 </div>
               </div>
-
-              {/* Professional Plan */}
-              <div className="p-6 rounded-3xl border-2 border-indigo-600 bg-white dark:bg-slate-900 shadow-md space-y-4 relative">
-                <div className="absolute -top-3 right-6 bg-indigo-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                  MOST POPULAR
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black uppercase tracking-wider text-indigo-600">Professional Plan</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 font-bold">
-                    Active
-                  </span>
-                </div>
-                <div>
-                  <div className="text-2xl font-black text-slate-900 dark:text-slate-100">₹599 <span className="text-xs font-normal text-slate-500">/ mo</span></div>
-                  <div className="text-xs text-slate-500 mt-1">For growing service teams</div>
-                </div>
-                <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> Up to 7 Staff / Technicians</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> Up to 500 Jobs / month</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> Advanced Scheduling & Portal</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-indigo-600" /> Priority Support & Analytics</div>
-                </div>
-                <div className="pt-2 text-xs font-bold text-slate-500">
-                  {businesses.filter(b => b.plan === 'Professional' || b.planId === 'plan-pro' || (!b.plan && !b.planId)).length} Tenants Subscribed
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Add-on Packs</div>
+                <div className="text-xl font-black text-slate-900 dark:text-white mt-0.5">
+                  {addonPacks.filter((a) => a.isActive !== false).length}
                 </div>
               </div>
-
-              {/* Business Plan */}
-              <div className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black uppercase tracking-wider text-purple-600">Business Plan</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 font-bold">
-                    Active
-                  </span>
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Active Coupons</div>
+                <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  {coupons.filter((c) => c.isActive).length}
                 </div>
-                <div>
-                  <div className="text-2xl font-black text-slate-900 dark:text-slate-100">₹999 <span className="text-xs font-normal text-slate-500">/ mo</span></div>
-                  <div className="text-xs text-slate-500 mt-1">For larger service operations</div>
-                </div>
-                <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Up to 15 Staff / Technicians</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Up to 1,500 Jobs / month</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Multi-Location Support</div>
-                  <div className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-purple-600" /> Advanced Staff & Business Controls</div>
-                </div>
-                <div className="pt-2 text-xs font-bold text-slate-500">
-                  {businesses.filter(b => b.plan === 'Business' || b.planId === 'plan-biz' || b.plan === 'Enterprise').length} Tenants Subscribed
+              </div>
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800">
+                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Coupon Redemptions</div>
+                <div className="text-xl font-black text-indigo-600 dark:text-indigo-400 mt-0.5">
+                  {coupons.reduce((sum, c) => sum + (c.usedCount || 0), 0)}
                 </div>
               </div>
             </div>
+
+            {/* Sub-View Switcher */}
+            <div className="inline-flex p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setPlansSubView('plans')}
+                className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                  plansSubView === 'plans'
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Plans & Add-on Pricing ({plans.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlansSubView('coupons')}
+                className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                  plansSubView === 'coupons'
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                <Tag className="w-3.5 h-3.5" />
+                <span>Promo & Coupon Codes ({coupons.length})</span>
+              </button>
+            </div>
+
+            {plansSubView === 'plans' ? (
+              <div className="space-y-6">
+                {/* Editable Subscription Plans Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
+                  {plans.map((plan) => {
+                    const annualInfo = calculateAnnualPricing(plan.price, plan.originalPrice, plan.billingCycle);
+                    const isPopular = Boolean(plan.popular || plan.id === 'plan-pro');
+                    const isHidden = plan.isActive === false;
+                    const tenantCount = businesses.filter(
+                      (b) =>
+                        b.planId === plan.id ||
+                        (b.plan || '').toLowerCase() === plan.name.toLowerCase()
+                    ).length;
+
+                    return (
+                      <div
+                        key={plan.id}
+                        className={`p-5 sm:p-6 rounded-3xl flex flex-col justify-between space-y-4 relative transition-all ${
+                          isHidden
+                            ? 'border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/40 opacity-75'
+                            : isPopular
+                            ? 'border-2 border-indigo-600 bg-white dark:bg-slate-900 shadow-md'
+                            : 'border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30'
+                        }`}
+                      >
+                        {isPopular && (
+                          <div className="absolute -top-3 right-6 bg-indigo-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                            <Flame className="w-3 h-3 text-amber-300" />
+                            <span>{plan.badge || 'MOST POPULAR'}</span>
+                          </div>
+                        )}
+
+                        <div className="space-y-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                                {plan.name}
+                              </span>
+                              <div className="text-[11px] text-slate-500 mt-0.5">
+                                {plan.targetAudience || 'SaaS Subscription Tier'}
+                              </div>
+                            </div>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                isHidden
+                                  ? 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                                  : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+                              }`}
+                            >
+                              {isHidden ? 'Hidden' : 'Live'}
+                            </span>
+                          </div>
+
+                          <div className="tabular-nums">
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                              <span className="text-2xl font-black text-slate-900 dark:text-slate-100">
+                                ₹{annualInfo.discountedAnnual.toLocaleString('en-IN')}
+                              </span>
+                              <span className="text-xs font-semibold text-slate-500">/ year</span>
+                              {annualInfo.savings > 0 && (
+                                <span className="text-xs line-through text-slate-400 ml-1">
+                                  ₹{annualInfo.originalAnnual.toLocaleString('en-IN')}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              ~₹{annualInfo.monthlyEquivalent.toLocaleString('en-IN')}/mo
+                              {annualInfo.savings > 0 ? ` · Save ${annualInfo.discountPercent}%` : ''}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 text-center tabular-nums">
+                            <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700">
+                              <div className="text-[10px] text-slate-400 font-semibold">Staff</div>
+                              <div className="text-xs font-black text-slate-900 dark:text-white">{plan.maxStaff}</div>
+                            </div>
+                            <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700">
+                              <div className="text-[10px] text-slate-400 font-semibold">Jobs/mo</div>
+                              <div className="text-xs font-black text-slate-900 dark:text-white">
+                                {plan.maxJobs.toLocaleString('en-IN')}
+                              </div>
+                            </div>
+                            <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700">
+                              <div className="text-[10px] text-slate-400 font-semibold">Customers</div>
+                              <div className="text-xs font-black text-slate-900 dark:text-white">
+                                {plan.maxCustomers.toLocaleString('en-IN')}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
+                            {plan.features.slice(0, 6).map((feat, i) => (
+                              <div key={i} className="flex items-start gap-2">
+                                <Check className="w-3.5 h-3.5 text-teal-600 shrink-0 mt-0.5" />
+                                <span className="text-[11px] leading-snug">{feat}</span>
+                              </div>
+                            ))}
+                            {plan.features.length > 6 && (
+                              <div className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 pl-5">
+                                +{plan.features.length - 6} more features
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-200 dark:border-slate-700 space-y-2.5">
+                          <div className="flex items-center justify-between text-xs font-bold text-slate-500 tabular-nums">
+                            <span>{tenantCount} Tenants Subscribed</span>
+                            <span className="font-mono text-[10px] text-slate-400">{plan.id}</span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingPlan({ ...plan });
+                                setPlanFeaturesText((plan.features || []).join('\n'));
+                              }}
+                              className="flex-1 py-2 px-3 rounded-xl bg-slate-900 dark:bg-indigo-600 hover:opacity-90 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              <span>Edit Price & Quotas</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                saveSubscriptionPlan({ ...plan, isActive: isHidden })
+                              }
+                              className={`p-2 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
+                                isHidden
+                                  ? 'border-emerald-300 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                  : 'border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                              }`}
+                              title={isHidden ? 'Make Plan Live' : 'Hide Plan'}
+                            >
+                              <Power className="w-4 h-4" />
+                            </button>
+
+                            {!['plan-starter', 'plan-pro', 'plan-biz'].includes(plan.id) && (
+                              <button
+                                type="button"
+                                onClick={() => deleteSubscriptionPlan(plan.id)}
+                                className="p-2 rounded-xl border border-rose-200 dark:border-rose-900 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+                                title="Delete Custom Plan"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Editable Add-on Packs */}
+                <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-amber-500" />
+                      <span>Customizable Add-On Packs</span>
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Edit pricing and quota increments for optional add-on packs shown to Business Owners
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {addonPacks.map((addon) => (
+                      <div
+                        key={addon.id}
+                        className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-sm text-slate-900 dark:text-white">
+                              {addon.name}
+                            </span>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                addon.isActive !== false
+                                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+                                  : 'bg-slate-200 text-slate-600'
+                              }`}
+                            >
+                              {addon.isActive !== false ? 'Active' : 'Hidden'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {addon.description}
+                          </p>
+                          <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 tabular-nums">
+                            ₹{(addon.yearlyPrice ?? addon.price).toLocaleString('en-IN')}/year · +
+                            {addon.capacityIncrease.toLocaleString('en-IN')}{' '}
+                            {addon.type === 'staff_pack' ? 'Staff Seats' : 'WhatsApp Credits'}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setEditingAddon({ ...addon })}
+                          className="px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center gap-1.5 shrink-0 cursor-pointer"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Edit Add-on</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* COUPON CODE MANAGER */
+              <div className="space-y-4">
+                {/* Search & Status Filter */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={couponSearchQuery}
+                      onChange={(e) => setCouponSearchQuery(e.target.value)}
+                      placeholder="Search coupon code or description..."
+                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+                    {(['all', 'active', 'paused', 'expired'] as const).map((status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => setCouponStatusFilter(status)}
+                        className={`px-3 py-1.5 rounded-xl capitalize transition-colors cursor-pointer ${
+                          couponStatusFilter === status
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {(() => {
+                  const todayStr = getLocalDateString();
+                  const filteredCoupons = coupons.filter((c) => {
+                    const isExpired = Boolean(c.validUntil && todayStr > c.validUntil.slice(0, 10));
+                    if (couponStatusFilter === 'active' && (!c.isActive || isExpired)) return false;
+                    if (couponStatusFilter === 'paused' && c.isActive) return false;
+                    if (couponStatusFilter === 'expired' && !isExpired) return false;
+                    if (couponSearchQuery.trim()) {
+                      const q = couponSearchQuery.trim().toLowerCase();
+                      const matchCode = c.code.toLowerCase().includes(q);
+                      const matchDesc = (c.description || '').toLowerCase().includes(q);
+                      if (!matchCode && !matchDesc) return false;
+                    }
+                    return true;
+                  });
+
+                  if (filteredCoupons.length === 0) {
+                    return (
+                      <div className="p-10 text-center rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/30 space-y-3">
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
+                          <Tag className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="font-black text-sm text-slate-900 dark:text-white">
+                            {coupons.length === 0 ? 'No Coupon Codes Created Yet' : 'No Matching Coupons Found'}
+                          </h3>
+                          <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                            Create discount codes like <span className="font-mono font-bold">WELCOME20</span> or{' '}
+                            <span className="font-mono font-bold">SAVE500</span> for Business Owners to apply during subscription checkout.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingCoupon({
+                              code: '',
+                              description: '',
+                              discountType: 'percentage',
+                              discountValue: 20,
+                              applicableTo: 'all',
+                              applicablePlanIds: [],
+                              isActive: true,
+                              allowWithReferral: false,
+                            });
+                            setIsCouponModalOpen(true);
+                          }}
+                          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Create First Coupon</span>
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {filteredCoupons.map((coupon) => {
+                        const isExpired = Boolean(
+                          coupon.validUntil && todayStr > coupon.validUntil.slice(0, 10)
+                        );
+                        const isExhausted = Boolean(
+                          coupon.maxUses && coupon.maxUses > 0 && (coupon.usedCount || 0) >= coupon.maxUses
+                        );
+
+                        return (
+                          <div
+                            key={coupon.id}
+                            className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+                              !coupon.isActive || isExpired || isExhausted
+                                ? 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 opacity-80'
+                                : 'border-indigo-200/80 dark:border-indigo-900/60 bg-white dark:bg-slate-900 shadow-xs'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="space-y-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <code className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 font-mono font-black text-sm text-indigo-700 dark:text-indigo-300 tracking-wider">
+                                    {coupon.code}
+                                  </code>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(coupon.code);
+                                      showToast(`Copied coupon code "${coupon.code}"`, 'success');
+                                    }}
+                                    className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 cursor-pointer"
+                                    title="Copy Code"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" />
+                                  </button>
+                                  <span
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                      isExpired
+                                        ? 'bg-rose-500/15 text-rose-700 dark:text-rose-400'
+                                        : isExhausted
+                                        ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                                        : coupon.isActive
+                                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+                                        : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                                    }`}
+                                  >
+                                    {isExpired
+                                      ? 'Expired'
+                                      : isExhausted
+                                      ? 'Limit Reached'
+                                      : coupon.isActive
+                                      ? 'Active'
+                                      : 'Paused'}
+                                  </span>
+                                </div>
+
+                                <div className="text-xs font-extrabold text-slate-900 dark:text-white tabular-nums">
+                                  {coupon.discountType === 'percentage'
+                                    ? `${coupon.discountValue}% OFF`
+                                    : `₹${coupon.discountValue.toLocaleString('en-IN')} FLAT OFF`}
+                                  {coupon.maxDiscountAmount
+                                    ? ` (up to ₹${coupon.maxDiscountAmount.toLocaleString('en-IN')})`
+                                    : ''}
+                                </div>
+
+                                {coupon.description && (
+                                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                    {coupon.description}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="text-right text-[11px] tabular-nums shrink-0">
+                                <div className="text-slate-400 font-semibold">Used</div>
+                                <div className="font-black text-slate-900 dark:text-white">
+                                  {coupon.usedCount || 0}
+                                  {coupon.maxUses ? ` / ${coupon.maxUses}` : ' / ∞'}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Metadata & Actions */}
+                            <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+                              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                                <span className="capitalize font-semibold text-slate-700 dark:text-slate-300">
+                                  Scope:{' '}
+                                  {coupon.applicablePlanIds && coupon.applicablePlanIds.length > 0
+                                    ? coupon.applicablePlanIds
+                                        .map((pid) => plans.find((p) => p.id === pid)?.name || pid)
+                                        .join(', ')
+                                    : coupon.applicableTo === 'all'
+                                    ? 'All Plans & Add-ons'
+                                    : coupon.applicableTo === 'plans'
+                                    ? 'All Plans'
+                                    : 'Add-ons Only'}
+                                </span>
+                                {coupon.minOrderAmount ? (
+                                  <span>· Min ₹{coupon.minOrderAmount.toLocaleString('en-IN')}</span>
+                                ) : null}
+                                {coupon.validUntil ? <span>· Until {coupon.validUntil.slice(0, 10)}</span> : null}
+                                {coupon.allowWithReferral ? (
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                                    · Stackable
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleCouponStatus(coupon.id, !coupon.isActive)}
+                                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] cursor-pointer transition-colors ${
+                                    coupon.isActive
+                                      ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300'
+                                      : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
+                                  }`}
+                                >
+                                  {coupon.isActive ? 'Pause' : 'Activate'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingCoupon({ ...coupon });
+                                    setIsCouponModalOpen(true);
+                                  }}
+                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                                  title="Edit Coupon"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteCoupon(coupon.id)}
+                                  className="p-1.5 rounded-lg border border-rose-200 dark:border-rose-900 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+                                  title="Delete Coupon"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2073,7 +2627,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                           </div>
                         </div>
 
-                        <div className="border-l border-slate-200 dark:border-slate-700 pl-4 text-right">
+                        <div className="border-l border-slate-200 dark:border-slate-700 pl-4 text-right tabular-nums">
                           <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                             {p.status === 'verified' ? 'Total Paid' : 'Amount Submitted'}
                           </div>
@@ -2082,7 +2636,8 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                           </div>
                           {p.discountAmount ? (
                             <div className="text-[10px] text-emerald-600 font-bold">
-                              ₹{p.discountAmount} Off
+                              ₹{p.discountAmount.toLocaleString('en-IN')} Off
+                              {p.couponCode ? ` (${p.couponCode})` : ''}
                             </div>
                           ) : null}
                         </div>
@@ -4103,6 +4658,705 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT / CREATE SUBSCRIPTION PLAN MODAL */}
+      {editingPlan && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-xl w-full p-6 shadow-2xl space-y-4 my-auto animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-white text-base">
+                  {plans.some((p) => p.id === editingPlan.id)
+                    ? `Edit Plan: ${editingPlan.name}`
+                    : 'Create Custom Subscription Plan'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Changes apply immediately across Pricing Modal, Settings, Quota Enforcement & Checkout
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingPlan(null)}
+                className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!editingPlan.name.trim()) {
+                  showToast('Plan name is required.', 'error');
+                  return;
+                }
+                setIsSavingPlan(true);
+                try {
+                  const parsedFeatures = planFeaturesText
+                    .split('\n')
+                    .map((line) => line.trim())
+                    .filter(Boolean);
+                  await saveSubscriptionPlan({
+                    ...editingPlan,
+                    features: parsedFeatures,
+                  });
+                  setEditingPlan(null);
+                } catch (err: any) {
+                  showToast(err?.message || 'Failed to save plan', 'error');
+                } finally {
+                  setIsSavingPlan(false);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Plan Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingPlan.name}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, name: e.target.value })}
+                    placeholder="e.g. Starter / Pro / Enterprise"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Target Audience Subtitle
+                  </label>
+                  <input
+                    type="text"
+                    value={editingPlan.targetAudience || ''}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, targetAudience: e.target.value })}
+                    placeholder="e.g. For growing service teams"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/80 dark:border-indigo-900/60 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Annual Selling Price (₹ / year) *
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      required
+                      value={editingPlan.price}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        setEditingPlan({ ...editingPlan, price: val, yearlyPrice: val });
+                      }}
+                      className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-black text-sm text-indigo-700 dark:text-indigo-300 tabular-nums"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Original / MRP Strikethrough Price (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editingPlan.originalPrice ?? ''}
+                      onChange={(e) =>
+                        setEditingPlan({
+                          ...editingPlan,
+                          originalPrice: e.target.value === '' ? undefined : Number(e.target.value),
+                        })
+                      }
+                      placeholder="Optional (auto 20% if blank)"
+                      className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold tabular-nums"
+                    />
+                  </div>
+                </div>
+                {(() => {
+                  const preview = calculateAnnualPricing(
+                    editingPlan.price,
+                    editingPlan.originalPrice,
+                    editingPlan.billingCycle
+                  );
+                  return (
+                    <div className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 tabular-nums">
+                      Preview: ₹{preview.discountedAnnual.toLocaleString('en-IN')}/yr (~₹
+                      {preview.monthlyEquivalent.toLocaleString('en-IN')}/mo)
+                      {preview.savings > 0
+                        ? ` · Strikethrough ₹${preview.originalAnnual.toLocaleString('en-IN')} (${preview.discountPercent}% OFF)`
+                        : ''}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Max Staff *
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    required
+                    value={editingPlan.maxStaff}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, maxStaff: Number(e.target.value) || 1 })}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold tabular-nums"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Max Jobs / mo *
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    required
+                    value={editingPlan.maxJobs}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, maxJobs: Number(e.target.value) || 1 })}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold tabular-nums"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Max Customers *
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    required
+                    value={editingPlan.maxCustomers}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, maxCustomers: Number(e.target.value) || 1 })}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold tabular-nums"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Highlight Badge (if Popular)
+                  </label>
+                  <input
+                    type="text"
+                    value={editingPlan.badge || ''}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, badge: e.target.value })}
+                    placeholder="e.g. MOST POPULAR"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Display Order
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={editingPlan.sortOrder ?? 1}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, sortOrder: Number(e.target.value) || 1 })}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 tabular-nums"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Features Checklist (one per line)
+                </label>
+                <textarea
+                  rows={5}
+                  value={planFeaturesText}
+                  onChange={(e) => setPlanFeaturesText(e.target.value)}
+                  placeholder="Enter one feature per line..."
+                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs leading-relaxed"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-4 pt-1">
+                <label className="inline-flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editingPlan.popular)}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, popular: e.target.checked })}
+                    className="w-4 h-4 rounded accent-indigo-600"
+                  />
+                  <span>Mark as Most Popular</span>
+                </label>
+
+                <label className="inline-flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editingPlan.isActive !== false}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, isActive: e.target.checked })}
+                    className="w-4 h-4 rounded accent-emerald-600"
+                  />
+                  <span>Active & Visible to Tenants</span>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingPlan(null)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingPlan}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold flex items-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{isSavingPlan ? 'Saving...' : 'Save Plan Live'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT ADD-ON PACK MODAL */}
+      {editingAddon && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 shadow-2xl space-y-4 my-auto animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 className="font-black text-slate-900 dark:text-white text-base">
+                Edit Add-on Pack
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditingAddon(null)}
+                className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setIsSavingAddon(true);
+                try {
+                  await saveAddonPack(editingAddon);
+                  setEditingAddon(null);
+                } catch (err: any) {
+                  showToast(err?.message || 'Failed to update add-on', 'error');
+                } finally {
+                  setIsSavingAddon(false);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Add-on Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingAddon.name}
+                  onChange={(e) => setEditingAddon({ ...editingAddon, name: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Annual Price (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    required
+                    value={editingAddon.yearlyPrice ?? editingAddon.price}
+                    onChange={(e) => {
+                      const val = Number(e.target.value) || 0;
+                      setEditingAddon({ ...editingAddon, yearlyPrice: val, price: val });
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-black text-indigo-600 tabular-nums"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Quota Increase *
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    required
+                    value={editingAddon.capacityIncrease}
+                    onChange={(e) =>
+                      setEditingAddon({ ...editingAddon, capacityIncrease: Number(e.target.value) || 1 })
+                    }
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold tabular-nums"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Description
+                </label>
+                <textarea
+                  rows={2}
+                  value={editingAddon.description}
+                  onChange={(e) => setEditingAddon({ ...editingAddon, description: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                />
+              </div>
+
+              <label className="inline-flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editingAddon.isActive !== false}
+                  onChange={(e) => setEditingAddon({ ...editingAddon, isActive: e.target.checked })}
+                  className="w-4 h-4 rounded accent-emerald-600"
+                />
+                <span>Visible to Tenants</span>
+              </label>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingAddon(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingAddon}
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingAddon ? 'Saving...' : 'Save Add-on'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE / EDIT PROMO COUPON MODAL */}
+      {isCouponModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 shadow-2xl space-y-4 my-auto animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-white text-base flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-indigo-600" />
+                  <span>{editingCoupon.id ? `Edit Coupon: ${editingCoupon.code}` : 'Create Discount Coupon Code'}</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Tenants can apply this code during UPI/Bank subscription checkout
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCouponModalOpen(false)}
+                className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!editingCoupon.code?.trim()) {
+                  showToast('Coupon code is required.', 'error');
+                  return;
+                }
+                setIsSavingCoupon(true);
+                try {
+                  await saveCoupon({
+                    ...editingCoupon,
+                    code: editingCoupon.code.trim().toUpperCase(),
+                    discountType: editingCoupon.discountType || 'percentage',
+                    discountValue: Number(editingCoupon.discountValue) || 10,
+                  });
+                  setIsCouponModalOpen(false);
+                } catch (err: any) {
+                  showToast(err?.message || 'Failed to save coupon', 'error');
+                } finally {
+                  setIsSavingCoupon(false);
+                }
+              }}
+              className="space-y-4 text-xs"
+            >
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Coupon Code *
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={editingCoupon.code || ''}
+                    onChange={(e) =>
+                      setEditingCoupon({
+                        ...editingCoupon,
+                        code: e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''),
+                      })
+                    }
+                    placeholder="e.g. WELCOME20 or FESTIVE500"
+                    className="flex-1 p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono font-black uppercase tracking-wider text-sm text-indigo-700 dark:text-indigo-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const randomCode = `SERVI${Math.floor(100 + Math.random() * 900)}`;
+                      setEditingCoupon({ ...editingCoupon, code: randomCode });
+                    }}
+                    className="px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1 cursor-pointer"
+                    title="Auto Generate Code"
+                  >
+                    <Shuffle className="w-3.5 h-3.5" />
+                    <span>Auto</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Campaign Note / Description (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={editingCoupon.description || ''}
+                  onChange={(e) => setEditingCoupon({ ...editingCoupon, description: e.target.value })}
+                  placeholder="e.g. Festive Launch Offer - 20% Off Annual Plans"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Discount Type *
+                  </label>
+                  <select
+                    value={editingCoupon.discountType || 'percentage'}
+                    onChange={(e) =>
+                      setEditingCoupon({
+                        ...editingCoupon,
+                        discountType: e.target.value as 'percentage' | 'flat',
+                      })
+                    }
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold"
+                  >
+                    <option value="percentage">Percentage (%)</option>
+                    <option value="flat">Flat Amount (₹)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    {editingCoupon.discountType === 'flat' ? 'Discount Amount (₹) *' : 'Discount Percentage (%) *'}
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={editingCoupon.discountType === 'flat' ? 100000 : 100}
+                    required
+                    value={editingCoupon.discountValue ?? ''}
+                    onChange={(e) =>
+                      setEditingCoupon({ ...editingCoupon, discountValue: Number(e.target.value) })
+                    }
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-black tabular-nums"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {editingCoupon.discountType !== 'flat' && (
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Max Discount Cap (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editingCoupon.maxDiscountAmount ?? ''}
+                      onChange={(e) =>
+                        setEditingCoupon({
+                          ...editingCoupon,
+                          maxDiscountAmount: e.target.value === '' ? undefined : Number(e.target.value),
+                        })
+                      }
+                      placeholder="Optional (No cap)"
+                      className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 tabular-nums"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Minimum Order Amount (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editingCoupon.minOrderAmount ?? ''}
+                    onChange={(e) =>
+                      setEditingCoupon({
+                        ...editingCoupon,
+                        minOrderAmount: e.target.value === '' ? undefined : Number(e.target.value),
+                      })
+                    }
+                    placeholder="Optional (e.g. 2000)"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 tabular-nums"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Applicable To
+                  </label>
+                  <select
+                    value={editingCoupon.applicableTo || 'all'}
+                    onChange={(e) =>
+                      setEditingCoupon({
+                        ...editingCoupon,
+                        applicableTo: e.target.value as 'all' | 'plans' | 'addons',
+                      })
+                    }
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-semibold"
+                  >
+                    <option value="all">All Plans & Add-ons</option>
+                    <option value="plans">Subscription Plans Only</option>
+                    <option value="addons">Add-on Packs Only</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Max Total Redemptions
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editingCoupon.maxUses ?? ''}
+                    onChange={(e) =>
+                      setEditingCoupon({
+                        ...editingCoupon,
+                        maxUses: e.target.value === '' ? undefined : Number(e.target.value),
+                      })
+                    }
+                    placeholder="Blank = Unlimited"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 tabular-nums"
+                  />
+                </div>
+              </div>
+
+              {editingCoupon.applicableTo !== 'addons' && (
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Restrict to Specific Plans (Optional — leave unchecked for all plans)
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {plans.map((p) => {
+                      const selected = (editingCoupon.applicablePlanIds || []).includes(p.id);
+                      return (
+                        <label
+                          key={p.id}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold cursor-pointer ${
+                            selected
+                              ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300'
+                              : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={(e) => {
+                              const prev = editingCoupon.applicablePlanIds || [];
+                              const next = e.target.checked
+                                ? [...prev, p.id]
+                                : prev.filter((id) => id !== p.id);
+                              setEditingCoupon({ ...editingCoupon, applicablePlanIds: next });
+                            }}
+                            className="accent-indigo-600"
+                          />
+                          <span>{p.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Valid From (Optional)
+                  </label>
+                  <input
+                    type="date"
+                    value={editingCoupon.validFrom?.slice(0, 10) || ''}
+                    onChange={(e) => setEditingCoupon({ ...editingCoupon, validFrom: e.target.value || undefined })}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Expiry Date (Optional)
+                  </label>
+                  <input
+                    type="date"
+                    value={editingCoupon.validUntil?.slice(0, 10) || ''}
+                    onChange={(e) => setEditingCoupon({ ...editingCoupon, validUntil: e.target.value || undefined })}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-4 pt-1">
+                <label className="inline-flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editingCoupon.isActive !== false}
+                    onChange={(e) => setEditingCoupon({ ...editingCoupon, isActive: e.target.checked })}
+                    className="w-4 h-4 rounded accent-emerald-600"
+                  />
+                  <span>Active Immediately</span>
+                </label>
+
+                <label className="inline-flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editingCoupon.allowWithReferral)}
+                    onChange={(e) => setEditingCoupon({ ...editingCoupon, allowWithReferral: e.target.checked })}
+                    className="w-4 h-4 rounded accent-indigo-600"
+                  />
+                  <span>Stackable with 10% Referral Discount</span>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsCouponModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingCoupon}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold flex items-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{isSavingCoupon ? 'Saving...' : editingCoupon.id ? 'Update Coupon' : 'Create Coupon'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

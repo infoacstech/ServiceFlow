@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   CreditCard,
@@ -13,15 +13,16 @@ import {
   ExternalLink,
   Receipt,
   FileCheck,
+  Tag,
+  AlertCircle,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Plan, SubscriptionPayment } from '../types';
+import { Plan, SubscriptionPayment, SubscriptionCoupon } from '../types';
 import {
   AddonPack,
   SAAS_UPI_CONFIG,
   buildUpiPaymentUrl,
   calculateAnnualPricing,
-  ANNUAL_DISCOUNT_PERCENT,
 } from '../utils/planUtils';
 import {
   generateUniqueInvoiceNumber,
@@ -45,11 +46,17 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
   onClose,
   plan,
   addon,
-  defaultBillingCycle = 'yearly',
   onPaymentSuccess,
   onViewReceipt,
 }) => {
-  const { currentBusiness, currentUser, showToast, logActivity, submitSubscriptionPayment, subscriptionPayments } = useApp();
+  const {
+    currentBusiness,
+    currentUser,
+    showToast,
+    submitSubscriptionPayment,
+    subscriptionPayments,
+    validateCoupon,
+  } = useApp();
 
   const billingCycle: 'yearly' = 'yearly';
   const [activePaymentTab, setActivePaymentTab] = useState<'upi_qr' | 'bank_transfer'>('upi_qr');
@@ -62,25 +69,109 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedPayment, setSubmittedPayment] = useState<SubscriptionPayment | null>(null);
 
+  // Coupon state
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<SubscriptionCoupon | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+
+  // Reset checkout form when modal opens or selected item changes
+  useEffect(() => {
+    if (isOpen) {
+      setUtrNumber('');
+      setNotes('');
+      setSubmittedPayment(null);
+      setIsSubmitting(false);
+      setCouponInput('');
+      setAppliedCoupon(null);
+      setCouponError(null);
+      setSenderName(currentUser?.name || currentBusiness?.name || '');
+      setSenderPhone(currentUser?.phone || currentBusiness?.mobile || '');
+    }
+  }, [isOpen, plan?.id, addon?.id]);
+
   if (!isOpen || (!plan && !addon)) return null;
 
   const isPlan = Boolean(plan);
   const itemName = isPlan ? `${plan!.name} Plan` : addon!.name;
 
-  // Pricing Calculation (Annual Billing Only)
+  // Pricing Calculation (Live Customizable Plan / Add-on Pricing)
   let basePrice = 0;
   if (isPlan) {
-    const annualCalc = calculateAnnualPricing(plan!.price);
+    const annualCalc = calculateAnnualPricing(plan!.price, plan!.originalPrice, plan!.billingCycle);
     basePrice = annualCalc.discountedAnnual;
   } else {
-    basePrice = addon!.yearlyPrice ? addon!.yearlyPrice : addon!.price;
+    basePrice = addon!.yearlyPrice ?? addon!.price;
   }
 
-  // Check 10% referral discount eligibility
-  const hasReferralDiscount = Boolean(currentBusiness?.referralDiscountApplied);
-  const discountPercent = hasReferralDiscount ? 10 : 0;
-  const discountAmount = hasReferralDiscount ? Math.round((basePrice * 10) / 100) : 0;
+  // Referral + Coupon Discount Resolution
+  const hasReferralEligibility = Boolean(currentBusiness?.referralDiscountApplied);
+  const rawReferralDiscount = hasReferralEligibility ? Math.round((basePrice * 10) / 100) : 0;
+
+  const liveCouponEval = appliedCoupon
+    ? validateCoupon(appliedCoupon.code, {
+        itemPrice: basePrice,
+        itemType: isPlan ? 'plan' : 'addon',
+        planId: plan?.id,
+      })
+    : null;
+
+  const activeCoupon = liveCouponEval?.valid ? liveCouponEval.coupon : null;
+  const rawCouponDiscount = liveCouponEval?.valid ? liveCouponEval.discountAmount : 0;
+
+  let referralDiscountAmount = rawReferralDiscount;
+  let couponDiscountAmount = 0;
+  let discountNote: string | null = null;
+
+  if (activeCoupon && rawCouponDiscount > 0) {
+    if (activeCoupon.allowWithReferral) {
+      referralDiscountAmount = rawReferralDiscount;
+      couponDiscountAmount = Math.min(Math.max(0, basePrice - referralDiscountAmount), rawCouponDiscount);
+    } else if (hasReferralEligibility) {
+      if (rawCouponDiscount >= rawReferralDiscount) {
+        referralDiscountAmount = 0;
+        couponDiscountAmount = rawCouponDiscount;
+        discountNote = 'Coupon discount applied (replaces 10% referral discount as it gives higher savings).';
+      } else {
+        referralDiscountAmount = rawReferralDiscount;
+        couponDiscountAmount = 0;
+        discountNote = '10% Referral Discount kept because it saves more than this non-stackable coupon.';
+      }
+    } else {
+      referralDiscountAmount = 0;
+      couponDiscountAmount = rawCouponDiscount;
+    }
+  }
+
+  const discountPercent = referralDiscountAmount > 0 ? 10 : 0;
+  const discountAmount = referralDiscountAmount + couponDiscountAmount;
   const netPayable = Math.max(0, basePrice - discountAmount);
+
+  const handleApplyCoupon = () => {
+    const result = validateCoupon(couponInput, {
+      itemPrice: basePrice,
+      itemType: isPlan ? 'plan' : 'addon',
+      planId: plan?.id,
+    });
+
+    if (!result.valid || !result.coupon) {
+      setAppliedCoupon(null);
+      setCouponError(result.error || 'Coupon code is not valid.');
+      return;
+    }
+
+    setAppliedCoupon(result.coupon);
+    setCouponError(null);
+    showToast(
+      `Coupon ${result.coupon.code} applied! Savings: ₹${result.discountAmount.toLocaleString('en-IN')}`,
+      'success'
+    );
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError(null);
+  };
 
   // Generate UPI URI
   const upiTxNote = `ServiFlow ${itemName} (Annual)`;
@@ -106,8 +197,12 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
 
   const handleSubmitUtr = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanUtr = utrNumber.trim();
-    if (!cleanUtr || cleanUtr.length < 6) {
+    const isFreeWithCoupon = netPayable === 0 && Boolean(activeCoupon);
+    const cleanUtr = isFreeWithCoupon
+      ? (utrNumber.trim() || `CPN-${activeCoupon!.code}-${Date.now().toString().slice(-6)}`)
+      : utrNumber.trim();
+
+    if (!isFreeWithCoupon && (!cleanUtr || cleanUtr.length < 6)) {
       showToast('Please enter a valid 12-digit UPI UTR / Bank Reference Number', 'error');
       return;
     }
@@ -147,6 +242,10 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
       amount: basePrice,
       discountAmount,
       referralDiscountPercent: discountPercent,
+      referralDiscountAmount: referralDiscountAmount > 0 ? referralDiscountAmount : undefined,
+      couponCode: couponDiscountAmount > 0 && activeCoupon ? activeCoupon.code : undefined,
+      couponId: couponDiscountAmount > 0 && activeCoupon ? activeCoupon.id : undefined,
+      couponDiscountAmount: couponDiscountAmount > 0 ? couponDiscountAmount : undefined,
       netPayable,
       utrNumber: cleanUtr,
       paymentMethod: activePaymentTab === 'upi_qr' ? 'upi' : 'bank_transfer',
@@ -182,7 +281,7 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
         onPaymentSuccess(paymentRecord);
       }
       showToast('Payment verification request submitted successfully!', 'success');
-    }, 800);
+    }, 600);
   };
 
   return (
@@ -243,6 +342,14 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
                   {submittedPayment.planName} ({submittedPayment.billingCycle})
                 </span>
               </div>
+              {submittedPayment.couponCode && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Coupon Applied:</span>
+                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    {submittedPayment.couponCode} (-₹{(submittedPayment.couponDiscountAmount || 0).toLocaleString('en-IN')})
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-slate-500">Submitted UTR #:</span>
                 <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
@@ -251,7 +358,7 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
               </div>
               <div className="flex justify-between pt-2 border-t border-slate-200 dark:border-slate-700 text-sm">
                 <span className="font-bold text-slate-700 dark:text-slate-300">Amount Submitted:</span>
-                <span className="font-black text-amber-600 dark:text-amber-400">
+                <span className="font-black text-amber-600 dark:text-amber-400 tabular-nums">
                   ₹{submittedPayment.netPayable.toLocaleString('en-IN')}
                 </span>
               </div>
@@ -279,17 +386,17 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
           </div>
         ) : (
           /* FORM STATE */
-          <div className="p-5 sm:p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+          <div className="p-5 sm:p-6 space-y-5 max-h-[82vh] overflow-y-auto">
             {/* Top Order Summary Bar */}
             <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-black text-sm text-slate-900 dark:text-slate-100">
                     {itemName}
                   </span>
-                  {hasReferralDiscount && (
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white font-extrabold text-[10px]">
-                      10% REF DISCOUNT
+                  {referralDiscountAmount > 0 && (
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-600 text-white font-bold text-[10px]">
+                      10% REFERRAL
                     </span>
                   )}
                 </div>
@@ -305,18 +412,110 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
               </div>
             </div>
 
+            {/* Promo / Coupon Code Input */}
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <span>Have a Promo / Coupon Code?</span>
+                </label>
+                {activeCoupon && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
+                  >
+                    Remove Coupon
+                  </button>
+                )}
+              </div>
+
+              {activeCoupon ? (
+                <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <div className="min-w-0">
+                      <span className="font-mono font-black text-emerald-800 dark:text-emerald-300">
+                        {activeCoupon.code}
+                      </span>
+                      <span className="text-emerald-700 dark:text-emerald-400 ml-2 font-semibold">
+                        ({activeCoupon.discountType === 'percentage'
+                          ? `${activeCoupon.discountValue}% OFF`
+                          : `₹${activeCoupon.discountValue.toLocaleString('en-IN')} OFF`}
+                        )
+                      </span>
+                      {activeCoupon.description && (
+                        <div className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80 truncate">
+                          {activeCoupon.description}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <span className="font-mono font-black text-emerald-700 dark:text-emerald-300 shrink-0 tabular-nums">
+                    -₹{rawCouponDiscount.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={couponInput}
+                    onChange={(e) => {
+                      setCouponInput(e.target.value.toUpperCase());
+                      if (couponError) setCouponError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleApplyCoupon();
+                      }
+                    }}
+                    placeholder="Enter promo code (e.g. WELCOME20)"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 font-mono text-xs uppercase tracking-wider text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    disabled={!couponInput.trim()}
+                    className="px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-indigo-600 hover:opacity-90 text-white font-bold text-xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0 min-h-[40px]"
+                  >
+                    Apply
+                  </button>
+                </div>
+              )}
+
+              {couponError && (
+                <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{couponError}</span>
+                </p>
+              )}
+
+              {discountNote && (
+                <p className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                  {discountNote}
+                </p>
+              )}
+            </div>
+
             {/* Price Breakdown Calculation Box */}
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs space-y-2">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs space-y-2 tabular-nums">
               <div className="flex justify-between text-slate-600 dark:text-slate-400">
                 <span>Standard Pricing (Annual Subscription):</span>
                 <span className="font-semibold text-slate-800 dark:text-slate-200">
                   ₹{basePrice.toLocaleString('en-IN')}
                 </span>
               </div>
-              {hasReferralDiscount && (
+              {referralDiscountAmount > 0 && (
                 <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
                   <span>Referral Partner Discount (10% OFF):</span>
-                  <span>-₹{discountAmount.toLocaleString('en-IN')}</span>
+                  <span>-₹{referralDiscountAmount.toLocaleString('en-IN')}</span>
+                </div>
+              )}
+              {couponDiscountAmount > 0 && activeCoupon && (
+                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
+                  <span>Promo Coupon ({activeCoupon.code}):</span>
+                  <span>-₹{couponDiscountAmount.toLocaleString('en-IN')}</span>
                 </div>
               )}
               <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-baseline">
@@ -335,59 +534,61 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
             </div>
 
             {/* Payment Method Switcher */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-                  Select Direct Payment Channel
-                </span>
-                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5" /> 0% Transaction Fees
-                </span>
-              </div>
+            {netPayable > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                    Select Direct Payment Channel
+                  </span>
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5" /> 0% Transaction Fees
+                  </span>
+                </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setActivePaymentTab('upi_qr')}
-                  className={`p-3.5 rounded-2xl border flex items-center gap-3 transition-all cursor-pointer ${
-                    activePaymentTab === 'upi_qr'
-                      ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-100 font-bold'
-                      : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  <QrCode className="w-5 h-5 text-indigo-600 shrink-0" />
-                  <div className="text-left text-xs">
-                    <div className="font-bold">Instant UPI QR Code</div>
-                    <div className="text-[10px] text-slate-500">GPay, PhonePe, Paytm, BHIM</div>
-                  </div>
-                </button>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setActivePaymentTab('upi_qr')}
+                    className={`p-3.5 rounded-2xl border flex items-center gap-3 transition-all cursor-pointer ${
+                      activePaymentTab === 'upi_qr'
+                        ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-100 font-bold'
+                        : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    <QrCode className="w-5 h-5 text-indigo-600 shrink-0" />
+                    <div className="text-left text-xs">
+                      <div className="font-bold">Instant UPI QR Code</div>
+                      <div className="text-[10px] text-slate-500">GPay, PhonePe, Paytm, BHIM</div>
+                    </div>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setActivePaymentTab('bank_transfer')}
-                  className={`p-3.5 rounded-2xl border flex items-center gap-3 transition-all cursor-pointer ${
-                    activePaymentTab === 'bank_transfer'
-                      ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-100 font-bold'
-                      : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400'
-                  }`}
-                >
-                  <Building2 className="w-5 h-5 text-indigo-600 shrink-0" />
-                  <div className="text-left text-xs">
-                    <div className="font-bold">NEFT / IMPS Bank Transfer</div>
-                    <div className="text-[10px] text-slate-500">Corporate & Current A/C</div>
-                  </div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setActivePaymentTab('bank_transfer')}
+                    className={`p-3.5 rounded-2xl border flex items-center gap-3 transition-all cursor-pointer ${
+                      activePaymentTab === 'bank_transfer'
+                        ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-100 font-bold'
+                        : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    <Building2 className="w-5 h-5 text-indigo-600 shrink-0" />
+                    <div className="text-left text-xs">
+                      <div className="font-bold">NEFT / IMPS Bank Transfer</div>
+                      <div className="text-[10px] text-slate-500">Corporate & Current A/C</div>
+                    </div>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* CHANNEL 1: UPI QR CODE */}
-            {activePaymentTab === 'upi_qr' && (
+            {netPayable > 0 && activePaymentTab === 'upi_qr' && (
               <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center gap-6">
                 {/* QR Display */}
                 <div className="p-3 bg-white rounded-2xl border-2 border-indigo-200 dark:border-indigo-800 shadow-sm shrink-0 flex flex-col items-center">
                   <QRCodeSVG value={upiUrl} size={160} level="M" />
-                  <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mt-2">
-                    Scan to Pay ₹{netPayable}
+                  <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mt-2 tabular-nums">
+                    Scan to Pay ₹{netPayable.toLocaleString('en-IN')}
                   </span>
                 </div>
 
@@ -426,7 +627,7 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
             )}
 
             {/* CHANNEL 2: DIRECT BANK TRANSFER */}
-            {activePaymentTab === 'bank_transfer' && (
+            {netPayable > 0 && activePaymentTab === 'bank_transfer' && (
               <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-slate-700 dark:text-slate-300">
@@ -463,32 +664,50 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
               </div>
             )}
 
+            {netPayable === 0 && activeCoupon && (
+              <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-xs text-emerald-900 dark:text-emerald-200 flex items-center gap-2.5">
+                <Check className="w-5 h-5 text-emerald-600 shrink-0" />
+                <div>
+                  <div className="font-black">100% Covered by Coupon ({activeCoupon.code})</div>
+                  <div className="text-[11px] opacity-85">
+                    No UPI/Bank transfer needed. Click below to submit your activation request to Super Admin.
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* STEP 2: VERIFICATION FORM */}
             <form onSubmit={handleSubmitUtr} className="space-y-4 pt-2 border-t border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-slate-100">
                 <span className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px]">
                   2
                 </span>
-                <span>Enter Transaction Reference / UTR Number to Activate</span>
+                <span>
+                  {netPayable === 0
+                    ? 'Confirm Activation Request'
+                    : 'Enter Transaction Reference / UTR Number to Activate'}
+                </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    12-Digit UTR / UPI Reference No. <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={utrNumber}
-                    onChange={(e) => setUtrNumber(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-                    placeholder="e.g. 423589201948 or UPI Ref ID"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-sm uppercase tracking-wider text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none"
-                  />
-                  <span className="text-[11px] text-slate-400 mt-1 block">
-                    You can find this 12-digit number in your Google Pay, PhonePe, or Banking app transfer receipt.
-                  </span>
-                </div>
+                {netPayable > 0 && (
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      12-Digit UTR / UPI Reference No. <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={utrNumber}
+                      onChange={(e) => setUtrNumber(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                      placeholder="e.g. 423589201948 or UPI Ref ID"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-sm uppercase tracking-wider text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                    <span className="text-[11px] text-slate-400 mt-1 block">
+                      You can find this 12-digit number in your Google Pay, PhonePe, or Banking app transfer receipt.
+                    </span>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
@@ -538,7 +757,7 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || !utrNumber.trim()}
+                  disabled={isSubmitting || (netPayable > 0 && !utrNumber.trim())}
                   className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
@@ -546,7 +765,13 @@ export const SubscriptionCheckoutModal: React.FC<SubscriptionCheckoutModalProps>
                   ) : (
                     <ArrowRight className="w-4 h-4" />
                   )}
-                  <span>{isSubmitting ? 'Verifying...' : `Submit UTR & Activate Plan`}</span>
+                  <span>
+                    {isSubmitting
+                      ? 'Submitting...'
+                      : netPayable === 0
+                      ? 'Submit & Activate Plan'
+                      : 'Submit UTR & Activate Plan'}
+                  </span>
                 </button>
               </div>
             </form>

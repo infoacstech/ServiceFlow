@@ -525,15 +525,43 @@ export const SubscriptionReceiptModal: React.FC<SubscriptionReceiptModalProps> =
               </div>
 
               {fin.hasDiscount ? (
-                <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
-                  <span className="flex items-center gap-1">
-                    <BadgePercent className="w-3.5 h-3.5" />
-                    <span>Referral / Promo Discount:</span>
-                  </span>
-                  <span className="font-mono font-bold">
-                    -₹{fin.discountAmount.toLocaleString('en-IN')}
-                  </span>
-                </div>
+                <>
+                  {payment.referralDiscountAmount && payment.referralDiscountAmount > 0 ? (
+                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                      <span className="flex items-center gap-1">
+                        <BadgePercent className="w-3.5 h-3.5" />
+                        <span>Referral Discount (10%):</span>
+                      </span>
+                      <span className="font-mono font-bold">
+                        -₹{payment.referralDiscountAmount.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  ) : null}
+                  {payment.couponDiscountAmount && payment.couponDiscountAmount > 0 ? (
+                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                      <span className="flex items-center gap-1">
+                        <BadgePercent className="w-3.5 h-3.5" />
+                        <span>Coupon ({payment.couponCode}):</span>
+                      </span>
+                      <span className="font-mono font-bold">
+                        -₹{payment.couponDiscountAmount.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  ) : null}
+                  {!payment.referralDiscountAmount && !payment.couponDiscountAmount && (
+                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                      <span className="flex items-center gap-1">
+                        <BadgePercent className="w-3.5 h-3.5" />
+                        <span>
+                          {payment.couponCode ? `Promo (${payment.couponCode})` : 'Referral / Promo Discount'}:
+                        </span>
+                      </span>
+                      <span className="font-mono font-bold">
+                        -₹{fin.discountAmount.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="flex justify-between text-slate-400">
                   <span>Discount:</span>

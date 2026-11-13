@@ -419,5 +419,22 @@ service cloud.firestore {
       );
       allow update, delete: if isSuperAdmin();
     }
+
+    // Customizable Subscription Plans & Add-on Packs (Readable globally, editable only by Super Admin)
+    match /plans/{planId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /addonPacks/{addonId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // Promo & Discount Coupons (Readable by authenticated tenants for checkout validation, managed only by Super Admin)
+    match /coupons/{couponId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
   }
 }
