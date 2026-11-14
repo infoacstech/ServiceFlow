@@ -4,24 +4,13 @@ import { navigationManager, useBackHandler } from './utils/backNavigation';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { MobileNav } from './components/MobileNav';
-import { OnboardingModal } from './components/OnboardingModal';
-import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { ToastContainer } from './components/ToastContainer';
-import { ActivityLogDrawer } from './components/ActivityLogDrawer';
 import { OfflineSyncBanner } from './components/OfflineSyncBanner';
 import { SupportSessionBanner } from './components/SupportSessionBanner';
 import { GlobalBroadcastBanner } from './components/GlobalBroadcastBanner';
-import { AuthModal } from './components/AuthModal';
 import { AccessDeniedView } from './components/AccessDeniedView';
 import { PullToRefresh } from './components/PullToRefresh';
-import { JobNotificationPopup } from './components/JobNotificationPopup';
-import { QuickActionFab } from './components/QuickActionFab';
-import { UserProfileDrawer } from './components/UserProfileDrawer';
-import { InstallAppModal } from './components/InstallAppModal';
-import { PwaInstallPrompt } from './components/PwaInstallPrompt';
 import { TrialStatusBanner } from './components/TrialStatusBanner';
-import { TrialExpiredModal } from './components/TrialExpiredModal';
-import { LandingView } from './views/LandingView';
 
 import type { JobInitialFilter } from './views/JobsView';
 import type { InvoiceInitialFilter } from './views/InvoicesView';
@@ -50,6 +39,17 @@ const NotificationsView = lazyWithRetry(() => import('./views/NotificationsView'
 const AttendanceView = lazyWithRetry(() => import('./views/AttendanceView').then(m => ({ default: m.AttendanceView })), 'AttendanceView');
 const EmployeeAttendanceView = lazyWithRetry(() => import('./views/EmployeeAttendanceView').then(m => ({ default: m.EmployeeAttendanceView })), 'EmployeeAttendanceView');
 const LoginView = lazyWithRetry(() => import('./views/LoginView').then(m => ({ default: m.LoginView })), 'LoginView');
+const LandingView = lazyWithRetry(() => import('./views/LandingView').then(m => ({ default: m.LandingView })), 'LandingView');
+const OnboardingModal = lazyWithRetry(() => import('./components/OnboardingModal').then(m => ({ default: m.OnboardingModal })), 'OnboardingModal');
+const GlobalSearchModal = lazyWithRetry(() => import('./components/GlobalSearchModal').then(m => ({ default: m.GlobalSearchModal })), 'GlobalSearchModal');
+const ActivityLogDrawer = lazyWithRetry(() => import('./components/ActivityLogDrawer').then(m => ({ default: m.ActivityLogDrawer })), 'ActivityLogDrawer');
+const AuthModal = lazyWithRetry(() => import('./components/AuthModal').then(m => ({ default: m.AuthModal })), 'AuthModal');
+const QuickActionFab = lazyWithRetry(() => import('./components/QuickActionFab').then(m => ({ default: m.QuickActionFab })), 'QuickActionFab');
+const UserProfileDrawer = lazyWithRetry(() => import('./components/UserProfileDrawer').then(m => ({ default: m.UserProfileDrawer })), 'UserProfileDrawer');
+const InstallAppModal = lazyWithRetry(() => import('./components/InstallAppModal').then(m => ({ default: m.InstallAppModal })), 'InstallAppModal');
+const TrialExpiredModal = lazyWithRetry(() => import('./components/TrialExpiredModal').then(m => ({ default: m.TrialExpiredModal })), 'TrialExpiredModal');
+const JobNotificationPopup = lazyWithRetry(() => import('./components/JobNotificationPopup').then(m => ({ default: m.JobNotificationPopup })), 'JobNotificationPopup');
+const PwaInstallPrompt = lazyWithRetry(() => import('./components/PwaInstallPrompt').then(m => ({ default: m.PwaInstallPrompt })), 'PwaInstallPrompt');
 const PrivacyPolicyView = lazyWithRetry(() => import('./views/PrivacyPolicyView').then(m => ({ default: m.PrivacyPolicyView })), 'PrivacyPolicyView');
 
 const ViewLoadingFallback: React.FC = () => (
@@ -389,7 +389,9 @@ const MainContent: React.FC = () => {
           </header>
 
           <main className="flex-1 max-w-4xl mx-auto w-full p-4 sm:p-6 overflow-y-auto">
-            <CustomerPortalView onBackToApp={() => setIsPublicCustomerPortal(false)} />
+            <React.Suspense fallback={<ViewLoadingFallback />}>
+              <CustomerPortalView onBackToApp={() => setIsPublicCustomerPortal(false)} />
+            </React.Suspense>
           </main>
           <ToastContainer />
         </div>
@@ -399,15 +401,17 @@ const MainContent: React.FC = () => {
     if (unauthView === 'landing') {
       return (
         <>
-          <LandingView
-            onOpenAuth={(tab, planName) => {
-              setPreselectedPlanName(planName);
-              setUnauthView(tab);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onOpenPrivacy={() => setIsPrivacyPolicyOpen(true)}
-            onOpenCustomerPortal={() => setIsPublicCustomerPortal(true)}
-          />
+          <React.Suspense fallback={<ViewLoadingFallback />}>
+            <LandingView
+              onOpenAuth={(tab, planName) => {
+                setPreselectedPlanName(planName);
+                setUnauthView(tab);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenPrivacy={() => setIsPrivacyPolicyOpen(true)}
+              onOpenCustomerPortal={() => setIsPublicCustomerPortal(true)}
+            />
+          </React.Suspense>
           <ToastContainer />
         </>
       );
@@ -580,63 +584,75 @@ const MainContent: React.FC = () => {
       {/* Mobile Bottom Navigation */}
       <MobileNav activeTab={activeTab} setActiveTab={handleTabChange} />
 
-      {/* Global Modals & Toasts */}
-      <TrialExpiredModal
-        isOpen={isTrialExpiredModalOpen}
-        onClose={closeTrialExpiredModal}
-        onUpgradeClick={() => handleTabChange('settings_subscription')}
-        actionAttempted={trialExpiredAction}
-      />
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-      />
-      <OnboardingModal
-        isOpen={isOnboardingOpen}
-        onClose={() => setIsOnboardingOpen(false)}
-      />
-      <GlobalSearchModal onSelectTab={(tab) => handleTabChange(tab)} />
-      <ActivityLogDrawer />
-      <JobNotificationPopup
-        onOpenJob={(jobId) => {
-          handleNavigateWithFilter('jobs', { query: jobId });
-        }}
-      />
-      <QuickActionFab
-        onOpenNewJob={handleOpenNewJob}
-        onNavigate={handleTabChange}
-        activeTab={activeTab}
-      />
+      {/* Global Modals & Toasts (Code-split & lazily loaded) */}
+      <React.Suspense fallback={null}>
+        {isTrialExpiredModalOpen && (
+          <TrialExpiredModal
+            isOpen={isTrialExpiredModalOpen}
+            onClose={closeTrialExpiredModal}
+            onUpgradeClick={() => handleTabChange('settings_subscription')}
+            actionAttempted={trialExpiredAction}
+          />
+        )}
+        {isAuthModalOpen && (
+          <AuthModal
+            isOpen={isAuthModalOpen}
+            onClose={() => setIsAuthModalOpen(false)}
+          />
+        )}
+        {isOnboardingOpen && (
+          <OnboardingModal
+            isOpen={isOnboardingOpen}
+            onClose={() => setIsOnboardingOpen(false)}
+          />
+        )}
+        <GlobalSearchModal onSelectTab={(tab) => handleTabChange(tab)} />
+        <ActivityLogDrawer />
+        <JobNotificationPopup
+          onOpenJob={(jobId) => {
+            handleNavigateWithFilter('jobs', { query: jobId });
+          }}
+        />
+        <QuickActionFab
+          onOpenNewJob={handleOpenNewJob}
+          onNavigate={handleTabChange}
+          activeTab={activeTab}
+        />
 
-      {/* Root-Level Full Viewport User Profile & Settings Drawer */}
-      <UserProfileDrawer
-        isOpen={isProfileDrawerOpen}
-        onClose={() => setIsProfileDrawerOpen(false)}
-        onNavigateToSettings={() => {
-          handleTabChange('settings');
-          setIsProfileDrawerOpen(false);
-        }}
-        onOpenInstallModal={() => {
-          setIsInstallModalOpen(true);
-          setIsProfileDrawerOpen(false);
-        }}
-        onSignOut={() => {
-          handleTabChange('login');
-        }}
-        onOpenPrivacy={() => {
-          setIsPrivacyPolicyOpen(true);
-          setIsProfileDrawerOpen(false);
-        }}
-      />
+        {/* Root-Level Full Viewport User Profile & Settings Drawer */}
+        {isProfileDrawerOpen && (
+          <UserProfileDrawer
+            isOpen={isProfileDrawerOpen}
+            onClose={() => setIsProfileDrawerOpen(false)}
+            onNavigateToSettings={() => {
+              handleTabChange('settings');
+              setIsProfileDrawerOpen(false);
+            }}
+            onOpenInstallModal={() => {
+              setIsInstallModalOpen(true);
+              setIsProfileDrawerOpen(false);
+            }}
+            onSignOut={() => {
+              handleTabChange('login');
+            }}
+            onOpenPrivacy={() => {
+              setIsPrivacyPolicyOpen(true);
+              setIsProfileDrawerOpen(false);
+            }}
+          />
+        )}
 
-      {/* Root-Level Standalone Installation Modal */}
-      <InstallAppModal
-        isOpen={isInstallModalOpen}
-        onClose={() => setIsInstallModalOpen(false)}
-      />
+        {/* Root-Level Standalone Installation Modal */}
+        {isInstallModalOpen && (
+          <InstallAppModal
+            isOpen={isInstallModalOpen}
+            onClose={() => setIsInstallModalOpen(false)}
+          />
+        )}
 
-      {/* PWA Floating Install Prompt for mobile/desktop browsers */}
-      <PwaInstallPrompt />
+        {/* PWA Floating Install Prompt for mobile/desktop browsers */}
+        <PwaInstallPrompt />
+      </React.Suspense>
 
       <ToastContainer />
     </div>

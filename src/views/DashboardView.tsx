@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { speakText } from '../utils/audioNotification';
 import {
@@ -226,160 +226,249 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const curr = currentBusiness.currency;
 
-  // KPI Calculations
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todaysJobs = jobs.filter(
-    (j) => (j.scheduledDate === todayStr || isJobInProgress(j.status) || j.status === 'assigned') && isJobActive(j.status)
-  );
-  const pendingJobs = jobs.filter((j) => isJobActive(j.status));
-  const completedJobs = jobs.filter((j) => isJobCompleted(j.status));
-  
-  // P0-6: Real Today's Collection (payments collected today via recorded receipts or technician on-site collections)
-  const todayPaymentsFromRecords = (payments || [])
-    .filter((p) => {
-      const pDate = p.date || p.paymentDate;
-      return pDate === todayStr;
-    })
-    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  // KPI Calculations (Memoized)
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
 
-  const todayJobCollections = (jobs || [])
-    .filter((j) => {
-      if (!j.paymentCollected || !j.paymentCollected.amount) return false;
-      const collectedDate = (j.paymentCollected.collectedAt || '').split('T')[0];
-      const isToday = collectedDate === todayStr;
-      const alreadyInPayments = (payments || []).some(
-        (p) => p.jobId === j.jobId && ((p.date || p.paymentDate) === todayStr)
-      );
-      return isToday && !alreadyInPayments;
-    })
-    .reduce((sum, j) => sum + (Number(j.paymentCollected?.amount) || 0), 0);
+  const { todaysJobs, pendingJobs, completedJobs, todayPayments, totalSales, pendingPayments } = useMemo(() => {
+    const todays = jobs.filter(
+      (j) => (j.scheduledDate === todayStr || isJobInProgress(j.status) || j.status === 'assigned') && isJobActive(j.status)
+    );
+    const pending = jobs.filter((j) => isJobActive(j.status));
+    const completed = jobs.filter((j) => isJobCompleted(j.status));
 
-  const todayPayments = todayPaymentsFromRecords + todayJobCollections;
+    const todayPaymentsFromRecords = (payments || [])
+      .filter((p) => (p.date || p.paymentDate) === todayStr)
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
-  const totalSales = invoices.reduce((sum, inv) => sum + inv.grandTotal, 0);
-  const pendingPayments = invoices.reduce((sum, inv) => sum + inv.balanceAmount, 0);
+    const todayJobCollections = (jobs || [])
+      .filter((j) => {
+        if (!j.paymentCollected || !j.paymentCollected.amount) return false;
+        const collectedDate = (j.paymentCollected.collectedAt || '').split('T')[0];
+        if (collectedDate !== todayStr) return false;
+        const alreadyInPayments = (payments || []).some(
+          (p) => p.jobId === j.jobId && ((p.date || p.paymentDate) === todayStr)
+        );
+        return !alreadyInPayments;
+      })
+      .reduce((sum, j) => sum + (Number(j.paymentCollected?.amount) || 0), 0);
 
-  // Enquiries & Intake calculations
-  const todayDateStr = new Date().toISOString().split('T')[0];
-  const newEnquiriesCount = (enquiries || []).filter((e) => e.status === 'new').length;
-  const followUpsDueTodayCount = (enquiries || []).filter((e) => {
-    return (e.status === 'follow_up' || e.status === 'new' || e.status === 'contacted') && e.followUpDate === todayDateStr;
-  }).length;
-  const qualifiedEnquiriesCount = (enquiries || []).filter((e) => e.status === 'qualified').length;
-  const quotedEnquiriesCount = (enquiries || []).filter((e) => e.status === 'quoted').length;
-  const convertedEnquiriesCount = (enquiries || []).filter((e) => e.status === 'converted').length;
+    const sales = invoices.reduce((sum, inv) => sum + inv.grandTotal, 0);
+    const pendingPay = invoices.reduce((sum, inv) => sum + inv.balanceAmount, 0);
 
-  // Urgent Jobs calculations & modal filters
-  const urgentJobsList = jobs.filter((j) => j.priority === 'urgent' || j.priority === 'high');
-  const activeUrgentJobs = urgentJobsList.filter((j) => isJobActive(j.status));
-  const activePendingUrgentJobs = urgentJobsList.filter((j) => isJobActivePending(j.status));
-  const unassignedUrgentJobs = urgentJobsList.filter((j) => !j.assignedStaffId && isJobActive(j.status));
-  const activeUrgentValue = activeUrgentJobs.reduce((sum, j) => sum + (j.estimatedAmount || 0), 0);
+    return {
+      todaysJobs: todays,
+      pendingJobs: pending,
+      completedJobs: completed,
+      todayPayments: todayPaymentsFromRecords + todayJobCollections,
+      totalSales: sales,
+      pendingPayments: pendingPay,
+    };
+  }, [jobs, payments, invoices, todayStr]);
 
-  // Incoming Customer Service Requests (From Customer Portal / QR / Direct Requests)
-  const incomingCustomerRequests = (jobs || []).filter(
-    (j) =>
-      (j.status === 'new' || j.status === 'scheduled') &&
-      (!j.assignedStaffId || j.description?.includes('[Portal Booking]') || (j as any).source === 'customer_portal')
-  );
+  // Enquiries & Intake calculations (Memoized)
+  const {
+    newEnquiriesCount,
+    followUpsDueTodayCount,
+    qualifiedEnquiriesCount,
+    quotedEnquiriesCount,
+    convertedEnquiriesCount,
+  } = useMemo(() => {
+    let newCount = 0;
+    let followUpDueCount = 0;
+    let qualifiedCount = 0;
+    let quotedCount = 0;
+    let convertedCount = 0;
+
+    for (const e of enquiries || []) {
+      if (e.status === 'new') newCount++;
+      else if (e.status === 'qualified') qualifiedCount++;
+      else if (e.status === 'quoted') quotedCount++;
+      else if (e.status === 'converted') convertedCount++;
+
+      if ((e.status === 'follow_up' || e.status === 'new' || e.status === 'contacted') && e.followUpDate === todayStr) {
+        followUpDueCount++;
+      }
+    }
+
+    return {
+      newEnquiriesCount: newCount,
+      followUpsDueTodayCount: followUpDueCount,
+      qualifiedEnquiriesCount: qualifiedCount,
+      quotedEnquiriesCount: quotedCount,
+      convertedEnquiriesCount: convertedCount,
+    };
+  }, [enquiries, todayStr]);
+
+  // Urgent Jobs calculations & Incoming Portal Requests (Memoized)
+  const {
+    urgentJobsList,
+    activeUrgentJobs,
+    activePendingUrgentJobs,
+    unassignedUrgentJobs,
+    activeUrgentValue,
+    incomingCustomerRequests,
+  } = useMemo(() => {
+    const urgent = jobs.filter((j) => j.priority === 'urgent' || j.priority === 'high');
+    const activeUrgent = urgent.filter((j) => isJobActive(j.status));
+    const activePendingUrgent = urgent.filter((j) => isJobActivePending(j.status));
+    const unassignedUrgent = urgent.filter((j) => !j.assignedStaffId && isJobActive(j.status));
+    const urgentValue = activeUrgent.reduce((sum, j) => sum + (j.estimatedAmount || 0), 0);
+
+    const incoming = (jobs || []).filter(
+      (j) =>
+        (j.status === 'new' || j.status === 'scheduled') &&
+        (!j.assignedStaffId || j.description?.includes('[Portal Booking]') || (j as any).source === 'customer_portal')
+    );
+
+    return {
+      urgentJobsList: urgent,
+      activeUrgentJobs: activeUrgent,
+      activePendingUrgentJobs: activePendingUrgent,
+      unassignedUrgentJobs: unassignedUrgent,
+      activeUrgentValue: urgentValue,
+      incomingCustomerRequests: incoming,
+    };
+  }, [jobs]);
 
   // Due AMC Preventive Maintenance Visits (due now or within 7 days)
-  const dueAmcContracts = React.useMemo(() => {
+  const dueAmcContracts = useMemo(() => {
     return getUpcomingDueAmcContracts(contracts || [], 7);
   }, [contracts]);
 
-  const filteredUrgentModalJobs = urgentJobsList.filter((job) => {
-    const customer = customers.find((c) => c.id === job.customerId);
+  const customerMap = useMemo(() => {
+    const map = new Map<string, typeof customers[number]>();
+    for (const c of customers) {
+      map.set(c.id, c);
+    }
+    return map;
+  }, [customers]);
+
+  const filteredUrgentModalJobs = useMemo(() => {
     const searchLow = urgentSearch.toLowerCase();
-    const matchesSearch =
-      !urgentSearch ||
-      job.jobId.toLowerCase().includes(searchLow) ||
-      job.description.toLowerCase().includes(searchLow) ||
-      job.location.toLowerCase().includes(searchLow) ||
-      (customer?.name || '').toLowerCase().includes(searchLow) ||
-      (customer?.companyName || '').toLowerCase().includes(searchLow);
+    return urgentJobsList.filter((job) => {
+      const customer = customerMap.get(job.customerId);
+      const matchesSearch =
+        !searchLow ||
+        job.jobId.toLowerCase().includes(searchLow) ||
+        job.description.toLowerCase().includes(searchLow) ||
+        job.location.toLowerCase().includes(searchLow) ||
+        (customer?.name || '').toLowerCase().includes(searchLow) ||
+        (customer?.companyName || '').toLowerCase().includes(searchLow);
 
-    const matchesTab =
-      urgentTabFilter === 'all'
-        ? true
-        : urgentTabFilter === 'pending'
-        ? isJobActive(job.status)
-        : !job.assignedStaffId && isJobActive(job.status);
+      const matchesTab =
+        urgentTabFilter === 'all'
+          ? true
+          : urgentTabFilter === 'pending'
+          ? isJobActive(job.status)
+          : !job.assignedStaffId && isJobActive(job.status);
 
-    return matchesSearch && matchesTab;
-  });
+      return matchesSearch && matchesTab;
+    });
+  }, [urgentJobsList, customerMap, urgentSearch, urgentTabFilter]);
 
-  // Revenue Invoices calculation & modal filters
-  const todayPaidInvoices = invoices.filter((inv) => inv.status === 'paid' || inv.paidAmount > 0);
+  // Revenue Invoices calculation & modal filters (Memoized)
+  const todayPaidInvoices = useMemo(
+    () => invoices.filter((inv) => inv.status === 'paid' || inv.paidAmount > 0),
+    [invoices]
+  );
 
-  const filteredRevenueModalInvoices = invoices.filter((inv) => {
-    const customer = customers.find((c) => c.id === inv.customerId);
+  const filteredRevenueModalInvoices = useMemo(() => {
     const searchLow = revenueSearch.toLowerCase();
-    const matchesSearch =
-      !revenueSearch ||
-      inv.invoiceNumber.toLowerCase().includes(searchLow) ||
-      (customer?.name || '').toLowerCase().includes(searchLow) ||
-      (customer?.companyName || '').toLowerCase().includes(searchLow) ||
-      (inv.notes || '').toLowerCase().includes(searchLow);
+    return invoices.filter((inv) => {
+      const customer = customerMap.get(inv.customerId);
+      const matchesSearch =
+        !searchLow ||
+        inv.invoiceNumber.toLowerCase().includes(searchLow) ||
+        (customer?.name || '').toLowerCase().includes(searchLow) ||
+        (customer?.companyName || '').toLowerCase().includes(searchLow) ||
+        (inv.notes || '').toLowerCase().includes(searchLow);
 
-    const matchesTab =
-      revenueTabFilter === 'all'
-        ? true
-        : revenueTabFilter === 'paid'
-        ? inv.status === 'paid' || inv.paidAmount > 0
-        : inv.status !== 'paid' && inv.balanceAmount > 0;
+      const matchesTab =
+        revenueTabFilter === 'all'
+          ? true
+          : revenueTabFilter === 'paid'
+          ? inv.status === 'paid' || inv.paidAmount > 0
+          : inv.status !== 'paid' && inv.balanceAmount > 0;
 
-    return matchesSearch && matchesTab;
-  });
+      return matchesSearch && matchesTab;
+    });
+  }, [invoices, customerMap, revenueSearch, revenueTabFilter]);
 
-  const lowStockItems = inventory.filter((item) => item.currentStock <= item.minStock);
-  const expiringContracts = contracts.filter((c) => c.status === 'expiring_soon' || c.status === 'expired');
+  const lowStockItems = useMemo(
+    () => inventory.filter((item) => item.currentStock <= item.minStock),
+    [inventory]
+  );
+  const expiringContracts = useMemo(
+    () => contracts.filter((c) => c.status === 'expiring_soon' || c.status === 'expired'),
+    [contracts]
+  );
 
-  // Dynamic Rolling Monthly Sales & Collections Chart Data
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const now = new Date();
-  const salesChartData = Array.from({ length: 5 }).map((_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (4 - i), 1);
-    const mIndex = d.getMonth();
-    const yStr = d.getFullYear();
-    const monthLabel = monthNames[mIndex];
-    const prefix = `${yStr}-${String(mIndex + 1).padStart(2, '0')}`;
+  // Dynamic Rolling Monthly Sales & Collections Chart Data (Memoized)
+  const salesChartData = useMemo(() => {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    return Array.from({ length: 5 }).map((_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (4 - i), 1);
+      const mIndex = d.getMonth();
+      const yStr = d.getFullYear();
+      const monthLabel = monthNames[mIndex];
+      const prefix = `${yStr}-${String(mIndex + 1).padStart(2, '0')}`;
 
-    const monthSales = invoices
-      .filter((inv) => (inv.date || '').startsWith(prefix))
-      .reduce((sum, inv) => sum + (Number(inv.grandTotal) || 0), 0);
+      const monthSales = invoices
+        .filter((inv) => (inv.date || '').startsWith(prefix))
+        .reduce((sum, inv) => sum + (Number(inv.grandTotal) || 0), 0);
 
-    const monthPaymentsSum = (payments || [])
-      .filter((p) => (p.date || p.paymentDate || '').startsWith(prefix))
-      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const monthPaymentsSum = (payments || [])
+        .filter((p) => (p.date || p.paymentDate || '').startsWith(prefix))
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
-    const monthCollections = monthPaymentsSum > 0
-      ? monthPaymentsSum
-      : invoices
-          .filter((inv) => (inv.date || '').startsWith(prefix))
-          .reduce((sum, inv) => sum + (Number(inv.paidAmount) || 0), 0);
+      const monthCollections = monthPaymentsSum > 0
+        ? monthPaymentsSum
+        : invoices
+            .filter((inv) => (inv.date || '').startsWith(prefix))
+            .reduce((sum, inv) => sum + (Number(inv.paidAmount) || 0), 0);
+
+      return {
+        month: monthLabel,
+        sales: monthSales,
+        collections: monthCollections,
+      };
+    });
+  }, [invoices, payments]);
+
+  const hasRevenueData = useMemo(
+    () => salesChartData.some((d) => d.sales > 0 || d.collections > 0) || totalSales > 0 || todayPayments > 0,
+    [salesChartData, totalSales, todayPayments]
+  );
+
+  const {
+    completedJobsCount,
+    inProgressJobsCount,
+    assignedJobsCount,
+    newJobsCount,
+    totalWorkflowJobs,
+    jobStatusData,
+  } = useMemo(() => {
+    const comp = jobs.filter((j) => isJobCompleted(j.status)).length;
+    const inProg = jobs.filter((j) => isJobInProgress(j.status)).length;
+    const assigned = jobs.filter((j) => j.status === 'assigned' || j.status === 'accepted').length;
+    const fresh = jobs.filter((j) => j.status === 'new' || j.status === 'scheduled').length;
+    const total = comp + inProg + assigned + fresh;
 
     return {
-      month: monthLabel,
-      sales: monthSales,
-      collections: monthCollections,
+      completedJobsCount: comp,
+      inProgressJobsCount: inProg,
+      assignedJobsCount: assigned,
+      newJobsCount: fresh,
+      totalWorkflowJobs: total,
+      jobStatusData: [
+        { name: 'Completed', value: comp, color: '#10b981' },
+        { name: 'In Progress', value: inProg, color: '#3b82f6' },
+        { name: 'Assigned', value: assigned, color: '#f59e0b' },
+        { name: 'New', value: fresh, color: '#8b5cf6' },
+      ],
     };
-  });
-
-  const hasRevenueData = salesChartData.some((d) => d.sales > 0 || d.collections > 0) || totalSales > 0 || todayPayments > 0;
-
-  const completedJobsCount = jobs.filter((j) => isJobCompleted(j.status)).length;
-  const inProgressJobsCount = jobs.filter((j) => isJobInProgress(j.status)).length;
-  const assignedJobsCount = jobs.filter((j) => j.status === 'assigned' || j.status === 'accepted').length;
-  const newJobsCount = jobs.filter((j) => j.status === 'new' || j.status === 'scheduled').length;
-  const totalWorkflowJobs = completedJobsCount + inProgressJobsCount + assignedJobsCount + newJobsCount;
-
-  const jobStatusData = [
-    { name: 'Completed', value: completedJobsCount, color: '#10b981' },
-    { name: 'In Progress', value: inProgressJobsCount, color: '#3b82f6' },
-    { name: 'Assigned', value: assignedJobsCount, color: '#f59e0b' },
-    { name: 'New', value: newJobsCount, color: '#8b5cf6' },
-  ];
+  }, [jobs]);
 
   return (
     <div className="space-y-4 lg:space-y-4.5 pb-8 animate-in fade-in w-full max-w-full overflow-x-hidden">
@@ -1297,7 +1386,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <p className="text-[11px] text-slate-500 dark:text-slate-400">Monthly billing vs payment receipts</p>
             </div>
             <span className="text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
-              {now.getFullYear()} Trend
+              {new Date().getFullYear()} Trend
             </span>
           </div>
 

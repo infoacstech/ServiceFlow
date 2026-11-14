@@ -1,4 +1,4 @@
-const CACHE_NAME = 'serviflow-standalone-v4';
+const CACHE_NAME = 'serviflow-standalone-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -146,7 +146,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-First with Cache Fallback for static assets, scripts and styles (never fallback to index.html for JS/CSS)
+  // Cache-First for immutable Vite hashed build assets (/assets/*)
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        return fetch(event.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+          }
+          return networkResponse;
+        });
+      })
+    );
+    return;
+  }
+
+  // Network-First with Cache Fallback for unhashed static files & manifests (never fallback to index.html for JS/CSS)
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {

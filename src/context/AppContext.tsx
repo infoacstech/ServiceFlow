@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type {
   Business,
   User,
@@ -630,12 +630,29 @@ const loadCache = <T,>(key: string, fallback: T): T => {
   return fallback;
 };
 
+const pendingCacheTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
 const saveCache = (key: string, data: any) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    console.warn(`Error saving cache for ${key}:`, e);
+  const existingTimer = pendingCacheTimers.get(key);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
   }
+  const timer = setTimeout(() => {
+    pendingCacheTimers.delete(key);
+    const write = () => {
+      try {
+        localStorage.setItem(key, JSON.stringify(data));
+      } catch (e) {
+        console.warn(`Error saving cache for ${key}:`, e);
+      }
+    };
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(write, { timeout: 1000 });
+    } else {
+      write();
+    }
+  }, 250);
+  pendingCacheTimers.set(key, timer);
 };
 
 // Firestore helper wrappers
@@ -735,6 +752,10 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [users, setUsers] = useState<User[]>(() =>
     loadCache('serviflow_users_cache', [SUPER_ADMIN_USER])
   );
+  const businessesRef = useRef<Business[]>(businesses);
+  businessesRef.current = businesses;
+  const usersRef = useRef<User[]>(users);
+  usersRef.current = users;
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       const savedSession = localStorage.getItem('serviflow_user_session');
@@ -992,8 +1013,65 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       : null;
 
     const unsubs: Array<() => void> = [];
+    let isEffectActive = true;
 
-    // 19. System Settings (Always global - allow read: if true)
+    const getPlanOrder = (p: Plan) =>
+      p.sortOrder ??
+      (p.id === 'plan-starter' ? 1 : p.id === 'plan-pro' ? 2 : p.id === 'plan-biz' ? 3 : 99);
+
+    // IF NO USER IS LOGGED IN OR NO ACTIVE TENANT RESOLVED:
+    // Fetch public catalog/settings once (one-shot getDoc/getDocs) instead of holding 3 idle onSnapshot streams,
+    // and DO NOT open listeners for private tenant collections!
+    if (!currentUser || !activeBizId) {
+      getDoc(doc(db, 'systemSettings', 'global'))
+        .then((docSnap) => {
+          if (isEffectActive && docSnap.exists()) {
+            const loaded = docSnap.data() as SystemSettings;
+            setSystemSettings(loaded);
+            saveCache('serviflow_system_settings_cache', loaded);
+          }
+        })
+        .catch(() => {});
+
+      getDocs(collection(db, 'plans'))
+        .then((snapshot) => {
+          if (!isEffectActive) return;
+          if (!snapshot.empty) {
+            const loadedPlans = snapshot.docs
+              .map((d) => ({ ...(d.data() as Plan), id: d.id || (d.data() as Plan).id }))
+              .sort((a, b) => getPlanOrder(a) - getPlanOrder(b));
+            setPlans(loadedPlans);
+            saveCache('serviflow_plans_cache', loadedPlans);
+          } else {
+            setPlans(PLANS);
+            saveCache('serviflow_plans_cache', PLANS);
+          }
+        })
+        .catch(() => {});
+
+      getDocs(collection(db, 'addonPacks'))
+        .then((snapshot) => {
+          if (!isEffectActive) return;
+          if (!snapshot.empty) {
+            const loadedAddons = snapshot.docs
+              .map((d) => ({ ...(d.data() as AddonPack), id: d.id || (d.data() as AddonPack).id }))
+              .sort((a, b) => (a.sortOrder ?? 99) - (b.sortOrder ?? 99));
+            setAddonPacks(loadedAddons);
+            saveCache('serviflow_addon_packs_cache', loadedAddons);
+          } else {
+            setAddonPacks(ADDON_PACKS);
+            saveCache('serviflow_addon_packs_cache', ADDON_PACKS);
+          }
+        })
+        .catch(() => {});
+
+      return () => {
+        isEffectActive = false;
+        unsubs.forEach((u) => u());
+      };
+    }
+
+    // 19. System Settings (Authenticated live listener)
     const unsubSystemSettings = onSnapshot(
       doc(db, 'systemSettings', 'global'),
       (docSnap) => {
@@ -1009,11 +1087,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
     unsubs.push(unsubSystemSettings);
 
-    // 19b. Customizable Subscription Plans (Public read; Super Admin writable)
-    const getPlanOrder = (p: Plan) =>
-      p.sortOrder ??
-      (p.id === 'plan-starter' ? 1 : p.id === 'plan-pro' ? 2 : p.id === 'plan-biz' ? 3 : 99);
-
+    // 19b. Customizable Subscription Plans (Authenticated live listener)
     const unsubPlans = onSnapshot(
       collection(db, 'plans'),
       (snapshot) => {
@@ -1035,7 +1109,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
     unsubs.push(unsubPlans);
 
-    // 19c. Customizable Add-on Packs (Public read; Super Admin writable)
+    // 19c. Customizable Add-on Packs (Authenticated live listener)
     const unsubAddonPacks = onSnapshot(
       collection(db, 'addonPacks'),
       (snapshot) => {
@@ -1056,15 +1130,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (error) => handleFirestoreError(error, OperationType.GET, 'addonPacks')
     );
     unsubs.push(unsubAddonPacks);
-
-    // IF NO USER IS LOGGED IN OR NO ACTIVE TENANT RESOLVED:
-    // Do NOT open listeners for private tenant collections!
-    // This stops unauthenticated permission-denied errors and cuts idle reads to zero.
-    if (!currentUser || !activeBizId) {
-      return () => {
-        unsubs.forEach((u) => u());
-      };
-    }
 
     // 17. Roles (Authenticated users only; seed only by Super Admin)
     const unsubRoles = onSnapshot(
@@ -1534,7 +1599,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     if (curId === targetId || curEmail === targetId) {
                       isTargetedToMe = true;
                     } else {
-                      const matchedUser = (users || []).find((u) => u.id === notif.targetUserId);
+                      const matchedUser = (usersRef.current || []).find((u) => u.id === notif.targetUserId);
                       if (matchedUser) {
                         const mEmail = (matchedUser.email || '').trim().toLowerCase();
                         const mPhone = (matchedUser.phone || '').replace(/\D/g, '');
@@ -1888,7 +1953,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   setCurrentBusiness(tData);
                   saveCache('serviflow_current_biz_cache', tData);
                 } else {
-                  const biz = businesses.find((b) => b.id === targetBizId);
+                  const biz = businessesRef.current.find((b) => b.id === targetBizId);
                   if (biz) {
                     setCurrentBusiness(biz);
                     saveCache('serviflow_current_biz_cache', biz);
@@ -2080,7 +2145,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isMounted = false;
       unsubscribe();
     };
-  }, [businesses]);
+  }, []);
 
   const loginUser = async (userToLogin: User, password?: string): Promise<User> => {
     try {
@@ -3041,147 +3106,192 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newBiz;
   };
 
-  // Business-filtered helpers
+  // Business-filtered helpers (Memoized to avoid unnecessary downstream re-renders)
   const isSuperAdminUser = checkIsSuperAdmin(currentUser);
   const currBizId = currentBusiness?.id;
   const isGlobalScope = isSuperAdminUser && (currBizId === 'all' || !currBizId || currBizId === 'biz-default');
+  const bizCount = businesses.length;
 
-  const matchesTenant = (itemBizId?: string) => {
-    if (isGlobalScope) return true;
-    if (!currBizId) return true;
-    if (itemBizId === currBizId) return true;
-    if (!itemBizId && businesses.length <= 1) return true;
-    return false;
-  };
+  const matchesTenant = useCallback(
+    (itemBizId?: string) => {
+      if (isGlobalScope) return true;
+      if (!currBizId) return true;
+      if (itemBizId === currBizId) return true;
+      if (!itemBizId && bizCount <= 1) return true;
+      return false;
+    },
+    [isGlobalScope, currBizId, bizCount]
+  );
 
-  const filteredEnquiries = enquiries.filter((e) => matchesTenant(e.businessId));
-  const filteredCustomers = customers.filter((c) => matchesTenant(c.businessId));
-  const filteredCategories = categories.filter((c) => matchesTenant(c.businessId));
-  const filteredServices = services.filter((s) => matchesTenant(s.businessId));
-  const filteredJobs = jobs.filter((j) => matchesTenant(j.businessId));
-  const filteredInventory = inventory.filter((i) => matchesTenant(i.businessId));
-  const filteredQuotations = quotations.filter((q) => matchesTenant(q.businessId));
-  const filteredInvoices = invoices.filter((inv) => matchesTenant(inv.businessId));
-  const filteredPayments = payments.filter((p) => matchesTenant(p.businessId));
-  const filteredContracts = contracts.filter((c) => matchesTenant(c.businessId));
-  const filteredExpenses = expenses.filter((e) => matchesTenant(e.businessId));
-  const filteredNotifications = (isSuperAdminUser
-    ? notifications
-    : notifications.filter((n) => {
-        if (n.businessId !== currBizId) return false;
-        if (!currentUser) return true;
+  const filteredEnquiries = useMemo(() => enquiries.filter((e) => matchesTenant(e.businessId)), [enquiries, matchesTenant]);
+  const filteredCustomers = useMemo(() => customers.filter((c) => matchesTenant(c.businessId)), [customers, matchesTenant]);
+  const filteredCategories = useMemo(() => categories.filter((c) => matchesTenant(c.businessId)), [categories, matchesTenant]);
+  const filteredServices = useMemo(() => services.filter((s) => matchesTenant(s.businessId)), [services, matchesTenant]);
+  const filteredJobs = useMemo(() => jobs.filter((j) => matchesTenant(j.businessId)), [jobs, matchesTenant]);
+  const filteredInventory = useMemo(() => inventory.filter((i) => matchesTenant(i.businessId)), [inventory, matchesTenant]);
+  const filteredQuotations = useMemo(() => quotations.filter((q) => matchesTenant(q.businessId)), [quotations, matchesTenant]);
+  const filteredInvoices = useMemo(() => invoices.filter((inv) => matchesTenant(inv.businessId)), [invoices, matchesTenant]);
+  const filteredPayments = useMemo(() => payments.filter((p) => matchesTenant(p.businessId)), [payments, matchesTenant]);
+  const filteredContracts = useMemo(() => contracts.filter((c) => matchesTenant(c.businessId)), [contracts, matchesTenant]);
+  const filteredExpenses = useMemo(() => expenses.filter((e) => matchesTenant(e.businessId)), [expenses, matchesTenant]);
 
-        const isJobAssignment =
-          n.actionType === 'assigned' ||
-          n.title?.toLowerCase().includes('assigned') ||
-          n.title?.toLowerCase().includes('job issued');
+  const filteredNotifications = useMemo(() => {
+    const list = isSuperAdminUser
+      ? [...notifications]
+      : notifications.filter((n) => {
+          if (n.businessId !== currBizId) return false;
+          if (!currentUser) return true;
 
-        if (currentUser.role === 'business_owner' || currentUser.role === 'manager' || currentUser.role === 'super_admin') {
-          // Business owner, manager & super admin do not need to see technician assignment notifications
-          if (isJobAssignment) return false;
-          return true;
-        }
+          const isJobAssignment =
+            n.actionType === 'assigned' ||
+            n.title?.toLowerCase().includes('assigned') ||
+            n.title?.toLowerCase().includes('job issued');
 
-        if (currentUser.role === 'technician') {
-          // Technicians do not need to see status updates in their alert list (e.g. accepted, started, completed)
-          const isStatusUpdate =
-            n.actionType === 'accepted' ||
-            n.actionType === 'started' ||
-            n.actionType === 'completed' ||
-            n.title?.toLowerCase().includes('job accepted') ||
-            n.title?.toLowerCase().includes('job on the way') ||
-            n.title?.toLowerCase().includes('job started') ||
-            n.title?.toLowerCase().includes('job work started') ||
-            n.title?.toLowerCase().includes('job completed');
-          if (isStatusUpdate) return false;
-          if (n.senderUserId === currentUser.id) return false;
+          if (currentUser.role === 'business_owner' || currentUser.role === 'manager' || currentUser.role === 'super_admin') {
+            if (isJobAssignment) return false;
+            return true;
+          }
+
+          if (currentUser.role === 'technician') {
+            const isStatusUpdate =
+              n.actionType === 'accepted' ||
+              n.actionType === 'started' ||
+              n.actionType === 'completed' ||
+              n.title?.toLowerCase().includes('job accepted') ||
+              n.title?.toLowerCase().includes('job on the way') ||
+              n.title?.toLowerCase().includes('job started') ||
+              n.title?.toLowerCase().includes('job work started') ||
+              n.title?.toLowerCase().includes('job completed');
+            if (isStatusUpdate) return false;
+            if (n.senderUserId === currentUser.id) return false;
+
+            if (n.targetUserId) {
+              if (n.targetUserId === currentUser.id || n.targetUserId === currentUser.email) return true;
+              const matchedStaff = (users || []).find((u) => u.id === n.targetUserId);
+              if (matchedStaff) {
+                if (currentUser.email && matchedStaff.email && matchedStaff.email.toLowerCase() === currentUser.email.toLowerCase()) return true;
+                if (currentUser.name && matchedStaff.name && matchedStaff.name.toLowerCase() === currentUser.name.toLowerCase()) return true;
+              }
+              return false;
+            }
+            if (n.targetRoleId) {
+              return n.targetRoleId === 'technician';
+            }
+            return true;
+          }
 
           if (n.targetUserId) {
-            if (n.targetUserId === currentUser.id || n.targetUserId === currentUser.email) return true;
-            const matchedStaff = (users || []).find((u) => u.id === n.targetUserId);
-            if (matchedStaff) {
-              if (currentUser.email && matchedStaff.email && matchedStaff.email.toLowerCase() === currentUser.email.toLowerCase()) return true;
-              if (currentUser.name && matchedStaff.name && matchedStaff.name.toLowerCase() === currentUser.name.toLowerCase()) return true;
-            }
-            return false;
+            return n.targetUserId === currentUser.id || n.targetUserId === currentUser.email;
           }
           if (n.targetRoleId) {
-            return n.targetRoleId === 'technician';
+            return currentUser.role === n.targetRoleId;
           }
           return true;
-        }
-
-        if (n.targetUserId) {
-          return n.targetUserId === currentUser.id || n.targetUserId === currentUser.email;
-        }
-        if (n.targetRoleId) {
-          return currentUser.role === n.targetRoleId;
-        }
-        return true;
-      }))
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 10);
-  const filteredActivityLogs = isSuperAdminUser ? activityLogs : activityLogs.filter((a) => a.businessId === currBizId);
-  const filteredStaff = isSuperAdminUser
-    ? users
-    : users
-        .filter((u) => u.businessId === currBizId && u.role !== 'super_admin')
-        .filter((u, index, self) => {
-          const uEmail = (u.email || '').trim().toLowerCase();
-          const uPhone = (u.phone || '').replace(/[^0-9]/g, '').slice(-10);
-          return (
-            index ===
-            self.findIndex(
-              (o) =>
-                o.id === u.id ||
-                (uEmail && (o.email || '').trim().toLowerCase() === uEmail) ||
-                (uPhone && (o.phone || '').replace(/[^0-9]/g, '').slice(-10) === uPhone)
-            )
-          );
         });
-  const filteredReferralRecords = isSuperAdminUser
-    ? referralRecords
-    : referralRecords.filter(
-        (r) =>
-          r.referrerBusinessId === currBizId ||
-          r.referredBusinessId === currBizId
-      );
-  const filteredReferralPayouts = isSuperAdminUser
-    ? referralPayoutRequests
-    : referralPayoutRequests.filter((p) => p.businessId === currBizId);
+
+    return list
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 10);
+  }, [isSuperAdminUser, notifications, currBizId, currentUser, users]);
+
+  const filteredActivityLogs = useMemo(
+    () => (isSuperAdminUser ? activityLogs : activityLogs.filter((a) => a.businessId === currBizId)),
+    [isSuperAdminUser, activityLogs, currBizId]
+  );
+
+  // O(N) Set-based staff deduplication
+  const filteredStaff = useMemo(() => {
+    if (isSuperAdminUser) return users;
+    const seenIds = new Set<string>();
+    const seenEmails = new Set<string>();
+    const seenPhones = new Set<string>();
+    const result: User[] = [];
+
+    for (const u of users) {
+      if (u.businessId !== currBizId || u.role === 'super_admin') continue;
+      const uEmail = (u.email || '').trim().toLowerCase();
+      const uPhone = (u.phone || '').replace(/[^0-9]/g, '').slice(-10);
+
+      if (seenIds.has(u.id) || (uEmail && seenEmails.has(uEmail)) || (uPhone && seenPhones.has(uPhone))) {
+        continue;
+      }
+
+      seenIds.add(u.id);
+      if (uEmail) seenEmails.add(uEmail);
+      if (uPhone) seenPhones.add(uPhone);
+      result.push(u);
+    }
+
+    return result;
+  }, [isSuperAdminUser, users, currBizId]);
+
+  const filteredReferralRecords = useMemo(
+    () =>
+      isSuperAdminUser
+        ? referralRecords
+        : referralRecords.filter(
+            (r) => r.referrerBusinessId === currBizId || r.referredBusinessId === currBizId
+          ),
+    [isSuperAdminUser, referralRecords, currBizId]
+  );
+
+  const filteredReferralPayouts = useMemo(
+    () => (isSuperAdminUser ? referralPayoutRequests : referralPayoutRequests.filter((p) => p.businessId === currBizId)),
+    [isSuperAdminUser, referralPayoutRequests, currBizId]
+  );
 
   const isEmployeeRole = currentUser?.role === 'technician';
+  const currUserId = currentUser?.id;
+  const currUserEmailLower = currentUser?.email?.toLowerCase();
 
-  const filteredAttendanceRecords = isSuperAdminUser
-    ? attendanceRecords
-    : attendanceRecords.filter((a) => {
-        if (a.businessId !== currBizId) return false;
-        if (isEmployeeRole && currentUser) {
-          const matchStaffId = a.staffId === currentUser.id;
-          const matchEmail = currentUser.email && a.staffEmail?.toLowerCase() === currentUser.email.toLowerCase();
-          return matchStaffId || matchEmail;
-        }
-        return true;
-      });
-  const filteredAttendanceLocations = isSuperAdminUser
-    ? attendanceLocations
-    : attendanceLocations.filter((l) => l.businessId === currBizId);
-  const filteredAttendanceAuditLogs = isSuperAdminUser
-    ? attendanceAuditLogs
-    : attendanceAuditLogs.filter((l) => l.businessId === currBizId);
-  const filteredAttendanceIssues = isSuperAdminUser
-    ? attendanceIssues
-    : attendanceIssues.filter((i) => {
-        if (i.businessId !== currBizId) return false;
-        if (isEmployeeRole && currentUser) {
-          const matchStaffId = i.staffId === currentUser.id;
-          const matchEmail = currentUser.email && i.staffEmail?.toLowerCase() === currentUser.email.toLowerCase();
-          return matchStaffId || matchEmail;
-        }
-        return true;
-      });
-  const attendanceWorkingRules: AttendanceWorkingRules =
-    currentBusiness?.attendanceWorkingRules || DEFAULT_ATTENDANCE_RULES;
+  const filteredAttendanceRecords = useMemo(
+    () =>
+      isSuperAdminUser
+        ? attendanceRecords
+        : attendanceRecords.filter((a) => {
+            if (a.businessId !== currBizId) return false;
+            if (isEmployeeRole && currUserId) {
+              const matchStaffId = a.staffId === currUserId;
+              const matchEmail = Boolean(currUserEmailLower && a.staffEmail?.toLowerCase() === currUserEmailLower);
+              return matchStaffId || matchEmail;
+            }
+            return true;
+          }),
+    [isSuperAdminUser, attendanceRecords, currBizId, isEmployeeRole, currUserId, currUserEmailLower]
+  );
+
+  const filteredAttendanceLocations = useMemo(
+    () => (isSuperAdminUser ? attendanceLocations : attendanceLocations.filter((l) => l.businessId === currBizId)),
+    [isSuperAdminUser, attendanceLocations, currBizId]
+  );
+
+  const filteredAttendanceAuditLogs = useMemo(
+    () => (isSuperAdminUser ? attendanceAuditLogs : attendanceAuditLogs.filter((l) => l.businessId === currBizId)),
+    [isSuperAdminUser, attendanceAuditLogs, currBizId]
+  );
+
+  const filteredAttendanceIssues = useMemo(
+    () =>
+      isSuperAdminUser
+        ? attendanceIssues
+        : attendanceIssues.filter((i) => {
+            if (i.businessId !== currBizId) return false;
+            if (isEmployeeRole && currUserId) {
+              const matchStaffId = i.staffId === currUserId;
+              const matchEmail = Boolean(currUserEmailLower && i.staffEmail?.toLowerCase() === currUserEmailLower);
+              return matchStaffId || matchEmail;
+            }
+            return true;
+          }),
+    [isSuperAdminUser, attendanceIssues, currBizId, isEmployeeRole, currUserId, currUserEmailLower]
+  );
+
+  const attendanceWorkingRules: AttendanceWorkingRules = useMemo(
+    () => currentBusiness?.attendanceWorkingRules || DEFAULT_ATTENDANCE_RULES,
+    [currentBusiness?.attendanceWorkingRules]
+  );
+
+  const memoizedTrialStatus = useMemo(() => getTrialStatus(currentBusiness), [currentBusiness]);
 
   // Enquiry Actions
   const addEnquiry = (data: Omit<Enquiry, 'id' | 'businessId' | 'enquiryId' | 'createdAt'>) => {
@@ -7139,10 +7249,64 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, message: 'Issue resolved' };
   };
 
-  const getRolePermissions = (roleCode?: UserRole): RolePermission => {
-    if (!roleCode) {
+  const getRolePermissions = useCallback(
+    (roleCode?: UserRole): RolePermission => {
+      if (!roleCode) {
+        return {
+          canManageJobs: false,
+          canViewFinancials: false,
+          canManageStaff: false,
+          canManageInventory: false,
+          canAccessSettings: false,
+          canAccessSuperAdmin: false,
+          canAccessCustomerPortal: false,
+          canManageServices: false,
+          canManageContracts: false,
+        };
+      }
+      const r = (roles || []).find((role) => role.code === roleCode);
+      if (r) return r.permissions;
+      if (roleCode === 'super_admin') {
+        return {
+          canManageJobs: true,
+          canViewFinancials: true,
+          canManageStaff: true,
+          canManageInventory: true,
+          canAccessSettings: true,
+          canAccessSuperAdmin: true,
+          canAccessCustomerPortal: true,
+          canManageServices: true,
+          canManageContracts: true,
+        };
+      }
+      if (roleCode === 'business_owner') {
+        return {
+          canManageJobs: true,
+          canViewFinancials: true,
+          canManageStaff: true,
+          canManageInventory: true,
+          canAccessSettings: true,
+          canAccessSuperAdmin: false,
+          canAccessCustomerPortal: true,
+          canManageServices: true,
+          canManageContracts: true,
+        };
+      }
+      if (roleCode === 'manager') {
+        return {
+          canManageJobs: true,
+          canViewFinancials: true,
+          canManageStaff: true,
+          canManageInventory: true,
+          canAccessSettings: false,
+          canAccessSuperAdmin: false,
+          canAccessCustomerPortal: true,
+          canManageServices: true,
+          canManageContracts: true,
+        };
+      }
       return {
-        canManageJobs: false,
+        canManageJobs: true,
         canViewFinancials: false,
         canManageStaff: false,
         canManageInventory: false,
@@ -7152,60 +7316,9 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         canManageServices: false,
         canManageContracts: false,
       };
-    }
-    const r = (roles || []).find((role) => role.code === roleCode);
-    if (r) return r.permissions;
-    if (roleCode === 'super_admin') {
-      return {
-        canManageJobs: true,
-        canViewFinancials: true,
-        canManageStaff: true,
-        canManageInventory: true,
-        canAccessSettings: true,
-        canAccessSuperAdmin: true,
-        canAccessCustomerPortal: true,
-        canManageServices: true,
-        canManageContracts: true,
-      };
-    }
-    if (roleCode === 'business_owner') {
-      return {
-        canManageJobs: true,
-        canViewFinancials: true,
-        canManageStaff: true,
-        canManageInventory: true,
-        canAccessSettings: true,
-        canAccessSuperAdmin: false,
-        canAccessCustomerPortal: true,
-        canManageServices: true,
-        canManageContracts: true,
-      };
-    }
-    if (roleCode === 'manager') {
-      return {
-        canManageJobs: true,
-        canViewFinancials: true,
-        canManageStaff: true,
-        canManageInventory: true,
-        canAccessSettings: false,
-        canAccessSuperAdmin: false,
-        canAccessCustomerPortal: true,
-        canManageServices: true,
-        canManageContracts: true,
-      };
-    }
-    return {
-      canManageJobs: true,
-      canViewFinancials: false,
-      canManageStaff: false,
-      canManageInventory: false,
-      canAccessSettings: false,
-      canAccessSuperAdmin: false,
-      canAccessCustomerPortal: false,
-      canManageServices: false,
-      canManageContracts: false,
-    };
-  };
+    },
+    [roles]
+  );
 
   return (
     <AppContext.Provider
@@ -7378,7 +7491,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         subscriptionPayments,
         submitSubscriptionPayment,
         verifySubscriptionPayment,
-        trialStatus: getTrialStatus(currentBusiness),
+        trialStatus: memoizedTrialStatus,
         isTrialExpiredModalOpen,
         trialExpiredAction,
         openTrialExpiredModal,

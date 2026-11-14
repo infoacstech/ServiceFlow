@@ -26,6 +26,12 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
   const startXRef = useRef<number | null>(null);
   const isDraggingRef = useRef(false);
   const hasFiredThresholdHapticRef = useRef(false);
+  const pullDistanceRef = useRef(0);
+
+  const updatePullDistance = useCallback((val: number) => {
+    pullDistanceRef.current = val;
+    setPullDistance(val);
+  }, []);
 
   const PULL_THRESHOLD = 70;
   const MAX_PULL = 90;
@@ -65,10 +71,10 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
       isDraggingRef.current = false;
       startYRef.current = null;
       startXRef.current = null;
-      setPullDistance(0);
+      updatePullDistance(0);
       setIsPulling(false);
     }
-  }, [disabled]);
+  }, [disabled, updatePullDistance]);
 
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
@@ -105,8 +111,8 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
         isRefreshing ||
         isTargetInModalOrLocked(e.target)
       ) {
-        if (pullDistance > 0) {
-          setPullDistance(0);
+        if (pullDistanceRef.current > 0) {
+          updatePullDistance(0);
           setIsPulling(false);
         }
         return;
@@ -114,8 +120,8 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
 
       const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
       if (scrollTop > 1) {
-        if (pullDistance > 0) {
-          setPullDistance(0);
+        if (pullDistanceRef.current > 0) {
+          updatePullDistance(0);
           setIsPulling(false);
         }
         isDraggingRef.current = false;
@@ -129,8 +135,8 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
 
       // If horizontal swipe or scrolling up, do not intercept natural scroll
       if (diffX > Math.abs(diffY) || diffY <= 4) {
-        if (pullDistance > 0) {
-          setPullDistance(0);
+        if (pullDistanceRef.current > 0) {
+          updatePullDistance(0);
           setIsPulling(false);
         }
         return;
@@ -138,7 +144,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
 
       // Elastic dampened pull calculation
       const dampened = Math.min(diffY * 0.35, MAX_PULL);
-      setPullDistance(dampened);
+      updatePullDistance(dampened);
       setIsPulling(true);
 
       // Haptic tick on threshold cross
@@ -149,7 +155,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
         hasFiredThresholdHapticRef.current = false;
       }
     },
-    [disabled, isRefreshing, triggerHaptic, PULL_THRESHOLD, MAX_PULL, pullDistance]
+    [disabled, isRefreshing, triggerHaptic, PULL_THRESHOLD, MAX_PULL, updatePullDistance]
   );
 
   const handleTouchEnd = useCallback(async () => {
@@ -157,18 +163,19 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
       isDraggingRef.current = false;
       startYRef.current = null;
       startXRef.current = null;
-      setPullDistance(0);
+      updatePullDistance(0);
       setIsPulling(false);
       return;
     }
 
+    const currentPull = pullDistanceRef.current;
     isDraggingRef.current = false;
     startYRef.current = null;
     startXRef.current = null;
 
-    if (pullDistance >= PULL_THRESHOLD) {
+    if (currentPull >= PULL_THRESHOLD) {
       setIsRefreshing(true);
-      setPullDistance(40);
+      updatePullDistance(40);
       triggerHaptic([15, 30, 15]);
 
       try {
@@ -191,23 +198,23 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
 
         setTimeout(() => {
           setIsSuccess(false);
-          setPullDistance(0);
+          updatePullDistance(0);
           setIsPulling(false);
           hasFiredThresholdHapticRef.current = false;
         }, 500);
       } catch (err) {
         console.error('Pull to refresh failed:', err);
         setIsRefreshing(false);
-        setPullDistance(0);
+        updatePullDistance(0);
         setIsPulling(false);
         showToast('Failed to refresh data. Please try again.', 'error');
       }
     } else {
-      setPullDistance(0);
+      updatePullDistance(0);
       setIsPulling(false);
       hasFiredThresholdHapticRef.current = false;
     }
-  }, [pullDistance, PULL_THRESHOLD, isRefreshing, disabled, onRefresh, syncOfflineQueue, isOffline, showToast, triggerHaptic]);
+  }, [PULL_THRESHOLD, isRefreshing, disabled, onRefresh, syncOfflineQueue, isOffline, showToast, triggerHaptic, updatePullDistance]);
 
   const rotationDeg = Math.min((pullDistance / PULL_THRESHOLD) * 360, 360);
   const progressRatio = Math.min(pullDistance / PULL_THRESHOLD, 1);
