@@ -169,6 +169,7 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
         u.role === 'super_admin' ||
         uEmail === 'admin@serviflow.io' ||
         uEmail === 'superadmin@serviflow.io' ||
+        uEmail === 'uniquesolutions108@gmail.com' ||
         u.id === 'usr-admin';
       if (isSuper) return false;
       return Boolean(u.businessId && validBizIds.has(u.businessId));

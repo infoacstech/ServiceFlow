@@ -153,7 +153,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       return;
     }
 
-    if (cleanEmail !== 'admin@serviflow.io' && cleanEmail !== 'superadmin@serviflow.io') {
+    if (
+      cleanEmail !== 'admin@serviflow.io' &&
+      cleanEmail !== 'superadmin@serviflow.io' &&
+      cleanEmail !== 'uniquesolutions108@gmail.com'
+    ) {
       showToast('Invalid Super Admin credentials. Access is strictly restricted to platform administrators.', 'error');
       return;
     }

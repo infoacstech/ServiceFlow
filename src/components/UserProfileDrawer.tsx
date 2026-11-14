@@ -308,7 +308,11 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
       return;
     }
 
-    if (cleanNewEmail === 'admin@serviflow.io' || cleanNewEmail === 'superadmin@serviflow.io') {
+    if (
+      cleanNewEmail === 'admin@serviflow.io' ||
+      cleanNewEmail === 'superadmin@serviflow.io' ||
+      cleanNewEmail === 'uniquesolutions108@gmail.com'
+    ) {
       setEmailUpdateError('This email is reserved for Platform Super Administrator.');
       return;
     }
@@ -387,6 +391,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
     currentUser?.role === 'super_admin' &&
     ((currentUser?.email || '').trim().toLowerCase() === 'admin@serviflow.io' ||
       (currentUser?.email || '').trim().toLowerCase() === 'superadmin@serviflow.io' ||
+      (currentUser?.email || '').trim().toLowerCase() === 'uniquesolutions108@gmail.com' ||
       currentUser?.id === 'usr-super-admin-001');
 
   // Role permissions breakdown

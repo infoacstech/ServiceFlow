@@ -695,7 +695,8 @@ export const isSuperAdminEmail = (email?: string | null): boolean => {
   const clean = email.trim().toLowerCase();
   return (
     clean === 'admin@serviflow.io' ||
-    clean === 'superadmin@serviflow.io'
+    clean === 'superadmin@serviflow.io' ||
+    clean === 'uniquesolutions108@gmail.com'
   );
 };
 
@@ -740,14 +741,22 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (savedSession) {
         const u = JSON.parse(savedSession) as User;
         if (u) {
-          const isRealSuper = u.role === 'super_admin' && (isSuperAdminEmail(u.email) || u.id === SUPER_ADMIN_USER.id);
-          if (u.role === 'super_admin' && !isRealSuper) {
-            console.warn('[Security Sanitizer] Cached user had illegitimate super_admin role. Resetting to business_owner.');
-            u.role = 'business_owner';
-            if (!u.businessId || u.businessId === 'all') {
-              u.businessId = `tenant-${u.id}`;
-            }
+          if (isSuperAdminEmail(u.email)) {
+            u.role = 'super_admin';
+            u.businessId = 'all';
+            u.status = 'active';
+            u.approvalStatus = 'active';
             localStorage.setItem('serviflow_user_session', JSON.stringify(u));
+          } else {
+            const isRealSuper = u.role === 'super_admin' && (isSuperAdminEmail(u.email) || u.id === SUPER_ADMIN_USER.id);
+            if (u.role === 'super_admin' && !isRealSuper) {
+              console.warn('[Security Sanitizer] Cached user had illegitimate super_admin role. Resetting to business_owner.');
+              u.role = 'business_owner';
+              if (!u.businessId || u.businessId === 'all') {
+                u.businessId = `tenant-${u.id}`;
+              }
+              localStorage.setItem('serviflow_user_session', JSON.stringify(u));
+            }
           }
           console.log('[AuthDebug] Initialized currentUser from cached session:', {
             id: u.id,
@@ -1823,9 +1832,22 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
 
           if (userRecord && isMounted) {
-            // Strict Role Integrity: Enforce that only verified super admin emails can possess super_admin role
-            const isAuthorizedSuper = isSuperAdminEmail(userRecord.email) || userRecord.id === SUPER_ADMIN_USER.id;
-            if (userRecord.role === 'super_admin' && !isAuthorizedSuper) {
+            // Strict Role Integrity: Enforce that authorized super admin emails always get super_admin role
+            const isAuthorizedSuper = isSuperAdminEmail(userRecord.email) || isSuperAdminEmail(firebaseUser.email) || userRecord.id === SUPER_ADMIN_USER.id;
+            if (isSuperAdminEmail(userRecord.email) || isSuperAdminEmail(firebaseUser.email)) {
+              if (
+                userRecord.role !== 'super_admin' ||
+                userRecord.businessId !== 'all' ||
+                userRecord.status !== 'active' ||
+                userRecord.approvalStatus !== 'active'
+              ) {
+                userRecord.role = 'super_admin';
+                userRecord.businessId = 'all';
+                userRecord.status = 'active';
+                userRecord.approvalStatus = 'active';
+                setDoc(doc(db, 'users', userRecord.id), cleanFirestoreData(userRecord), { merge: true }).catch(() => {});
+              }
+            } else if (userRecord.role === 'super_admin' && !isAuthorizedSuper) {
               console.warn(
                 `[AuthDebug] Non-authorized account (${userRecord.email}) had super_admin role. Correcting to business_owner.`
               );
@@ -1845,7 +1867,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             localStorage.setItem('serviflow_logged_in_uid', userRecord.id);
 
             // Fetch and set tenant
-            const isRealSuperAdmin = userRecord.role === 'super_admin' && isSuperAdminEmail(userRecord.email);
+            const isRealSuperAdmin = userRecord.role === 'super_admin' && isSuperAdminEmail(userRecord.email || firebaseUser.email);
             if (isRealSuperAdmin && userRecord.businessId === 'all') {
               setCurrentBusiness(GLOBAL_SUPER_ADMIN_BUSINESS);
               saveCache('serviflow_current_biz_cache', GLOBAL_SUPER_ADMIN_BUSINESS);
@@ -1903,13 +1925,21 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               try {
                 const parsed = JSON.parse(savedSessionRaw) as User;
                 if (parsed && parsed.id) {
-                  const isAuthorizedSuper = isSuperAdminEmail(parsed.email) || parsed.id === SUPER_ADMIN_USER.id;
-                  if (parsed.role === 'super_admin' && !isAuthorizedSuper) {
-                    parsed.role = 'business_owner';
-                    if (!parsed.businessId || parsed.businessId === 'all') {
-                      parsed.businessId = `tenant-${parsed.id}`;
-                    }
+                  if (isSuperAdminEmail(parsed.email)) {
+                    parsed.role = 'super_admin';
+                    parsed.businessId = 'all';
+                    parsed.status = 'active';
+                    parsed.approvalStatus = 'active';
                     localStorage.setItem('serviflow_user_session', JSON.stringify(parsed));
+                  } else {
+                    const isAuthorizedSuper = isSuperAdminEmail(parsed.email) || parsed.id === SUPER_ADMIN_USER.id;
+                    if (parsed.role === 'super_admin' && !isAuthorizedSuper) {
+                      parsed.role = 'business_owner';
+                      if (!parsed.businessId || parsed.businessId === 'all') {
+                        parsed.businessId = `tenant-${parsed.id}`;
+                      }
+                      localStorage.setItem('serviflow_user_session', JSON.stringify(parsed));
+                    }
                   }
                   setCurrentUser(parsed);
                   if (isMounted) setIsAuthInitializing(false);
@@ -1985,14 +2015,22 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             try {
               const savedUser = JSON.parse(savedSessionRaw) as User;
               if (savedUser && savedUser.id && (savedUser.email || savedUser.phone)) {
-                const isRealSuper = savedUser.role === 'super_admin' && (isSuperAdminEmail(savedUser.email) || savedUser.id === SUPER_ADMIN_USER.id);
-                if (savedUser.role === 'super_admin' && !isRealSuper) {
-                  console.warn('[AuthDebug] Stale cached session had unauthorized super_admin role. Correcting to business_owner.');
-                  savedUser.role = 'business_owner';
-                  if (!savedUser.businessId || savedUser.businessId === 'all') {
-                    savedUser.businessId = `tenant-${savedUser.id}`;
-                  }
+                if (isSuperAdminEmail(savedUser.email)) {
+                  savedUser.role = 'super_admin';
+                  savedUser.businessId = 'all';
+                  savedUser.status = 'active';
+                  savedUser.approvalStatus = 'active';
                   localStorage.setItem('serviflow_user_session', JSON.stringify(savedUser));
+                } else {
+                  const isRealSuper = savedUser.role === 'super_admin' && (isSuperAdminEmail(savedUser.email) || savedUser.id === SUPER_ADMIN_USER.id);
+                  if (savedUser.role === 'super_admin' && !isRealSuper) {
+                    console.warn('[AuthDebug] Stale cached session had unauthorized super_admin role. Correcting to business_owner.');
+                    savedUser.role = 'business_owner';
+                    if (!savedUser.businessId || savedUser.businessId === 'all') {
+                      savedUser.businessId = `tenant-${savedUser.id}`;
+                    }
+                    localStorage.setItem('serviflow_user_session', JSON.stringify(savedUser));
+                  }
                 }
 
                 setCurrentUser(savedUser);
@@ -2605,7 +2643,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUsers((prev) =>
           prev.filter((u) => {
             const uEmail = (u.email || '').trim().toLowerCase();
-            const isSuper = u.role === 'super_admin' || uEmail === 'admin@serviflow.io';
+            const isSuper = u.role === 'super_admin' || isSuperAdminEmail(uEmail);
             if (isSuper) return true;
             return businesses.some((b) => b.id === u.businessId);
           })
@@ -2733,7 +2771,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const target = users.find((u) => u.id === userId);
     if (!target) return;
-    if (target.role === 'super_admin' || target.email === 'admin@serviflow.io') {
+    if (target.role === 'super_admin' || isSuperAdminEmail(target.email)) {
       showToast('Action Forbidden: The SaaS Super Admin account cannot be deleted.', 'error');
       return;
     }
@@ -2877,7 +2915,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cleanEmail = (bData.email || ownerData?.email || '').trim().toLowerCase();
     const cleanMobile = (bData.mobile || ownerData?.phone || '').trim();
 
-    if (cleanEmail === 'admin@serviflow.io' || cleanEmail === 'superadmin@serviflow.io') {
+    if (isSuperAdminEmail(cleanEmail)) {
       showToast('Cannot use Platform Super Admin email to create a business tenant.', 'error');
       throw new Error('Cannot use Platform Super Admin email to create a business tenant.');
     }
@@ -5404,7 +5442,7 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const normalizedEmail = (data.email || '').trim().toLowerCase();
     const cleanPhoneDigits = (data.phone || '').replace(/[^0-9]/g, '');
 
-    if (normalizedEmail === 'admin@serviflow.io' || normalizedEmail === 'superadmin@serviflow.io') {
+    if (isSuperAdminEmail(normalizedEmail)) {
       const errorMsg = 'This email address is reserved for Platform Super Admin. Please use your business email address.';
       showToast(errorMsg, 'error');
       throw new Error(errorMsg);

@@ -198,6 +198,7 @@ export class FirestoreService {
             u.role === 'super_admin' ||
             uEmail === 'admin@serviflow.io' ||
             uEmail === 'superadmin@serviflow.io' ||
+            uEmail === 'uniquesolutions108@gmail.com' ||
             d.id === 'usr-admin';
           if (!isSuper) {
             batch.delete(d.ref);
@@ -274,6 +275,7 @@ export class FirestoreService {
             u.role === 'super_admin' ||
             uEmail === 'admin@serviflow.io' ||
             uEmail === 'superadmin@serviflow.io' ||
+            uEmail === 'uniquesolutions108@gmail.com' ||
             d.id === 'usr-admin';
 
           if (!isSuper) {
@@ -362,10 +364,13 @@ export class FirestoreService {
         let count = 0;
         allUsersSnap.docs.forEach((d) => {
           const uData = d.data() as User;
+          const uEmail = (uData.email || '').trim().toLowerCase();
           if (
             uData.businessId === businessId &&
             uData.role !== 'super_admin' &&
-            uData.email !== 'admin@serviflow.io' &&
+            uEmail !== 'admin@serviflow.io' &&
+            uEmail !== 'superadmin@serviflow.io' &&
+            uEmail !== 'uniquesolutions108@gmail.com' &&
             d.id !== 'usr-admin'
           ) {
             batch.delete(d.ref);
@@ -449,7 +454,14 @@ export class FirestoreService {
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
         const u = userSnap.data() as User;
-        if (u.role === 'super_admin' || u.email === 'admin@serviflow.io' || u.id === 'usr-admin') {
+        const uEmail = (u.email || '').trim().toLowerCase();
+        if (
+          u.role === 'super_admin' ||
+          uEmail === 'admin@serviflow.io' ||
+          uEmail === 'superadmin@serviflow.io' ||
+          uEmail === 'uniquesolutions108@gmail.com' ||
+          u.id === 'usr-admin'
+        ) {
           throw new Error('Cannot delete Super Admin account.');
         }
       }

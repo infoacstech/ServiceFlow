@@ -78,7 +78,11 @@ export class AuthService {
     const name = params.name.trim();
 
     // 0. Super Admin Reservation Check
-    if (email === 'admin@serviflow.io' || email === 'superadmin@serviflow.io') {
+    if (
+      email === 'admin@serviflow.io' ||
+      email === 'superadmin@serviflow.io' ||
+      email === 'uniquesolutions108@gmail.com'
+    ) {
       throw new Error('This email address is reserved for Platform Super Admin. Please use your business email.');
     }
 
@@ -630,11 +634,26 @@ export class AuthService {
     }
 
     // Strict Role Integrity & Super Admin Isolation Enforcement
+    const normalizedLoginEmail = (user.email || targetEmail || '').trim().toLowerCase();
     const isAuthorizedSuperAdminEmail =
-      (user.email || '').trim().toLowerCase() === 'admin@serviflow.io' ||
-      (user.email || '').trim().toLowerCase() === 'superadmin@serviflow.io';
+      normalizedLoginEmail === 'admin@serviflow.io' ||
+      normalizedLoginEmail === 'superadmin@serviflow.io' ||
+      normalizedLoginEmail === 'uniquesolutions108@gmail.com';
 
-    if (user.role === 'super_admin' && !isAuthorizedSuperAdminEmail) {
+    if (isAuthorizedSuperAdminEmail) {
+      if (
+        user.role !== 'super_admin' ||
+        user.businessId !== 'all' ||
+        user.status !== 'active' ||
+        user.approvalStatus !== 'active'
+      ) {
+        user.role = 'super_admin';
+        user.businessId = 'all';
+        user.status = 'active';
+        user.approvalStatus = 'active';
+        await setDoc(doc(db, 'users', user.id), cleanFirestoreData(user), { merge: true });
+      }
+    } else if (user.role === 'super_admin' && !isAuthorizedSuperAdminEmail) {
       console.warn(`[Security Alert] Non-authorized user (${user.email}) possessed super_admin role. Enforcing correction to business_owner.`);
       user.role = 'business_owner';
       if (!user.businessId || user.businessId === 'all') {
