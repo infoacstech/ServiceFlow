@@ -21,6 +21,7 @@ import { InstallAppModal } from './components/InstallAppModal';
 import { PwaInstallPrompt } from './components/PwaInstallPrompt';
 import { TrialStatusBanner } from './components/TrialStatusBanner';
 import { TrialExpiredModal } from './components/TrialExpiredModal';
+import { LandingView } from './views/LandingView';
 
 import type { JobInitialFilter } from './views/JobsView';
 import type { InvoiceInitialFilter } from './views/InvoicesView';
@@ -129,7 +130,28 @@ const MainContent: React.FC = () => {
     return false;
   });
 
+  const [unauthView, setUnauthView] = useState<'landing' | 'login' | 'register' | 'super_admin'>(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const hash = window.location.hash.toLowerCase();
+      const isSuperAdminLink =
+        urlParams.get('admin') === 'portal' ||
+        urlParams.get('admin') === 'true' ||
+        urlParams.get('superadmin') === 'true' ||
+        urlParams.get('mode') === 'super_admin' ||
+        urlParams.get('portal') === 'admin' ||
+        hash === '#superadmin' ||
+        hash === '#admin';
+      if (isSuperAdminLink) return 'super_admin';
+      if (urlParams.get('ref') || urlParams.get('referral') || urlParams.get('auth') === 'register') return 'register';
+      if (urlParams.get('auth') === 'login') return 'login';
+    }
+    return 'landing';
+  });
+  const [preselectedPlanName, setPreselectedPlanName] = useState<string | undefined>(undefined);
+
   useBackHandler(isPrivacyPolicyOpen, () => setIsPrivacyPolicyOpen(false), 'app-privacy-policy');
+  useBackHandler(!currentUser && unauthView !== 'landing', () => setUnauthView('landing'), 'app-unauth-landing');
 
   const prevUserIdRef = React.useRef<string | null>(null);
 
@@ -297,8 +319,8 @@ const MainContent: React.FC = () => {
     }
   };
 
-  // 1. Loading / Splash Screen ONLY while resolving if NO cached session exists
-  if (isAuthInitializing && !currentUser) {
+  // 1. Loading / Splash Screen ONLY for explicit auth deep-links while resolving session
+  if (isAuthInitializing && !currentUser && unauthView !== 'landing' && !isPublicCustomerPortal && !isPrivacyPolicyOpen) {
     return (
       <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
         <div className="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-indigo-600/30 mb-6 animate-pulse">
@@ -363,11 +385,40 @@ const MainContent: React.FC = () => {
       );
     }
 
+    if (unauthView === 'landing') {
+      return (
+        <>
+          <LandingView
+            onOpenAuth={(tab, planName) => {
+              setPreselectedPlanName(planName);
+              setUnauthView(tab);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenPrivacy={() => setIsPrivacyPolicyOpen(true)}
+            onOpenCustomerPortal={() => setIsPublicCustomerPortal(true)}
+          />
+          <ToastContainer />
+        </>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-[#F7F5F0] dark:bg-slate-950 text-stone-900 dark:text-slate-100 flex flex-col font-sans antialiased overflow-x-hidden">
         <main className="flex-1 max-w-7xl mx-auto w-full min-h-screen overflow-y-auto">
           <PullToRefresh className="p-3 sm:p-6 lg:p-8">
-            <LoginView onLoginSuccess={() => {}} onOpenPrivacy={() => setIsPrivacyPolicyOpen(true)} />
+            <React.Suspense fallback={<ViewLoadingFallback />}>
+              <LoginView
+                initialTab={unauthView}
+                preselectedPlanName={preselectedPlanName}
+                onBackToHome={() => {
+                  setPreselectedPlanName(undefined);
+                  setUnauthView('landing');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onLoginSuccess={() => {}}
+                onOpenPrivacy={() => setIsPrivacyPolicyOpen(true)}
+              />
+            </React.Suspense>
           </PullToRefresh>
         </main>
         <ToastContainer />

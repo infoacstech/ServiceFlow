@@ -3,11 +3,122 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
-    <title>ServiFlow - Field Service Management SaaS</title>
-    <meta name="description" content="Multi-tenant, mobile-first Field Service Management SaaS platform for CCTV, Solar, HVAC, Electrical, Plumbing, and repair businesses." />
-    <meta property="og:title" content="ServiFlow - Field Service Management SaaS" />
-    <meta property="og:description" content="Multi-tenant, mobile-first Field Service Management SaaS platform for CCTV, Solar, HVAC, Electrical, Plumbing, and repair businesses." />
-    
+    <title>ServiFlow – Field Service &amp; Job Management Software</title>
+    <meta
+      name="description"
+      content="Manage field technicians, job tickets, AMC contracts, GST invoices, and spare parts inventory in one mobile-first platform built for service teams."
+    />
+    <meta
+      name="keywords"
+      content="field service management software, technician dispatch app, AMC contract management, GST service billing, CCTV service software, HVAC job management, solar maintenance software, ServiFlow"
+    />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+    <meta name="author" content="ServiFlow" />
+    <link rel="canonical" id="canonical-link" href="/" />
+
+    <!-- OpenGraph Social Metadata -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="ServiFlow" />
+    <meta property="og:locale" content="en_IN" />
+    <meta property="og:title" content="ServiFlow – Field Service &amp; Job Management Software" />
+    <meta
+      property="og:description"
+      content="Manage field technicians, job tickets, AMC contracts, GST invoices, and spare parts inventory in one mobile-first platform built for service teams."
+    />
+    <meta property="og:image" content="/icon-512.png" />
+    <meta property="og:image:alt" content="ServiFlow Field Service Management Platform" />
+    <meta property="og:url" id="og-url-meta" content="/" />
+
+    <!-- Twitter / X Social Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="ServiFlow – Field Service &amp; Job Management Software" />
+    <meta
+      name="twitter:description"
+      content="Manage field technicians, job tickets, AMC contracts, GST invoices, and spare parts inventory in one mobile-first platform built for service teams."
+    />
+    <meta name="twitter:image" content="/icon-512.png" />
+
+    <!-- Dynamic Canonical & OpenGraph URL Resolution -->
+    <script>
+      (function () {
+        try {
+          var currentUrl = window.location.origin + window.location.pathname;
+          var canonical = document.getElementById('canonical-link');
+          var ogUrl = document.getElementById('og-url-meta');
+          if (canonical) canonical.setAttribute('href', currentUrl);
+          if (ogUrl) ogUrl.setAttribute('content', currentUrl);
+        } catch (e) {}
+      })();
+    </script>
+
+    <!-- Schema.org Structured Data (SoftwareApplication + FAQPage) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "SoftwareApplication",
+            "name": "ServiFlow",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web, Android, iOS",
+            "description": "Multi-tenant, mobile-first Field Service Management SaaS platform for CCTV, Solar, HVAC, Electrical, Plumbing, and repair businesses.",
+            "offers": {
+              "@type": "AggregateOffer",
+              "priceCurrency": "INR",
+              "lowPrice": "4999",
+              "highPrice": "19999",
+              "offerCount": "3"
+            },
+            "featureList": [
+              "Enquiry to Job Ticket Dispatch",
+              "Technician Mobile Check-in & Photo Proof",
+              "GST Quotations & Invoicing",
+              "AMC Contract & Renewal Tracking",
+              "Spare Parts Inventory Ledger",
+              "Customer Self-Service Portal"
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "How does the 14-day free trial work on ServiFlow?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Every new service business gets 14 days of unrestricted access to job tickets, technician dispatch, GST invoicing, inventory, and AMC tracking without upfront payment."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Which service businesses is ServiFlow built for?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "ServiFlow is designed for CCTV & Security integrators, Solar EPC & maintenance teams, AC & HVAC contractors, Electrical, Plumbing, RO Water Purifier, and IT hardware repair businesses."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Can technicians use ServiFlow from their mobile phones in the field?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. ServiFlow is an installable Progressive Web App (PWA) where technicians view assigned jobs, capture completion photos, collect digital customer signatures, and record payments on mobile."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+
+    <!-- Editorial Typography (Plus Jakarta Sans + DM Sans + JetBrains Mono) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
     <!-- PWA Manifest & Multi-Device Standalone Web App Meta -->
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -48,9 +159,8 @@
       });
     </script>
   </head>
-  <body class="bg-slate-900">
+  <body class="bg-[#F7F5F0] dark:bg-slate-950">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

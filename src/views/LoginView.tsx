@@ -38,9 +38,18 @@ import {
 interface LoginViewProps {
   onLoginSuccess?: () => void;
   onOpenPrivacy?: () => void;
+  initialTab?: 'login' | 'register' | 'super_admin';
+  preselectedPlanName?: string;
+  onBackToHome?: () => void;
 }
 
-export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPrivacy }) => {
+export const LoginView: React.FC<LoginViewProps> = ({
+  onLoginSuccess,
+  onOpenPrivacy,
+  initialTab = 'login',
+  preselectedPlanName,
+  onBackToHome,
+}) => {
   const {
     users,
     loginUser,
@@ -58,7 +67,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
     t,
   } = useApp();
 
-  const [authTab, setAuthTab] = useState<'login' | 'register' | 'super_admin'>('login');
+  const [authTab, setAuthTab] = useState<'login' | 'register' | 'super_admin'>(initialTab);
+
+  React.useEffect(() => {
+    setAuthTab(initialTab);
+  }, [initialTab]);
 
   // Sign In Form State
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -555,6 +568,22 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenPriv
   return (
     <div className="min-h-full w-full flex flex-col justify-center items-center pt-2 sm:pt-4 pb-28 sm:pb-36 px-3.5 sm:px-6 animate-in fade-in">
       <div className="w-full max-w-[440px] sm:max-w-md space-y-4 sm:space-y-5 mx-auto">
+        {onBackToHome && (
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={onBackToHome}
+              className="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 py-1.5 cursor-pointer transition-colors"
+            >
+              ← Back to ServiFlow Home
+            </button>
+            {preselectedPlanName && authTab === 'register' && (
+              <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400">
+                14-Day Trial · {preselectedPlanName}
+              </span>
+            )}
+          </div>
+        )}
         {/* Brand Header */}
         <div className="text-center space-y-1 sm:space-y-1.5">
           <div
