@@ -195,14 +195,14 @@ export const StaffView: React.FC = () => {
       await addStaff({
         name: name.trim(),
         email: email.trim(),
-        phone: phone.trim() || '+91 98765 00000',
+        phone: phone.trim(),
         password: password.trim() || 'ServiFlow@123',
         role: selectedRole,
         skills: skillsArray.length > 0 ? skillsArray : ['General Field Service'],
         joiningDate: new Date().toISOString().split('T')[0],
         status: 'active',
         approvalStatus: 'active',
-        avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80`,
+        avatar: '',
       });
 
       setName('');
@@ -329,7 +329,7 @@ export const StaffView: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Phone className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{reqUser.phone || '+91 98765 00000'}</span>
+                    <span>{reqUser.phone || 'Not provided'}</span>
                   </div>
                   <div className="text-[11px] text-slate-400 pt-1">
                     Requested Date: {reqUser.requestedDate || reqUser.joiningDate || 'Today'}
@@ -707,7 +707,7 @@ export const StaffView: React.FC = () => {
                           </div>
                           <div className="flex items-center gap-2">
                             <Phone className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{st.phone || '+91 98765 00000'}</span>
+                            <span>{st.phone || 'Not provided'}</span>
                           </div>
                         </div>
                       </div>

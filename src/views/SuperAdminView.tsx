@@ -473,14 +473,14 @@ export const SuperAdminView: React.FC<SuperAdminViewProps> = ({
           name: newTenantForm.businessName.trim(),
           type: newTenantForm.industryType,
           email: newTenantForm.ownerEmail.trim(),
-          mobile: newTenantForm.ownerPhone.trim() || '9876543210',
+          mobile: newTenantForm.ownerPhone.trim(),
         },
         'General Service',
         isPending,
         {
           name: newTenantForm.ownerName.trim(),
           email: newTenantForm.ownerEmail.trim(),
-          phone: newTenantForm.ownerPhone.trim() || '9876543210',
+          phone: newTenantForm.ownerPhone.trim(),
           password: newTenantForm.ownerPassword.trim() || '1234',
         }
       );

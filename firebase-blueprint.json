@@ -364,6 +364,20 @@
         "maxUses": { "type": "number" },
         "validUntil": { "type": "string" }
       }
+    },
+    "landingLeads": {
+      "title": "Landing Callback Lead",
+      "description": "Assisted onboarding callback requests submitted from the public landing page",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "business": { "type": "string" },
+        "phone": { "type": "string" },
+        "trade": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -454,6 +468,10 @@
     "coupons/{couponId}": {
       "schema": "coupons",
       "description": "Super Admin discount and promo coupons"
+    },
+    "landingLeads/{leadId}": {
+      "schema": "landingLeads",
+      "description": "Public landing page onboarding callback requests"
     }
   }
 }

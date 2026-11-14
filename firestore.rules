@@ -69,25 +69,65 @@ service cloud.firestore {
       allow update, delete: if isTenantOwner(tenantId) || isSuperAdmin();
     }
 
-    // Tenant Memberships
+    // Tenant Memberships (Hardened against cross-tenant membership spoofing)
     match /tenantMembers/{membershipId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        resource.data.userId == request.auth.uid ||
+        (resource.data.tenantId != null && isTenantMember(resource.data.tenantId))
+      );
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (
+          request.resource.data.role != 'super_admin' &&
+          (
+            (
+              request.resource.data.userId == request.auth.uid &&
+              request.resource.data.role == 'business_owner' &&
+              membershipId == (request.resource.data.tenantId + '_' + request.auth.uid) &&
+              (
+                !exists(/databases/$(database)/documents/tenants/$(request.resource.data.tenantId)) ||
+                get(/databases/$(database)/documents/tenants/$(request.resource.data.tenantId)).data.ownerId == request.auth.uid
+              )
+            ) ||
+            (
+              request.resource.data.tenantId != null &&
+              isTenantOwner(request.resource.data.tenantId)
+            )
+          )
+        )
+      );
       allow update, delete: if isSuperAdmin() || (
-        isAuthenticated() && resource.data.userId == request.auth.uid
+        isAuthenticated() && (
+          resource.data.userId == request.auth.uid ||
+          (resource.data.tenantId != null && isTenantOwner(resource.data.tenantId))
+        )
       );
     }
 
-    // Users Collection (Strict Tenant Isolation & Self-Profile Protection)
+    // Users Collection (Strict Tenant Isolation, Anti-Escalation & Self-Profile Protection)
     match /users/{userId} {
       allow read: if isUserSelf(userId) || isSuperAdmin() || (
         isAuthenticated() && resource.data.businessId != null && isTenantMember(resource.data.businessId)
       );
-      allow create: if isAuthenticated(); // Registration and admin-invited staff creation
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (
+          request.resource.data.role != 'super_admin' &&
+          (
+            request.auth.uid == userId ||
+            (request.resource.data.businessId != null && isTenantOwner(request.resource.data.businessId))
+          )
+        )
+      );
       allow update: if isSuperAdmin() || (
-        isUserSelf(userId) && request.resource.data.role == resource.data.role
+        isUserSelf(userId) &&
+        request.resource.data.role == resource.data.role
       ) || (
-        isAuthenticated() && resource.data.businessId != null && isTenantOwner(resource.data.businessId)
+        isAuthenticated() &&
+        resource.data.businessId != null &&
+        isTenantOwner(resource.data.businessId) &&
+        request.resource.data.role != 'super_admin'
       );
       allow delete: if isSuperAdmin() || (
         isAuthenticated() && resource.data.businessId != null && isTenantOwner(resource.data.businessId)
@@ -259,14 +299,12 @@ service cloud.firestore {
         isSuperAdmin()
       );
       allow create: if isAuthenticated() && (
-        request.resource.data.businessId == null ||
-        isTenantMember(request.resource.data.businessId) ||
-        isSuperAdmin()
+        isSuperAdmin() ||
+        (request.resource.data.businessId != null && isTenantMember(request.resource.data.businessId))
       );
       allow update, delete: if isAuthenticated() && (
-        resource.data.businessId == null ||
-        isTenantMember(resource.data.businessId) ||
-        isSuperAdmin()
+        isSuperAdmin() ||
+        (resource.data.businessId != null && isTenantMember(resource.data.businessId))
       );
     }
 
@@ -277,9 +315,8 @@ service cloud.firestore {
         isSuperAdmin()
       );
       allow create: if isAuthenticated() && (
-        request.resource.data.businessId == null ||
-        isTenantMember(request.resource.data.businessId) ||
-        isSuperAdmin()
+        isSuperAdmin() ||
+        (request.resource.data.businessId != null && isTenantMember(request.resource.data.businessId))
       );
       allow update, delete: if isSuperAdmin();
     }
@@ -435,6 +472,18 @@ service cloud.firestore {
     match /coupons/{couponId} {
       allow read: if isAuthenticated();
       allow write: if isSuperAdmin();
+    }
+
+    // Public Landing Page Assisted Onboarding Callback Leads (Write-only validated creation, readable only by Super Admin)
+    match /landingLeads/{leadId} {
+      allow create: if
+        request.resource.data.keys().hasAll(['id', 'name', 'business', 'phone', 'trade', 'createdAt']) &&
+        request.resource.data.keys().hasOnly(['id', 'name', 'business', 'phone', 'trade', 'createdAt', 'status']) &&
+        request.resource.data.name is string && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 120 &&
+        request.resource.data.business is string && request.resource.data.business.size() >= 2 && request.resource.data.business.size() <= 150 &&
+        request.resource.data.phone is string && request.resource.data.phone.size() >= 10 && request.resource.data.phone.size() <= 20 &&
+        request.resource.data.trade is string && request.resource.data.trade.size() >= 2 && request.resource.data.trade.size() <= 80;
+      allow read, update, delete: if isSuperAdmin();
     }
   }
 }

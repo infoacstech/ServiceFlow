@@ -166,7 +166,6 @@ interface AppContextType {
   setCurrentUser: (u: User | null) => void;
   isAuthInitializing: boolean;
   loginUser: (u: User, password?: string) => Promise<User>;
-  loginSandboxDemo: (role?: 'business_owner' | 'technician') => Promise<User>;
   logoutUser: () => Promise<void>;
   switchRole: (role: UserRole) => Promise<void>;
   switchBusiness: (businessId: string) => void;
@@ -314,7 +313,6 @@ interface AppContextType {
   toasts: ToastMessage[];
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   dismissToast: (id: string) => void;
-  resetDemoData: () => void;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
   language: AppLanguage;
@@ -679,13 +677,13 @@ export const GLOBAL_SUPER_ADMIN_BUSINESS: Business = {
   name: 'ServiFlow Global Network',
   type: 'Platform Management',
   logo: '',
-  mobile: '+91 90000 00000',
-  whatsapp: '+91 90000 00000',
+  mobile: '',
+  whatsapp: '',
   email: 'admin@serviflow.io',
-  address: 'Global Operations Centre',
-  city: 'New Delhi',
-  state: 'Delhi',
-  pin: '110001',
+  address: '',
+  city: '',
+  state: '',
+  pin: '',
   currency: '₹',
   createdAt: '2026-01-01',
   planId: 'plan-enterprise',
@@ -1878,8 +1876,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                       name: userRecord.name ? `${userRecord.name}'s Services` : 'My Service Business',
                       type: 'General Services',
                       email: userRecord.email,
-                      mobile: userRecord.phone || '+91 98765 43210',
-                      whatsapp: userRecord.phone || '+91 98765 43210',
+                      mobile: userRecord.phone || '',
+                      whatsapp: userRecord.phone || '',
                       address: '',
                       city: '',
                       state: '',
@@ -1926,8 +1924,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const autoUser: User = {
               id: firebaseUser.uid,
               name: firebaseUser.displayName || (isSuper ? 'SaaS Platform Admin' : 'Business Owner'),
-              email: targetEmail || 'owner@serviflow.io',
-              phone: firebaseUser.phoneNumber || '+91 98765 43210',
+              email: targetEmail || '',
+              phone: firebaseUser.phoneNumber || '',
               role: isSuper ? 'super_admin' : 'business_owner',
               businessId: isSuper ? 'all' : `tenant-${firebaseUser.uid}`,
               status: 'active',
@@ -2073,29 +2071,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err: any) {
       console.error('Error logging in user:', err);
       showToast(err.message || 'Login failed', 'error');
-      throw err;
-    }
-  };
-
-  const loginSandboxDemo = async (role: 'business_owner' | 'technician' = 'business_owner'): Promise<User> => {
-    try {
-      const { user, tenant } = await AuthService.loginSandboxDemo(role);
-      localStorage.setItem('serviflow_user_session', JSON.stringify(user));
-      localStorage.setItem('serviflow_logged_in_email', user.email);
-      localStorage.setItem('serviflow_logged_in_uid', user.id);
-      saveCache('serviflow_current_biz_cache', tenant);
-
-      const targetTab = role === 'technician' ? 'jobs' : 'dashboard';
-      localStorage.setItem('serviflow_active_tab', targetTab);
-      sessionStorage.setItem('serviflow_active_tab', targetTab);
-
-      setCurrentUser(user);
-      setCurrentBusiness(tenant);
-      showToast(`Welcome to ServiFlow Demo Sandbox!`, 'info');
-      return user;
-    } catch (err: any) {
-      console.error('Error starting demo session:', err);
-      showToast('Unable to start demo session. Please try again.', 'error');
       throw err;
     }
   };
@@ -2287,10 +2262,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const dismissToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  const resetDemoData = () => {
-    showToast('Data synchronized with latest cloud Firestore state.', 'info');
   };
 
   const logActivity = (
@@ -2903,8 +2874,8 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ownerData?: { name?: string; email?: string; phone?: string; password?: string }
   ) => {
     const newBizId = bData.id || `biz-${Date.now()}`;
-    const cleanEmail = (bData.email || ownerData?.email || 'contact@business.com').trim().toLowerCase();
-    const cleanMobile = (bData.mobile || ownerData?.phone || '+91 99999 88888').trim();
+    const cleanEmail = (bData.email || ownerData?.email || '').trim().toLowerCase();
+    const cleanMobile = (bData.mobile || ownerData?.phone || '').trim();
 
     if (cleanEmail === 'admin@serviflow.io' || cleanEmail === 'superadmin@serviflow.io') {
       showToast('Cannot use Platform Super Admin email to create a business tenant.', 'error');
@@ -2915,14 +2886,14 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: newBizId,
       name: bData.name || 'New Service Business',
       type: bData.type || 'CCTV & Security',
-      logo: bData.logo || 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&auto=format&fit=crop&q=80',
+      logo: bData.logo || '',
       mobile: cleanMobile,
       whatsapp: bData.whatsapp || cleanMobile,
       email: cleanEmail,
-      address: bData.address || 'Main Market Street',
-      city: bData.city || 'Delhi',
-      state: bData.state || 'Delhi',
-      pin: bData.pin || '110001',
+      address: bData.address || '',
+      city: bData.city || '',
+      state: bData.state || '',
+      pin: bData.pin || '',
       gstNumber: bData.gstNumber,
       currency: bData.currency || '₹',
       createdAt: new Date().toISOString().split('T')[0],
@@ -5371,10 +5342,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (currentUser?.id === userId) {
-      if (currentUser.isDemoSandbox) {
-        showToast('Password updated in Demo Sandbox session.', 'info');
-        return;
-      }
       if (!auth.currentUser) {
         throw new Error('Active authentication session required. Please log in again.');
       }
@@ -7213,7 +7180,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentUser,
         isAuthInitializing,
         loginUser,
-        loginSandboxDemo,
         logoutUser,
         switchRole,
         switchBusiness,
@@ -7258,7 +7224,6 @@ const AppContentProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toasts,
         showToast,
         dismissToast,
-        resetDemoData,
         theme,
         toggleTheme,
         logActivity,

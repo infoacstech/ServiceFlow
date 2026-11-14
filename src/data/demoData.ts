@@ -107,7 +107,7 @@ export const SUPER_ADMIN_USER: User = {
   id: 'usr-admin',
   name: 'SaaS Platform Admin',
   email: 'admin@serviflow.io',
-  phone: '+91 90000 00000',
+  phone: '',
   role: 'super_admin',
   businessId: 'all',
   status: 'active',

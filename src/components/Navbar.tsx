@@ -75,7 +75,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     markNotificationRead,
     setIsSearchOpen,
     setIsAuthModalOpen,
-    resetDemoData,
     theme,
     toggleTheme,
     setIsActivityLogOpen,

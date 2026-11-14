@@ -336,7 +336,7 @@ export const PhotoEvidenceUploader: React.FC<PhotoEvidenceUploaderProps> = ({
                 <div className="flex gap-1.5">
                   <input
                     type="url"
-                    placeholder="https://images.unsplash.com/..."
+                    placeholder="https://example.com/photo.jpg"
                     value={urlDraft}
                     onChange={(e) => setUrlDraft(e.target.value)}
                     className="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[11px] text-slate-900 dark:text-slate-100 focus:outline-hidden"

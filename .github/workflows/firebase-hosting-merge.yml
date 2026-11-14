@@ -19,3 +19,13 @@ jobs:
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_SERVICEFLOW_969F5 }}'
           channelId: live
           projectId: serviceflow-969f5
+      - name: Deploy Firestore Rules
+        continue-on-error: true
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SERVICEFLOW_969F5 }}
+        run: |
+          if [ -n "$SA_JSON" ]; then
+            printf '%s' "$SA_JSON" > /tmp/firebase-sa.json
+            GOOGLE_APPLICATION_CREDENTIALS=/tmp/firebase-sa.json npx -y firebase-tools deploy --only firestore:rules --project serviceflow-969f5 --non-interactive
+            rm -f /tmp/firebase-sa.json
+          fi

@@ -73,28 +73,20 @@ async function startServer() {
   // Gemini AI Assistant Endpoint
   app.post("/api/ai/assistant", async (req, res) => {
     try {
-      const { prompt, businessContext, isDemoSandbox } = req.body;
+      const { prompt, businessContext } = req.body;
       if (!prompt) {
         return res.status(400).json({ error: "Prompt is required" });
       }
 
       const isAuthorized = await verifyFirebaseBearerToken(req.headers.authorization);
       if (!isAuthorized) {
-        if (isDemoSandbox) {
-          const ctx = businessContext || {};
-          return res.json({
-            response: `Demo Sandbox Snapshot for ${ctx.businessName || "Your Business"}:\n- Active Jobs: ${ctx.totalJobsCount ?? 0} (${ctx.pendingJobsCount ?? 0} pending)\n- Unpaid Invoices: ${ctx.unpaidInvoicesCount ?? 0} of ${ctx.totalInvoicesCount ?? 0}\n- Low Stock Parts: ${ctx.lowStockItemsCount ?? 0}\nSign in with a verified business account for live AI analysis.`,
-            isDemo: true,
-          });
-        }
         return res.status(401).json({ error: "Unauthorized: Valid user session required." });
       }
 
       const client = getGeminiClient();
       if (!client) {
-        return res.json({
-          response: "AI Assistant is currently in preview/offline mode. Please configure GEMINI_API_KEY in Settings > Secrets to unlock live AI business insights.",
-          isDemo: true,
+        return res.status(503).json({
+          error: "AI Assistant requires GEMINI_API_KEY to be configured on the server.",
         });
       }
 
@@ -116,7 +108,7 @@ ${JSON.stringify(businessContext || {}, null, 2)}`;
       });
 
       const text = response.text || "No insights generated.";
-      return res.json({ response: text, isDemo: false });
+      return res.json({ response: text });
     } catch (error: any) {
       console.error("Gemini API Error:", error);
       return res.status(500).json({
@@ -129,29 +121,26 @@ ${JSON.stringify(businessContext || {}, null, 2)}`;
   // AI Route Optimization Endpoint
   app.post("/api/ai/optimize-route", async (req, res) => {
     try {
-      const { technician, startLocation, jobs, date, isDemoSandbox } = req.body;
+      const { technician, startLocation, jobs, date } = req.body;
       if (!jobs || !Array.isArray(jobs) || jobs.length === 0) {
         return res.status(400).json({ error: "Jobs list is required for route optimization" });
       }
 
       const isAuthorized = await verifyFirebaseBearerToken(req.headers.authorization);
       if (!isAuthorized) {
-        if (isDemoSandbox) {
-          const fallback = buildHeuristicRoute(startLocation || "Central Service Operations Hub", jobs);
-          return res.json({ ...fallback, isDemo: true });
-        }
         return res.status(401).json({ error: "Unauthorized: Valid user session required." });
       }
 
       const client = getGeminiClient();
       if (!client) {
-        const fallback = buildHeuristicRoute(startLocation || "Central Service Operations Hub", jobs);
-        return res.json({ ...fallback, isDemo: true });
+        return res.status(503).json({
+          error: "Route Optimization AI requires GEMINI_API_KEY to be configured on the server.",
+        });
       }
 
       const prompt = `You are an AI Field Logistics & Route Dispatch Specialist for field technicians.
 Optimize the following job sequence for technician "${technician?.name || 'Field Technician'}" on date "${date || 'Today'}".
-Start & End Base Hub: "${startLocation || 'Central Operations Hub, Sector 62, Noida'}"
+Start & End Base Hub: "${startLocation || ''}"
 
 Assigned Jobs to optimize:
 ${JSON.stringify(jobs, null, 2)}
@@ -165,27 +154,24 @@ Instructions:
 Return ONLY a strictly valid JSON object (no markdown code blocks, no backticks, no wrapper text):
 {
   "summary": "Short 2-sentence explanation of why this sequence is optimal and how much fuel/time it saves.",
-  "totalDistanceKm": 28.4,
-  "totalTravelTimeMins": 45,
-  "distanceSavedKm": 14.2,
-  "timeSavedMins": 35,
-  "estimatedCarbonSavedKg": 3.8,
+  "totalDistanceKm": 0,
+  "totalTravelTimeMins": 0,
+  "distanceSavedKm": 0,
+  "timeSavedMins": 0,
+  "estimatedCarbonSavedKg": 0,
   "optimizedSequence": [
     {
       "id": "job-id",
-      "jobId": "JOB-2026-101",
+      "jobId": "JOB-ID",
       "seq": 1,
       "estimatedArrival": "09:25 AM",
       "estimatedDurationMins": 60,
-      "distanceFromPrevKm": 6.2,
-      "travelTimeFromPrevMins": 15,
-      "notes": "Optimal first stop along Sector 62 corridor."
+      "distanceFromPrevKm": 0,
+      "travelTimeFromPrevMins": 0,
+      "notes": "Priority dispatch note"
     }
   ],
-  "recommendations": [
-    "Pre-call customer 15 mins prior to arrival",
-    "Ensure 50m Cat6 cable in van for stop #2"
-  ]
+  "recommendations": []
 }`;
 
       const response = await client.models.generateContent({
@@ -200,11 +186,13 @@ Return ONLY a strictly valid JSON object (no markdown code blocks, no backticks,
       const text = response.text || "{}";
       const cleanedText = text.replace(/```json/g, "").replace(/```/g, "").trim();
       const parsed = JSON.parse(cleanedText);
-      return res.json({ ...parsed, isDemo: false });
+      return res.json(parsed);
     } catch (error: any) {
       console.error("AI Route Optimization Error:", error);
-      const fallback = buildHeuristicRoute(req.body.startLocation || "Central Operations Hub", req.body.jobs || []);
-      return res.json({ ...fallback, isDemo: true, error: error?.message });
+      return res.status(500).json({
+        error: "Failed to optimize route",
+        details: error?.message || String(error),
+      });
     }
   });
 
@@ -226,69 +214,6 @@ Return ONLY a strictly valid JSON object (no markdown code blocks, no backticks,
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`ServiFlow SaaS Server running on http://0.0.0.0:${PORT}`);
   });
-}
-
-function buildHeuristicRoute(startLocation: string, jobs: any[]) {
-  // Sort jobs by priority first (urgent -> high -> medium -> low), then maintain clean ordering
-  const priorityMap: Record<string, number> = { urgent: 1, high: 2, medium: 3, low: 4 };
-  const sorted = [...jobs].sort((a, b) => {
-    const pA = priorityMap[a.priority] || 3;
-    const pB = priorityMap[b.priority] || 3;
-    return pA - pB;
-  });
-
-  let currentMinutes = 9 * 60 + 15; // Start at 9:15 AM
-  let totalDist = 0;
-  let totalTravelMins = 0;
-
-  const sequence = sorted.map((job, idx) => {
-    const dist = Math.round((4.5 + idx * 3.2) * 10) / 10;
-    const travelTime = Math.round(dist * 2.2);
-    currentMinutes += travelTime;
-
-    const hours = Math.floor(currentMinutes / 60);
-    const mins = currentMinutes % 60;
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    const displayHour = hours % 12 === 0 ? 12 : hours % 12;
-    const timeStr = `${displayHour < 10 ? '0' + displayHour : displayHour}:${mins < 10 ? '0' + mins : mins} ${ampm}`;
-
-    // Add job duration (approx 60 mins)
-    currentMinutes += 60;
-
-    totalDist += dist;
-    totalTravelMins += travelTime;
-
-    return {
-      id: job.id,
-      jobId: job.jobId || `JOB-${100 + idx}`,
-      seq: idx + 1,
-      estimatedArrival: timeStr,
-      estimatedDurationMins: 60,
-      distanceFromPrevKm: dist,
-      travelTimeFromPrevMins: travelTime,
-      notes: idx === 0 
-        ? `First priority stop from ${startLocation.split(',')[0]}` 
-        : `Clustered stop #${idx + 1} to minimize driving time`,
-    };
-  });
-
-  const distSaved = Math.round(totalDist * 0.35 * 10) / 10;
-  const timeSaved = Math.round(totalTravelMins * 0.38);
-
-  return {
-    summary: `Geographically re-ordered ${jobs.length} jobs to prioritize high-urgency sites while minimizing total driving distance along major corridors.`,
-    totalDistanceKm: Math.round(totalDist * 10) / 10,
-    totalTravelTimeMins: totalTravelMins,
-    distanceSavedKm: distSaved,
-    timeSavedMins: timeSaved,
-    estimatedCarbonSavedKg: Math.round(distSaved * 0.22 * 10) / 10,
-    optimizedSequence: sequence,
-    recommendations: [
-      "Contact customer 15 minutes before arrival for gate access",
-      "Keep standard crimping kit & spare Patch cables ready in service vehicle",
-      "Consolidate parts inventory check at start of route"
-    ],
-  };
 }
 
 startServer().catch((err) => {

@@ -322,7 +322,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
       return;
     }
 
-    if (!currentUser.isDemoSandbox && !emailVerifyPassword.trim()) {
+    if (!emailVerifyPassword.trim()) {
       setEmailUpdateError('Please enter your current password to verify your identity.');
       return;
     }
@@ -331,7 +331,7 @@ export const UserProfileDrawer: React.FC<UserProfileDrawerProps> = ({
     setEmailUpdateError('');
 
     try {
-      if (!currentUser.isDemoSandbox && auth.currentUser?.email) {
+      if (auth.currentUser?.email) {
         const credential = EmailAuthProvider.credential(
           auth.currentUser.email,
           emailVerifyPassword.trim()

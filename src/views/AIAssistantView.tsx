@@ -42,7 +42,6 @@ export const AIAssistantView: React.FC = () => {
         headers,
         body: JSON.stringify({
           prompt: q,
-          isDemoSandbox: Boolean(currentBusiness?.isDemoSandbox || currentUser?.isDemoSandbox),
           businessContext: {
             businessName: currentBusiness.name,
             businessType: currentBusiness.type,
@@ -65,12 +64,12 @@ export const AIAssistantView: React.FC = () => {
         ...prev,
         { role: 'assistant', content: data.response || data.reply || 'Analysis complete.' },
       ]);
-    } catch (err) {
+    } catch (err: any) {
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: `Here is an operational snapshot for ${currentBusiness.name}:\n- Total Active Jobs: ${jobs.length}\n- Pending Unpaid Invoices: ${invoices.filter((i) => i.balanceAmount > 0).length}\n- Low Stock Parts: ${inventory.filter((i) => i.currentStock <= i.minStock).length}`,
+          content: err?.message || 'Unable to reach AI Assistant right now. Please try again shortly.',
         },
       ]);
     } finally {

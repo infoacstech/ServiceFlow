@@ -147,14 +147,14 @@ export class AuthService {
       type: effectiveType,
       serviceDomain: effectiveServiceDomain,
       customServiceName: customName,
-      logo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&auto=format&fit=crop&q=80',
-      mobile: phone || '+91 98765 00000',
-      whatsapp: phone || '+91 98765 00000',
+      logo: '',
+      mobile: phone || '',
+      whatsapp: phone || '',
       email: email,
-      address: 'Main Service Hub',
-      city: params.city || 'New Delhi',
-      state: params.state || 'Delhi',
-      pin: '110001',
+      address: '',
+      city: params.city || '',
+      state: params.state || '',
+      pin: '',
       currency: params.currency || '₹',
       createdAt: today,
       planId: 'plan-pro',
@@ -176,14 +176,14 @@ export class AuthService {
       id: uid,
       name: name,
       email: email,
-      phone: phone.startsWith('+') ? phone : `+91 ${phone}`,
+      phone: phone ? (phone.startsWith('+') ? phone : `+91 ${phone}`) : '',
       role: 'business_owner',
       businessId: tenantId,
       status: 'active',
       approvalStatus: 'active',
       joiningDate: today,
       requestedDate: today,
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+      avatar: '',
       referralCode: newReferralCode,
     };
 
@@ -429,7 +429,7 @@ export class AuthService {
       skills: params.skills && params.skills.length > 0 ? params.skills : ['General Field Service'],
       joiningDate: today,
       requestedDate: today,
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
+      avatar: '',
     };
 
     const membershipId = `${params.businessId}_${uid}`;
@@ -667,14 +667,14 @@ export class AuthService {
         id: 'all',
         name: 'ServiFlow Global Network',
         type: 'Platform Management',
-        logo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&auto=format&fit=crop&q=80',
-        mobile: '+91 90000 00000',
-        whatsapp: '+91 90000 00000',
+        logo: '',
+        mobile: '',
+        whatsapp: '',
         email: 'admin@serviflow.io',
-        address: 'Global Operations Centre',
-        city: 'New Delhi',
-        state: 'Delhi',
-        pin: '110001',
+        address: '',
+        city: '',
+        state: '',
+        pin: '',
         currency: '₹',
         createdAt: new Date().toISOString().split('T')[0],
         planId: 'plan-enterprise',
@@ -724,14 +724,14 @@ export class AuthService {
           id: user.businessId,
           name: defaultBizName,
           type: 'CCTV & Security',
-          logo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&auto=format&fit=crop&q=80',
-          mobile: user.phone || '+91 99999 88888',
-          whatsapp: user.phone || '+91 99999 88888',
+          logo: '',
+          mobile: user.phone || '',
+          whatsapp: user.phone || '',
           email: user.email || targetEmail,
-          address: 'Main Service Office',
-          city: 'Delhi',
-          state: 'Delhi',
-          pin: '110001',
+          address: '',
+          city: '',
+          state: '',
+          pin: '',
           currency: '₹',
           createdAt: new Date().toISOString().split('T')[0],
           planId: 'plan-pro',
@@ -792,54 +792,6 @@ export class AuthService {
   static async sendPasswordReset(email: string): Promise<void> {
     const cleanEmail = email.trim().toLowerCase();
     await sendPasswordResetEmail(auth, cleanEmail);
-  }
-
-  /**
-   * Secure, isolated sandbox demonstration environment.
-   * Completely isolated from production customer and business data.
-   * Super Admin is strictly forbidden from demo access.
-   */
-  static async loginSandboxDemo(role: 'business_owner' | 'technician' = 'business_owner'): Promise<{
-    user: User;
-    tenant: Business;
-    membership?: TenantMembership;
-  }> {
-    const isTech = role === 'technician';
-    const sandboxTenantId = 'tenant-demo-sandbox';
-
-    const user: User = {
-      id: isTech ? 'usr-sandbox-tech' : 'usr-sandbox-owner',
-      name: isTech ? 'Demo Service Technician' : 'Demo Business Owner',
-      email: isTech ? 'demo.tech@serviflow.sandbox' : 'demo.owner@serviflow.sandbox',
-      phone: '+91 98000 00000',
-      role: isTech ? 'technician' : 'business_owner',
-      businessId: sandboxTenantId,
-      status: 'active',
-      approvalStatus: 'active',
-      joiningDate: new Date().toISOString().split('T')[0],
-      isDemoSandbox: true,
-    };
-
-    const tenant: Business = {
-      id: sandboxTenantId,
-      name: 'Demo Field Services (Sandbox)',
-      type: 'Air Conditioning & Refrigeration',
-      logo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=150&auto=format&fit=crop&q=80',
-      mobile: '+91 98000 00000',
-      whatsapp: '+91 98000 00000',
-      email: 'demo@serviflow.sandbox',
-      address: '123 Tech Park, Phase 1',
-      city: 'Mumbai',
-      state: 'Maharashtra',
-      pin: '400001',
-      currency: '₹',
-      createdAt: new Date().toISOString().split('T')[0],
-      planId: 'plan-pro',
-      status: 'active',
-      isDemoSandbox: true,
-    };
-
-    return { user, tenant };
   }
 
   /**

@@ -84,7 +84,13 @@ const MainContent: React.FC = () => {
     closeTrialExpiredModal,
   } = useApp();
   const [activeTab, setActiveTab] = useState<string>(() => {
-    const raw = localStorage.getItem('serviflow_active_tab') || sessionStorage.getItem('serviflow_active_tab') || 'dashboard';
+    const urlTab =
+      typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null;
+    const raw =
+      urlTab ||
+      localStorage.getItem('serviflow_active_tab') ||
+      sessionStorage.getItem('serviflow_active_tab') ||
+      'dashboard';
     if (raw === 'super_admin' || raw.startsWith('super_admin_')) {
       try {
         const savedSession = localStorage.getItem('serviflow_user_session');
@@ -266,7 +272,12 @@ const MainContent: React.FC = () => {
     // Session synchronization when user identity changes
     if (prevUserIdRef.current !== currentUser.id) {
       prevUserIdRef.current = currentUser.id;
-      const rawSavedTab = localStorage.getItem('serviflow_active_tab') || sessionStorage.getItem('serviflow_active_tab');
+      const urlShortcutTab =
+        typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null;
+      const rawSavedTab =
+        urlShortcutTab ||
+        localStorage.getItem('serviflow_active_tab') ||
+        sessionStorage.getItem('serviflow_active_tab');
 
       let defaultTargetTab: string;
       if (isTechUser) {

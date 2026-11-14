@@ -61,21 +61,19 @@ export const JobCompletionModal: React.FC<JobCompletionModalProps> = ({
 
   // Form states
   const [problemFound, setProblemFound] = useState(
-    job.problemFound || job.notes || 'Routine check & maintenance'
+    job.problemFound || job.notes || ''
   );
   const [solutionProvided, setSolutionProvided] = useState(
-    job.solutionProvided || 'Repaired faulty parts, tested circuits and verified normal functionality with client.'
+    job.solutionProvided || ''
   );
   const [selectedMaterials, setSelectedMaterials] = useState<
     { inventoryId: string; quantity: number }[]
   >([]);
   const [beforePhoto, setBeforePhoto] = useState<string>(
-    job.beforePhotos?.[0] ||
-      'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=500&auto=format&fit=crop&q=80'
+    job.beforePhotos?.[0] || ''
   );
   const [afterPhoto, setAfterPhoto] = useState<string>(
-    job.afterPhotos?.[0] ||
-      'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=500&auto=format&fit=crop&q=80'
+    job.afterPhotos?.[0] || ''
   );
   const [rating, setRating] = useState<number>(job.customerRating || 5);
   const [signature, setSignature] = useState<string>(job.customerSignature || '');

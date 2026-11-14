@@ -10,6 +10,8 @@ import {
   Sun,
   Moon,
 } from 'lucide-react';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { useApp } from '../context/AppContext';
 import { BrandLogo } from '../components/BrandLogo';
 import { calculateAnnualPricing } from '../utils/planUtils';
@@ -210,7 +212,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
     });
   }, [activePlans]);
 
-  const handleLeadSubmit = (e: React.FormEvent) => {
+  const handleLeadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = leadName.trim();
     const cleanBusiness = leadBusiness.trim();
@@ -231,19 +233,32 @@ export const LandingView: React.FC<LandingViewProps> = ({
 
     setLeadError(null);
     setLeadSubmitted(true);
+
+    const leadId = `lead-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const leadPayload = {
+      id: leadId,
+      name: cleanName.slice(0, 120),
+      business: cleanBusiness.slice(0, 150),
+      phone: cleanPhoneDigits.slice(0, 20),
+      trade: leadTrade.slice(0, 80),
+      status: 'new',
+      createdAt: new Date().toISOString(),
+    };
+
     try {
       const existing = JSON.parse(localStorage.getItem('serviflow_landing_leads') || '[]');
-      existing.unshift({
-        name: cleanName,
-        business: cleanBusiness,
-        phone: cleanPhoneDigits,
-        trade: leadTrade,
-        createdAt: new Date().toISOString(),
-      });
+      existing.unshift(leadPayload);
       localStorage.setItem('serviflow_landing_leads', JSON.stringify(existing.slice(0, 20)));
     } catch {
       // ignore storage quota errors
     }
+
+    try {
+      await setDoc(doc(db, 'landingLeads', leadId), leadPayload);
+    } catch {
+      // fallback already saved locally if offline or rules pending deployment
+    }
+
     showToast('Callback request saved! You can also start your 14-day trial right away.', 'success');
   };
 

@@ -259,7 +259,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
 
     setIsUpdatingPassword(true);
     try {
-      if (!currentUser.isDemoSandbox && auth.currentUser?.email) {
+      if (auth.currentUser?.email) {
         if (!cleanCurrent) {
           showToast('Please enter your current password to verify your identity', 'error');
           setIsUpdatingPassword(false);
@@ -2310,19 +2310,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialTab }) => {
           )}
 
           <form onSubmit={handlePasswordChange} className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-            {!currentUser?.isDemoSandbox && (
-              <div>
-                <label className="font-semibold block mb-1">Current Password *</label>
-                <input
-                  type="password"
-                  required
-                  value={currentPassInput}
-                  onChange={(e) => setCurrentPassInput(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 dark:border-slate-700 font-medium"
-                />
-              </div>
-            )}
+            <div>
+              <label className="font-semibold block mb-1">Current Password *</label>
+              <input
+                type="password"
+                required
+                value={currentPassInput}
+                onChange={(e) => setCurrentPassInput(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-3 py-2 rounded-xl border bg-slate-50 dark:bg-slate-800 dark:border-slate-700 font-medium"
+              />
+            </div>
 
             <div>
               <label className="font-semibold block mb-1">New Password (Min 6 chars) *</label>

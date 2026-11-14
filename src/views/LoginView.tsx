@@ -53,7 +53,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const {
     users,
     loginUser,
-    loginSandboxDemo,
     businesses,
     switchRole,
     currentUser,
@@ -359,24 +358,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
     } catch (err: any) {
       console.error('Sign in error:', err);
       const errMsg = err?.message || t('auth.invalidCredentials', undefined, 'Invalid login credentials. Please check your email/mobile and password.');
-      setLoginError(errMsg);
-      showToast(errMsg, 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Dedicated, isolated sandbox demonstration environment
-  const handleTryDemo = async () => {
-    setIsSubmitting(true);
-    setLoginError(null);
-    try {
-      await loginSandboxDemo('business_owner');
-      sessionStorage.setItem('serviflow_active_tab', 'dashboard');
-      if (onLoginSuccess) onLoginSuccess();
-    } catch (err: any) {
-      console.error('Error starting demo session:', err);
-      const errMsg = t('auth.demoError', undefined, 'Unable to start demo session. Please try again.');
       setLoginError(errMsg);
       showToast(errMsg, 'error');
     } finally {
@@ -777,32 +758,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </form>
 
               {/* Separator */}
-              <div className="relative my-2">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200 dark:border-slate-800" />
-                </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="bg-white dark:bg-slate-900 px-3 text-slate-400 font-medium">
-                    {t('auth.or', undefined, 'or')}
-                  </span>
-                </div>
-              </div>
-
-              {/* Production-Safe Isolated Demo Sandbox Action */}
-              <div className="space-y-1.5">
-                <button
-                  type="button"
-                  onClick={handleTryDemo}
-                  disabled={isSubmitting}
-                  className="w-full min-h-[44px] py-2.5 px-4 rounded-xl sm:rounded-2xl border border-purple-200 dark:border-purple-800/60 bg-purple-50/60 dark:bg-purple-950/30 hover:bg-purple-100/70 dark:hover:bg-purple-950/60 text-purple-900 dark:text-purple-200 text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                >
-                  <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
-                  <span>{t('auth.tryDemo', undefined, 'Try Demo (Sandbox)')}</span>
-                </button>
-                <p className="text-[11px] text-center text-slate-400 dark:text-slate-500 leading-tight">
-                  {t('auth.tryDemoSubtitle', undefined, 'Explore field operations with sample data in an isolated sandbox')}
-                </p>
-              </div>
             </div>
           )}
 

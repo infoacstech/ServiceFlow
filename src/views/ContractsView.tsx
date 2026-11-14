@@ -72,6 +72,7 @@ export const ContractsView: React.FC = () => {
   const [editingContract, setEditingContract] = useState<RecurringContract | null>(null);
   const [isBatchSchedulerOpen, setIsBatchSchedulerOpen] = useState(false);
   const [dispatchModalContract, setDispatchModalContract] = useState<RecurringContract | null>(null);
+  const [deletingContract, setDeletingContract] = useState<RecurringContract | null>(null);
 
   // Single Visit Dispatch Form State
   const [dispatchDate, setDispatchDate] = useState(new Date().toISOString().split('T')[0]);
@@ -797,9 +798,7 @@ export const ContractsView: React.FC = () => {
                                 type="button"
                                 onClick={() => {
                                   setOpenMenuId(null);
-                                  if (window.confirm(`Are you sure you want to remove contract ${contract.contractNumber}?`)) {
-                                    deleteContract(contract.id);
-                                  }
+                                  setDeletingContract(contract);
                                 }}
                                 className="w-full px-3.5 py-2 text-left hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-semibold flex items-center gap-2"
                               >
@@ -1050,11 +1049,7 @@ export const ContractsView: React.FC = () => {
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
-                              if (window.confirm(`Are you sure you want to remove contract ${contract.contractNumber}?`)) {
-                                deleteContract(contract.id);
-                              }
-                            }}
+                            onClick={() => setDeletingContract(contract)}
                             className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
                             title="Delete Contract"
                           >
@@ -1564,6 +1559,45 @@ export const ContractsView: React.FC = () => {
                 className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md cursor-pointer"
               >
                 {editingContract ? 'Update Contract' : 'Save AMC Contract'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete AMC Contract Confirmation Modal */}
+      {deletingContract && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">
+                  Delete AMC Contract?
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Are you sure you want to remove contract <strong className="text-slate-900 dark:text-slate-200">{deletingContract.contractNumber}</strong> ({deletingContract.name})? This cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setDeletingContract(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteContract(deletingContract.id);
+                  setDeletingContract(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer"
+              >
+                Delete Contract
               </button>
             </div>
           </div>

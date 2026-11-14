@@ -36,6 +36,7 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isModified, setIsModified] = useState(false);
+  const [isConfirmingClear, setIsConfirmingClear] = useState(false);
 
   // Sync initial content from job record
   useEffect(() => {
@@ -75,10 +76,9 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
   };
 
   const handleClear = () => {
-    if (window.confirm('Clear current notes for this job?')) {
-      setNotes('');
-      setIsModified(true);
-    }
+    setNotes('');
+    setIsModified(true);
+    setIsConfirmingClear(false);
   };
 
   const handleCopy = () => {
@@ -132,14 +132,33 @@ export const VoiceNotesRecorder: React.FC<VoiceNotesRecorderProps> = ({
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
-              <button
-                type="button"
-                onClick={handleClear}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                title="Clear notes"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              {!isConfirmingClear ? (
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmingClear(true)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                  title="Clear notes"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    className="px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold cursor-pointer"
+                  >
+                    Confirm Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmingClear(false)}
+                    className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>

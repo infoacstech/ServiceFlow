@@ -341,7 +341,7 @@ export const sendInvoiceWhatsAppReminder = (
 ${invoice.notes ? `\n📝 *विवरण:* ${invoice.notes}` : ''}
 
 💳 *भुगतान विकल्प:*
-• *Google Pay / PhonePe / Paytm / UPI:* ${business?.mobile || '9999999999'}
+• *Google Pay / PhonePe / Paytm / UPI:* ${business?.mobile || business?.whatsapp || upiId || 'Contact support desk'}
 ${business?.gstNumber ? `• *GSTIN:* ${business.gstNumber}` : ''}
 ${upiLink ? `📲 *त्वरित UPI भुगतान लिंक:* ${upiLink}\n` : ''}
 _कृपया ${invoice.dueDate} से पहले भुगतान सुनिश्चित करें। धन्यवाद!_`;
@@ -363,7 +363,7 @@ _कृपया ${invoice.dueDate} से पहले भुगतान स�
 ${invoice.notes ? `\n📝 *टीप:* ${invoice.notes}` : ''}
 
 💳 *पेमेंट पर्याय:*
-• *Google Pay / PhonePe / Paytm / UPI:* ${business?.mobile || '9999999999'}
+• *Google Pay / PhonePe / Paytm / UPI:* ${business?.mobile || business?.whatsapp || upiId || 'Contact support desk'}
 ${business?.gstNumber ? `• *GSTIN:* ${business.gstNumber}` : ''}
 ${upiLink ? `📲 *तातडीची UPI पेमेंट लिंक:* ${upiLink}\n` : ''}
 _कृपया ${invoice.dueDate} पूर्वी पेमेंट करावे. धन्यवाद!_`;
@@ -385,7 +385,7 @@ Here is the invoice for your recent service with *${business?.name || 'us'}*.
 ${invoice.notes ? `\n📝 *Notes:* ${invoice.notes}` : ''}
 
 💳 *Payment Options:*
-• *Google Pay / PhonePe / Paytm / UPI:* ${business?.mobile || '9999999999'}
+• *Google Pay / PhonePe / Paytm / UPI:* ${business?.mobile || business?.whatsapp || upiId || 'Contact support desk'}
 ${business?.gstNumber ? `• *GSTIN:* ${business.gstNumber}` : ''}
 ${upiLink ? `📲 *Instant UPI Pay Link:* ${upiLink}\n` : ''}
 _Kindly arrange the payment before ${invoice.dueDate}. Thank you!_`;

@@ -105,14 +105,14 @@ export const QuickActionFab: React.FC<QuickActionFabProps> = ({
           name: tenantForm.businessName.trim(),
           type: tenantForm.industryType,
           email: tenantForm.ownerEmail.trim(),
-          mobile: tenantForm.ownerPhone.trim() || '+91 98765 00000',
+          mobile: tenantForm.ownerPhone.trim(),
         },
         'General Service',
         isPending,
         {
           name: tenantForm.ownerName.trim(),
           email: tenantForm.ownerEmail.trim(),
-          phone: tenantForm.ownerPhone.trim() || '+91 98765 00000',
+          phone: tenantForm.ownerPhone.trim(),
           password: tenantForm.ownerPassword.trim() || 'ServiFlow@123',
         }
       );
